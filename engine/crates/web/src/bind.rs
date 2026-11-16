@@ -67,124 +67,6 @@ pub async fn open_stage(canvas: web_sys::HtmlCanvasElement, width: u32, height: 
 	open(Canvas::Element(canvas), width, height, backend, low_memory).await
 }
 
-/// Copy a picture into texture `id`, made the picture's size (or `size`), and let the picture go.
-/// `from_canvas`: it is a canvas's `transferToImageBitmap` (a tile), not a `createImageBitmap`.
-/// No texture is made bigger than the device's picture limit: a bigger picture (the page resizes
-/// them first, so it should not come) keeps what fits, and says so. A picture with nothing in it
-/// (closed, or transferred away) is not copied (`copy_extent`), and the answer is false.
-/// Copy a bitmap into texture `id`, and close it, unless `keep` (it is handed on to the page after).
-fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool) -> bool {
-	copy_in_keep(gpu, id, bitmap, size, from_canvas, false)
-}
-
-fn copy_in_keep(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool, keep: bool) -> bool {
-	copy_in_as(gpu, id, bitmap, size, from_canvas, keep, false)
-}
-
-/// As `copy_in_keep`; `levels`: a picture, kept with its smaller sizes, made on the GPU after the copy.
-fn copy_in_as(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool, keep: bool, levels: bool) -> bool {
-	let Some(_) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (u32::MAX, u32::MAX)) else {
-		web_sys::console::warn_1(&"stage: a picture with nothing in it (closed, or sent elsewhere) was not copied".into());
-		return false;
-	};
-	let cap = gpu.limits().max_picture();
-	let (w, h) = size.unwrap_or((bitmap.width().max(1), bitmap.height().max(1)));
-	let (w, h) = (w.min(cap), h.min(cap));
-	if bitmap.width() > w || bitmap.height() > h {
-		web_sys::console::warn_1(&format!("stage: a {}×{} picture is over the {cap}-pixel limit: only {w}×{h} of it is kept", bitmap.width(), bitmap.height()).into());
-	}
-	if levels {
-		gpu.picture_texture(id, w, h);
-	} else if gpu.texture_handle(id).is_none_or(|t| t.width() != w || t.height() != h || t.mip_level_count() != 1) {
-		gpu.texture(id, TextureKind::Color, w, h, None);
-	}
-	let texture = gpu.texture_handle(id).expect("just made").clone();
-	let (cw, ch) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (w, h)).expect("not empty, checked above");
-	gpu.copy_bitmap(bitmap, &texture, cw, ch, from_canvas);
-	if levels {
-		gpu.fill_levels(id);
-	}
-	if !keep {
-		bitmap.close();
-	}
-	true
-}
-
-
-/// The app's markdown reader, a JavaScript function from a card's source to its blocks as JSON.
-fn reader(read: js_sys::Function) -> Box<dyn Fn(&str) -> Option<Vec<stage_text::markdown::Block>>> {
-	Box::new(move |source: &str| {
-		let out = read.call1(&JsValue::NULL, &JsValue::from_str(source)).ok()?;
-		stage_text::markdown::from_json(&out.as_string()?).ok()
-	})
-}
-
-/// The app's typesetter (`math.ts`): TeX and whether it is a display formula in, the formula's
-/// outlines as JSON out, or null.
-fn typesetter(typeset: js_sys::Function) -> Box<dyn Fn(&str, bool) -> Option<stage_text::math::Formula>> {
-	Box::new(move |tex: &str, display: bool| {
-		let out = typeset.call2(&JsValue::NULL, &JsValue::from_str(tex), &JsValue::from_bool(display)).ok()?;
-		serde_json::from_str(&out.as_string()?).ok()
-	})
-}
-
-fn icon_shape(json: &str) -> Option<stage_paint::painter::IconShape> {
-	serde_json::from_str(json).ok()
-}
-
-fn parse_edits(json: &str) -> Result<Vec<stage_doc::edits::Edit>, String> {
-	let list: Vec<serde_json::Value> = serde_json::from_str(json).map_err(|e| e.to_string())?;
-	list.iter().map(stage_doc::edits::Edit::from_json).collect()
-}
-
-/// A gesture's previews from the app's `PenPreview`s: a size, a corner and fields become fields.
-fn previews(json: &str) -> Option<Vec<(String, crate::engine::Preview)>> {
-	let list: Vec<(String, serde_json::Value)> = serde_json::from_str(json).ok()?;
-	Some(
-		list.into_iter()
-			.map(|(id, p)| {
-				let n = |k: &str| p.get(k).and_then(serde_json::Value::as_f64);
-				let mut set: Vec<(String, Option<serde_json::Value>)> = Vec::new();
-				if let Some(w) = n("w") {
-					set.push(("width".into(), Some(w.into())));
-				}
-				if let Some(h) = n("h") {
-					set.push(("height".into(), Some(h.into())));
-				}
-				match p.get("radius") {
-					Some(serde_json::Value::Null) => set.push(("cornerRadius".into(), None)),
-					Some(r) if r.is_number() => set.push(("cornerRadius".into(), Some(r.clone()))),
-					_ => {}
-				}
-				if let Some(serde_json::Value::Object(fields)) = p.get("set") {
-					for (k, v) in fields {
-						set.push((k.clone(), if v.is_null() { None } else { Some(v.clone()) }));
-					}
-				}
-				(id, crate::engine::Preview { dx: n("dx").unwrap_or(0.0), dy: n("dy").unwrap_or(0.0), set })
-			})
-			.collect(),
-	)
-}
-
-fn view_state(json: &str) -> crate::engine::ViewState {
-	let v: serde_json::Value = serde_json::from_str(json).unwrap_or_default();
-	let set = |k: &str| v.get(k).and_then(|a| a.as_array()).map(|a| a.iter().filter_map(|s| s.as_str().map(str::to_owned)).collect()).unwrap_or_default();
-	let scrolls = v.get("scrolls").and_then(|s| s.as_object()).map(|m| m.iter().filter_map(|(k, x)| Some((k.clone(), x.as_f64()?))).collect()).unwrap_or_default();
-	crate::engine::ViewState { hidden: set("hidden"), mute: set("mute"), holes: set("holes"), scrolls, writer: v.get("writer").and_then(writer_of) }
-}
-
-/// `{ name?, color }`: who last wrote the drawing, as its placeholder frames are marked.
-pub(crate) fn writer_of(v: &serde_json::Value) -> Option<stage_paint::painter::Writer> {
-	let color = v.get("color").and_then(serde_json::Value::as_str).and_then(stage_scene::values::parse_color)?;
-	let name = v.get("name").and_then(serde_json::Value::as_str).map(str::to_owned).filter(|n| !n.trim().is_empty());
-	Some(stage_paint::painter::Writer { name, color })
-}
-
-fn ids(json: &str) -> Vec<String> {
-	serde_json::from_str(json).unwrap_or_default()
-}
-
 /// Any page canvas, as `openStage`.
 #[wasm_bindgen(js_name = openCanvas)]
 pub async fn open_canvas(canvas: web_sys::HtmlCanvasElement, width: u32, height: u32, backend: Option<String>, low_memory: Option<bool>) -> Result<GpuHandle, JsError> {
@@ -197,10 +79,6 @@ pub async fn open_offscreen(canvas: web_sys::OffscreenCanvas, width: u32, height
 	open(Canvas::Offscreen(canvas), width, height, backend, low_memory).await
 }
 
-fn key(scale: u32, x: i32, y: i32) -> Key {
-	Key { scale, x, y }
-}
-
 #[wasm_bindgen]
 pub struct PageEngine {
 	page: Page,
@@ -209,6 +87,7 @@ pub struct PageEngine {
 	/// Meshes in the last frame drawn: any at all and the GPU draws the whole canvas with four samples a pixel.
 	meshes: u32,
 }
+
 
 #[wasm_bindgen]
 impl PageEngine {
@@ -220,6 +99,10 @@ impl PageEngine {
 	#[wasm_bindgen(js_name = setGpu)]
 	pub fn set_gpu(&mut self, handle: GpuHandle) {
 		self.gpu = Some(handle.gpu);
+	}
+
+	pub fn lost(&self) -> bool {
+		self.gpu.as_ref().is_some_and(|g| g.lost())
 	}
 
 	/// A font file, under the name the app's chains use; `fallback` for the files tried last. The
@@ -237,6 +120,28 @@ impl PageEngine {
 	#[wasm_bindgen(js_name = layOut)]
 	pub fn lay_out(&mut self) {
 		self.page.lay_out();
+	}
+
+	/// Read cards with the app's own reader: `(source) => JSON of blocks`.
+	#[wasm_bindgen(js_name = setMarkdownReader)]
+	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
+		self.page.text.set_reader(reader(read));
+		self.page.scene.update(&self.page.doc, None, &self.page.text);
+	}
+
+	/// The app's typesetter for `$…$` formulas in words and cards.
+	#[wasm_bindgen(js_name = setMath)]
+	pub fn set_math(&mut self, typeset: js_sys::Function) {
+		self.page.text.set_math(typesetter(typeset));
+		self.page.scene.update(&self.page.doc, None, &self.page.text);
+	}
+
+	/// An icon's shapes, as `parseIcon` gives them, by the key the engine asked for (after `icon:`).
+	#[wasm_bindgen(js_name = putIcon)]
+	pub fn put_icon(&mut self, key: &str, json: &str) {
+		if let Some(shape) = icon_shape(json) {
+			self.page.icons.insert(key.to_owned(), shape);
+		}
 	}
 
 	/// The server's edits (`stage.pen.delta` `edits`, as JSON).
@@ -293,8 +198,15 @@ impl PageEngine {
 		self.page.ids.next(&self.page.doc)
 	}
 
+	// Questions about the drawing: what is where, its layout, the words it needs.
 	pub fn pick(&self, x: f64, y: f64, slop: f64) -> String {
 		self.page.pick(x, y, slop).to_string()
+	}
+
+	/// Every item under a stage point, topmost first.
+	#[wasm_bindgen(js_name = pickAll)]
+	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> String {
+		self.page.pick_all(x, y, slop).to_string()
 	}
 
 	pub fn within(&self, x: f64, y: f64, w: f64, h: f64) -> String {
@@ -338,6 +250,43 @@ impl PageEngine {
 		"null".into()
 	}
 
+	/// Every item as laid out: `[[id, x, y, w, h, parent, order, theme], …]`.
+	pub fn layout(&self) -> String {
+		self.page.layout_json().to_string()
+	}
+
+	/// The layout as it changed since the last call (`Page::layout_changes`): what the page reads after
+	/// each change instead of `layout` and `cards` whole.
+	#[wasm_bindgen(js_name = layoutChanges)]
+	pub fn layout_changes(&mut self) -> String {
+		self.page.layout_changes().to_string()
+	}
+
+	/// Each markdown card's links and wide tables.
+	pub fn cards(&self) -> String {
+		self.page.cards_json().to_string()
+	}
+
+	/// The words and faces on the stage, for fonts.
+	#[wasm_bindgen(js_name = fontNeeds)]
+	pub fn font_needs(&self) -> String {
+		self.page.font_needs().to_string()
+	}
+
+	/// The words and faces of what was laid out again since the last call (all of it the first time), for fonts.
+	#[wasm_bindgen(js_name = fontNeedsChanged)]
+	pub fn font_needs_changed(&mut self) -> String {
+		self.page.font_needs_changed().to_string()
+	}
+
+	/// Words measured with this stage's own fonts and readers, as `TextMeasure.measure` measures them
+	/// on the server: for the page to lay out an edit the person made, and route its arrows, ahead of
+	/// the server's drawing, on the boxes the server will find.
+	pub fn measure(&self, text: &str, style: &str, max_width: f64, markdown: bool, align: &str) -> Vec<f64> {
+		measure_words(&self.page.text, text, style, max_width, markdown, align)
+	}
+
+	// Tiles from the worker, and pictures.
 	/// A tile's picture from the worker, copied into the page's own texture for it.
 	#[wasm_bindgen(js_name = putTile)]
 	pub fn put_tile(&mut self, scale: u32, x: i32, y: i32, bitmap: web_sys::ImageBitmap) {
@@ -364,6 +313,48 @@ impl PageEngine {
 		}
 		let texture = gpu.texture_handle(id).expect("just made").clone();
 		gpu.write_pixels(pixels, stride, &texture, TILE_SIZE, TILE_SIZE);
+	}
+
+	/// The worker discarded these tiles, `[[scale, x, y], …]`.
+	#[wasm_bindgen(js_name = forgetTiles)]
+	pub fn forget_tiles(&mut self, keys: &str) {
+		let list: Vec<(u32, i32, i32)> = serde_json::from_str(keys).unwrap_or_default();
+		let keys: Vec<Key> = list.into_iter().map(|(s, x, y)| key(s, x, y)).collect();
+		let gone = self.page.forget_tiles(&keys);
+		if let Some(gpu) = &mut self.gpu {
+			for t in gone {
+				gpu.forget_to_spare(t);
+			}
+		}
+	}
+
+	/// Tiles let go of past the budget, `[[scale, x, y], …]`, to tell the worker.
+	pub fn evict(&mut self) -> String {
+		let gone = self.page.evict();
+		if let Some(gpu) = &mut self.gpu {
+			for (_, t) in &gone {
+				gpu.forget_to_spare(*t);
+			}
+		}
+		let list: Vec<String> = gone.iter().map(|(k, _)| format!("[{},{},{}]", k.scale, k.x, k.y)).collect();
+		format!("[{}]", list.join(","))
+	}
+
+	/// The scale shown (`Page::shown_scale`), as an `f32`'s bits.
+	#[wasm_bindgen(js_name = shownScale)]
+	pub fn shown_scale(&self) -> u32 {
+		self.page.shown_scale()
+	}
+
+	/// Show the level wanted at the next frame, whole or not: its tiles stopped coming.
+	#[wasm_bindgen(js_name = showWanted)]
+	pub fn show_wanted(&mut self) {
+		self.page.show_wanted();
+	}
+
+	#[wasm_bindgen(js_name = tileCount)]
+	pub fn tile_count(&self) -> u32 {
+		self.page.tiles.len() as u32
 	}
 
 	/// A picture by its address (an image fill's `url`, or `card:<path>`). `width` × `height` is its
@@ -455,36 +446,24 @@ impl PageEngine {
 		serde_json::to_string(&self.page.pictures.take_wanted()).unwrap_or_else(|_| "[]".into())
 	}
 
-	/// Read cards with the app's own reader: `(source) => JSON of blocks`.
-	#[wasm_bindgen(js_name = setMarkdownReader)]
-	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
-		self.page.text.set_reader(reader(read));
-		self.page.scene.update(&self.page.doc, None, &self.page.text);
+	/// Whether `wantedPictures` has anything to say: asked before it, so most frames make no JSON.
+	#[wasm_bindgen(js_name = hasWanted)]
+	pub fn has_wanted(&self) -> bool {
+		!self.page.pictures.wanted.borrow().is_empty()
 	}
 
-	/// The app's typesetter for `$…$` formulas in words and cards.
-	#[wasm_bindgen(js_name = setMath)]
-	pub fn set_math(&mut self, typeset: js_sys::Function) {
-		self.page.text.set_math(typesetter(typeset));
-		self.page.scene.update(&self.page.doc, None, &self.page.text);
-	}
-
-	/// An icon's shapes, as `parseIcon` gives them, by the key the engine asked for (after `icon:`).
-	#[wasm_bindgen(js_name = putIcon)]
-	pub fn put_icon(&mut self, key: &str, json: &str) {
-		if let Some(shape) = icon_shape(json) {
-			self.page.icons.insert(key.to_owned(), shape);
+	/// Forget a card's picture (it changed): asked for again when next drawn.
+	#[wasm_bindgen(js_name = forgetPicture)]
+	pub fn forget_picture(&mut self, url: &str) {
+		let textures = self.page.forget_picture(url);
+		if let Some(gpu) = &mut self.gpu {
+			for texture in textures {
+				gpu.forget(texture);
+			}
 		}
 	}
 
-	/// A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
-	#[wasm_bindgen(js_name = setPreview)]
-	/// Returns what it newly lifted (the arrows it bends, a resized shape's outline), as a JSON list, for the worker to lift.
-	pub fn set_preview(&mut self, moving: &str) -> Result<String, JsError> {
-		let bent = self.page.preview(previews(moving)).map_err(err)?;
-		Ok(serde_json::to_string(&bent).unwrap_or_else(|_| "[]".into()))
-	}
-
+	// The view: cards, gestures, ink, and the frame itself.
 	/// What the stage hides, mutes or shows live, and who wrote it: `{ hidden, mute, holes, scrolls, writer? }`.
 	#[wasm_bindgen(js_name = setView)]
 	pub fn set_view(&mut self, view: &str) {
@@ -552,12 +531,6 @@ impl PageEngine {
 		self.page.marks
 	}
 
-	/// Whether `wantedPictures` has anything to say: asked before it, so most frames make no JSON.
-	#[wasm_bindgen(js_name = hasWanted)]
-	pub fn has_wanted(&self) -> bool {
-		!self.page.pictures.wanted.borrow().is_empty()
-	}
-
 	/// The boards drawn as their picture in the last frame.
 	pub fn pictured(&self) -> String {
 		serde_json::to_string(&self.page.pictured).unwrap_or_else(|_| "[]".into())
@@ -568,57 +541,12 @@ impl PageEngine {
 		serde_json::to_string(&self.page.carrying).unwrap_or_else(|_| "[]".into())
 	}
 
-	/// Forget a card's picture (it changed): asked for again when next drawn.
-	#[wasm_bindgen(js_name = forgetPicture)]
-	pub fn forget_picture(&mut self, url: &str) {
-		let textures = self.page.forget_picture(url);
-		if let Some(gpu) = &mut self.gpu {
-			for texture in textures {
-				gpu.forget(texture);
-			}
-		}
-	}
-
-	/// Every item as laid out: `[[id, x, y, w, h, parent, order, theme], …]`.
-	pub fn layout(&self) -> String {
-		self.page.layout_json().to_string()
-	}
-
-	/// The layout as it changed since the last call (`Page::layout_changes`): what the page reads after
-	/// each change instead of `layout` and `cards` whole.
-	#[wasm_bindgen(js_name = layoutChanges)]
-	pub fn layout_changes(&mut self) -> String {
-		self.page.layout_changes().to_string()
-	}
-
-	/// Every item under a stage point, topmost first.
-	#[wasm_bindgen(js_name = pickAll)]
-	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> String {
-		self.page.pick_all(x, y, slop).to_string()
-	}
-
-	/// Each markdown card's links and wide tables.
-	pub fn cards(&self) -> String {
-		self.page.cards_json().to_string()
-	}
-
-	/// The words and faces on the stage, for fonts.
-	#[wasm_bindgen(js_name = fontNeeds)]
-	pub fn font_needs(&self) -> String {
-		self.page.font_needs().to_string()
-	}
-
-	/// The words and faces of what was laid out again since the last call (all of it the first time), for fonts.
-	#[wasm_bindgen(js_name = fontNeedsChanged)]
-	pub fn font_needs_changed(&mut self) -> String {
-		self.page.font_needs_changed().to_string()
-	}
-
-	/// Words measured with this stage's own fonts and readers, as `TextMeasure.measure` measures them
-	/// on the server: for the page to lay out an edit the person made, and route its arrows, ahead of
-	/// the server's drawing, on the boxes the server will find.
-	pub fn measure(&self, text: &str, style: &str, max_width: f64, markdown: bool, align: &str) -> Vec<f64> {
-		measure_words(&self.page.text, text, style, max_width, markdown, align)
+	/// A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
+	#[wasm_bindgen(js_name = setPreview)]
+	/// Returns what it newly lifted (the arrows it bends, a resized shape's outline), as a JSON list, for the worker to lift.
+	pub fn set_preview(&mut self, moving: &str) -> Result<String, JsError> {
+		let bent = self.page.preview(previews(moving)).map_err(err)?;
+		Ok(serde_json::to_string(&bent).unwrap_or_else(|_| "[]".into()))
 	}
 
 	/// Lift top-level items for a drag (`["id", …]`): drawn here from now on.
@@ -708,52 +636,127 @@ impl PageEngine {
 		self.page.only_lifted = false;
 		n
 	}
+}
 
-	/// The worker discarded these tiles, `[[scale, x, y], …]`.
-	#[wasm_bindgen(js_name = forgetTiles)]
-	pub fn forget_tiles(&mut self, keys: &str) {
-		let list: Vec<(u32, i32, i32)> = serde_json::from_str(keys).unwrap_or_default();
-		let keys: Vec<Key> = list.into_iter().map(|(s, x, y)| key(s, x, y)).collect();
-		let gone = self.page.forget_tiles(&keys);
-		if let Some(gpu) = &mut self.gpu {
-			for t in gone {
-				gpu.forget_to_spare(t);
-			}
-		}
-	}
+/// Copy a picture into texture `id`, made the picture's size (or `size`), and let the picture go.
+/// `from_canvas`: it is a canvas's `transferToImageBitmap` (a tile), not a `createImageBitmap`.
+/// No texture is made bigger than the device's picture limit: a bigger picture (the page resizes
+/// them first, so it should not come) keeps what fits, and says so. A picture with nothing in it
+/// (closed, or transferred away) is not copied (`copy_extent`), and the answer is false.
+/// Copy a bitmap into texture `id`, and close it, unless `keep` (it is handed on to the page after).
+fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool) -> bool {
+	copy_in_keep(gpu, id, bitmap, size, from_canvas, false)
+}
 
-	/// Tiles let go of past the budget, `[[scale, x, y], …]`, to tell the worker.
-	pub fn evict(&mut self) -> String {
-		let gone = self.page.evict();
-		if let Some(gpu) = &mut self.gpu {
-			for (_, t) in &gone {
-				gpu.forget_to_spare(*t);
-			}
-		}
-		let list: Vec<String> = gone.iter().map(|(k, _)| format!("[{},{},{}]", k.scale, k.x, k.y)).collect();
-		format!("[{}]", list.join(","))
-	}
+fn copy_in_keep(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool, keep: bool) -> bool {
+	copy_in_as(gpu, id, bitmap, size, from_canvas, keep, false)
+}
 
-	/// The scale shown (`Page::shown_scale`), as an `f32`'s bits.
-	#[wasm_bindgen(js_name = shownScale)]
-	pub fn shown_scale(&self) -> u32 {
-		self.page.shown_scale()
+/// As `copy_in_keep`; `levels`: a picture, kept with its smaller sizes, made on the GPU after the copy.
+fn copy_in_as(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool, keep: bool, levels: bool) -> bool {
+	let Some(_) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (u32::MAX, u32::MAX)) else {
+		web_sys::console::warn_1(&"stage: a picture with nothing in it (closed, or sent elsewhere) was not copied".into());
+		return false;
+	};
+	let cap = gpu.limits().max_picture();
+	let (w, h) = size.unwrap_or((bitmap.width().max(1), bitmap.height().max(1)));
+	let (w, h) = (w.min(cap), h.min(cap));
+	if bitmap.width() > w || bitmap.height() > h {
+		web_sys::console::warn_1(&format!("stage: a {}×{} picture is over the {cap}-pixel limit: only {w}×{h} of it is kept", bitmap.width(), bitmap.height()).into());
 	}
+	if levels {
+		gpu.picture_texture(id, w, h);
+	} else if gpu.texture_handle(id).is_none_or(|t| t.width() != w || t.height() != h || t.mip_level_count() != 1) {
+		gpu.texture(id, TextureKind::Color, w, h, None);
+	}
+	let texture = gpu.texture_handle(id).expect("just made").clone();
+	let (cw, ch) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (w, h)).expect("not empty, checked above");
+	gpu.copy_bitmap(bitmap, &texture, cw, ch, from_canvas);
+	if levels {
+		gpu.fill_levels(id);
+	}
+	if !keep {
+		bitmap.close();
+	}
+	true
+}
 
-	/// Show the level wanted at the next frame, whole or not: its tiles stopped coming.
-	#[wasm_bindgen(js_name = showWanted)]
-	pub fn show_wanted(&mut self) {
-		self.page.show_wanted();
-	}
+/// The app's markdown reader, a JavaScript function from a card's source to its blocks as JSON.
+fn reader(read: js_sys::Function) -> Box<dyn Fn(&str) -> Option<Vec<stage_text::markdown::Block>>> {
+	Box::new(move |source: &str| {
+		let out = read.call1(&JsValue::NULL, &JsValue::from_str(source)).ok()?;
+		stage_text::markdown::from_json(&out.as_string()?).ok()
+	})
+}
 
-	#[wasm_bindgen(js_name = tileCount)]
-	pub fn tile_count(&self) -> u32 {
-		self.page.tiles.len() as u32
-	}
+/// The app's typesetter (`math.ts`): TeX and whether it is a display formula in, the formula's
+/// outlines as JSON out, or null.
+fn typesetter(typeset: js_sys::Function) -> Box<dyn Fn(&str, bool) -> Option<stage_text::math::Formula>> {
+	Box::new(move |tex: &str, display: bool| {
+		let out = typeset.call2(&JsValue::NULL, &JsValue::from_str(tex), &JsValue::from_bool(display)).ok()?;
+		serde_json::from_str(&out.as_string()?).ok()
+	})
+}
 
-	pub fn lost(&self) -> bool {
-		self.gpu.as_ref().is_some_and(|g| g.lost())
-	}
+fn icon_shape(json: &str) -> Option<stage_paint::painter::IconShape> {
+	serde_json::from_str(json).ok()
+}
+
+fn parse_edits(json: &str) -> Result<Vec<stage_doc::edits::Edit>, String> {
+	let list: Vec<serde_json::Value> = serde_json::from_str(json).map_err(|e| e.to_string())?;
+	list.iter().map(stage_doc::edits::Edit::from_json).collect()
+}
+
+/// A gesture's previews from the app's `PenPreview`s: a size, a corner and fields become fields.
+fn previews(json: &str) -> Option<Vec<(String, crate::engine::Preview)>> {
+	let list: Vec<(String, serde_json::Value)> = serde_json::from_str(json).ok()?;
+	Some(
+		list.into_iter()
+			.map(|(id, p)| {
+				let n = |k: &str| p.get(k).and_then(serde_json::Value::as_f64);
+				let mut set: Vec<(String, Option<serde_json::Value>)> = Vec::new();
+				if let Some(w) = n("w") {
+					set.push(("width".into(), Some(w.into())));
+				}
+				if let Some(h) = n("h") {
+					set.push(("height".into(), Some(h.into())));
+				}
+				match p.get("radius") {
+					Some(serde_json::Value::Null) => set.push(("cornerRadius".into(), None)),
+					Some(r) if r.is_number() => set.push(("cornerRadius".into(), Some(r.clone()))),
+					_ => {}
+				}
+				if let Some(serde_json::Value::Object(fields)) = p.get("set") {
+					for (k, v) in fields {
+						set.push((k.clone(), if v.is_null() { None } else { Some(v.clone()) }));
+					}
+				}
+				(id, crate::engine::Preview { dx: n("dx").unwrap_or(0.0), dy: n("dy").unwrap_or(0.0), set })
+			})
+			.collect(),
+	)
+}
+
+fn view_state(json: &str) -> crate::engine::ViewState {
+	let v: serde_json::Value = serde_json::from_str(json).unwrap_or_default();
+	let set = |k: &str| v.get(k).and_then(|a| a.as_array()).map(|a| a.iter().filter_map(|s| s.as_str().map(str::to_owned)).collect()).unwrap_or_default();
+	let scrolls = v.get("scrolls").and_then(|s| s.as_object()).map(|m| m.iter().filter_map(|(k, x)| Some((k.clone(), x.as_f64()?))).collect()).unwrap_or_default();
+	crate::engine::ViewState { hidden: set("hidden"), mute: set("mute"), holes: set("holes"), scrolls, writer: v.get("writer").and_then(writer_of) }
+}
+
+/// `{ name?, color }`: who last wrote the drawing, as its placeholder frames are marked.
+pub(crate) fn writer_of(v: &serde_json::Value) -> Option<stage_paint::painter::Writer> {
+	let color = v.get("color").and_then(serde_json::Value::as_str).and_then(stage_scene::values::parse_color)?;
+	let name = v.get("name").and_then(serde_json::Value::as_str).map(str::to_owned).filter(|n| !n.trim().is_empty());
+	Some(stage_paint::painter::Writer { name, color })
+}
+
+fn ids(json: &str) -> Vec<String> {
+	serde_json::from_str(json).unwrap_or_default()
+}
+
+fn key(scale: u32, x: i32, y: i32) -> Key {
+	Key { scale, x, y }
 }
 
 /// This engine's compiled `WebAssembly.Module`, which the page posts to its render worker so the
@@ -800,6 +803,12 @@ impl TextMeasure {
 	}
 }
 
+impl Default for TextMeasure {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 /// `[w, h]` of words with a text system's fonts and readers: `TextMeasure`'s, or the page engine's own.
 fn measure_words(words: &stage_text::Text, text: &str, style: &str, max_width: f64, markdown: bool, align: &str) -> Vec<f64> {
 	let v: serde_json::Value = serde_json::from_str(style).unwrap_or_default();
@@ -826,12 +835,6 @@ fn measure_words(words: &stage_text::Text, text: &str, style: &str, max_width: f
 	let item = stage_scene::tree::Item { id: String::new(), props: Default::default(), parent: None, children: Vec::new(), handle: None };
 	let (w, h) = stage_scene::layout::Measure::measure(words, text, &style, max, &item);
 	vec![w, h]
-}
-
-impl Default for TextMeasure {
-	fn default() -> Self {
-		Self::new()
-	}
 }
 
 /// One joined arrow routed by the engine's router (`stage_scene::arrows`), for the server's reroute:

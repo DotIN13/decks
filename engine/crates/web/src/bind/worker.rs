@@ -61,6 +61,47 @@ impl WorkerEngine {
 		self.worker.add_font(name, bytes, fallback);
 	}
 
+	#[wasm_bindgen(js_name = setMarkdownReader)]
+	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
+		self.worker.text.set_reader(reader(read));
+		let text = self.worker.doc.to_text();
+		let dark = self.worker.dark;
+		let _ = self.worker.reload(&text, dark);
+	}
+
+	#[wasm_bindgen(js_name = setMath)]
+	pub fn set_math(&mut self, typeset: js_sys::Function) {
+		self.worker.text.set_math(typesetter(typeset));
+		let text = self.worker.doc.to_text();
+		let dark = self.worker.dark;
+		let _ = self.worker.reload(&text, dark);
+	}
+
+	#[wasm_bindgen(js_name = putIcon)]
+	pub fn put_icon(&mut self, key: &str, json: &str) {
+		if let Some(shape) = icon_shape(json) {
+			self.worker.icon(key, shape);
+		}
+	}
+
+	/// As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
+	/// `keep`: the bitmap is left open, to be handed to the page, which copies it too.
+	#[wasm_bindgen(js_name = putPicture)]
+	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>, keep: Option<bool>) {
+		let Some(gpu) = &mut self.gpu else { return };
+		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
+		let id = self.worker.pictures.get(url).map(|p| p.0).unwrap_or(0x8000_0000 + self.worker.pictures.held.len() as u32);
+		if copy_in_keep(gpu, id, &bitmap, None, false, keep.unwrap_or(false)) {
+			self.worker.picture(url, id, w, h);
+		}
+	}
+
+	#[wasm_bindgen(js_name = wantedPictures)]
+	pub fn wanted_pictures(&self) -> String {
+		serde_json::to_string(&self.worker.pictures.take_wanted()).unwrap_or_else(|_| "[]".into())
+	}
+
+	// The document, by the page's numbered batches.
 	/// The server's edits (`stage.pen.delta` `edits`, as JSON).
 	#[wasm_bindgen(js_name = applyEdits)]
 	pub fn apply_edits(&mut self, edits: &str) -> Result<(), JsError> {
@@ -77,6 +118,7 @@ impl WorkerEngine {
 		self.worker.reload(text, dark).map_err(err)
 	}
 
+	// Painting tiles, and the ones let go of.
 	/// Paint up to `limit` tiles the view needs: `[{ scale, x, y, bitmap }]`, bitmaps to transfer.
 	#[allow(clippy::too_many_arguments)]
 	pub fn paint(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, zooming: bool, limit: u32) -> js_sys::Array {
@@ -160,6 +202,24 @@ impl WorkerEngine {
 		self.worker.view_left(Camera { x, y, zoom }, dpr, width, height, zooming) as u32
 	}
 
+	/// Stale tiles at other scales the worker let go of since the last call: `[[scale, x, y], …]`.
+	pub fn discarded(&mut self) -> String {
+		let list: Vec<String> = self.worker.discarded.drain(..).map(|k| format!("[{},{},{}]", k.scale, k.x, k.y)).collect();
+		format!("[{}]", list.join(","))
+	}
+
+	/// The page let go of a tile.
+	pub fn dropped(&mut self, scale: u32, x: i32, y: i32) {
+		self.worker.dropped(key(scale, x, y));
+	}
+
+	/// The scale of the overview's tiles (`overview_scale`), as an `f32`'s bits; 0 for an empty stage.
+	#[wasm_bindgen(js_name = overviewScale)]
+	pub fn overview_scale(&self) -> u32 {
+		self.worker.scene.extent().map_or(0, |e| stage_paint::tiles::overview_scale(&e).to_bits())
+	}
+
+	// What the page lifts, hides and puts down.
 	pub fn lift(&mut self, items: &str) {
 		self.worker.lift(&ids(items));
 	}
@@ -174,66 +234,9 @@ impl WorkerEngine {
 		self.worker.drop_items(&ids(items));
 	}
 
-	/// Stale tiles at other scales the worker let go of since the last call: `[[scale, x, y], …]`.
-	pub fn discarded(&mut self) -> String {
-		let list: Vec<String> = self.worker.discarded.drain(..).map(|k| format!("[{},{},{}]", k.scale, k.x, k.y)).collect();
-		format!("[{}]", list.join(","))
-	}
-
 	/// Items put down whose tiles are all painted again: `["id", …]`.
 	pub fn landed(&mut self) -> String {
 		serde_json::to_string(&self.worker.landed()).unwrap_or_else(|_| "[]".into())
-	}
-
-	/// As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
-	/// `keep`: the bitmap is left open, to be handed to the page, which copies it too.
-	#[wasm_bindgen(js_name = putPicture)]
-	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>, keep: Option<bool>) {
-		let Some(gpu) = &mut self.gpu else { return };
-		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
-		let id = self.worker.pictures.get(url).map(|p| p.0).unwrap_or(0x8000_0000 + self.worker.pictures.held.len() as u32);
-		if copy_in_keep(gpu, id, &bitmap, None, false, keep.unwrap_or(false)) {
-			self.worker.picture(url, id, w, h);
-		}
-	}
-
-	#[wasm_bindgen(js_name = wantedPictures)]
-	pub fn wanted_pictures(&self) -> String {
-		serde_json::to_string(&self.worker.pictures.take_wanted()).unwrap_or_else(|_| "[]".into())
-	}
-
-	#[wasm_bindgen(js_name = setMarkdownReader)]
-	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
-		self.worker.text.set_reader(reader(read));
-		let text = self.worker.doc.to_text();
-		let dark = self.worker.dark;
-		let _ = self.worker.reload(&text, dark);
-	}
-
-	#[wasm_bindgen(js_name = setMath)]
-	pub fn set_math(&mut self, typeset: js_sys::Function) {
-		self.worker.text.set_math(typesetter(typeset));
-		let text = self.worker.doc.to_text();
-		let dark = self.worker.dark;
-		let _ = self.worker.reload(&text, dark);
-	}
-
-	#[wasm_bindgen(js_name = putIcon)]
-	pub fn put_icon(&mut self, key: &str, json: &str) {
-		if let Some(shape) = icon_shape(json) {
-			self.worker.icon(key, shape);
-		}
-	}
-
-	/// The page let go of a tile.
-	pub fn dropped(&mut self, scale: u32, x: i32, y: i32) {
-		self.worker.dropped(key(scale, x, y));
-	}
-
-	/// The scale of the overview's tiles (`overview_scale`), as an `f32`'s bits; 0 for an empty stage.
-	#[wasm_bindgen(js_name = overviewScale)]
-	pub fn overview_scale(&self) -> u32 {
-		self.worker.scene.extent().map_or(0, |e| stage_paint::tiles::overview_scale(&e).to_bits())
 	}
 }
 

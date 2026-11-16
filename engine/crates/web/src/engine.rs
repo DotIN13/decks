@@ -1,5 +1,6 @@
-//! The two engines, without the browser: what the page and the worker each keep and do. The wasm
-//! bindings (`lib.rs`) only carry calls across; everything here also runs, and is tested, natively.
+//! The two engines, without the browser: the page's (here, with its frame and gestures in `engine/`)
+//! and the worker's (`engine/worker.rs`). The wasm bindings (`bind.rs`) only carry calls across;
+//! everything here also runs, and is tested, natively.
 
 use serde_json::{Value, json};
 use stage_doc::{Change, Document, History, Ids};
@@ -29,35 +30,11 @@ pub struct Camera {
 	pub zoom: f64,
 }
 
-/// Pictures by address (an image fill's `url`, or `card:<path>` for a card's picture): texture,
-/// width and height, and the addresses asked for that have not arrived.
-#[derive(Default)]
-pub struct Pictures {
-	pub held: HashMap<String, (u32, u32, u32)>,
-	pub wanted: RefCell<Vec<String>>,
-	/// A card's picture a sharper or newer one has replaced, kept drawn under it while the new one
-	/// fades in (`Page::fade_pictures`): texture, width, height, and how far the new one has come, 0 to 1.
-	pub fading: HashMap<String, (u32, u32, u32, f32)>,
-	/// Textures let go of here (an old picture whose fade is done, or one replaced mid-fade), for the caller to free on the GPU.
-	pub dropped: Vec<u32>,
-}
-
-impl Pictures {
-	pub fn get(&self, url: &str) -> Option<(u32, u32, u32)> {
-		self.held.get(url).copied()
-	}
-
-	/// Take the addresses asked for since the last time, each once, leaving out those held.
-	pub fn take_wanted(&self) -> Vec<String> {
-		let mut seen = HashSet::new();
-		self.wanted.borrow_mut().drain(..).filter(|u| !self.held.contains_key(u) && seen.insert(u.clone())).collect()
-	}
-}
-
 /// The page's engine: owns the document, answers the pointer, and lays the worker's tiles on the
 /// screen in the same frame as the board pages.
 /// The fewest tiles the page keeps, whatever the screen.
 const MIN_TILES: usize = 160;
+
 /// How long a card's new picture takes to fade in over the one it replaced (`Page::fade_pictures`).
 const PICTURE_FADE_MS: f32 = 180.0;
 
@@ -120,13 +97,75 @@ pub struct Page {
 	/// The version of each root whose words `font_needs_changed` last told, by root.
 	fonts_sent: HashMap<stage_doc::Handle, u64>,
 }
-
 /// A root as `layout_changes` last reported it.
 struct SentRoot {
 	id: String,
 	version: u64,
 	base: u32,
 	seen: u64,
+}
+
+/// What the stage asks the drawing to leave out or change, besides the document.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ViewState {
+	/// Hidden: being erased, deleted until the server says so.
+	pub hidden: HashSet<String>,
+	/// Their words are not drawn: an editor is open over them.
+	pub mute: HashSet<String>,
+	/// Drawn as holes: a live file shows under the drawing there.
+	pub holes: HashSet<String>,
+	/// Wide tables' scroll, by `id:index`.
+	pub scrolls: HashMap<String, f64>,
+	/// Who last wrote the drawing, as its placeholder frames are marked; none: the accent, no name.
+	pub writer: Option<Writer>,
+}
+
+impl ViewState {
+	fn apply<'a>(&'a self, ctx: &mut Context<'a>) {
+		ctx.mute = Some(&self.mute);
+		ctx.holes = Some(&self.holes);
+		ctx.scrolls = Some(&self.scrolls);
+		ctx.writer = self.writer.as_ref();
+	}
+
+	/// The ids whose look changes between two states (for a scroll, `id:index`).
+	fn differs(&self, other: &ViewState) -> Vec<String> {
+		let mut out: Vec<String> = Vec::new();
+		for (a, b) in [(&self.hidden, &other.hidden), (&self.mute, &other.mute), (&self.holes, &other.holes)] {
+			out.extend(a.symmetric_difference(b).cloned());
+		}
+		for key in self.scrolls.keys().chain(other.scrolls.keys()) {
+			if self.scrolls.get(key) != other.scrolls.get(key) {
+				out.push(key.clone());
+			}
+		}
+		out
+	}
+}
+
+/// Pictures by address (an image fill's `url`, or `card:<path>` for a card's picture): texture,
+/// width and height, and the addresses asked for that have not arrived.
+#[derive(Default)]
+pub struct Pictures {
+	pub held: HashMap<String, (u32, u32, u32)>,
+	pub wanted: RefCell<Vec<String>>,
+	/// A card's picture a sharper or newer one has replaced, kept drawn under it while the new one
+	/// fades in (`Page::fade_pictures`): texture, width, height, and how far the new one has come, 0 to 1.
+	pub fading: HashMap<String, (u32, u32, u32, f32)>,
+	/// Textures let go of here (an old picture whose fade is done, or one replaced mid-fade), for the caller to free on the GPU.
+	pub dropped: Vec<u32>,
+}
+
+impl Pictures {
+	pub fn get(&self, url: &str) -> Option<(u32, u32, u32)> {
+		self.held.get(url).copied()
+	}
+
+	/// Take the addresses asked for since the last time, each once, leaving out those held.
+	pub fn take_wanted(&self) -> Vec<String> {
+		let mut seen = HashSet::new();
+		self.wanted.borrow_mut().drain(..).filter(|u| !self.held.contains_key(u) && seen.insert(u.clone())).collect()
+	}
 }
 
 impl Page {
@@ -138,6 +177,7 @@ impl Page {
 		Ok(Page { overlay: None, pictures_unlaid: false, only_lifted: false, hide_lifted: false, cards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), titles: RefCell::new(HashMap::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
 	}
 
+	// The document: batches, undo, the server's edits, the arrows they move.
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
 	/// Returns the batch's generation, to hand the worker with the same changes.
 	pub fn apply(&mut self, changes: &[Change], mine: bool) -> Result<u64, String> {
@@ -315,6 +355,7 @@ impl Page {
 		self.scene = Scene::new(&self.doc, dark, &self.text);
 	}
 
+	// Layout: fonts, and the layout as the page is told it.
 	/// A font file arrived: words are measured again, so everything is laid out again.
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.hold_font(name, bytes, fallback);
@@ -459,12 +500,6 @@ impl Page {
 		Some(json!({ "id": item.id, "box": { "x": r.x, "y": r.y, "w": r.w, "h": r.h }, "pad": pad, "links": links, "scrollers": scrollers }))
 	}
 
-	/// The ids of every item under a stage point, topmost first.
-	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> Value {
-		let ids: Vec<&str> = self.scene.pick_all(x, y, slop).into_iter().map(|(r, i)| self.scene.roots[r as usize].tree.items[i as usize].id.as_str()).collect();
-		json!(ids)
-	}
-
 	/// Each markdown card's links and wide tables, for a press to be answered with: `{ id, order,
 	/// box, pad, links, scrollers }`, the links and tables from the card's words' top-left.
 	pub fn cards_json(&self) -> Value {
@@ -544,12 +579,19 @@ impl Page {
 		}
 	}
 
+	// Questions: what is under a point or in an area, and the cards.
 	/// The topmost item under a stage point, as its id path.
 	pub fn pick(&self, x: f64, y: f64, slop: f64) -> Value {
 		match self.scene.pick(x, y, slop) {
 			Some(hit) => json!({ "id": hit.id, "path": hit.path }),
 			None => Value::Null,
 		}
+	}
+
+	/// The ids of every item under a stage point, topmost first.
+	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> Value {
+		let ids: Vec<&str> = self.scene.pick_all(x, y, slop).into_iter().map(|(r, i)| self.scene.roots[r as usize].tree.items[i as usize].id.as_str()).collect();
+		json!(ids)
 	}
 
 	/// Ids of the items whose whole box is inside an area.
@@ -603,6 +645,7 @@ impl Page {
 	}
 
 
+	// Pictures and the tiles the page holds.
 	/// A picture arrived: its texture is made by the caller; this names it. Cards with it are laid
 	/// out again, since their height may change.
 	pub fn picture(&mut self, url: &str, texture: u32, width: u32, height: u32) {
@@ -705,44 +748,6 @@ impl Page {
 
 #[cfg(test)]
 mod tests;
-
-/// What the stage asks the drawing to leave out or change, besides the document.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ViewState {
-	/// Hidden: being erased, deleted until the server says so.
-	pub hidden: HashSet<String>,
-	/// Their words are not drawn: an editor is open over them.
-	pub mute: HashSet<String>,
-	/// Drawn as holes: a live file shows under the drawing there.
-	pub holes: HashSet<String>,
-	/// Wide tables' scroll, by `id:index`.
-	pub scrolls: HashMap<String, f64>,
-	/// Who last wrote the drawing, as its placeholder frames are marked; none: the accent, no name.
-	pub writer: Option<Writer>,
-}
-
-impl ViewState {
-	fn apply<'a>(&'a self, ctx: &mut Context<'a>) {
-		ctx.mute = Some(&self.mute);
-		ctx.holes = Some(&self.holes);
-		ctx.scrolls = Some(&self.scrolls);
-		ctx.writer = self.writer.as_ref();
-	}
-
-	/// The ids whose look changes between two states (for a scroll, `id:index`).
-	fn differs(&self, other: &ViewState) -> Vec<String> {
-		let mut out: Vec<String> = Vec::new();
-		for (a, b) in [(&self.hidden, &other.hidden), (&self.mute, &other.mute), (&self.holes, &other.holes)] {
-			out.extend(a.symmetric_difference(b).cloned());
-		}
-		for key in self.scrolls.keys().chain(other.scrolls.keys()) {
-			if self.scrolls.get(key) != other.scrolls.get(key) {
-				out.push(key.clone());
-			}
-		}
-		out
-	}
-}
 
 #[cfg(test)]
 mod bend_bench {

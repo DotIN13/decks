@@ -91,12 +91,6 @@ impl Worker {
 		Ok(())
 	}
 
-	/// A font file arrived: laid out again and every tile repainted, at the next paint (`settle`).
-	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
-		self.text.add_font(name, bytes, fallback);
-		self.relayout = true;
-	}
-
 	/// The tiles a change reaches are painted again: in a root laid out again, what each changed item
 	/// painted before and paints now (`Root::changed_ink`), so a word changed in a big frame repaints
 	/// that word's tiles, not the frame's; the whole extent, before and after, when its items changed.
@@ -138,6 +132,39 @@ impl Worker {
 		}
 	}
 
+	// Fonts, pictures and icons arriving.
+	/// A font file arrived: laid out again and every tile repainted, at the next paint (`settle`).
+	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
+		self.text.add_font(name, bytes, fallback);
+		self.relayout = true;
+	}
+
+	/// A picture arrived (its texture made by the caller).
+	pub fn picture(&mut self, url: &str, texture: u32, width: u32, height: u32) {
+		self.pictures.held.insert(url.to_owned(), (texture, width, height));
+		// Laid out again, and every tile painted again, for a card that shows it (`Text::picture`);
+		// otherwise only the tiles painted without it are painted again.
+		if self.text.picture(url, width as f32, height as f32) {
+			self.relayout = true;
+		}
+		if let Some(keys) = self.missing.remove(url) {
+			self.version += 1;
+			for key in keys {
+				if let Some(tile) = self.grid.tiles.get_mut(&key) {
+					tile.dirty = true;
+				}
+			}
+		}
+	}
+
+	/// An icon arrived: tiles are painted again (an icon is small, but it may be anywhere), at the
+	/// next paint, once for however many came (`settle`).
+	pub fn icon(&mut self, key: &str, shape: IconShape) {
+		self.icons.insert(key.to_owned(), shape);
+		self.repaint = true;
+	}
+
+	// What the page hides, lifts and puts down.
 	/// What the stage hides, mutes or shows live changed: the tiles those items are on are painted again.
 	pub fn set_view(&mut self, next: ViewState) {
 		self.settle();
@@ -242,31 +269,7 @@ impl Worker {
 		out
 	}
 
-	/// A picture arrived (its texture made by the caller).
-	pub fn picture(&mut self, url: &str, texture: u32, width: u32, height: u32) {
-		self.pictures.held.insert(url.to_owned(), (texture, width, height));
-		// Laid out again, and every tile painted again, for a card that shows it (`Text::picture`);
-		// otherwise only the tiles painted without it are painted again.
-		if self.text.picture(url, width as f32, height as f32) {
-			self.relayout = true;
-		}
-		if let Some(keys) = self.missing.remove(url) {
-			self.version += 1;
-			for key in keys {
-				if let Some(tile) = self.grid.tiles.get_mut(&key) {
-					tile.dirty = true;
-				}
-			}
-		}
-	}
-
-	/// An icon arrived: tiles are painted again (an icon is small, but it may be anywhere), at the
-	/// next paint, once for however many came (`settle`).
-	pub fn icon(&mut self, key: &str, shape: IconShape) {
-		self.icons.insert(key.to_owned(), shape);
-		self.repaint = true;
-	}
-
+	// Painting tiles.
 	/// The next tiles to paint for a view, with their draw lists: missing ones first, the middle first.
 	///
 	/// For tests and measures: the lists are built one after another without being drawn, so text in
