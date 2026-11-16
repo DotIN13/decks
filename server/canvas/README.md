@@ -1,13 +1,13 @@
 # server/canvas
 
 The canvas feature: a canvas's drawing, the ops that change it, and the log of those changes.
-It answers `item.*` (13 calls), `canvas.*` (11 of 13: not `screenshot` or `export`), `frame.*` (4).
+It answers `item.*` (13 calls), `canvas.*` (12 of 14: not `screenshot` or `export`), `frame.*` (4).
 
 ## Owns
 
 - `doc.ts`: `PenCanvas`, one drawing's `CanvasDoc`; `log.ts` its changes and undo; `arrows.ts` reroutes.
-- `ops.ts` (ops into pen's edits), `place.ts` (at, beside, below, space), `kinds.ts` (who owns a node).
-- `spans.ts` keeps untouched items' bytes; `store.ts` every canvas, title, file and its history; `clips.ts`.
+- `ops.ts`, `place.ts`, `kinds.ts`: ops into pen's edits, places, which feature owns a node; `spans.ts`
+  keeps untouched items' bytes; `store.ts` every canvas, title, file and history; `clips.ts`.
 - `item-calls.ts`, `canvas-calls.ts`, `frame-calls.ts`, `feature.ts`: the calls, and the feature.
 
 ## May import
@@ -24,8 +24,9 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
 4. Each kept apply is one change: the next revision of that drawing, the caller who made it and
    the ops. Revisions start at 0 when the server opens a drawing and rise by one per change.
 5. `since(rev)` gives the changes after rev, oldest first. Undo, sync and news read it.
-6. A change is written to the file, then announced as `item.changed` with the ids it touched;
-   a call that makes it answers after both.
+6. A change is written to the file, then announced as `item.changed`: its ids, its ops, the same
+   change as pen's diff edits (routes too), and in `made` the edit name its caller gave, if any;
+   a call that makes it answers after both. `canvas.drawing` reads the file's document and rev.
 7. A place is one of `at` (the top-left corner), `beside` (160 px right of an item, tops aligned)
    or `below` (160 px under it, lefts aligned). Two at once is refused. A later op may be beside
    an item an earlier op made. An insert given no place keeps its own x and y, or else joins
@@ -50,8 +51,7 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
 13. A canvas's `name` is its folder and never changes; its `title` is in `canvas.json`. A call
     may name a canvas by either; one written there from outside is read in. A canvas named by
     none is the caller's here.
-14. A frame file holds one reusable item. `frame.save` writes an item to one and puts a ref in
-    its place unless `replace` is false.
+14. A frame file holds one reusable item; `frame.save` writes one and leaves a ref unless `replace` is false.
 15. A drawing's versions are its file's revisions in the deck's history, newest first. `restore`
     reads one back in at once and writes it as a new change, announced like any other.
 

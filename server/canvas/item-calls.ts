@@ -20,20 +20,20 @@ export function itemCalls(store: CanvasStore, clips: Clips) {
 		insert: async (ctx, { item, at: corner, beside, below, parent, index, ...on }) => written(await one(store, at(ctx, on), { op: "insert", item, ...defined({ at: corner, beside, below, parent, index }) }, ctx)),
 		update: async (ctx, { id, set, at: corner, size, ...on }) => written(await one(store, at(ctx, on), { op: "update", id, ...defined({ set, at: corner, size }) }, ctx)),
 		replace: async (ctx, { id, item, ...on }) => written(await one(store, at(ctx, on), { op: "replace", id, item }, ctx)),
-		remove: (ctx, { id, ...on }) => {
+		remove: (ctx, { id, edit, ...on }) => {
 			const doc = at(ctx, on);
 			const found = doc.idOf(id);
-			doc.apply([{ op: "delete", id: found }], ctx.caller);
+			doc.apply([{ op: "delete", id: found }], ctx.caller, edit);
 			return written({ deleted: id });
 		},
 		move: async (ctx, { id, at: corner, beside, below, parent, index, ...on }) => written(await one(store, at(ctx, on), { op: "move", id, ...defined({ at: corner, beside, below, parent, index }) }, ctx)),
 		copy: async (ctx, { id, as, at: corner, parent, ...on }) => written(await one(store, at(ctx, on), { op: "copy", id, ...defined({ as, at: corner, parent }) }, ctx)),
-		batch: async (ctx, { ops, for: _for, ...on }) => {
+		batch: async (ctx, { ops, for: _for, edit, ...on }) => {
 			const doc = at(ctx, on);
-			return written(doc.apply(await store.kindsOf().prepare(ops, prepping(doc, ctx)), ctx.caller).items);
+			return written(doc.apply(await store.kindsOf().prepare(ops, prepping(doc, ctx)), ctx.caller, edit).items);
 		},
 		clip: (ctx, a) => clips.clip(ctx.canvasName(a.canvas), a.ids, a.id),
-		paste: async (ctx, a) => written(await clips.paste(a.clip.id, ctx.canvasName(a.canvas), a.at, ctx.caller)),
+		paste: async (ctx, a) => written(await clips.paste(a.clip.id, ctx.canvasName(a.canvas), a.at, ctx.caller, a.edit)),
 		space: (ctx, a) => roomFor(at(ctx, a), a),
 		variables: (ctx, { set, themes, ...on }) => {
 			const name = ctx.canvasName(on.canvas);

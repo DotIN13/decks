@@ -29,7 +29,7 @@ export class Clips {
 		return { id, canvas, box: { x1: b.x, y1: b.y, x2: b.x + b.w, y2: b.y + b.h }, items: taken.items.length };
 	}
 
-	async paste(clipId: string, to: string, at: { x: number; y: number } | undefined, by: Caller): Promise<Item[]> {
+	async paste(clipId: string, to: string, at: { x: number; y: number } | undefined, by: Caller, edit?: string): Promise<Item[]> {
 		this.sweep();
 		const held = this.held.get(clipId);
 		if (!held) throw new Refused("not_found", `No clip called ${clipId} is held; clips last a day.`, "item.clip");
@@ -39,7 +39,7 @@ export class Clips {
 		const paths = await this.carryFiles(held, to, by);
 		const copies = pastedItems(held.items, idsOf(doc.pen()), { dx, dy }).items.map((node) => this.repath(node, held.canvas, to, paths));
 		const ops: ItemOp[] = copies.map((item) => ({ op: "insert", item, parent: null }));
-		return doc.apply(ops, by).items;
+		return doc.apply(ops, by, edit).items;
 	}
 
 	/** Copy each file an item needs into the target canvas; old deck path to new. */

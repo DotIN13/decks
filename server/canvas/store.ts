@@ -1,7 +1,7 @@
 import { shortVariables } from "@decks/pen";
 import { events, idsOf, layout, Refused, type Caller, type Infer, type shapes } from "../../protocol/index.ts";
 import { toDeckPath, type Change, type Deck, type DeckPath, type Kernel, type Stop } from "../kernel/types.ts";
-import { PenCanvas } from "./doc.ts";
+import { PenCanvas, type Told } from "./doc.ts";
 import { Kinds } from "./kinds.ts";
 
 // Every drawing in the deck, kept in memory: each canvas's canvas.pen and
@@ -93,6 +93,12 @@ export class CanvasStore {
 		};
 	}
 
+	/** canvas.drawing: the document as the file holds it, its revision, and where its paths are read from. */
+	drawingOf(name: string): { doc: Record<string, unknown>; rev: number; base: string } {
+		const doc = this.doc(name);
+		return { doc: doc.pen() as unknown as Record<string, unknown>, rev: doc.rev, base: `/files/${layout.canvasFolder(name)}/` };
+	}
+
 	// Finding a drawing
 	file(name: string): DeckPath {
 		return toDeckPath(`${layout.canvasFolder(name)}/canvas.pen`);
@@ -149,22 +155,22 @@ export class CanvasStore {
 
 	private keep(file: DeckPath, canvas: string, text: string): Kept {
 		const kept: Kept = { canvas, file, mine: [], queue: Promise.resolve(), doc: undefined as never };
-		kept.doc = new PenCanvas(canvas, text, this.kinds, (out, change, ids, by) => this.save(kept, out, change, ids, by), () => this.clock());
+		kept.doc = new PenCanvas(canvas, text, this.kinds, (out, change, ids, by, told) => this.save(kept, out, change, ids, by, told), () => this.clock());
 		this.drawings.set(file, kept);
 		return kept;
 	}
 
 	// Writing a change, and hearing one from outside
-	private save(kept: Kept, text: string, change: Change, ids: string[], by: Caller): void {
+	private save(kept: Kept, text: string, change: Change, ids: string[], by: Caller, told: Told): void {
 		kept.mine.push(text);
 		if (kept.mine.length > 20) kept.mine.shift();
-		const announce = () => this.announce(kept.canvas, change, ids);
+		const announce = () => this.announce(kept.canvas, change, ids, told);
 		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(announce, () => undefined);
 	}
 
 	/** A change, told as item.changed once it is on disk. */
-	private announce(canvas: string, change: Change, ids: string[]): void {
-		this.kernel.events.emit(events.itemChanged, { canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops });
+	private announce(canvas: string, change: Change, ids: string[], told: Told): void {
+		this.kernel.events.emit(events.itemChanged, { canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops, pen: told.pen as never, ...(told.made ? { made: told.made } : {}) });
 	}
 
 	private async heard(path: DeckPath, kind: "written" | "deleted", by: string): Promise<void> {
@@ -176,13 +182,13 @@ export class CanvasStore {
 		if (text === undefined) return;
 		const echo = kept ? kept.mine.indexOf(text) : -1;
 		if (kept && echo >= 0) return void kept.mine.splice(0, echo + 1);
-		let change: Change | undefined;
+		let read: ReturnType<PenCanvas["reload"]>;
 		try {
-			change = kept?.doc.reload(text, by);
+			read = kept?.doc.reload(text, by);
 		} catch {
 			return;
 		}
-		if (change) this.announce(kept!.canvas, change, change.ops.flatMap(idsOf));
+		if (read) this.announce(kept!.canvas, read.change, read.change.ops.flatMap(idsOf), { pen: read.pen });
 		if (kept) return;
 		if (at.rest === "canvas.pen" || at.rest.startsWith("frames/")) {
 			if (!this.titles.has(at.name)) this.titles.set(at.name, readTitle(await this.text(this.metaFile(at.name))) ?? at.name);
@@ -215,10 +221,10 @@ export class CanvasStore {
 	async restore(name: string, rev: number, by: Caller): Promise<void> {
 		const text = await this.version(name, rev);
 		const kept = this.drawing(this.file(name));
-		const change = kept.doc.reload(text, by.id);
-		if (!change) return;
+		const read = kept.doc.reload(text, by.id);
+		if (!read) return;
 		kept.mine.push(text);
-		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(() => this.announce(name, change, change.ops.flatMap(idsOf)), () => undefined);
+		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(() => this.announce(name, read.change, read.change.ops.flatMap(idsOf), { pen: read.pen }), () => undefined);
 		await kept.queue;
 	}
 

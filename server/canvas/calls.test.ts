@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { applyEdits, type PenDocument } from "@decks/pen";
 import { callers, testServer } from "../kernel/testing.ts";
 import { toDeckPath, type Item } from "../kernel/types.ts";
 import { canvasFeature } from "./feature.ts";
@@ -91,6 +92,42 @@ test("a drawing's versions are its file's revisions, newest first; one reads bac
 	assert.match(await text(s, "canvases/plan/canvas.pen"), /"one"/);
 	assert.ok(s.heard.some((e) => e.name === "item.changed" && e.payload.rev === restored.rev && e.payload.by === "person"));
 	assert.equal((await s.call("canvas.restore", { rev: versions[1]!.rev, canvas: "plan" }, ann)).ok, false);
+	await s.close();
+});
+
+test("canvas.drawing reads the file's document, its revision and where its paths are read from", async () => {
+	const s = await start();
+	await s.value("item.update", { id: "a", set: { content: "one" } }, ann);
+	const got = await s.value<{ doc: { children: { id: string; content?: string }[] }; rev: number; base: string }>("canvas.drawing", { canvas: "plan" });
+	assert.deepEqual([got.rev, got.base, got.doc.children[0]!.content], [1, "/files/canvases/plan/", "one"]);
+	await s.close();
+});
+
+test("item.changed carries the change as pen's edits, routes too, turning the drawing at base into this one", async () => {
+	const s = await start();
+	const before = (await s.value<{ doc: PenDocument }>("canvas.drawing", { canvas: "plan" })).doc;
+	await s.value("item.batch", { ops: [{ op: "insert", item: { type: "path", id: "ar", metadata: { type: "decks.arrow", from: "a", to: "b" } } }, { op: "move", id: "b", at: { x: 360, y: 400 } }] }, ann);
+	const told = s.heard.filter((e) => e.name === "item.changed").at(-1)!.payload as { pen: unknown[]; base: number; rev: number };
+	const after = (await s.value<{ doc: PenDocument; rev: number }>("canvas.drawing", { canvas: "plan" })).doc;
+	assert.deepEqual(applyEdits(before, told.pen as never), after);
+	assert.ok(JSON.stringify(told.pen).includes("geometry"));
+	await s.close();
+});
+
+test("an edit name given to batch, delete, paste or undo comes back in item.changed's made", async () => {
+	const s = await start();
+	const made = () => (s.heard.filter((e) => e.name === "item.changed").at(-1)!.payload as { made?: string[] }).made;
+	await s.value("item.batch", { ops: [{ op: "update", id: "a", set: { content: "x" } }], edit: "e1", canvas: "plan" });
+	assert.deepEqual(made(), ["e1"]);
+	await s.value("canvas.undo", { canvas: "plan", edit: "e2" });
+	assert.deepEqual(made(), ["e2"]);
+	await s.value("item.clip", { ids: ["a"], id: "c1", canvas: "plan" });
+	await s.value("item.paste", { clip: { id: "c1", canvas: "plan" }, canvas: "plan", edit: "e3" });
+	assert.deepEqual(made(), ["e3"]);
+	await s.value("item.delete", { id: "b", canvas: "plan", edit: "e4" });
+	assert.deepEqual(made(), ["e4"]);
+	await s.value("item.update", { id: "a", set: { content: "y" } }, ann);
+	assert.equal(made(), undefined);
 	await s.close();
 });
 

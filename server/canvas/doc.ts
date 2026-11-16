@@ -1,4 +1,4 @@
-import { baseTheme, parse, PenError, read as penRead, themeFrom, type PenDocument, type PenNode } from "@decks/pen";
+import { baseTheme, diff, parse, PenError, read as penRead, themeFrom, type PenDocument, type PenNode } from "@decks/pen";
 import { idsOf, Refused, type Caller } from "../../protocol/index.ts";
 import type { CanvasDoc, Change, Item, ItemOp, ItemQuery } from "../kernel/types.ts";
 import type { Kinds } from "./kinds.ts";
@@ -10,7 +10,9 @@ import { sourceOf, writeLike, type Source } from "./spans.ts";
 // One drawing in memory: read, changed only by apply (all or none), and
 // written back through `saved` so untouched items keep their bytes.
 
-export type Saved = (text: string, change: Change, ids: string[], by: Caller) => void;
+/** What item.changed carries beside the ops: the change as pen's diff edits, and the caller's edit name. */
+export type Told = { pen: unknown[]; made?: string[] };
+export type Saved = (text: string, change: Change, ids: string[], by: Caller, told: Told) => void;
 export type ReadOptions = ItemQuery & { resolve?: { variables?: boolean; instances?: boolean; geometry?: boolean }; theme?: Record<string, string> };
 
 export class PenCanvas implements CanvasDoc {
@@ -59,7 +61,7 @@ export class PenCanvas implements CanvasDoc {
 	}
 
 	// Changing it: all or none, one revision per change
-	apply(ops: ItemOp[], by: Caller): { items: Item[]; rev: number } {
+	apply(ops: ItemOp[], by: Caller, edit?: string): { items: Item[]; rev: number } {
 		if (!Array.isArray(ops) || !ops.length) throw new Refused("invalid", "Give at least one op.", "item.batch");
 		let work = this.doc;
 		const written: ItemOp[] = [];
@@ -76,20 +78,21 @@ export class PenCanvas implements CanvasDoc {
 		});
 		ids.push(...routeArrows(work, this.name));
 		const before = this.doc;
-		this.commit(work, written, by, ids);
+		this.commit(work, written, by, ids, by.kind === "person", edit);
 		if (by.kind === "person") this.log.edited(before, work);
 		const kept = [...new Set(ids)].filter((id) => findIn(this.doc, id, { canvas: this.name, kinds: this.kinds }));
 		return { items: kept.flatMap((id) => this.read({ ids: [id] })), rev: this.rev };
 	}
 
-	private commit(next: PenDocument, ops: ItemOp[], by: Caller, ids: string[], own = by.kind === "person"): void {
+	private commit(next: PenDocument, ops: ItemOp[], by: Caller, ids: string[], own = by.kind === "person", edit?: string): void {
+		const pen = diff(this.doc, next);
 		this.doc = next;
 		this.rev++;
 		const change: Change = { rev: this.rev, ops, by: by.id, at: this.clock() };
 		this.log.add(change, own || by.kind === "card");
 		const text = writeLike(this.source, next as unknown as Record<string, unknown>);
 		this.source = sourceOf(text);
-		this.saved(text, change, [...new Set(ids)], by);
+		this.saved(text, change, [...new Set(ids)], by, { pen, ...(edit ? { made: [edit] } : {}) });
 	}
 
 	// Its log: since, undo and redo, and edits from outside
@@ -102,25 +105,26 @@ export class PenCanvas implements CanvasDoc {
 	}
 
 	/** Take back the person's last edit, or put it back. */
-	undo(by: Caller, redo = false): number {
+	undo(by: Caller, redo = false, edit?: string): number {
 		const taken = this.log.take(redo);
 		const ops = opsBetween(this.doc, taken.doc);
-		this.commit(taken.doc, ops, by, ops.flatMap(idsOf), true);
+		this.commit(taken.doc, ops, by, ops.flatMap(idsOf), true, edit);
 		taken.done();
 		return this.rev;
 	}
 
 	/** The file changed from outside: take it in as one change by whoever wrote it. */
-	reload(text: string, by: string): Change | undefined {
+	reload(text: string, by: string): { change: Change; pen: unknown[] } | undefined {
 		if (this.source?.text === text) return undefined;
 		const next = parseOrRefuse(text, this.name);
+		const pen = diff(this.doc, next);
 		const ops = opsBetween(this.doc, next);
 		this.source = sourceOf(text);
 		this.doc = next;
 		this.rev++;
 		const change = { rev: this.rev, ops, by, at: this.clock() };
 		this.log.add(change, false);
-		return change;
+		return { change, pen };
 	}
 }
 

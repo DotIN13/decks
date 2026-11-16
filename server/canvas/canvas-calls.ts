@@ -6,14 +6,15 @@ import { emptyDrawing, type CanvasStore } from "./store.ts";
 // the protocol (screenshot, export) is another feature's until named here.
 // A canvas's name is its folder and never changes; its title can.
 
-const { list, get, here, create, update, remove, copy, undo, versions, version, restore } = calls.canvas;
-const mine = { list, get, here, create, update, remove, copy, undo, versions, version, restore };
+const { list, get, drawing, here, create, update, remove, copy, undo, versions, version, restore } = calls.canvas;
+const mine = { list, get, drawing, here, create, update, remove, copy, undo, versions, version, restore };
 
 export function canvasCalls(store: CanvasStore) {
 	const changed = (ctx: Context, name: string) => ctx.events.emit(events.canvasChanged, { canvas: name, ids: [name], by: ctx.caller.id, rev: 0 });
 	return handleAll(mine, {
 		list: () => store.list().map((name) => store.describe(name)),
 		get: (ctx, a) => store.describe(ctx.canvasName(a.canvas)),
+		drawing: (ctx, a) => store.drawingOf(ctx.canvasName(a.canvas)),
 		here: (ctx) => store.describe(ctx.canvasName()),
 		create: async (ctx, { title }) => {
 			const name = await make(store, title, ctx.caller);
@@ -49,10 +50,10 @@ export function canvasCalls(store: CanvasStore) {
 			await store.restore(name, rev, ctx.caller);
 			return store.describe(name);
 		},
-		undo: async (ctx, { redo, canvas }) => {
+		undo: async (ctx, { redo, canvas, edit }) => {
 			const name = ctx.canvasName(canvas);
 			if (ctx.caller.kind !== "person" && ctx.caller.kind !== "card") throw new Refused("refused", "Only the person's own edits are undone.", "item.batch");
-			store.doc(name).undo(ctx.caller, redo ?? false);
+			store.doc(name).undo(ctx.caller, redo ?? false, edit);
 			await store.flush();
 			return store.describe(name);
 		},
