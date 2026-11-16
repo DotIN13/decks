@@ -12,7 +12,8 @@ messages a server and Studio exchange. Package `@decks/protocol`. Only Lexicon e
 - `event.ts`: `defineEvent`. `events.ts`: every event.
 - `calls/<noun>.ts`: every call, one file per noun; `calls/index.ts` lists them all.
 - `glossary.ts`: the nouns, the shared verbs, and `retired`, the words the names gate refuses.
-- `layout.ts`: the deck folder's layout and path rules. `sync.ts`: what a server and Studio exchange.
+- `layout.ts`: the deck folder's layout and path rules. `deck-files.ts`: a card's meta tag and the deck's
+  import map, read one way. `sync.ts`: what a server and Studio exchange.
 - `version.ts`: the protocol's version.
 
 ## May import
