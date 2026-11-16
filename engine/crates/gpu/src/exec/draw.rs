@@ -17,16 +17,6 @@ pub struct Out<'a> {
 	pub format: wgpu::TextureFormat,
 }
 
-/// The samples a pixel `built` is drawn with, at most `most`: only triangles need more than one.
-/// Shapes, glyphs and pictures carry their own soft edges, so a list of those alone (the page's
-/// frame of tiles and board pictures, nearly always) is drawn straight into its target. Four samples
-/// over the page's canvas (the window and its slack at 2×) held the card at 93% redrawing it each
-/// frame (55% without), and each redraw during a pan stalled the screen for 40 to 60 ms.
-pub fn samples_for(built: &Built, most: u32) -> u32 {
-	let triangles = built.passes.iter().any(|p| p.cmds.iter().any(|c| matches!(c, Cmd::Mesh { .. })));
-	if triangles { most } else { 1 }
-}
-
 /// Encode and submit `built` into `out`. `textures` are the stage's own (tiles, atlases, pictures).
 #[allow(clippy::too_many_arguments)]
 pub fn run(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &mut Pipelines, res: &mut Resources, limits: &Limits, textures: &HashMap<u32, Tex>, built: &Built, out: Out) {
@@ -96,4 +86,14 @@ fn encode(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, res
 		}
 	}
 	queue.submit([encoder.finish()]);
+}
+
+/// The samples a pixel `built` is drawn with, at most `most`: only triangles need more than one.
+/// Shapes, glyphs and pictures carry their own soft edges, so a list of those alone (the page's
+/// frame of tiles and board pictures, nearly always) is drawn straight into its target. Four samples
+/// over the page's canvas (the window and its slack at 2×) held the card at 93% redrawing it each
+/// frame (55% without), and each redraw during a pan stalled the screen for 40 to 60 ms.
+pub fn samples_for(built: &Built, most: u32) -> u32 {
+	let triangles = built.passes.iter().any(|p| p.cmds.iter().any(|c| matches!(c, Cmd::Mesh { .. })));
+	if triangles { most } else { 1 }
 }

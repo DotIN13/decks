@@ -111,6 +111,124 @@ impl Gpu {
 		}
 	}
 
+	/// The graphics API this backend's device is on.
+	pub fn api(&self) -> Api {
+		self.api
+	}
+
+	/// Mark the device gone from outside wgpu (a WebGL context lost): `lost()` says so from now on.
+	pub fn lost_flag(&self) -> Arc<AtomicBool> {
+		self.lost.clone()
+	}
+
+	// Its textures, by the stage's own numbers.
+	fn make_texture(&self, kind: TextureKind, width: u32, height: u32) -> Tex {
+		Tex::new(&self.device, &self.pipelines.picture_layout, kind, width, height)
+	}
+
+	/// A texture the caller made elsewhere (a picture copied from an `ImageBitmap`), under our id.
+	pub fn adopt(&mut self, id: u32, texture: wgpu::Texture) {
+		let tex = Tex::wrap(&self.device, &self.pipelines.picture_layout, texture, TextureKind::Color);
+		self.textures.insert(id, tex);
+	}
+
+	pub fn texture_handle(&self, id: u32) -> Option<&wgpu::Texture> {
+		self.textures.get(&id).map(|t| &t.texture)
+	}
+
+	/// A texture's pixels, RGBA8 premultiplied, rows tight: for tests and pictures of tiles.
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn read(&self, id: u32) -> Option<Vec<u8>> {
+		let tex = self.textures.get(&id)?;
+		let bytes = if tex.kind == TextureKind::Mask { 1 } else { 4 };
+		let row = (tex.width * bytes).div_ceil(256) * 256;
+		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor { label: Some("read"), size: (row * tex.height) as u64, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
+		let mut encoder = self.device.create_command_encoder(&Default::default());
+		encoder.copy_texture_to_buffer(
+			tex.texture.as_image_copy(),
+			wgpu::TexelCopyBufferInfo { buffer: &buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(tex.height) } },
+			wgpu::Extent3d { width: tex.width, height: tex.height, depth_or_array_layers: 1 },
+		);
+		self.queue.submit([encoder.finish()]);
+		let slice = buffer.slice(..);
+		slice.map_async(wgpu::MapMode::Read, |_| {});
+		self.device.poll(wgpu::PollType::wait_indefinitely()).ok()?;
+		let data = slice.get_mapped_range().ok()?;
+		let mut out = Vec::with_capacity((tex.width * tex.height * bytes) as usize);
+		for y in 0..tex.height {
+			let start = (y * row) as usize;
+			out.extend_from_slice(&data[start..start + (tex.width * bytes) as usize]);
+		}
+		Some(out)
+	}
+
+	// Ready before a gesture needs it: pipelines made, spare textures kept.
+	/// Make now what a draw would otherwise make the first time it needs it, so that time is not
+	/// taken in the middle of a gesture: the pipelines for every colour format drawn into here (the
+	/// screen's, layers' and read-back tiles' RGBA8) at one sample a pixel and at the most (a draw
+	/// with triangles: paper, ink, lifted items), and for `msaa`, a screen-sized multisampled texture
+	/// and one layer texture of that size (the worker's tile, 512 pixels square; the page's window
+	/// is too big to hold one for a draw that may never come). Compiling a pipeline holds the GPU
+	/// process's one thread, frames included.
+	pub fn warm(&mut self, msaa: bool) {
+		let mut formats = vec![wgpu::TextureFormat::Rgba8Unorm];
+		for (_, config) in &self.surfaces {
+			if !formats.contains(&config.format) {
+				formats.push(config.format);
+			}
+		}
+		let most = self.pipelines.samples;
+		for format in &formats {
+			for samples in [1, most] {
+				self.pipelines.prepare(&self.device, *format, samples);
+			}
+		}
+		if let (true, Some((_, config))) = (msaa, self.surfaces.first()) {
+			let (width, height, format) = (config.width, config.height, config.format);
+			if most > 1 {
+				for f in [format, wgpu::TextureFormat::Rgba8Unorm] {
+					self.resources.msaa(&self.device, most, width, height, f, 0);
+				}
+			}
+			self.resources.lend_layers(&self.device, &self.pipelines, &[(u32::MAX, width, height)], width, height);
+			self.resources.return_layers();
+		}
+	}
+
+	/// Let a texture go, but keep it among the spares of its size and kind (`texture_from_spare`):
+	/// the page's tiles, made and let go of by the dozen in a zoom.
+	pub fn forget_to_spare(&mut self, id: u32) {
+		if let Some(tex) = self.textures.remove(&id) {
+			let spare = self.spare_textures.entry((tex.width, tex.height, tex.kind as u8)).or_default();
+			if spare.len() < self.spare_cap {
+				spare.push(tex);
+			}
+		}
+	}
+
+	/// A `width` × `height` texture under `id` from the spares (`forget_to_spare`), or a new one;
+	/// what a spare held is still in it, for a caller that writes it whole.
+	pub fn texture_from_spare(&mut self, id: u32, kind: TextureKind, width: u32, height: u32) {
+		let spare = self.spare_textures.get_mut(&(width, height, kind as u8)).and_then(Vec::pop);
+		let tex = match spare {
+			Some(tex) => tex,
+			None => self.make_texture(kind, width, height),
+		};
+		self.textures.insert(id, tex);
+	}
+
+	/// Hold up to `count` spare textures of a size and kind, made now (`warm`), and keep no more
+	/// than that many from then on.
+	pub fn make_spares(&mut self, kind: TextureKind, width: u32, height: u32, count: usize) {
+		self.spare_cap = count;
+		let have = self.spare_textures.get(&(width, height, kind as u8)).map_or(0, Vec::len);
+		for _ in have..count {
+			let tex = self.make_texture(kind, width, height);
+			self.spare_textures.entry((width, height, kind as u8)).or_default().push(tex);
+		}
+	}
+
+	// Pictures: their smaller sizes, and compressed ones.
 	/// A picture's texture under `id`, `width` × `height`, with room for its smaller sizes
 	/// (`fill_levels`), unless the one there already is that. WebGL 2 keeps one size: drawing into
 	/// one level of a texture while reading the next is not something its backend promises.
@@ -196,121 +314,6 @@ impl Gpu {
 		self.queue.submit([encoder.finish()]);
 		self.textures.insert(id, smaller);
 		Some((w, h))
-	}
-
-	/// The graphics API this backend's device is on.
-	pub fn api(&self) -> Api {
-		self.api
-	}
-
-	/// Mark the device gone from outside wgpu (a WebGL context lost): `lost()` says so from now on.
-	pub fn lost_flag(&self) -> Arc<AtomicBool> {
-		self.lost.clone()
-	}
-
-	fn make_texture(&self, kind: TextureKind, width: u32, height: u32) -> Tex {
-		Tex::new(&self.device, &self.pipelines.picture_layout, kind, width, height)
-	}
-
-	/// A texture the caller made elsewhere (a picture copied from an `ImageBitmap`), under our id.
-	pub fn adopt(&mut self, id: u32, texture: wgpu::Texture) {
-		let tex = Tex::wrap(&self.device, &self.pipelines.picture_layout, texture, TextureKind::Color);
-		self.textures.insert(id, tex);
-	}
-
-	/// Make now what a draw would otherwise make the first time it needs it, so that time is not
-	/// taken in the middle of a gesture: the pipelines for every colour format drawn into here (the
-	/// screen's, layers' and read-back tiles' RGBA8) at one sample a pixel and at the most (a draw
-	/// with triangles: paper, ink, lifted items), and for `msaa`, a screen-sized multisampled texture
-	/// and one layer texture of that size (the worker's tile, 512 pixels square; the page's window
-	/// is too big to hold one for a draw that may never come). Compiling a pipeline holds the GPU
-	/// process's one thread, frames included.
-	pub fn warm(&mut self, msaa: bool) {
-		let mut formats = vec![wgpu::TextureFormat::Rgba8Unorm];
-		for (_, config) in &self.surfaces {
-			if !formats.contains(&config.format) {
-				formats.push(config.format);
-			}
-		}
-		let most = self.pipelines.samples;
-		for format in &formats {
-			for samples in [1, most] {
-				self.pipelines.prepare(&self.device, *format, samples);
-			}
-		}
-		if let (true, Some((_, config))) = (msaa, self.surfaces.first()) {
-			let (width, height, format) = (config.width, config.height, config.format);
-			if most > 1 {
-				for f in [format, wgpu::TextureFormat::Rgba8Unorm] {
-					self.resources.msaa(&self.device, most, width, height, f, 0);
-				}
-			}
-			self.resources.lend_layers(&self.device, &self.pipelines, &[(u32::MAX, width, height)], width, height);
-			self.resources.return_layers();
-		}
-	}
-
-	/// Let a texture go, but keep it among the spares of its size and kind (`texture_from_spare`):
-	/// the page's tiles, made and let go of by the dozen in a zoom.
-	pub fn forget_to_spare(&mut self, id: u32) {
-		if let Some(tex) = self.textures.remove(&id) {
-			let spare = self.spare_textures.entry((tex.width, tex.height, tex.kind as u8)).or_default();
-			if spare.len() < self.spare_cap {
-				spare.push(tex);
-			}
-		}
-	}
-
-	/// A `width` × `height` texture under `id` from the spares (`forget_to_spare`), or a new one;
-	/// what a spare held is still in it, for a caller that writes it whole.
-	pub fn texture_from_spare(&mut self, id: u32, kind: TextureKind, width: u32, height: u32) {
-		let spare = self.spare_textures.get_mut(&(width, height, kind as u8)).and_then(Vec::pop);
-		let tex = match spare {
-			Some(tex) => tex,
-			None => self.make_texture(kind, width, height),
-		};
-		self.textures.insert(id, tex);
-	}
-
-	/// Hold up to `count` spare textures of a size and kind, made now (`warm`), and keep no more
-	/// than that many from then on.
-	pub fn make_spares(&mut self, kind: TextureKind, width: u32, height: u32, count: usize) {
-		self.spare_cap = count;
-		let have = self.spare_textures.get(&(width, height, kind as u8)).map_or(0, Vec::len);
-		for _ in have..count {
-			let tex = self.make_texture(kind, width, height);
-			self.spare_textures.entry((width, height, kind as u8)).or_default().push(tex);
-		}
-	}
-
-	pub fn texture_handle(&self, id: u32) -> Option<&wgpu::Texture> {
-		self.textures.get(&id).map(|t| &t.texture)
-	}
-
-	/// A texture's pixels, RGBA8 premultiplied, rows tight: for tests and pictures of tiles.
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn read(&self, id: u32) -> Option<Vec<u8>> {
-		let tex = self.textures.get(&id)?;
-		let bytes = if tex.kind == TextureKind::Mask { 1 } else { 4 };
-		let row = (tex.width * bytes).div_ceil(256) * 256;
-		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor { label: Some("read"), size: (row * tex.height) as u64, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
-		let mut encoder = self.device.create_command_encoder(&Default::default());
-		encoder.copy_texture_to_buffer(
-			tex.texture.as_image_copy(),
-			wgpu::TexelCopyBufferInfo { buffer: &buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(tex.height) } },
-			wgpu::Extent3d { width: tex.width, height: tex.height, depth_or_array_layers: 1 },
-		);
-		self.queue.submit([encoder.finish()]);
-		let slice = buffer.slice(..);
-		slice.map_async(wgpu::MapMode::Read, |_| {});
-		self.device.poll(wgpu::PollType::wait_indefinitely()).ok()?;
-		let data = slice.get_mapped_range().ok()?;
-		let mut out = Vec::with_capacity((tex.width * tex.height * bytes) as usize);
-		for y in 0..tex.height {
-			let start = (y * row) as usize;
-			out.extend_from_slice(&data[start..start + (tex.width * bytes) as usize]);
-		}
-		Some(out)
 	}
 }
 

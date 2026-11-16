@@ -11,102 +11,6 @@ use stage_render::{Limits, Table};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
-/// How many sizes a `width` × `height` texture can have, each half the one before, down to one pixel.
-pub fn levels_for(width: u32, height: u32) -> u32 {
-	32 - width.max(height).max(1).leading_zeros()
-}
-
-/// A texture of the stage's: a tile, a glyph atlas, a picture, or a layer.
-pub struct Tex {
-	pub texture: wgpu::Texture,
-	pub view: wgpu::TextureView,
-	pub kind: TextureKind,
-	pub width: u32,
-	pub height: u32,
-	/// The texture bound as a draw's picture (group 1).
-	pub picture: wgpu::BindGroup,
-}
-
-impl Tex {
-	pub fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, kind: TextureKind, width: u32, height: u32) -> Tex {
-		Tex::with_levels(device, layout, kind, width, height, 1)
-	}
-
-	/// As `new`, with `levels` sizes, each half the one before (`mips.rs`): a picture drawn small.
-	pub fn with_levels(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, kind: TextureKind, width: u32, height: u32, levels: u32) -> Tex {
-		let format = match kind {
-			TextureKind::Color => wgpu::TextureFormat::Rgba8Unorm,
-			TextureKind::Mask => wgpu::TextureFormat::R8Unorm,
-		};
-		Tex::with_format(device, layout, format, width, height, levels)
-	}
-
-	/// A colour texture of `format` with `levels` sizes: RGBA8, drawn into and read from, or a
-	/// compressed picture (`ASTC`), only written and drawn from.
-	pub fn with_format(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, format: wgpu::TextureFormat, width: u32, height: u32, levels: u32) -> Tex {
-		let usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
-		let usage = if format.is_compressed() { usage } else { usage | wgpu::TextureUsages::RENDER_ATTACHMENT };
-		let texture = device.create_texture(&wgpu::TextureDescriptor {
-			label: Some("stage texture"),
-			size: wgpu::Extent3d { width: width.max(1), height: height.max(1), depth_or_array_layers: 1 },
-			mip_level_count: levels.clamp(1, levels_for(width, height)),
-			sample_count: 1,
-			dimension: wgpu::TextureDimension::D2,
-			format,
-			usage,
-			view_formats: &[],
-		});
-		let kind = if format == wgpu::TextureFormat::R8Unorm { TextureKind::Mask } else { TextureKind::Color };
-		Tex::wrap(device, layout, texture, kind)
-	}
-
-	pub fn wrap(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, texture: wgpu::Texture, kind: TextureKind) -> Tex {
-		let view = texture.create_view(&Default::default());
-		let picture = device.create_bind_group(&wgpu::BindGroupDescriptor { label: Some("picture"), layout, entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) }] });
-		let (width, height) = (texture.width(), texture.height());
-		Tex { texture, view, kind, width, height, picture }
-	}
-}
-
-/// A vertex or index buffer kept between draws: written in place, and made again, twice as big,
-/// only when a draw needs more than it holds.
-pub struct Growable {
-	label: &'static str,
-	usage: wgpu::BufferUsages,
-	buffer: Option<wgpu::Buffer>,
-}
-
-impl Growable {
-	fn new(label: &'static str, usage: wgpu::BufferUsages) -> Growable {
-		Growable { label, usage: usage | wgpu::BufferUsages::COPY_DST, buffer: None }
-	}
-
-	/// Put `bytes` at the start of the buffer, growing it first if they do not fit. Nothing for none.
-	fn write(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, bytes: &[u8]) {
-		if bytes.is_empty() {
-			return;
-		}
-		let need = bytes.len() as u64;
-		if self.buffer.as_ref().is_none_or(|b| b.size() < need) {
-			let size = need.next_power_of_two().max(4096);
-			self.buffer = Some(device.create_buffer(&wgpu::BufferDescriptor { label: Some(self.label), size, usage: self.usage, mapped_at_creation: false }));
-		}
-		queue.write_buffer(self.buffer.as_ref().expect("just made"), 0, bytes);
-	}
-
-	pub fn get(&self) -> Option<&wgpu::Buffer> {
-		self.buffer.as_ref()
-	}
-}
-
-/// The paint and clip table's texture, as many rows tall as the largest draw so far has needed
-/// (rounded up to a power of two), and the frame bind group that refers to it.
-struct TableTexture {
-	view: wgpu::TextureView,
-	texture: wgpu::Texture,
-	rows: u32,
-}
-
 pub struct Resources {
 	ramp: wgpu::Texture,
 	ramp_view: wgpu::TextureView,
@@ -327,4 +231,100 @@ impl Resources {
 		self.msaa.retain(|(w, h, _, _), _| (*w, *h) != (width, height));
 		self.spare.remove(&(width, height));
 	}
+}
+
+/// The paint and clip table's texture, as many rows tall as the largest draw so far has needed
+/// (rounded up to a power of two), and the frame bind group that refers to it.
+struct TableTexture {
+	view: wgpu::TextureView,
+	texture: wgpu::Texture,
+	rows: u32,
+}
+
+/// A vertex or index buffer kept between draws: written in place, and made again, twice as big,
+/// only when a draw needs more than it holds.
+pub struct Growable {
+	label: &'static str,
+	usage: wgpu::BufferUsages,
+	buffer: Option<wgpu::Buffer>,
+}
+
+impl Growable {
+	fn new(label: &'static str, usage: wgpu::BufferUsages) -> Growable {
+		Growable { label, usage: usage | wgpu::BufferUsages::COPY_DST, buffer: None }
+	}
+
+	/// Put `bytes` at the start of the buffer, growing it first if they do not fit. Nothing for none.
+	fn write(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, bytes: &[u8]) {
+		if bytes.is_empty() {
+			return;
+		}
+		let need = bytes.len() as u64;
+		if self.buffer.as_ref().is_none_or(|b| b.size() < need) {
+			let size = need.next_power_of_two().max(4096);
+			self.buffer = Some(device.create_buffer(&wgpu::BufferDescriptor { label: Some(self.label), size, usage: self.usage, mapped_at_creation: false }));
+		}
+		queue.write_buffer(self.buffer.as_ref().expect("just made"), 0, bytes);
+	}
+
+	pub fn get(&self) -> Option<&wgpu::Buffer> {
+		self.buffer.as_ref()
+	}
+}
+
+/// A texture of the stage's: a tile, a glyph atlas, a picture, or a layer.
+pub struct Tex {
+	pub texture: wgpu::Texture,
+	pub view: wgpu::TextureView,
+	pub kind: TextureKind,
+	pub width: u32,
+	pub height: u32,
+	/// The texture bound as a draw's picture (group 1).
+	pub picture: wgpu::BindGroup,
+}
+
+impl Tex {
+	pub fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, kind: TextureKind, width: u32, height: u32) -> Tex {
+		Tex::with_levels(device, layout, kind, width, height, 1)
+	}
+
+	/// As `new`, with `levels` sizes, each half the one before (`mips.rs`): a picture drawn small.
+	pub fn with_levels(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, kind: TextureKind, width: u32, height: u32, levels: u32) -> Tex {
+		let format = match kind {
+			TextureKind::Color => wgpu::TextureFormat::Rgba8Unorm,
+			TextureKind::Mask => wgpu::TextureFormat::R8Unorm,
+		};
+		Tex::with_format(device, layout, format, width, height, levels)
+	}
+
+	/// A colour texture of `format` with `levels` sizes: RGBA8, drawn into and read from, or a
+	/// compressed picture (`ASTC`), only written and drawn from.
+	pub fn with_format(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, format: wgpu::TextureFormat, width: u32, height: u32, levels: u32) -> Tex {
+		let usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
+		let usage = if format.is_compressed() { usage } else { usage | wgpu::TextureUsages::RENDER_ATTACHMENT };
+		let texture = device.create_texture(&wgpu::TextureDescriptor {
+			label: Some("stage texture"),
+			size: wgpu::Extent3d { width: width.max(1), height: height.max(1), depth_or_array_layers: 1 },
+			mip_level_count: levels.clamp(1, levels_for(width, height)),
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format,
+			usage,
+			view_formats: &[],
+		});
+		let kind = if format == wgpu::TextureFormat::R8Unorm { TextureKind::Mask } else { TextureKind::Color };
+		Tex::wrap(device, layout, texture, kind)
+	}
+
+	pub fn wrap(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, texture: wgpu::Texture, kind: TextureKind) -> Tex {
+		let view = texture.create_view(&Default::default());
+		let picture = device.create_bind_group(&wgpu::BindGroupDescriptor { label: Some("picture"), layout, entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) }] });
+		let (width, height) = (texture.width(), texture.height());
+		Tex { texture, view, kind, width, height, picture }
+	}
+}
+
+/// How many sizes a `width` × `height` texture can have, each half the one before, down to one pixel.
+pub fn levels_for(width: u32, height: u32) -> u32 {
+	32 - width.max(height).max(1).leading_zeros()
 }
