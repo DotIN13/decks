@@ -152,8 +152,8 @@ test("rule 14: card.url's pass ends after an hour", async (t) => {
 	const { path } = await s.value<{ path: string }>("card.create", { title: "Short" }, ann);
 	const url = await s.value<string>("card.url", { card: path });
 	const pass = decodeURIComponent(url.split("pass=")[1]!);
-	assert.equal(s.kernel.callers.resolve(pass)?.kind, "card");
+	assert.equal(s.callers.resolve(pass)?.kind, "card");
 	t.mock.timers.tick(PAGE_PASS_MS);
-	assert.equal(s.kernel.callers.resolve(pass), undefined);
+	assert.equal(s.callers.resolve(pass), undefined);
 	await s.close();
 });
