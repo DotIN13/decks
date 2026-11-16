@@ -3,7 +3,7 @@ import { Show } from "solid-js";
 import { OverlayLayer, TextEditor, InsertMenu } from "../editor/index.ts";
 import { type HoldAction, HoldMenu } from "../chrome/HoldMenu.tsx";
 import { setPropsOpen, setInsertPanel } from "../editor/pen-tools.ts";
-import { StageInk } from "../ink/InkLayer.tsx";
+import { CanvasInk } from "../ink/InkLayer.tsx";
 import { toWorld } from "../camera/camera.ts";
 import { stagePoint } from "../camera/coords.ts";
 import type { Props, checkProbes, editsAndInput, engineOf, itemsOf, penActions, selectionOf } from "./CanvasView.tsx";
@@ -158,7 +158,7 @@ export function fixedLayerOf(ctx: {
 			}}
 		</Show>
 		<Show when={props.drawing && props.onPenEdit}>
-			<StageInk
+			<CanvasInk
 				camera={props.camera}
 				view={view()}
 				toStage={(event) => toWorld(ctl.now(), view(), stagePoint(event))}
