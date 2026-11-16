@@ -10,9 +10,11 @@ behaviour are today's.
 - `index.ts`: the entry. It exports the names Studio imports as `@decks/agent-ui/composer`, and
   the `Composer` the shell mounts in the dock.
 - One part per folder, each `model.ts` (no DOM, unit tested), `view.tsx`, `actions.ts`:
-  `bar/` (the composer), `draft/` (the field), `model-picker/`, `mode-menu/`, `slash-menu/`,
+  `bar/` (the composer, with `sending.ts`: a line sent with its comments and pills, and
+  `destination.ts`: where a line goes), `draft/` (the field), `model-picker/`, `mode-menu/`, `slash-menu/`,
   `mention-menu/`, `recipient/`, `context/`, `hints/`.
-- `pill/` (a pill's words, its card, what it is about; `pill/compat` reads old messages),
+- `pill/` (a pill's words, its card, what it is about, a sent message's parts, and `finding.ts`:
+  finding on the canvas what a pill names; `pill/compat` reads old messages),
   `voice/`, and the tests that cross the server: `send.test.ts`, `entries.test.ts`.
 
 ## May import
