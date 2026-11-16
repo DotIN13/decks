@@ -158,10 +158,12 @@ Boards are retired: everything that used to be a board is now a card. Old boards
   relative to this one: `<a href="../risks/index.html">the risks card</a>`. Clicking it puts that card
   on the canvas beside this one. Every other link opens in a new tab of its own, never in place of the
   app, so a claim can cite its source with `href="https://…"`.
-- **A button acts through `card.decks`, wired in the card's module.** The calls are the `decks`
-  command's, by group and name, answering a promise: a decision is a button whose listener calls
-  `await card.decks.agent.send("<your name>", { task: "Option A", cards: [card.path] })`. The view,
-  `here` and `now` are answered at once; the canvas's own calls (`canvas.*`, `card.*`, `frame.create`,
-  `file.url`) change this canvas as the person; `agent.*` and `view.goto` go through the app, which
-  asks the person before a card's message reaches an agent; anything else (apps, the shared tab,
-  another canvas) is refused. There are no `data-eval` blocks in a card.
+- **A button acts through `card.decks`, wired in the card's module.** The calls are the protocol's,
+  by noun and verb, each given one object and answering a promise: a decision is a button whose
+  listener calls `await card.decks.agent.send({ agent: "<your name>", task: "Option A", cards: [card.path] })`,
+  and an item goes in with `await card.decks.item.insert({ item, beside: card.path })`. The view,
+  `here` and `now` are answered at once; the canvas's own calls (`item.*`, `canvas.*`, `card.*`,
+  `frame.create`, `file.url`) change this canvas as the person; `agent.*` and `view.goto` go through
+  the app, which asks the person before a card's message reaches an agent; anything else (apps, the
+  shared tab, another canvas) is refused. A card written with the old shape,
+  `card.decks.agent.send("<name>", { task })`, keeps working. There are no `data-eval` blocks in a card.
