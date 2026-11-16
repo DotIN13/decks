@@ -15,8 +15,8 @@ HTML; `playwright` for the browser. No other feature.
 ## Rules
 
 1. Only browser.ts starts a browser. Behind the `Browser` interface, so tests give a fake one.
-2. The browser loads pages from this server, with a card's own pass, never from the disk. The
-   server's address comes from the `origin` option; without it these calls answer `unavailable`.
+2. The browser loads pages from this server with a card's own pass, sent with everything the page
+   loads from the server (card.css, its theme, fonts); `origin` gives the address, else unavailable.
 3. Every picture and page is written through `ctx.deck`, so history names who asked for it.
 4. `card.fit` needs the card on the canvas: its width there is the width it is measured at, and
    is never changed. The height is the content's once it holds for 0.6 s (3 s at most), not the

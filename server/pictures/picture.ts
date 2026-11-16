@@ -10,6 +10,8 @@ import type { PictureTools } from "./tools.ts";
 export const PICTURES = "/pictures/";
 /** The canvas's ladder: the widths it asks a card's picture at, from the protocol. */
 export const LADDER: readonly number[] = PICTURE_LADDER;
+/** How pictures are taken now: a new value retakes every kept one. 2: the page's pass reaches its imports and fonts. */
+export const TAKEN = "t2";
 /** The widest picture an export or a screenshot draws a card from. */
 const WIDEST = 2000;
 
@@ -38,7 +40,7 @@ export async function cardPicture(ctx: Context, m: PictureTools, card: string, a
 		throw new Refused("not_found", `There is no page at ${path}.`, "file.find");
 	});
 	const rung = exact ? exactWidth(asked) : rungFor(asked);
-	const key = `${createHash("sha256").update(source).digest("hex").slice(0, 24)}-${rung}-${scheme}.jpg`;
+	const key = `${createHash("sha256").update(source).digest("hex").slice(0, 24)}-${rung}-${scheme}-${TAKEN}.jpg`;
 	const kept = await ctx.store.get(key);
 	if (kept) return kept;
 	const width = metaWidth(new TextDecoder().decode(source));

@@ -70,10 +70,10 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export function overLimits(reading: Reading, width: number, views: Views | undefined, errors: string[]): string[] {
 	const screen = Math.round(width * 0.72);
 	const over: string[] = [];
-	if (reading.h > screen) over.push(`${reading.h} px tall, more than one screen (about ${screen} px at this width)`);
-	if (reading.words > 170) over.push(`${reading.words} words, where about 120 is what gets read`);
+	if (reading.h > screen) over.push(`it is ${reading.h} px tall, more than one screen (about ${screen} px at this width)`);
+	if (reading.words > 170) over.push(`it has ${reading.words} words, where about 120 is what gets read`);
 	if (reading.minFont !== undefined && reading.minFont < 14) over.push(`its smallest text is ${reading.minFont}px, and under 14px is not readable once the card is fitted to a window`);
-	if (reading.overflowX) over.push(`${reading.overflowX} px wider than the card, so its right edge is cut off`);
+	if (reading.overflowX) over.push(`it is ${reading.overflowX} px wider than the card, so its right edge is cut off`);
 	if (reading.cut) over.push(`${plural(reading.cut, "box", "boxes")} cut off their own content, and a card cannot scroll`);
 	if (reading.overlaps) over.push(`${plural(reading.overlaps, "pair")} of labels in a drawing overlap`);
 	for (const view of views?.views ?? []) {
@@ -87,7 +87,7 @@ export function overLimits(reading: Reading, width: number, views: Views | undef
 /** The note card.fit adds: the advice when something is over, else "One screen". */
 export function noteOf(reading: Reading, width: number, views: Views | undefined, errors: string[]): string {
 	const over = overLimits(reading, width, views, errors);
-	if (over.length) return `This card is ${over.join("; ")}. Cut it, enlarge the type, or move the second idea to its own card.`;
+	if (over.length) return `To fix: ${over.join("; ")}. Cut it, enlarge the type, or move the second idea to its own card.`;
 	const type = reading.minFont === undefined ? "" : `, smallest text ${reading.minFont}px`;
 	const pressed = views ? `, ${plural(views.controls, "control")} pressed and every view fits` : "";
 	return `One screen: ${reading.h} px tall, ${reading.words} words${type}${pressed}. Nothing to fix.`;

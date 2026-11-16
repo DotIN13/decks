@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { layout, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
 import type { PictureTools } from "./tools.ts";
+import { TAKEN } from "./picture.ts";
 import { canvasShot } from "./shot.ts";
 
 // A canvas's tile picture (rule 12): the whole canvas, its long side 480 px,
@@ -28,7 +29,7 @@ export async function canvasTile(ctx: Context, m: PictureTools, canvas: string, 
 	const name = ctx.canvasName(canvas);
 	const drawing = await ctx.deck.read(toDeckPath(`${layout.canvasFolder(name)}/canvas.pen`)).catch(() => undefined);
 	if (!drawing) throw new Refused("not_found", `There is no canvas called ${canvas}.`, "canvas.list");
-	const key = `tile-${createHash("sha256").update(name).update(drawing).digest("hex").slice(0, 24)}-${scheme}.jpg`;
+	const key = `tile-${createHash("sha256").update(name).update(drawing).digest("hex").slice(0, 24)}-${scheme}-${TAKEN}.jpg`;
 	const kept = await ctx.store.get(key);
 	if (kept) return kept;
 	const taken = await canvasShot(ctx, m, name, { format: "jpeg", scheme, scale: LONG_SIDE / 1600 });

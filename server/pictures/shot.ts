@@ -104,9 +104,11 @@ async function cardShot(ctx: Context, m: PictureTools, card: string, canvas: str
 /** The drawing and its cards, composed in one page. */
 export async function canvasShot(ctx: Context, m: PictureTools, canvas: string, args: ShotArgs): Promise<Taken> {
 	const passes: { done(): void }[] = [];
+	const urls: string[] = [];
 	const cardUrl = (path: string) => {
 		const page = m.cardPage(path, canvas);
 		passes.push(page);
+		urls.push(page.url);
 		return page.url;
 	};
 	const writer = await writerOf(ctx, canvas);
@@ -119,6 +121,10 @@ export async function canvasShot(ctx: Context, m: PictureTools, canvas: string, 
 	}
 	const tab = await m.browser.page({ width: made.w, height: made.h, scale: made.factor, scheme: args.scheme ?? "light" });
 	try {
+		// The cards' pages load their stylesheets, imports and fonts from the server: a card pass goes with them.
+		const first = urls[0] ? new URL(urls[0]) : undefined;
+		const pass = first?.searchParams.get("pass");
+		if (first && pass) await tab.authorize(first.origin, pass);
 		await tab.show(made.html);
 		const clip = { x: 0, y: 0, width: made.w, height: made.h };
 		const bytes = args.format === "pdf" ? await tab.pdf({ width: made.w, height: made.h }) : await tab.screenshot({ type: args.format === "jpeg" ? "jpeg" : "png", clip });

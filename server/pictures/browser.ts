@@ -82,6 +82,10 @@ function wrap(page: PwPage, close: () => Promise<void>): Page {
 	return {
 		errors,
 		async goto(url) {
+			// The page's pass goes with everything it loads from its server: stylesheets it imports, fonts.
+			const at = new URL(url);
+			const pass = at.searchParams.get("pass");
+			if (pass) await this.authorize(at.origin, pass);
 			await page.goto(url, { waitUntil: "load", timeout: LOAD_MS });
 			await settle(page);
 		},
