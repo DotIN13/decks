@@ -77,7 +77,7 @@ test("a reconnect watches from the revision held and catches up by the replay, n
 		assert.notEqual(again, ws);
 		again.open();
 		again.hello();
-		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed"], since: 7 });
+		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 7 });
 		again.event("item.changed", change(8, 7));
 		assert.equal(heard.filter((m) => m.type === "reconnected").length, 0);
 		assert.deepEqual(heard.filter((m) => m.type === "canvas.changed").map((m) => (m as { rev: number }).rev), [8]);
@@ -108,7 +108,7 @@ test("neither a renewal nor a reconnect reads the drawing whole, which is what e
 		const again = FakeSocket.all.filter((one) => one.url.pathname === "/api/v1/socket").at(-1)!;
 		again.open();
 		again.hello();
-		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed"], since: 4 });
+		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 4 });
 		again.event("item.changed", change(5, 4));
 		assert.equal(follower.rev(), 5);
 	} finally {
@@ -169,5 +169,5 @@ test("a call in flight when the pass is renewed is answered, not refused", async
 
 test("the frame's watch asks only for the events it hears, not every chat or file event", () => {
 	const { ws } = frameOn();
-	assert.deepEqual(ws.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed"], since: 3 });
+	assert.deepEqual(ws.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 3 });
 });

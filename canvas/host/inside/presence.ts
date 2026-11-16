@@ -82,7 +82,15 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 			if (message.phase === "done") linger.set(key, setTimeout(() => letGo(k, key), ACT_LINGER_MS));
 		},
 		tour: (agentId: string, by: PresenceBy, stops: ReadonlyArray<{ x: number; y: number }>) => tour(k, agentId, by, stops),
-		/** What the line says of someone else. */
+		/** Someone else's view on this canvas, as the socket says it (`view.changed`). */
+		hearView(payload: Record<string, unknown>): void {
+			const kind = payload.kind === "agent" ? "agent" : "person";
+			const by = { kind, id: String(payload.by ?? ""), ...(typeof payload.name === "string" ? { name: payload.name } : {}), color: String(payload.color ?? "") } as PresenceBy;
+			const said = Object.fromEntries(["pointer", "selection", "camera", "gone"].filter((k) => k in payload).map((k) => [k, payload[k]]));
+			const message = { type: "presence.changed", canvas: String(payload.canvas ?? ""), by, ...said } as Extract<ServerMessage, { type: "presence.changed" }>;
+			setPresent((all) => withHeard(all, `/${kind}/${by.id}`, message));
+		},
+		/** What Studio's live socket says of someone else. */
 		hear(message: ServerMessage): boolean {
 			if (message.type !== "presence.changed") return false;
 			const key = `${message.by.harness ?? ""}/${message.by.kind}/${message.by.id}`;

@@ -1,6 +1,6 @@
 import { life } from "./life.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Page, StageCall } from "@decks/protocol-old";
+import type { Page } from "@decks/protocol-old";
 import type { Presence, PresenceBy, ChangeAuthor } from "@decks/protocol";
 import type { CardShot } from "../../cards/card-snapshot.ts";
 import { deckPathEdits, readDrawing } from "./drawing-read.ts";
@@ -30,7 +30,7 @@ export interface Backend {
 	post(route: string, body: unknown): Promise<Record<string, unknown>>;
 	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
 	answer(id: string, value: unknown): void;
-	/** Where this frame is on its canvas, for the others on it (`presence.set`): only what changed. */
+	/** Where this frame is on its canvas, for the others on it (`view.update`): only what changed. */
 	presence(presence: Presence): void;
 	/** A card written out as a page (`card-snapshot.ts`), drawn by the harness's Chrome (`/api/snapshot`): the picture, or why not. */
 	snapshot(path: string, shot: CardShot): Promise<{ mime: string; data: string } | { why: string }>;
@@ -43,16 +43,10 @@ export type Heard =
 	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/canvas/store.ts`). */
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
-	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
-	| { type: "app.changed"; name: string; title?: string; status: string }
-	/** An agent at work on a card of this canvas (the server's record of acts): its cursor follows the work (`presence.ts`). */
-	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: string; ids?: string[]; boxes?: Array<{ x1: number; y1: number; x2: number; y2: number }>; label: string; color: string; at: number }
-	/** Someone else on this canvas moved, selected, looked elsewhere or left (`presence.ts`). */
-	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: { x: number; y: number; zoom: number } | null }
-	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
-	| { type: "view.called"; call: StageCall }
 	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
 	| { type: `doc.${string}`; path?: string; [key: string]: unknown }
+	/** An event on the socket the frame acts on itself: a view call, someone's view, an agent's act, an app's state. */
+	| { type: "event"; name: string; payload: Record<string, unknown> }
 	/** The line is back after a drop and nothing says what was missed: the drawing is read again. */
 	| { type: "reconnected" };
 
@@ -78,7 +72,7 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 			watch: () => [{ canvas, ...(sinceOf ? { since: sinceOf() } : {}) }],
 			// The drawing is the socket's now (`sock`): the line's copies of its changes are passed over.
 			hear: (message) => {
-				if ((message as { type?: string }).type === "canvas.changed") return;
+				if (LINE_DONE.has((message as { type?: string }).type ?? "")) return;
 				hearing.tell(message as Heard);
 			},
 		}));
@@ -123,12 +117,12 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 
 		answer(id, value) {
 			const error = value && typeof value === "object" && typeof (value as { error?: unknown }).error === "string" ? (value as { error: string }).error : undefined;
-			line().send(error ? { type: "view.answered", id, error } : { type: "view.answered", id, value });
+			void sock().call("view.answer", error ? { id, error } : { id, value });
 		},
 
 		presence(presence) {
-			// Said only down an open line: where the pointer was while the line was down is not news when it comes back.
-			if (opened?.open()) opened.send({ type: "presence.set", canvas, ...presence });
+			// Said only down an open socket: where the pointer was while it was down is not news when it comes back.
+			if (socket?.open()) void socket.call("view.update", { canvas, ...presence });
 		},
 
 		snapshot: (path, shot) => snapshotOf(`${base}/snapshot`, headers({ "content-type": "text/html" }), path, shot),
@@ -141,8 +135,12 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 	};
 }
 
+/** The socket's events the frame acts on itself, beside the drawing's `item.changed`. */
+const SOCKET_EVENTS = new Set(["view.requested", "view.changed", "agent.acted", "app.changed"]);
 /** The events the frame hears on its socket; a name joins when the frame first acts on it. */
-const FRAME_EVENTS = ["item.changed"] as const;
+const FRAME_EVENTS = ["item.changed", ...SOCKET_EVENTS];
+/** The line's messages the socket carries now: its copies are passed over. */
+const LINE_DONE = new Set(["canvas.changed", "view.called", "presence.changed", "agent.act", "app.changed"]);
 
 /**
  * Who hears the canvas's messages. What comes before anyone listens (the frame's editor is made between
@@ -177,7 +175,8 @@ function drawingSocket(origin: string, token: () => string, canvas: string, tell
 		events: FRAME_EVENTS,
 		hear: (name, payload) => {
 			const heard = drawingHeard(canvas, name, payload);
-			if (heard) tell(heard);
+			const event = heard ?? (SOCKET_EVENTS.has(name) ? { type: "event" as const, name, payload } : undefined);
+			if (event) tell(event);
 		},
 		// Back after a drop with no revision held yet (the frame not following): nothing can be replayed, so read whole.
 		onState: (open, again) => {

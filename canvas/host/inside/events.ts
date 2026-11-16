@@ -217,28 +217,8 @@ async function shootCard(ctx: FrameContext, call: StageCall): Promise<void> {
 /** What the harness's line says, beside the drawing's changes: an agent's view calls and acts, presence, documents, apps and cards. */
 function hearLine(ctx: FrameContext, handle: Handle, follower: Follower, message: Parameters<Parameters<FrameContext["backend"]["follow"]>[0]>[0]): void {
 	const { pages, setPages } = ctx;
-	if (message.type === "view.called") return viewCall(ctx, handle, message.call);
-	if (message.type === "presence.changed") return void ctx.presence?.hear(message);
-	// An agent at work on a card: its cursor and outline, from the card's place on the drawing. What it
-	// draws on the canvas is marked from the drawing's own change instead (`edits` above).
-	if (message.type === "agent.act") {
-		if (message.what === "draw") return;
-		const page = untrack(pages).find((one) => one.path === message.path) ?? untrack(pages).find((one) => message.path.endsWith(one.path) || one.path.endsWith(message.path));
-		let id: string | undefined;
-		try {
-			id = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path && page?.path.endsWith(one.metadata.path))?.id;
-		} catch {
-			id = undefined;
-		}
-		ctx.presence?.act(message, page ? { id, x: page.x, y: page.y } : undefined);
-		return;
-	}
+	if (message.type === "event") return heardEvent(ctx, handle, message.name, message.payload);
 	if (message.type.startsWith("doc.")) return ctx.hearDoc(message);
-	// An app's state changed: its windows hear it (`apps.watch`), and nothing asks the harness again.
-	if (message.type === "app.changed") {
-		for (const listener of ctx.appWatchers.get(message.name) ?? []) listener({ ...(message.title ? { title: message.title } : {}), status: message.status });
-		return;
-	}
 	// A card's file changed: its record taken, its place kept, as the drawing says it.
 	if (message.type === "card.changed") {
 		if (message.removed || !message.card) return;
@@ -252,6 +232,53 @@ function hearLine(ctx: FrameContext, handle: Handle, follower: Follower, message
 		return;
 	}
 	follower.hear(message);
+}
+
+/** An event on the frame's socket it acts on itself: a view call, someone's view, an agent at work, an app's state. */
+function heardEvent(ctx: FrameContext, handle: Handle, name: string, payload: Record<string, unknown>): void {
+	if (name === "view.requested") {
+		const call = viewCallOf(payload);
+		if (call) viewCall(ctx, handle, call);
+	} else if (name === "view.changed") ctx.presence?.hearView(payload);
+	else if (name === "agent.acted") agentActed(ctx, handle, payload);
+	else if (name === "app.changed") {
+		// Its windows hear it (`apps.watch`), and nothing asks the server again.
+		const app = Array.isArray(payload.ids) ? payload.ids[0] : undefined;
+		if (typeof app === "string") for (const listener of ctx.appWatchers.get(app) ?? []) listener({ ...(typeof payload.title === "string" ? { title: payload.title } : {}), status: String(payload.status ?? "") });
+	}
+}
+
+/** A view call as the view calls take it (`camera/view-calls.ts`). */
+type ViewCall = Parameters<typeof viewCall>[2];
+
+/** A view call the frame carries out: a card's picture (it answers by id), an agent's cursor, a card reloaded. */
+function viewCallOf(payload: Record<string, unknown>): ViewCall | undefined {
+	const args = (payload.args ?? {}) as { card?: unknown; at?: unknown; label?: unknown; color?: unknown };
+	const id = typeof payload.id === "string" ? payload.id : `v${Math.random().toString(36).slice(2, 10)}`;
+	const call = (op: string, more: Record<string, unknown>) => ({ op, id, agentId: String(payload.by ?? ""), args: more }) as ViewCall;
+	if (payload.call === "view.screenshot" && typeof payload.id === "string") return call("shot", { path: args.card });
+	if (payload.call === "view.cursor") return call("cursor", { path: args.card, at: args.at, label: args.label, ...(args.color ? { color: args.color } : {}) });
+	if (payload.call === "view.reload" && typeof args.card === "string") return call("reload", { path: args.card });
+	return undefined;
+}
+
+/**
+ * An agent at work on a card: its cursor and outline, from the card's place on the drawing. What it
+ * draws on the canvas is marked from the drawing's own change instead (`followDrawing`).
+ */
+function agentActed(ctx: FrameContext, handle: Handle, payload: Record<string, unknown>): void {
+	const path = Array.isArray(payload.ids) ? payload.ids.find((id): id is string => typeof id === "string" && id.includes("/")) : undefined;
+	if (!path || payload.what === "draw") return;
+	const pages = untrack(ctx.pages);
+	const page = pages.find((one) => one.path === path) ?? pages.find((one) => path.endsWith(one.path) || one.path.endsWith(path));
+	let id: string | undefined;
+	try {
+		id = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path && page?.path.endsWith(one.metadata.path))?.id;
+	} catch {
+		id = undefined;
+	}
+	const act = { agentId: String(payload.by ?? ""), phase: payload.phase as "start" | "done", label: String(payload.label ?? ""), color: String(payload.color ?? ""), at: typeof payload.at === "number" ? payload.at : Date.now(), ...(Array.isArray(payload.boxes) ? { boxes: payload.boxes as Array<{ x1: number; y1: number }> } : {}) };
+	ctx.presence?.act(act, page ? { id, x: page.x, y: page.y } : undefined);
 }
 
 /** What the page tells the frame: a card to reload, its look, the tool, the camera, a selection, who is busy, an edit. */
