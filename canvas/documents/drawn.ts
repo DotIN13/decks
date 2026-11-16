@@ -20,7 +20,7 @@ function drawText(path: string, text: string): Promise<string> {
 	const host = {
 		marks: () => [],
 		changes: () => [],
-		math: (into: HTMLElement) => { for (const el of into.querySelectorAll ? [into] : []) el.setAttribute("data-math", "drawn"); },
+		math: (into: HTMLElement) => into.setAttribute("data-math", "drawn"),
 		asset: async (src: string) => `asset:${src}`,
 		pdfPicture: async (src: string) => `pdf:${src}`,
 	};
