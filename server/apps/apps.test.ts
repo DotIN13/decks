@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -13,22 +13,34 @@ import { features } from "../main.ts";
 type App = { name: string; kind: string; status: string; url: string; repo?: { branch: string; head: string }; errors?: string[] };
 const ann = callers.agent("ann", "work");
 
+/** What each test opened: closed after it whatever it did, so a failed assertion fails and does not hang. */
+const open = new Set<() => Promise<void>>();
+afterEach(async () => {
+	for (const close of [...open]) await close();
+});
+
 async function start() {
 	const workdir = mkdtempSync(join(tmpdir(), "depot-apps-"));
 	const deck = new MemoryDeck({ "canvases/work/canvas.pen": '{"version":"2.14","children":[]}' });
 	const s = await testServer({ features: features({ appRun: workdir }), deck });
 	const door = await s.listen(0);
+	let closed = false;
+	const close = async () => {
+		if (closed) return;
+		closed = true;
+		open.delete(close);
+		await door.close();
+		await s.close();
+		rmSync(workdir, { recursive: true, force: true });
+	};
+	open.add(close);
 	const page = (path: string, init?: RequestInit) => fetch(`${door.url}${path}${path.includes("?") ? "&" : "?"}pass=${door.token}`, init);
 	return {
 		s,
 		page,
 		url: (path: string) => `${door.url}${path}`,
 		carried: (path: string) => fetch(`${door.url}/app/t/${door.token}/${path}`),
-		async close() {
-			await door.close();
-			await s.close();
-			rmSync(workdir, { recursive: true, force: true });
-		},
+		close,
 	};
 }
 

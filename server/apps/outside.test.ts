@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,11 +13,27 @@ import { outsideFolder } from "./source.ts";
 type App = { name: string; status: string; source?: { path: string; repo?: string } };
 const ann = callers.agent("ann", "work");
 
+/** What each test opened: closed after it whatever it did, so a failed assertion fails and does not hang. */
+const open = new Set<() => Promise<void>>();
+afterEach(async () => {
+	for (const close of [...open]) await close();
+});
+
 async function start() {
 	const scratch = mkdtempSync(join(tmpdir(), "depot-outside-"));
 	const s = await testServer({ features: features({ appRun: join(scratch, "run") }), deck: new MemoryDeck({ "canvases/work/canvas.pen": '{"version":"2.14","children":[]}' }) });
 	const door = await s.listen(0);
-	return { s, scratch, door, page: (path: string) => fetch(`${door.url}${path}?pass=${door.token}`), async close() { await door.close(); await s.close(); rmSync(scratch, { recursive: true, force: true }); } };
+	let closed = false;
+	const close = async () => {
+		if (closed) return;
+		closed = true;
+		open.delete(close);
+		await door.close();
+		await s.close();
+		rmSync(scratch, { recursive: true, force: true });
+	};
+	open.add(close);
+	return { s, scratch, door, page: (path: string) => fetch(`${door.url}${path}?pass=${door.token}`), close };
 }
 
 test("rule 14: the person makes an app in a folder outside the deck; the deck keeps only its record", async () => {
