@@ -3,7 +3,7 @@ import { createMemo, Show } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { AgentFace, AgentMenu } from "../../agents/index.ts";
 import { Icon } from "@decks/ui";
-import type { Destination } from "../../shell/index.ts";
+import type { Destination } from "../bar/destination.ts";
 import { menuActions } from "./actions.ts";
 import { chipLabel, recipientChat, recipientName } from "./model.ts";
 
