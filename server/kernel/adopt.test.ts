@@ -25,8 +25,8 @@ async function oldDeck(): Promise<MemoryStore> {
 			{ id: "cc33", hash: hashOf("dk_pass"), principal: { kind: "canvas", canvas: "x", role: "edit" }, at: 3 },
 		],
 	});
-	await writeJson(old, "revisions/index.json", { "canvases/a/cards/x/index.html": [{ sha: "s1", at: 10 }, { sha: "s2", at: 30 }], "boards/old.html": [{ sha: "s3", at: 20 }] });
-	for (const [sha, text] of [["s1", "one"], ["s2", "two"], ["s3", "board"]] as const) await old.put(`revisions/${sha}.html`, enc(text));
+	await writeJson(old, "revisions/index.json", { "canvases/a/cards/x/index.html": [{ sha: "s1", at: 10 }, { sha: "s2", at: 30 }], "canvases/b/cards/y/index.html": [{ sha: "s3", at: 20 }] });
+	for (const [sha, text] of [["s1", "one"], ["s2", "two"], ["s3", "other"]] as const) await old.put(`revisions/${sha}.html`, enc(text));
 	return old;
 }
 

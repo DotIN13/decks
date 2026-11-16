@@ -46,7 +46,7 @@ function callerOf(one: OldToken): Caller | undefined {
 	return undefined;
 }
 
-// Card versions: revisions/index.json names each card's versions in order;
+// Card versions: today's revision index names each card's versions in order;
 // each becomes a written entry in history, its bytes kept once by hash.
 
 async function adoptRevisions(old: Store, history: Store): Promise<number> {
