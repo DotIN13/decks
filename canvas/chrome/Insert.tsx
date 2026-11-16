@@ -34,6 +34,7 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 	const [query, setQuery] = createSignal("");
 	const [library, setLibrary] = createSignal(penIcon().library);
 	let panel: HTMLDivElement | undefined;
+	const place = keepPlaced(props, () => panel);
 
 	// Another panel, another search. The field is not focused: a panel opened to pick from is not a
 	// request to type, and a focused field would take the keys the canvas's shortcuts use.
@@ -63,56 +64,7 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 	});
 	const recent = createMemo(() => (query().trim() ? [] : recentIcons().filter((one) => one.library === library()).slice(0, 14)));
 
-	const pickShape = (name: string) => {
-		setPenShape(name);
-		props.onPick("shape");
-	};
-	const pickIcon = (name: string) => {
-		const pick = { library: library(), name };
-		setPenIcon(pick);
-		noteRecentIcon(pick);
-		props.onPick("icon");
-	};
 
-	/*
-	 * Where it sits: beside the tool column, or at the point it was opened for, kept on screen.
-	 */
-	const [place, setPlace] = createSignal<{ left: number; top: number }>({ left: 64, top: 80 });
-	const position = () => {
-		const width = 288;
-		const height = panel?.offsetHeight ?? 460;
-		if (props.open.client) {
-			const left = Math.max(8, Math.min(props.open.client.x - 20, window.innerWidth - width - 8));
-			const top = Math.max(8, Math.min(props.open.client.y + 12, window.innerHeight - height - 8));
-			return setPlace({ left, top });
-		}
-		const tools = document.querySelector(".pen-tools")?.getBoundingClientRect();
-		const left = tools ? tools.right + 8 : 64;
-		const top = Math.max(8, Math.min(tools ? tools.top : 80, window.innerHeight - height - 8));
-		setPlace({ left, top });
-	};
-	onMount(() => {
-		position();
-		requestAnimationFrame(position);
-		window.addEventListener("resize", position);
-		const away = (event: PointerEvent) => {
-			const target = event.target as Element | null;
-			if (panel?.contains(target) || target?.closest?.("[data-insert-button]")) return;
-			props.onClose();
-		};
-		const key = (event: KeyboardEvent) => {
-			if (event.key === "Escape") props.onClose();
-		};
-		window.addEventListener("pointerdown", away, true);
-		window.addEventListener("keydown", key);
-		const stopDismiss = onDismiss(() => props.onClose());
-		onCleanup(() => {
-			stopDismiss();
-			window.removeEventListener("resize", position);
-			window.removeEventListener("pointerdown", away, true);
-			window.removeEventListener("keydown", key);
-		});
-	});
 
 	return (
 		<div
@@ -148,56 +100,126 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 			<div class="insert-body">
 				<Show
 					when={props.open.tab === "shapes"}
-					fallback={
-						<>
-							<Show when={recent().length > 0}>
-								<p class="insert-group">Used lately</p>
-								<div class="insert-grid icons">
-									<For each={recent()}>{(one) => <IconCell library={one.library} name={one.name} picked={penIcon().library === one.library && penIcon().name === one.name} onPick={pickIcon} />}</For>
-								</div>
-							</Show>
-							<Show
-								when={!icons.error}
-								fallback={<p class="insert-note">The icon list could not be fetched. Icons come from the internet; already drawn ones stay drawn.</p>}
-							>
-								<Show when={!icons.loading} fallback={<p class="insert-note">Fetching the list of icons…</p>}>
-									<p class="insert-group">{query().trim() ? `${found().length === 120 ? "120+" : found().length} found` : recent().length ? "More" : "Icons"}</p>
-									<div class="insert-grid icons">
-										<For each={found()}>{(one) => <IconCell library={library()} name={one.name} picked={penIcon().library === library() && penIcon().name === one.name} onPick={pickIcon} />}</For>
-									</div>
-									<Show when={query().trim() && found().length === 0}>
-										<p class="insert-note">No icon is called that.</p>
-									</Show>
-								</Show>
-							</Show>
-						</>
-					}
+					fallback={<IconsTab recent={recent()} icons={icons} found={found()} query={query()} library={library()} onPick={props.onPick} />}
 				>
-					<For each={shapes()}>
-						{(section) => (
-							<>
-								<p class="insert-group">{section.group}</p>
-								<div class="insert-grid">
-									<For each={section.list}>
-										{(shape) => (
-											<button type="button" class="insert-cell" data-shape={shape.name} data-on={penShape() === shape.name ? "true" : undefined} title={shape.name} aria-label={shape.name} onClick={() => pickShape(shape.name)}>
-												<svg viewBox="-4 -4 108 108" preserveAspectRatio="none" aria-hidden="true">
-													<path d={shape.geometry} fill-rule={shape.fillRule ?? "nonzero"} data-line={shape.line ? "true" : undefined} />
-												</svg>
-											</button>
-										)}
-									</For>
-								</div>
-							</>
-						)}
-					</For>
-					<Show when={shapes().length === 0}>
-						<p class="insert-note">No shape is called that.</p>
-					</Show>
+					<ShapesTab shapes={shapes()} onPick={props.onPick} />
 				</Show>
 			</div>
 			<p class="insert-note">{props.open.replace ? "Pick one to put in the selected icon's place." : props.open.at ? "Pick one to put it where you double-clicked." : "Pick one, then click or drag on the canvas."}</p>
 		</div>
+	);
+}
+
+/** Keep the panel beside the tool column, or at the point it was opened for, on screen; and close it on a press away or Escape. */
+function keepPlaced(props: { open: InsertPanel; onClose: () => void }, panelOf: () => HTMLDivElement | undefined) {
+	/*
+	 * Where it sits: beside the tool column, or at the point it was opened for, kept on screen.
+	 */
+	const [place, setPlace] = createSignal<{ left: number; top: number }>({ left: 64, top: 80 });
+	const position = () => {
+		const width = 288;
+		const height = panelOf()?.offsetHeight ?? 460;
+		if (props.open.client) {
+			const left = Math.max(8, Math.min(props.open.client.x - 20, window.innerWidth - width - 8));
+			const top = Math.max(8, Math.min(props.open.client.y + 12, window.innerHeight - height - 8));
+			return setPlace({ left, top });
+		}
+		const tools = document.querySelector(".pen-tools")?.getBoundingClientRect();
+		const left = tools ? tools.right + 8 : 64;
+		const top = Math.max(8, Math.min(tools ? tools.top : 80, window.innerHeight - height - 8));
+		setPlace({ left, top });
+	};
+	onMount(() => {
+		position();
+		requestAnimationFrame(position);
+		window.addEventListener("resize", position);
+		const away = (event: PointerEvent) => {
+			const target = event.target as Element | null;
+			if (panelOf()?.contains(target) || target?.closest?.("[data-insert-button]")) return;
+			props.onClose();
+		};
+		const key = (event: KeyboardEvent) => {
+			if (event.key === "Escape") props.onClose();
+		};
+		window.addEventListener("pointerdown", away, true);
+		window.addEventListener("keydown", key);
+		const stopDismiss = onDismiss(() => props.onClose());
+		onCleanup(() => {
+			stopDismiss();
+			window.removeEventListener("resize", position);
+			window.removeEventListener("pointerdown", away, true);
+			window.removeEventListener("keydown", key);
+		});
+	});
+	return place;
+}
+
+type IconEntry = { name: string };
+
+/** The icons tab: the ones used lately, then the library's list or what the search found. */
+function IconsTab(props: { recent: Array<{ library: string; name: string }>; icons: { error?: unknown; loading: boolean }; found: IconEntry[]; query: string; library: string; onPick: (tool: "shape" | "icon") => void }) {
+	const pickIcon = (name: string) => {
+		const pick = { library: props.library, name };
+		setPenIcon(pick);
+		noteRecentIcon(pick);
+		props.onPick("icon");
+	};
+	return (
+		<>
+			<Show when={props.recent.length > 0}>
+				<p class="insert-group">Used lately</p>
+				<div class="insert-grid icons">
+					<For each={props.recent}>{(one) => <IconCell library={one.library} name={one.name} picked={penIcon().library === one.library && penIcon().name === one.name} onPick={pickIcon} />}</For>
+				</div>
+			</Show>
+			<Show
+				when={!props.icons.error}
+				fallback={<p class="insert-note">The icon list could not be fetched. Icons come from the internet; already drawn ones stay drawn.</p>}
+			>
+				<Show when={!props.icons.loading} fallback={<p class="insert-note">Fetching the list of icons…</p>}>
+					<p class="insert-group">{props.query.trim() ? `${props.found.length === 120 ? "120+" : props.found.length} found` : props.recent.length ? "More" : "Icons"}</p>
+					<div class="insert-grid icons">
+						<For each={props.found}>{(one) => <IconCell library={props.library} name={one.name} picked={penIcon().library === props.library && penIcon().name === one.name} onPick={pickIcon} />}</For>
+					</div>
+					<Show when={props.query.trim() && props.found.length === 0}>
+						<p class="insert-note">No icon is called that.</p>
+					</Show>
+				</Show>
+			</Show>
+		</>
+	);
+}
+
+/** The shapes tab: each group's shapes, drawn from the outlines the canvas draws. */
+function ShapesTab(props: { shapes: Array<{ group: string; list: typeof SHAPES }>; onPick: (tool: "shape" | "icon") => void }) {
+	const pickShape = (name: string) => {
+		setPenShape(name);
+		props.onPick("shape");
+	};
+	return (
+		<>
+			<For each={props.shapes}>
+				{(section) => (
+					<>
+						<p class="insert-group">{section.group}</p>
+						<div class="insert-grid">
+							<For each={section.list}>
+								{(shape) => (
+									<button type="button" class="insert-cell" data-shape={shape.name} data-on={penShape() === shape.name ? "true" : undefined} title={shape.name} aria-label={shape.name} onClick={() => pickShape(shape.name)}>
+										<svg viewBox="-4 -4 108 108" preserveAspectRatio="none" aria-hidden="true">
+											<path d={shape.geometry} fill-rule={shape.fillRule ?? "nonzero"} data-line={shape.line ? "true" : undefined} />
+										</svg>
+									</button>
+								)}
+							</For>
+						</div>
+					</>
+				)}
+			</For>
+			<Show when={props.shapes.length === 0}>
+				<p class="insert-note">No shape is called that.</p>
+			</Show>
+		</>
 	);
 }
 
