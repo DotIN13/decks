@@ -1,4 +1,13 @@
+import { forgetAskedResults, setToolResultSender } from "@decks/agent-ui/chat";
 import type { ServerMessage } from "@decks/protocol";
+import { createEffect, onCleanup, onMount } from "solid-js";
+import { scratch } from "../state/agent.ts";
+import { stageOf } from "../state/canvases.ts";
+import { state } from "../state/deck.ts";
+import { notice } from "../state/notices.ts";
+import { rewatch, watchCanvas } from "../state/pens.ts";
+import { call, on, setFailureSink, start } from "../state/socket.ts";
+import { releasePages } from "../state/ui.ts";
 import { heardAgent } from "./heard/agent.ts";
 import { heardChat } from "./heard/chat.ts";
 import { heardDeck } from "./heard/deck.ts";
@@ -47,4 +56,30 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 	if (about(message, "view")) return heardView(message, hooks);
 	if (about(message, "harness") || about(message, "web") || about(message, "account")) return heardHarness(message, hooks);
 	if (about(message, "deck") || about(message, "card") || about(message, "doc") || about(message, "canvas") || about(message, "stage")) return heardDeck(message, hooks);
+}
+
+/** Open the connection to the harness when the page mounts, and answer what arrives on it. */
+export function listenToHarness(hooks: FrameHooks): void {
+	onMount(() => {
+		start(() => {
+			/* A reconnect means whatever the old connection was asked is not coming. */
+			scratch.forgetAsked();
+			forgetAskedResults();
+			rewatch();
+		});
+		setFailureSink((text) => notice("warn", text));
+		// Whatever arrives or does not, the canvas is not held empty for longer than this.
+		setTimeout(releasePages, 2500);
+		// The chip knows the row; the conversation it is in is found here.
+		setToolResultSender((itemId) => {
+			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
+			if (!agentId) return false;
+			void call("chat.tool", [agentId, itemId]);
+			return true;
+		});
+		const off = on((message) => handleFrame(message, hooks));
+		onCleanup(off);
+		// The drawing of the canvas on screen, whole and then every change (`state/pens.ts`), and again after a reconnect.
+		createEffect(() => watchCanvas(stageOf(state.focused)?.name));
+	});
 }
