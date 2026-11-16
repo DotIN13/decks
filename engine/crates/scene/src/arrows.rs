@@ -46,6 +46,7 @@ enum Bend {
 	Pull(f64, f64),
 }
 
+// An arrow's ends and style, read off its metadata.
 /// Whether an item's fields make it an arrow.
 pub fn is_arrow(props: &serde_json::Map<String, Value>) -> bool {
 	props.get("type").and_then(Value::as_str) == Some("path") && props.get("metadata").and_then(|m| m.get("type")).and_then(Value::as_str) == Some(ARROW)
@@ -110,6 +111,7 @@ pub fn style(metadata: &Value) -> (Route, Heads) {
 	(route, heads)
 }
 
+// Its route: the points it passes through, from end to end.
 /// The line an arrow's metadata describes, through where its ends are now (`find` gives an item's
 /// or board's box on the stage); `None` when an end cannot be found.
 pub fn points(metadata: &Value, find: &dyn Fn(&str) -> Option<Rect>) -> Option<Vec<Pt>> {
@@ -252,6 +254,7 @@ fn auto(a: Rect, b: Rect, route: Route, bend: Option<Bend>) -> Vec<Pt> {
 	vec![start, [start[0], mid], [end[0], mid], end]
 }
 
+// Its outline: the path, its heads, and the numbers written back.
 /// A path's fields: its corner on the stage, its size and its geometry (pen's `arrowShape`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Shape {

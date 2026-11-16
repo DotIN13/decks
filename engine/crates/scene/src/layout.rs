@@ -27,72 +27,6 @@ pub const DEFAULT_FONT_SIZE: f64 = 14.0;
 pub const NOTE_PAD: f64 = 16.0;
 pub const NOTE_WIDTH: f64 = 240.0;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextStyle {
-	pub family: String,
-	pub size: f64,
-	pub weight: f64,
-	pub italic: bool,
-	pub letter_spacing: f64,
-	/// A multiple of the size; `None` is the font's own.
-	pub line_height: Option<f64>,
-}
-
-/// Measures words: one line when `max_width` is `None`, wrapped at it otherwise.
-pub trait Measure {
-	fn measure(&self, text: &str, style: &TextStyle, max_width: Option<f64>, item: &Item) -> (f64, f64);
-}
-
-/// A rough measure for where there is no font: 0.55 em a character, 1 em for wide scripts.
-pub struct Estimate;
-
-fn wide(c: char) -> bool {
-	matches!(c as u32, 0x1100..=0x115F | 0x2E80..=0xA4CF | 0xAC00..=0xD7A3 | 0xF900..=0xFAFF | 0xFE30..=0xFE4F | 0xFF00..=0xFF60 | 0xFFE0..=0xFFE6)
-}
-
-impl Measure for Estimate {
-	fn measure(&self, text: &str, style: &TextStyle, max_width: Option<f64>, _: &Item) -> (f64, f64) {
-		let em = style.size;
-		let char_w = |c: char| (if wide(c) { em } else { em * 0.55 }) + style.letter_spacing;
-		let line_h = em * style.line_height.unwrap_or(1.2);
-		let mut lines: Vec<f64> = Vec::new();
-		for paragraph in text.split('\n') {
-			let Some(max) = max_width else {
-				lines.push(paragraph.chars().map(char_w).sum());
-				continue;
-			};
-			let mut line = 0.0;
-			// Words and the runs of space between them, as the browser breaks them.
-			let mut word = String::new();
-			let flush = |word: &mut String, line: &mut f64, lines: &mut Vec<f64>| {
-				let w: f64 = word.chars().map(char_w).sum();
-				if *line > 0.0 && *line + w > max && !word.trim().is_empty() {
-					lines.push(*line);
-					*line = w;
-				} else {
-					*line += w;
-				}
-				word.clear();
-			};
-			let mut space = false;
-			for c in paragraph.chars() {
-				if c.is_whitespace() != space && !word.is_empty() {
-					flush(&mut word, &mut line, &mut lines);
-				}
-				space = c.is_whitespace();
-				word.push(c);
-			}
-			if !word.is_empty() {
-				flush(&mut word, &mut line, &mut lines);
-			}
-			lines.push(line);
-		}
-		let widest = lines.iter().copied().fold(0.0, f64::max);
-		let w = max_width.map_or(widest, |m| widest.min(m));
-		(w, lines.len().max(1) as f64 * line_h)
-	}
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Sizing {
 	Fixed(f64),
@@ -106,6 +40,23 @@ pub struct Placed {
 	pub rect: Rect,
 	pub visible: bool,
 	pub theme: Rc<Theme>,
+}
+
+// Laying out a tree: each item's size, then its place in its parent.
+/// Lay out one tree: a [`Placed`] per item, hidden items (and everything under them) not visible.
+pub fn layout(tree: &Tree, vars: &Vars, theme: &Rc<Theme>, measure: &dyn Measure) -> Vec<Placed> {
+	let hidden = Placed { rect: Rect::default(), visible: false, theme: theme.clone() };
+	let mut out = vec![hidden; tree.items.len()];
+	if tree.items.is_empty() {
+		return out;
+	}
+	let ctx = Ctx { tree, vars, measure };
+	if !ctx.visible(0, theme) {
+		return out;
+	}
+	let size = ctx.size_of(0, theme, None, None);
+	ctx.place(0, ctx.x_y(&tree.items[0]), size, theme, &mut out);
+	out
 }
 
 struct Ctx<'a> {
@@ -409,24 +360,75 @@ fn fixed_or(s: Sizing, fallback: f64) -> f64 {
 	}
 }
 
-/// Lay out one tree: a [`Placed`] per item, hidden items (and everything under them) not visible.
-pub fn layout(tree: &Tree, vars: &Vars, theme: &Rc<Theme>, measure: &dyn Measure) -> Vec<Placed> {
-	let hidden = Placed { rect: Rect::default(), visible: false, theme: theme.clone() };
-	let mut out = vec![hidden; tree.items.len()];
-	if tree.items.is_empty() {
-		return out;
-	}
-	let ctx = Ctx { tree, vars, measure };
-	if !ctx.visible(0, theme) {
-		return out;
-	}
-	let size = ctx.size_of(0, theme, None, None);
-	ctx.place(0, ctx.x_y(&tree.items[0]), size, theme, &mut out);
-	out
+// Measuring words, by the app's fonts or by pen's estimate.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextStyle {
+	pub family: String,
+	pub size: f64,
+	pub weight: f64,
+	pub italic: bool,
+	pub letter_spacing: f64,
+	/// A multiple of the size; `None` is the font's own.
+	pub line_height: Option<f64>,
 }
 
 /// The text style an item draws its words in.
 pub fn text_style(item: &Item, vars: &Vars, theme: &Theme) -> TextStyle {
 	let tree = Tree::default();
 	Ctx { tree: &tree, vars, measure: &Estimate }.text_style(item, theme)
+}
+
+/// Measures words: one line when `max_width` is `None`, wrapped at it otherwise.
+pub trait Measure {
+	fn measure(&self, text: &str, style: &TextStyle, max_width: Option<f64>, item: &Item) -> (f64, f64);
+}
+
+/// A rough measure for where there is no font: 0.55 em a character, 1 em for wide scripts.
+pub struct Estimate;
+
+fn wide(c: char) -> bool {
+	matches!(c as u32, 0x1100..=0x115F | 0x2E80..=0xA4CF | 0xAC00..=0xD7A3 | 0xF900..=0xFAFF | 0xFE30..=0xFE4F | 0xFF00..=0xFF60 | 0xFFE0..=0xFFE6)
+}
+
+impl Measure for Estimate {
+	fn measure(&self, text: &str, style: &TextStyle, max_width: Option<f64>, _: &Item) -> (f64, f64) {
+		let em = style.size;
+		let char_w = |c: char| (if wide(c) { em } else { em * 0.55 }) + style.letter_spacing;
+		let line_h = em * style.line_height.unwrap_or(1.2);
+		let mut lines: Vec<f64> = Vec::new();
+		for paragraph in text.split('\n') {
+			let Some(max) = max_width else {
+				lines.push(paragraph.chars().map(char_w).sum());
+				continue;
+			};
+			let mut line = 0.0;
+			// Words and the runs of space between them, as the browser breaks them.
+			let mut word = String::new();
+			let flush = |word: &mut String, line: &mut f64, lines: &mut Vec<f64>| {
+				let w: f64 = word.chars().map(char_w).sum();
+				if *line > 0.0 && *line + w > max && !word.trim().is_empty() {
+					lines.push(*line);
+					*line = w;
+				} else {
+					*line += w;
+				}
+				word.clear();
+			};
+			let mut space = false;
+			for c in paragraph.chars() {
+				if c.is_whitespace() != space && !word.is_empty() {
+					flush(&mut word, &mut line, &mut lines);
+				}
+				space = c.is_whitespace();
+				word.push(c);
+			}
+			if !word.is_empty() {
+				flush(&mut word, &mut line, &mut lines);
+			}
+			lines.push(line);
+		}
+		let widest = lines.iter().copied().fold(0.0, f64::max);
+		let w = max_width.map_or(widest, |m| widest.min(m));
+		(w, lines.len().max(1) as f64 * line_h)
+	}
 }

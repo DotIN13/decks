@@ -1,3 +1,6 @@
+//! The scene's rules, tested: rows, columns and fills, groups, edits laid out where they reach,
+//! instances, picking, turned frames, real stages, and arrows routed as pen routes them.
+
 use super::*;
 use layout::Estimate;
 use serde_json::json;

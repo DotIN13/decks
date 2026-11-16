@@ -28,125 +28,6 @@ use layout::{Measure, Placed};
 use tree::{Sources, Tree};
 use values::{Theme, Vars};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Rect {
-	pub x: f64,
-	pub y: f64,
-	pub w: f64,
-	pub h: f64,
-}
-
-impl Rect {
-	pub fn right(&self) -> f64 {
-		self.x + self.w
-	}
-	pub fn bottom(&self) -> f64 {
-		self.y + self.h
-	}
-	pub fn cx(&self) -> f64 {
-		self.x + self.w / 2.0
-	}
-	pub fn cy(&self) -> f64 {
-		self.y + self.h / 2.0
-	}
-	pub fn union(&self, o: &Rect) -> Rect {
-		let x = self.x.min(o.x);
-		let y = self.y.min(o.y);
-		Rect { x, y, w: self.right().max(o.right()) - x, h: self.bottom().max(o.bottom()) - y }
-	}
-	/// Whether the two boxes overlap or touch.
-	pub fn meets(&self, o: &Rect) -> bool {
-		self.x <= o.right() && o.x <= self.right() && self.y <= o.bottom() && o.y <= self.bottom()
-	}
-	pub fn contains(&self, x: f64, y: f64) -> bool {
-		x >= self.x && x <= self.right() && y >= self.y && y <= self.bottom()
-	}
-	pub fn inside(&self, o: &Rect) -> bool {
-		self.x >= o.x && self.y >= o.y && self.right() <= o.right() && self.bottom() <= o.bottom()
-	}
-}
-
-/// One top-level item, laid out.
-#[derive(Clone, Debug)]
-pub struct Root {
-	pub handle: Handle,
-	pub id: String,
-	pub tree: Tree,
-	pub placed: Vec<Placed>,
-	/// Each item's own space to the stage: its place, its turn and flips, and its parents'.
-	pub world: Vec<Mat>,
-	pub bounds: Vec<Rect>,
-	/// What each item paints on: its box grown by its stroke, shadows and card paper.
-	pub ink: Vec<Rect>,
-	/// Everything this root paints, turned boxes, strokes and shadows included.
-	pub extent: Rect,
-	pub index: Index,
-	/// Whether it holds reusable items: a change in it can change instances anywhere.
-	pub reusable: bool,
-	/// Bumped every time this root is laid out again: what the painter keys its caches on.
-	pub version: u64,
-}
-
-impl Root {
-	/// Where this root paints differently from `was`, the same root laid out before: for each item
-	/// whose fields, place, theme, turn or shown-ness changed, what it and everything inside it
-	/// painted before and paints now. `None` when the two do not hold the same items in the same order
-	/// (one came, went or moved among its siblings): its whole extent then, before and after.
-	pub fn changed_ink(&self, was: &Root) -> Option<Vec<Rect>> {
-		let (now, then) = (&self.tree.items, &was.tree.items);
-		if now.len() != then.len() || now.iter().zip(then).any(|(a, b)| a.id != b.id || a.parent != b.parent) {
-			return None;
-		}
-		let mut marked = vec![false; now.len()];
-		let mut out = Vec::new();
-		for i in 0..now.len() {
-			let (a, b) = (&self.placed[i], &was.placed[i]);
-			let own = (!Rc::ptr_eq(&now[i].props, &then[i].props) && *now[i].props != *then[i].props)
-				|| a.rect != b.rect
-				|| a.visible != b.visible
-				|| (!Rc::ptr_eq(&a.theme, &b.theme) && *a.theme != *b.theme)
-				|| self.world[i].0 != was.world[i].0
-				|| self.ink[i] != was.ink[i];
-			// What is inside a changed item paints under its opacity, its clip, its turn: changed with it.
-			marked[i] = own || now[i].parent.is_some_and(|p| marked[p as usize]);
-			if marked[i] {
-				if b.visible {
-					out.push(was.ink[i]);
-				}
-				if a.visible {
-					out.push(self.ink[i]);
-				}
-			}
-		}
-		Some(out)
-	}
-}
-
-/// What an update changed, for the painter and the page.
-#[derive(Clone, Debug, Default)]
-pub struct Updated {
-	/// Roots laid out again (new ones included), by handle, with the extent they had before.
-	pub roots: Vec<(Handle, Option<Rect>)>,
-	/// Roots that are gone, with the extent they covered, so their tiles are repainted.
-	pub removed: Vec<(String, Rect)>,
-	/// The order of the top level changed.
-	pub reordered: bool,
-	/// The roots in `roots` as they were before (the ones kept, laid out again): what changed in them is
-	/// found item by item (`Root::changed_ink`), so a change inside a big frame repaints that change only.
-	pub old: Vec<Root>,
-}
-
-/// What a press found: the item, and the items it is inside, from the top level down.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Hit {
-	pub root: Handle,
-	/// Index of the item in its root's tree.
-	pub item: u32,
-	pub id: String,
-	/// Ids from the top-level item down to the one hit.
-	pub path: Vec<String>,
-}
-
 pub struct Scene {
 	pub vars: Vars,
 	pub dark: bool,
@@ -443,6 +324,125 @@ impl Scene {
 			"group" => false,
 			_ => true,
 		}
+	}
+}
+
+/// One top-level item, laid out.
+#[derive(Clone, Debug)]
+pub struct Root {
+	pub handle: Handle,
+	pub id: String,
+	pub tree: Tree,
+	pub placed: Vec<Placed>,
+	/// Each item's own space to the stage: its place, its turn and flips, and its parents'.
+	pub world: Vec<Mat>,
+	pub bounds: Vec<Rect>,
+	/// What each item paints on: its box grown by its stroke, shadows and card paper.
+	pub ink: Vec<Rect>,
+	/// Everything this root paints, turned boxes, strokes and shadows included.
+	pub extent: Rect,
+	pub index: Index,
+	/// Whether it holds reusable items: a change in it can change instances anywhere.
+	pub reusable: bool,
+	/// Bumped every time this root is laid out again: what the painter keys its caches on.
+	pub version: u64,
+}
+
+impl Root {
+	/// Where this root paints differently from `was`, the same root laid out before: for each item
+	/// whose fields, place, theme, turn or shown-ness changed, what it and everything inside it
+	/// painted before and paints now. `None` when the two do not hold the same items in the same order
+	/// (one came, went or moved among its siblings): its whole extent then, before and after.
+	pub fn changed_ink(&self, was: &Root) -> Option<Vec<Rect>> {
+		let (now, then) = (&self.tree.items, &was.tree.items);
+		if now.len() != then.len() || now.iter().zip(then).any(|(a, b)| a.id != b.id || a.parent != b.parent) {
+			return None;
+		}
+		let mut marked = vec![false; now.len()];
+		let mut out = Vec::new();
+		for i in 0..now.len() {
+			let (a, b) = (&self.placed[i], &was.placed[i]);
+			let own = (!Rc::ptr_eq(&now[i].props, &then[i].props) && *now[i].props != *then[i].props)
+				|| a.rect != b.rect
+				|| a.visible != b.visible
+				|| (!Rc::ptr_eq(&a.theme, &b.theme) && *a.theme != *b.theme)
+				|| self.world[i].0 != was.world[i].0
+				|| self.ink[i] != was.ink[i];
+			// What is inside a changed item paints under its opacity, its clip, its turn: changed with it.
+			marked[i] = own || now[i].parent.is_some_and(|p| marked[p as usize]);
+			if marked[i] {
+				if b.visible {
+					out.push(was.ink[i]);
+				}
+				if a.visible {
+					out.push(self.ink[i]);
+				}
+			}
+		}
+		Some(out)
+	}
+}
+
+/// What an update changed, for the painter and the page.
+#[derive(Clone, Debug, Default)]
+pub struct Updated {
+	/// Roots laid out again (new ones included), by handle, with the extent they had before.
+	pub roots: Vec<(Handle, Option<Rect>)>,
+	/// Roots that are gone, with the extent they covered, so their tiles are repainted.
+	pub removed: Vec<(String, Rect)>,
+	/// The order of the top level changed.
+	pub reordered: bool,
+	/// The roots in `roots` as they were before (the ones kept, laid out again): what changed in them is
+	/// found item by item (`Root::changed_ink`), so a change inside a big frame repaints that change only.
+	pub old: Vec<Root>,
+}
+
+/// What a press found: the item, and the items it is inside, from the top level down.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Hit {
+	pub root: Handle,
+	/// Index of the item in its root's tree.
+	pub item: u32,
+	pub id: String,
+	/// Ids from the top-level item down to the one hit.
+	pub path: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Rect {
+	pub x: f64,
+	pub y: f64,
+	pub w: f64,
+	pub h: f64,
+}
+
+impl Rect {
+	pub fn right(&self) -> f64 {
+		self.x + self.w
+	}
+	pub fn bottom(&self) -> f64 {
+		self.y + self.h
+	}
+	pub fn cx(&self) -> f64 {
+		self.x + self.w / 2.0
+	}
+	pub fn cy(&self) -> f64 {
+		self.y + self.h / 2.0
+	}
+	pub fn union(&self, o: &Rect) -> Rect {
+		let x = self.x.min(o.x);
+		let y = self.y.min(o.y);
+		Rect { x, y, w: self.right().max(o.right()) - x, h: self.bottom().max(o.bottom()) - y }
+	}
+	/// Whether the two boxes overlap or touch.
+	pub fn meets(&self, o: &Rect) -> bool {
+		self.x <= o.right() && o.x <= self.right() && self.y <= o.bottom() && o.y <= self.bottom()
+	}
+	pub fn contains(&self, x: f64, y: f64) -> bool {
+		x >= self.x && x <= self.right() && y >= self.y && y <= self.bottom()
+	}
+	pub fn inside(&self, o: &Rect) -> bool {
+		self.x >= o.x && self.y >= o.y && self.right() <= o.right() && self.bottom() <= o.bottom()
 	}
 }
 

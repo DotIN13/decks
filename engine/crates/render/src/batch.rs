@@ -61,43 +61,6 @@ pub struct View {
 	pub offset: (f32, f32),
 }
 
-/// A blur's Gaussian is drawn at most this many sigmas wide in the texture it is drawn in: a wider
-/// one is drawn on a texture halved (and halved again) and stretched back, so its passes cost about
-/// the same whatever the radius.
-pub const BLUR_SIGMA: f32 = 4.0;
-/// The most a blur's texture is halved: 64 times smaller across, so a sigma of 256 pixels.
-pub const BLUR_MOST_HALVED: u32 = 64;
-/// A blurred layer's sides are a multiple of this, so a stage's few sizes of them are kept and used
-/// again rather than made for each item.
-pub const BLUR_ROUND: u32 = 128;
-
-/// A blurred layer's texture: `blur.area` (which holds the blur's reach already), cut to `parent`
-/// grown by the blur's reach (what lies further off blurs nothing onto it), its sides rounded up to
-/// [`BLUR_ROUND`] and to how often it is halved, at most `max_side`. With the times it is halved.
-pub fn blur_view(blur: &LayerBlur, parent: &View, max_side: u32) -> (View, u32) {
-	let sigma = blur.sigma.max(0.0);
-	let mut halved = 1u32;
-	while sigma / halved as f32 > BLUR_SIGMA && halved < BLUR_MOST_HALVED {
-		halved *= 2;
-	}
-	let m = (sigma * 3.0).ceil();
-	let [ax, ay, aw, ah] = blur.area;
-	let (px, py) = (-parent.offset.0, -parent.offset.1);
-	// Its corner on a multiple of the halving in target pixels, so tiles side by side (whose corners
-	// are multiples of their size) halve along the same grid and meet without a seam.
-	let snap = |v: f32| (v / halved as f32).floor() * halved as f32;
-	let x0 = snap(ax.max(px - m));
-	let y0 = snap(ay.max(py - m));
-	let x1 = (ax + aw).min(px + parent.width as f32 + m).ceil();
-	let y1 = (ay + ah).min(py + parent.height as f32 + m).ceil();
-	let unit = BLUR_ROUND.max(halved);
-	let side = |a: f32, b: f32| {
-		let want = ((b - a).max(1.0) as u32).div_ceil(unit) * unit;
-		want.min((max_side / unit).max(1) * unit)
-	};
-	(View { width: side(x0, x1), height: side(y0, y1), offset: (-x0, -y0) }, halved)
-}
-
 /// A layer open while its contents are batched.
 struct Open {
 	id: u32,
@@ -105,7 +68,6 @@ struct Open {
 	blur: Option<(f32, u32)>,
 	view: View,
 }
-
 /// What a draw list turns into before it goes to the card.
 #[derive(Default)]
 pub struct Built {
@@ -119,17 +81,6 @@ pub struct Built {
 	/// Layers this draw needs: their ids and sizes.
 	pub layers: Vec<(u32, u32, u32)>,
 }
-
-pub fn affine_inverse(m: &[f32; 6]) -> [f32; 6] {
-	let [a, b, c, d, e, f] = *m;
-	let det = a * d - b * c;
-	if det.abs() < 1e-12 {
-		return [0.0; 6];
-	}
-	let (ia, ib, ic, id) = (d / det, -b / det, -c / det, a / det);
-	[ia, ib, ic, id, -(ia * e + ic * f), -(ib * e + id * f)]
-}
-
 impl Built {
 	fn paint(&mut self, paint: &Paint) -> (f32, Option<u32>) {
 		let mut rec = [0.0f32; 16];
@@ -340,6 +291,55 @@ impl Built {
 		}
 		b
 	}
+}
+
+pub fn affine_inverse(m: &[f32; 6]) -> [f32; 6] {
+	let [a, b, c, d, e, f] = *m;
+	let det = a * d - b * c;
+	if det.abs() < 1e-12 {
+		return [0.0; 6];
+	}
+	let (ia, ib, ic, id) = (d / det, -b / det, -c / det, a / det);
+	[ia, ib, ic, id, -(ia * e + ic * f), -(ib * e + id * f)]
+}
+
+/// A blur's Gaussian is drawn at most this many sigmas wide in the texture it is drawn in: a wider
+/// one is drawn on a texture halved (and halved again) and stretched back, so its passes cost about
+/// the same whatever the radius.
+pub const BLUR_SIGMA: f32 = 4.0;
+
+/// The most a blur's texture is halved: 64 times smaller across, so a sigma of 256 pixels.
+pub const BLUR_MOST_HALVED: u32 = 64;
+
+/// A blurred layer's sides are a multiple of this, so a stage's few sizes of them are kept and used
+/// again rather than made for each item.
+pub const BLUR_ROUND: u32 = 128;
+
+/// A blurred layer's texture: `blur.area` (which holds the blur's reach already), cut to `parent`
+/// grown by the blur's reach (what lies further off blurs nothing onto it), its sides rounded up to
+/// [`BLUR_ROUND`] and to how often it is halved, at most `max_side`. With the times it is halved.
+pub fn blur_view(blur: &LayerBlur, parent: &View, max_side: u32) -> (View, u32) {
+	let sigma = blur.sigma.max(0.0);
+	let mut halved = 1u32;
+	while sigma / halved as f32 > BLUR_SIGMA && halved < BLUR_MOST_HALVED {
+		halved *= 2;
+	}
+	let m = (sigma * 3.0).ceil();
+	let [ax, ay, aw, ah] = blur.area;
+	let (px, py) = (-parent.offset.0, -parent.offset.1);
+	// Its corner on a multiple of the halving in target pixels, so tiles side by side (whose corners
+	// are multiples of their size) halve along the same grid and meet without a seam.
+	let snap = |v: f32| (v / halved as f32).floor() * halved as f32;
+	let x0 = snap(ax.max(px - m));
+	let y0 = snap(ay.max(py - m));
+	let x1 = (ax + aw).min(px + parent.width as f32 + m).ceil();
+	let y1 = (ay + ah).min(py + parent.height as f32 + m).ceil();
+	let unit = BLUR_ROUND.max(halved);
+	let side = |a: f32, b: f32| {
+		let want = ((b - a).max(1.0) as u32).div_ceil(unit) * unit;
+		want.min((max_side / unit).max(1) * unit)
+	};
+	(View { width: side(x0, x1), height: side(y0, y1), offset: (-x0, -y0) }, halved)
 }
 
 /// A gradient's colours along 256 texels, premultiplied, as one row of the ramp texture.
