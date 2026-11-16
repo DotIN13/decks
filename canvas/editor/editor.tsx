@@ -72,6 +72,7 @@ export function createEditor(
 	const [ownGlide, setGlideAsk] = createSignal<{ token: number; ms: number }>();
 	let glides = 0;
 	const { doc, edit, step, movePage, resizePage, removePage } = drawing;
+	probes.penEdit = (ops) => edit(ops);
 
 	/** The stage's engine, once the stage is made (`Stage` `onEngine`): the layout the handle answers from. */
 	let engine: Engine | undefined;

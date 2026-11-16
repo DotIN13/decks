@@ -211,12 +211,14 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 			studio.save(edits);
 		} } : {}),
 		...(studio ? {} : { document: {
-			// Your edits, straight to the harness; one it refuses is dropped, and the drawing read again.
+			// Your edits, straight to the harness; one it refuses is dropped, the drawing read again, and you are told why.
 			send: async (ops, edit) => {
 				changed();
 				const answer = await backend.act("item.batch", { canvas: start.canvas.name, ops: ops.map(penOps.itemOpOf), ...(edit ? { edit } : {}) });
-				if (!answer.ok) reread();
-				return answer.ok;
+				if (answer.ok) return true;
+				reread();
+				ctx.say(`Your change was not saved: ${answer.error ?? "the server refused it."}`);
+				return false;
 			},
 			step: (direction, edit) => {
 				void backend.act("canvas.undo", { canvas: start.canvas.name, ...(direction === "redo" ? { redo: true } : {}), ...(edit ? { edit } : {}) }).then((answer) => {

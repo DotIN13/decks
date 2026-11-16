@@ -82,6 +82,8 @@ export interface Probes {
 	frameSelect?: ((ids: string[]) => void) | undefined;
 	frameCamera?: (() => unknown) | undefined;
 	frameState?: (() => unknown) | undefined;
+	/** The person's edit, as a gesture makes it: pen ops through the editor's own edit (edit-refused). */
+	penEdit?: ((ops: unknown[]) => boolean) | undefined;
 }
 
 const DEFAULTS: Knobs = { halfZoom: true, pinchTail: false, exactCamera: false, noGlide: false, noHold: false, skipLevels: true, warm: true };
