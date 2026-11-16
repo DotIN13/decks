@@ -4,7 +4,7 @@ import { harnessAnswers, type Parts } from "./calls.ts";
 import { AGENT_KINDS, type RunKind } from "./runtimes/types/index.ts";
 import { runtimeOf } from "./runtimes/registry.ts";
 import { harnessHome } from "./runtimes/shared/home.ts";
-import { Sessions, specOf, Transcripts, type HostLink } from "./sessions/index.ts";
+import { Sessions, specOf, Transcripts, type HostLink, type SessionDeps } from "./sessions/index.ts";
 import { Settings } from "./runtimes/settings.ts";
 
 // The harness's line to a server: offer the kinds it runs and the calls it
@@ -18,6 +18,8 @@ export type HarnessOptions = {
 	deck: string;
 	home?: string;
 	kinds?: RunKind[];
+	/** Opens each agent's runtime instead of the registry: a test's fake runtime. */
+	open?: SessionDeps["open"];
 	/** On a deck with no agent at all, start one, as a first run of Decks does; its home canvas when named. */
 	firstAgent?: false | { canvas?: string };
 };
@@ -38,7 +40,7 @@ export async function startHarness(options: HarnessOptions): Promise<Harness> {
 	};
 	const accounts = new ClaudeAccounts(home);
 	const transcripts = new Transcripts(home);
-	const sessions = new Sessions({ url: options.url, deckPath: options.deck, transcripts, host: link, accounts });
+	const sessions = new Sessions({ url: options.url, deckPath: options.deck, transcripts, host: link, accounts, ...(options.open ? { open: options.open } : {}) });
 	const parts: Parts = { sessions, accounts, settings: new Settings(home), host: link, forks: new Map() };
 
 	const connect = async (): Promise<void> => {
