@@ -1,8 +1,11 @@
 import { type InkStroke } from "./shaper.ts";
 
-export const round1 = (n: number) => Math.round(n * 10) / 10;
-// --- geometry ------------------------------------------------------------------------
+// A stroke's geometry: the path it is drawn as, its points thinned once it
+// is done, and the box round some strokes.
 
+export const round1 = (n: number) => Math.round(n * 10) / 10;
+
+// The path a stroke is drawn as.
 export interface Pt {
 	x: number;
 	y: number;
@@ -94,6 +97,7 @@ function outline(pts: Pt[], size: number): string {
 		`A${startRadius} ${startRadius} 0 0 1 ${f(start.x)} ${f(start.y)}Z`
 	);
 }
+// Fewer points, once the pen lifts.
 /**
  * Fewer points for the same line (Ramer-Douglas-Peucker on x and y, pressure carried along). At a
  * tolerance of 0.35 pixels a pencil's 240 points a second keep about one in six, and no eye can
@@ -133,6 +137,7 @@ export function simplify(points: number[], tolerance = 0.35): number[] {
 	});
 	return out;
 }
+/** How far a point is from the segment a to b. */
 export function segmentDistance(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
 	const dx = bx - ax;
 	const dy = by - ay;
@@ -140,6 +145,7 @@ export function segmentDistance(px: number, py: number, ax: number, ay: number, 
 	const t = lengthSquared === 0 ? 0 : Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / lengthSquared));
 	return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
 }
+// The box round some strokes.
 export interface InkBox {
 	x: number;
 	y: number;

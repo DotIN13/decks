@@ -10,12 +10,7 @@ import { scheme } from "../theme.ts";
  * `itemKind`): a document, edited where it sits, and an app, opened in a tab of its own.
  */
 
-/**
- * A document item (`decks.document`): the document editor (`canvas/documents/page.ts`) in the item's place, its
- * messages carried by the host (`CanvasHost.documents`): in the canvas frame, to the harness on the
- * canvas's token, which answers them only for files a document item on that canvas names. Plain
- * elements, not a shadow root: it is the canvas's own code, and the text selection it follows is the page's.
- */
+// The document.
 /**
  * The board tokens a dark board has (`cards/runtime/lib/theme.css`, `[data-theme="dark"]`), as values: the
  * document editor draws in `--b-*`, with light values as its fallbacks, and the frame's page defines none.
@@ -32,6 +27,12 @@ const DARK_TOKENS: Record<string, string> = {
 	"--b-accent-soft": "#1e2a52",
 };
 
+/**
+ * A document item (`decks.document`): the document editor (`canvas/documents/page.ts`) in the item's place, its
+ * messages carried by the host (`CanvasHost.documents`): in the canvas frame, to the harness on the
+ * canvas's token, which answers them only for files a document item on that canvas names. Plain
+ * elements, not a shadow root: it is the canvas's own code, and the text selection it follows is the page's.
+ */
 export function DocumentSurface(props: { file: string; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
 	// In the canvas's scheme, as a card is (`card-surface.tsx`): its tokens on the item, dark or left to the light fallbacks.
@@ -66,6 +67,49 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 	return <div class="document-surface" ref={(element) => (host = element)} style={{ width: "100%", height: "100%", overflow: "auto", background: "var(--b-bg, #fff)" }} />;
 }
 
+const scripts = new Map<string, Promise<void>>();
+/** A classic script from `lib/`, once for the page: the UMD builds set a global. */
+function script(lib: string, name: string): Promise<void> {
+	const href = new URL(name, lib).href;
+	let got = scripts.get(href);
+	if (!got) {
+		got = new Promise<void>((resolve, reject) => {
+			const tag = document.createElement("script");
+			tag.src = href;
+			tag.onload = () => resolve();
+			tag.onerror = () => reject(new Error(`${name} did not load`));
+			document.head.append(tag);
+		});
+		scripts.set(href, got);
+	}
+	return got;
+}
+
+async function markdown(lib: string, into: HTMLElement, source: string): Promise<void> {
+	await script(lib, "marked.umd.js");
+	const marked = (window as unknown as { marked: { parse(text: string, o: unknown): string } }).marked;
+	into.innerHTML = marked.parse(source, { gfm: true, breaks: false });
+	await maths(lib, into);
+}
+
+async function maths(lib: string, into: HTMLElement): Promise<void> {
+	if (!/\$|\\\(|\\\[/.test(into.textContent ?? "")) return;
+	const href = new URL("katex.min.css", lib).href;
+	if (!document.querySelector(`link[href="${href}"]`)) document.head.append(Object.assign(document.createElement("link"), { rel: "stylesheet", href }));
+	await script(lib, "katex.min.js");
+	await script(lib, "katex-auto-render.min.js");
+	(window as unknown as { renderMathInElement?: (el: Element, options: unknown) => void }).renderMathInElement?.(into, {
+		delimiters: [
+			{ left: "$$", right: "$$", display: true },
+			{ left: "$", right: "$", display: false },
+			{ left: "\\(", right: "\\)", display: false },
+			{ left: "\\[", right: "\\]", display: true },
+		],
+		throwOnError: false,
+	});
+}
+
+// The app.
 /** The app items whose window is showing the app itself, by item path: the others are drawn by the sheet as their pictures (`items-layer.tsx`). */
 const [shownApps, setShownApps] = createSignal<ReadonlyMap<string, number>>(new Map());
 export const appShowing = (path: string) => (shownApps().get(path) ?? 0) > 0;
@@ -210,46 +254,4 @@ function forwardWheel(frame: HTMLIFrameElement, wheel: ForwardedWheel): void {
 	const clientX = box.left + Number(wheel.x || 0) * scale;
 	const clientY = box.top + Number(wheel.y || 0) * scale;
 	stage.dispatchEvent(new WheelEvent("wheel", { deltaX: Number(wheel.dx) || 0, deltaY: Number(wheel.dy) || 0, deltaMode: Number(wheel.mode) || 0, clientX, clientY, ctrlKey: !!wheel.ctrlKey, metaKey: !!wheel.metaKey, shiftKey: !!wheel.shiftKey, bubbles: true, cancelable: true }));
-}
-
-const scripts = new Map<string, Promise<void>>();
-/** A classic script from `lib/`, once for the page: the UMD builds set a global. */
-function script(lib: string, name: string): Promise<void> {
-	const href = new URL(name, lib).href;
-	let got = scripts.get(href);
-	if (!got) {
-		got = new Promise<void>((resolve, reject) => {
-			const tag = document.createElement("script");
-			tag.src = href;
-			tag.onload = () => resolve();
-			tag.onerror = () => reject(new Error(`${name} did not load`));
-			document.head.append(tag);
-		});
-		scripts.set(href, got);
-	}
-	return got;
-}
-
-async function markdown(lib: string, into: HTMLElement, source: string): Promise<void> {
-	await script(lib, "marked.umd.js");
-	const marked = (window as unknown as { marked: { parse(text: string, o: unknown): string } }).marked;
-	into.innerHTML = marked.parse(source, { gfm: true, breaks: false });
-	await maths(lib, into);
-}
-
-async function maths(lib: string, into: HTMLElement): Promise<void> {
-	if (!/\$|\\\(|\\\[/.test(into.textContent ?? "")) return;
-	const href = new URL("katex.min.css", lib).href;
-	if (!document.querySelector(`link[href="${href}"]`)) document.head.append(Object.assign(document.createElement("link"), { rel: "stylesheet", href }));
-	await script(lib, "katex.min.js");
-	await script(lib, "katex-auto-render.min.js");
-	(window as unknown as { renderMathInElement?: (el: Element, options: unknown) => void }).renderMathInElement?.(into, {
-		delimiters: [
-			{ left: "$$", right: "$$", display: true },
-			{ left: "$", right: "$", display: false },
-			{ left: "\\(", right: "\\)", display: false },
-			{ left: "\\[", right: "\\]", display: true },
-		],
-		throwOnError: false,
-	});
 }

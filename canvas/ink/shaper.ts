@@ -1,6 +1,7 @@
 import { type Pt, f, widthAt } from "./outline.ts";
 export { widthAt, strokeShape, simplify, type InkBox, inkBounds } from "./outline.ts";
-export { hitStroke, insidePolygon, lassoPick, moveStroke, type InkHistory, inkHistory, inkCommit, inkUndo, inkRedo } from "./history.ts";
+export { hitStroke, insidePolygon, lassoPick, moveStroke } from "./hit.ts";
+export { type InkHistory, inkHistory, inkCommit, inkUndo, inkRedo } from "./history.ts";
 
 /**
  * Ink: what a person draws with a pen, a finger or a mouse — the shapes, the colours and the

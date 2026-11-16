@@ -43,6 +43,7 @@ export interface MediaFacts {
 	h?: number;
 }
 
+// The items a dropped file lands as.
 /** A text file's words as a card: a column of its blocks (`card-frame.ts`), each given its id by the server. */
 export function wordsCard(name: string, words: string): DroppedItem {
 	const children = cardChildren(words, [], { fresh: () => "", inner: DROP_CARD_W - CARD_PAD * 2 });
@@ -56,6 +57,12 @@ export function pictureItem(name: string, url: string, natural: Size): SizedItem
 	return { node: { type: "rectangle", name, cornerRadius: 8, fill: { type: "image", url, mode: "fill" } }, w, h };
 }
 
+/** A picture among a card's blocks: as wide as the card's words at most (`inner`), at its own proportions. */
+export function cardPicture(name: string, url: string, inner: number, natural: Size | undefined): Node {
+	const w = Math.round(Math.min(inner, natural?.width ?? inner));
+	const h = Math.round(natural ? (w * natural.height) / Math.max(1, natural.width) : w * 0.5625);
+	return { type: "rectangle", name, cornerRadius: 6, width: w, height: h, fill: { type: "image", url, mode: "fill" } };
+}
 /**
  * A film or a sound: pen's own rectangle, filled with the still the server wrote and marked as media
  * (`@decks/pen`, `MEDIA`). pen.dev opens it as the rectangle it is, showing the poster, which is the
@@ -79,6 +86,7 @@ export function mediaItem(name: string, file: string, facts: MediaFacts, url: (p
 	};
 }
 
+// Where they land.
 /** Items in a row centred on `middle`, a stage point, their tops level with the tallest's; `id` names each. */
 export function rowOps(items: readonly DroppedItem[], middle: Point, id: (index: number) => string): Op[] {
 	if (items.length === 0) return [];
@@ -99,6 +107,7 @@ export function centredOp(item: SizedItem, middle: Point, id: string): Op {
 	return { op: "insert", node: { ...item.node, id }, box };
 }
 
+// Files already in the deck.
 /** A deck file's preview as the server describes it (`/api/where`). */
 export interface FilePreview {
 	preview: string;
@@ -135,11 +144,4 @@ export function fileCardOps(files: ReadonlyArray<{ path: string; preview?: FileP
 		x += FILE_CARD_W + DROP_GAP;
 		return op;
 	});
-}
-
-/** A picture among a card's blocks: as wide as the card's words at most (`inner`), at its own proportions. */
-export function cardPicture(name: string, url: string, inner: number, natural: Size | undefined): Node {
-	const w = Math.round(Math.min(inner, natural?.width ?? inner));
-	const h = Math.round(natural ? (w * natural.height) / Math.max(1, natural.width) : w * 0.5625);
-	return { type: "rectangle", name, cornerRadius: 6, width: w, height: h, fill: { type: "image", url, mode: "fill" } };
 }
