@@ -286,6 +286,9 @@
 		"card-ground": {
 			"path": "tools/checks/cards/card-ground.mjs"
 		},
+		"card-calls": {
+			"path": "tools/checks/cards/card-calls.mjs"
+		},
 		"card-frame": {
 			"path": "tools/checks/pictures/card-frame.mjs"
 		},
