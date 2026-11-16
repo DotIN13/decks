@@ -99,7 +99,8 @@ test("the sandboxed frame (origin null) reads its page, assets and pass files", 
 	await server.close();
 });
 
-test("the deck's import map is read as paths under assets/, as today", async () => {
-	const { importPaths } = await import("./routes.ts");
-	assert.deepEqual(importPaths({ greet: "./libs/greet/index.js", d3: "https://cdn.example/d3.js", out: "../secret.js", hid: "./.git/x.js", n: 3 }), { greet: "assets/libs/greet/index.js", d3: "https://cdn.example/d3.js" });
+test("the deck's import map is read by the protocol's rule: paths under assets/ (a leading / too, as today), https as it is", async () => {
+	const { deckFiles } = await import("../../protocol/index.ts");
+	const map = JSON.stringify({ imports: { greet: "./libs/greet/index.js", d3: "https://cdn.example/d3.js", out: "../secret.js", hid: "./.git/x.js", root: "/abs.js", n: 3 } });
+	assert.deepEqual(deckFiles.importMap(map), { greet: "assets/libs/greet/index.js", d3: "https://cdn.example/d3.js", root: "assets/abs.js" });
 });
