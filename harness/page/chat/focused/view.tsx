@@ -20,7 +20,7 @@ export function FocusedStream(props: { shown: boolean; items: TranscriptItem[]; 
 			/*
 			 * Reaching back, in two parts: whether there is anything there, and how to
 			 * ask for it. The column owns the window over what is held; the server owns
-			 * everything older (`agents/store.ts`), and this is the seam between them.
+			 * everything older (`chat.list`, harness/sessions/answers.ts), and this is the seam between them.
 			 */
 			more={state.focused ? state.agents[state.focused!]?.moreHistory === true : false}
 			onEarlier={() => (state.focused ? loadEarlier(state.focused!) : Promise.resolve(0))}

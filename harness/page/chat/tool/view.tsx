@@ -76,7 +76,7 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 	const [open, setOpen] = createSignal(false);
 	/*
 	 * The whole output once it has been fetched, else what came with the row, which for a long
-	 * output is a preview, with `full` saying how long the whole of it is (`agents/wire.ts`).
+	 * output is a preview, with `full` saying how long the whole of it is (`chat.get` in harness/sessions/answers.ts).
 	 */
 	const result = () => (fullResult(props.item.id) ?? props.item.result)?.trimEnd() ?? "";
 	const partial = () => props.item.full !== undefined && fullResult(props.item.id) === undefined;

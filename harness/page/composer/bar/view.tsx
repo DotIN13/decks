@@ -118,7 +118,7 @@ export interface ComposerProps {
 	 * so leaving a page never loses a message, and another canvas starts with its own.
 	 */
 	page: string;
-	/** Button one of three: the file picker the app already has (`app/files/FilePicker.tsx`). */
+	/** Button one of three: the file picker the app already has (`files/FilePicker.tsx`). */
 	onAttach?: () => void;
 }
 

@@ -3,7 +3,7 @@ import { createSignal } from "solid-js";
 // The whole output of a tool call whose row came with only a preview: asked for once,
 // and held apart from the rows so a new row never drops it.
 
-/** The whole output of tool calls whose rows arrived with only a preview (`agents/wire.ts`). */
+/** The whole output of tool calls whose rows arrived with only a preview (`chat.get` in harness/sessions/answers.ts). */
 const [held, setHeld] = createSignal<ReadonlyMap<string, string>>(new Map());
 
 /** Asked and not yet answered, so a chip opened twice asks once, and can say it is waiting. */
