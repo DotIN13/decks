@@ -1,5 +1,5 @@
 import { life } from "./life.ts";
-import { createSignal, type Accessor } from "solid-js";
+import { createSignal, type Accessor, type Setter } from "solid-js";
 import type { Camera, Presence, PresenceBy, ServerMessage } from "@decks/protocol-old";
 import { toWorld } from "../../camera/camera.ts";
 
@@ -24,6 +24,83 @@ const TOUR_MOST = 6;
 /** How long a cursor is kept, pointer gone, for its fade out (`AgentCursor`, 600 ms). */
 export const LEAVE_MS = 650;
 
+/** What presence keeps between its calls: everyone heard, and the timers of agents' cursors. */
+interface Kept {
+	setPresent: Setter<Map<string, Present>>;
+	/** Agents' cursors on their way out, by key. */
+	linger: Map<string, ReturnType<typeof setTimeout>>;
+	/** Each agent's tour: the stops still to make and the timer between them, by key. */
+	tours: Map<string, { stops: Array<{ x: number; y: number }>; timer?: ReturnType<typeof setTimeout> }>;
+}
+
+/** Let an agent's cursor go: fading first, then dropped. */
+function letGo(k: Kept, key: string): void {
+	k.setPresent((all) => {
+		const was = all.get(key);
+		if (!was) return all;
+		const next = new Map(all);
+		next.set(key, { ...was, pointer: undefined, leaving: true });
+		return next;
+	});
+	k.linger.set(key, setTimeout(() => {
+		k.linger.delete(key);
+		k.setPresent((all) => {
+			const next = new Map(all);
+			next.delete(key);
+			return next;
+		});
+	}, LEAVE_MS));
+}
+
+	/**
+	 * An agent's edit landed: its cursor goes to each thing it touched in turn, resting `TOUR_STEP_MS`
+	 * on each, and stays on the last for `TOUR_LINGER_MS` so a run of edits reads as one hand at
+	 * work rather than a cursor that comes and goes. Stops past `TOUR_MOST` are skipped, newest kept.
+	 */
+function tour(k: Kept, agentId: string, by: PresenceBy, stops: ReadonlyArray<{ x: number; y: number }>): void {
+	if (!stops.length) return;
+	const key = `act/agent/${agentId}`;
+	clearTimeout(k.linger.get(key));
+	k.linger.delete(key);
+	const tour = k.tours.get(key) ?? { stops: [] };
+	k.tours.set(key, tour);
+	tour.stops.push(...stops);
+	if (tour.stops.length > TOUR_MOST) tour.stops.splice(0, tour.stops.length - TOUR_MOST);
+	const step = () => {
+		const stop = tour.stops.shift();
+		if (!stop) {
+			tour.timer = undefined;
+			k.linger.set(key, setTimeout(() => letGo(k, key), TOUR_LINGER_MS));
+			return;
+		}
+		k.setPresent((all) => {
+			const next = new Map(all);
+			const was = next.get(key);
+			next.set(key, { by, at: Date.now(), pointer: stop, selection: was?.selection ?? [] });
+			return next;
+		});
+		tour.timer = setTimeout(step, TOUR_STEP_MS);
+	};
+	if (tour.timer === undefined) step();
+}
+
+/** Everyone heard, with what one `presence.changed` says of `key` taken in. */
+function withHeard(all: Map<string, Present>, key: string, message: Extract<ServerMessage, { type: "presence.changed" }>): Map<string, Present> {
+	const next = new Map(all);
+	if (message.gone) next.delete(key);
+	else {
+		const was = next.get(key);
+		next.set(key, {
+			by: message.by,
+			at: Date.now(),
+			pointer: message.pointer === undefined ? was?.pointer : message.pointer,
+			selection: message.selection ?? was?.selection,
+			camera: message.camera === undefined ? was?.camera : message.camera,
+		});
+	}
+	return next;
+}
+
 /**
  * Presence: where everyone else on this canvas is, and where this frame is for them.
  *
@@ -35,28 +112,8 @@ export const LEAVE_MS = 650;
  */
 export function installPresence(options: { camera: Accessor<Camera>; send: (presence: Presence) => void; viewport: () => { width: number; height: number } }) {
 	const [present, setPresent] = createSignal<Map<string, Present>>(new Map());
-	/** Agents' cursors on their way out, by key. */
-	const linger = new Map<string, ReturnType<typeof setTimeout>>();
-	/** Each agent's tour: the stops still to make and the timer between them, by key. */
-	const tours = new Map<string, { stops: Array<{ x: number; y: number }>; timer?: ReturnType<typeof setTimeout> }>();
-	/** Let an agent's cursor go: fading first, then dropped. */
-	const letGo = (key: string) => {
-		setPresent((all) => {
-			const was = all.get(key);
-			if (!was) return all;
-			const next = new Map(all);
-			next.set(key, { ...was, pointer: undefined, leaving: true });
-			return next;
-		});
-		linger.set(key, setTimeout(() => {
-			linger.delete(key);
-			setPresent((all) => {
-				const next = new Map(all);
-				next.delete(key);
-				return next;
-			});
-		}, LEAVE_MS));
-	};
+	const k: Kept = { setPresent, linger: new Map(), tours: new Map() };
+	const { linger, tours } = k;
 	let last = 0;
 	let pointerOut = true;
 	const pointer = (event: PointerEvent) => {
@@ -96,58 +153,14 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 				next.set(key, { by, at: message.at, ...(pointer ? { pointer } : {}), selection: card?.id && message.phase === "start" ? [card.id] : [] });
 				return next;
 			});
-			if (message.phase === "done") linger.set(key, setTimeout(() => letGo(key), ACT_LINGER_MS));
+			if (message.phase === "done") linger.set(key, setTimeout(() => letGo(k, key), ACT_LINGER_MS));
 		},
-		/**
-		 * An agent's edit landed: its cursor goes to each thing it touched in turn, resting `TOUR_STEP_MS`
-		 * on each, and stays on the last for `TOUR_LINGER_MS` so a run of edits reads as one hand at
-		 * work rather than a cursor that comes and goes. Stops past `TOUR_MOST` are skipped, newest kept.
-		 */
-		tour(agentId: string, by: PresenceBy, stops: ReadonlyArray<{ x: number; y: number }>): void {
-			if (!stops.length) return;
-			const key = `act/agent/${agentId}`;
-			clearTimeout(linger.get(key));
-			linger.delete(key);
-			const tour = tours.get(key) ?? { stops: [] };
-			tours.set(key, tour);
-			tour.stops.push(...stops);
-			if (tour.stops.length > TOUR_MOST) tour.stops.splice(0, tour.stops.length - TOUR_MOST);
-			const step = () => {
-				const stop = tour.stops.shift();
-				if (!stop) {
-					tour.timer = undefined;
-					linger.set(key, setTimeout(() => letGo(key), TOUR_LINGER_MS));
-					return;
-				}
-				setPresent((all) => {
-					const next = new Map(all);
-					const was = next.get(key);
-					next.set(key, { by, at: Date.now(), pointer: stop, selection: was?.selection ?? [] });
-					return next;
-				});
-				tour.timer = setTimeout(step, TOUR_STEP_MS);
-			};
-			if (tour.timer === undefined) step();
-		},
+		tour: (agentId: string, by: PresenceBy, stops: ReadonlyArray<{ x: number; y: number }>) => tour(k, agentId, by, stops),
 		/** What the line says of someone else. */
 		hear(message: ServerMessage): boolean {
 			if (message.type !== "presence.changed") return false;
 			const key = `${message.by.harness ?? ""}/${message.by.kind}/${message.by.id}`;
-			setPresent((all) => {
-				const next = new Map(all);
-				if (message.gone) next.delete(key);
-				else {
-					const was = next.get(key);
-					next.set(key, {
-						by: message.by,
-						at: Date.now(),
-						pointer: message.pointer === undefined ? was?.pointer : message.pointer,
-						selection: message.selection ?? was?.selection,
-						camera: message.camera === undefined ? was?.camera : message.camera,
-					});
-				}
-				return next;
-			});
+			setPresent((all) => withHeard(all, key, message));
 			return true;
 		},
 		dispose() {
