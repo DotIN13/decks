@@ -1,11 +1,11 @@
 import { probes } from "../../debug.ts";
-import { Show, For, createMemo, createRoot } from "solid-js";
+import { Show, For, createMemo, createRoot, type JSX } from "solid-js";
 import { render } from "solid-js/web";
 import { createEditor } from "../../editor/editor.tsx";
 import type { Editor } from "../../types.ts";
 import type { FrameChromeView } from "../chrome.ts";
 import { AgentCursor } from "../../chrome/AgentCursor.tsx";
-import { openFrame } from "./boot.ts";
+import { openFrame, type FrameContext } from "./boot.ts";
 import { endLife } from "./life.ts";
 import { editorOptions, installHost } from "./options.ts";
 import { wireFrame } from "./events.ts";
@@ -68,16 +68,60 @@ export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView
 async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: FrameChromeView | undefined): Promise<() => void> {
 	const ctx = await openFrame(root, start, end, chrome);
 	return createRoot((disposeRoot) => {
-	const { camera, pages, cursor } = ctx;
 	installHost(ctx);
+	const cursors = presenceLayer(ctx);
+	let reread = () => {};
+	const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors));
+	const { handle } = editor;
+	ctx.setMade(editor);
+	ctx.changed();
+	setProbes(ctx, handle);
+
+	reread = wireFrame(ctx).reread;
+
+
+	if (chrome) {
+		// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
+		// Made inside the render's root, so its effects and its parts' onMount run (a float's grip, the pen's state).
+		const view = () => chromeView(ctx, handle, chrome);
+		const unrender = render(() => (
+			<>
+				{editor.surface()}
+				{view()}
+			</>
+		), root);
+		return () => {
+			unrender();
+			editor.dispose();
+			disposeRoot();
+		};
+	}
 
 	/*
-	 * The agent's cursor, in the stage's world (`CanvasOptions.world`): the card's place plus the point on
-	 * it, drifting from one place to the next and one size on the screen at any zoom. In the world rather
-	 * than over the canvas on a layer of its own, which placed it from the window's middle while the stage
-	 * places the drawing from the column beside the side panel: the cursor stood 180 px from what it pointed
-	 * at, and jittered against the drawing at every step of a pan, a frame behind the scroll.
+	 * No chrome of its own (Studio, until it brings one): the editor's own bars, or none. Nothing of the
+	 * tools crosses the frame line: an app's chrome lives in the frame beside the canvas.
 	 */
+	const unrender = render(() => (
+		<>
+			{start.look.toolbar ? editor.root() : editor.surface()}
+		</>
+	), root);
+	return () => {
+		unrender();
+		editor.dispose();
+		disposeRoot();
+	};
+	});
+}
+
+/*
+ * What the others on the canvas show in the stage's world (`CanvasOptions.world`): the agent's cursor at
+ * the card's place plus the point on it, everyone else's pointers and selections, and the marks of what
+ * agents drew. In the world rather than on a layer over the canvas, so it never stands off from the
+ * drawing or lags a frame behind the scroll.
+ */
+function presenceLayer(ctx: FrameContext): () => JSX.Element {
+	const { camera, pages, cursor } = ctx;
 	const cursorAt = () => {
 		const at = cursor();
 		const card = at ? pages().find((page) => page.path === at.path) : undefined;
@@ -133,74 +177,43 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			</div>
 		</Show>
 	);
-	let reread = () => {};
-	const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors));
-	const { handle } = editor;
-	ctx.setMade(editor);
-	ctx.changed();
-	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
+	return cursors;
+}
+
+/** For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read). */
+function setProbes(ctx: FrameContext, handle: Editor["handle"]): void {
+	const { pages, cursor } = ctx;
 	probes.frameDrawn = () => handle.drawn();
 	probes.frameNews = () => ctx.news();
 	probes.frameSelect = (ids) => handle.select(ids);
 	probes.frameCamera = () => handle.camera();
 	probes.frameState = () => ({ dock: ctx.dock(), agents: Object.keys(ctx.agents()).length, agent: ctx.agent(), cursor: cursor(), pages: pages().length, cardsReads: ctx.cardsReads(), cards: pages().map((page) => ({ path: page.path.split("/").at(-2) ?? page.path, rev: page.rev, sized: page.sized })) });
+}
 
-	reread = wireFrame(ctx).reread;
-
-
-	if (chrome) {
-		const { canWrite, setMode } = ctx;
-		// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
-		// Made inside the render's root, so its effects and its parts' onMount run (a float's grip, the pen's state).
-		const view = () => chrome({
-			handle,
-			revision: ctx.revision,
-			offer: ctx.offer,
-			dismissOffer: () => ctx.setOffer(undefined),
-			camera,
-			mode: ctx.mode,
-			setMode: (next) => {
-				if (next === "edit" && !canWrite()) return;
-				setMode(next);
-			},
-			canWrite,
-			dark: ctx.dark,
-			comment: ctx.comment,
-			setComment: ctx.setComment,
-			compose: (part) => end.emit("composer", part),
-			exportPicture: (ids) => end.emit("export", { ids }),
-			narrow: ctx.narrow,
-			dock: ctx.dock,
-			panel: (name) => end.emit("panel", { name }),
-			storage: ctx.storage,
-			canvas: start.canvas.name,
-		});
-		const unrender = render(() => (
-			<>
-				{editor.surface()}
-				{view()}
-			</>
-		), root);
-		return () => {
-			unrender();
-			editor.dispose();
-			disposeRoot();
-		};
-	}
-
-	/*
-	 * No chrome of its own (Studio, until it brings one): the editor's own bars, or none. Nothing of the
-	 * tools crosses the frame line: an app's chrome lives in the frame beside the canvas.
-	 */
-	const unrender = render(() => (
-		<>
-			{start.look.toolbar ? editor.root() : editor.surface()}
-		</>
-	), root);
-	return () => {
-		unrender();
-		editor.dispose();
-		disposeRoot();
-	};
+/** The app's chrome beside the canvas, told what it needs of the frame. */
+function chromeView(ctx: FrameContext, handle: Editor["handle"], chrome: FrameChromeView) {
+	const { canWrite, setMode, camera, end, start } = ctx;
+	return chrome({
+		handle,
+		revision: ctx.revision,
+		offer: ctx.offer,
+		dismissOffer: () => ctx.setOffer(undefined),
+		camera,
+		mode: ctx.mode,
+		setMode: (next) => {
+			if (next === "edit" && !canWrite()) return;
+			setMode(next);
+		},
+		canWrite,
+		dark: ctx.dark,
+		comment: ctx.comment,
+		setComment: ctx.setComment,
+		compose: (part) => end.emit("composer", part),
+		exportPicture: (ids) => end.emit("export", { ids }),
+		narrow: ctx.narrow,
+		dock: ctx.dock,
+		panel: (name) => end.emit("panel", { name }),
+		storage: ctx.storage,
+		canvas: start.canvas.name,
 	});
 }

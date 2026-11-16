@@ -167,7 +167,7 @@
 	"canvas/host/inside/events.ts: board": 1,
 	"canvas/host/inside/events.ts: stage": 8,
 	"canvas/host/inside/frame.tsx: board": 1,
-	"canvas/host/inside/frame.tsx: stage": 2,
+	"canvas/host/inside/frame.tsx: stage": 1,
 	"canvas/host/inside/marks.ts: stage": 1,
 	"canvas/host/messages.ts: board": 2,
 	"canvas/host/outside/framed-editor.tsx: board": 2,
