@@ -1,4 +1,4 @@
-import { PAGE, prepend } from "../chat/index.ts";
+import { PAGE, prepend } from "../chat/stream/model.ts";
 import { scratch } from "./agent.ts";
 import { ensureAgent, setState, state } from "./deck.ts";
 import { call, started } from "./line.ts";

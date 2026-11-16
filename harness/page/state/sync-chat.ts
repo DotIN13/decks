@@ -1,4 +1,4 @@
-import { historyShown } from "../chat/index.ts";
+import { historyShown } from "../chat/edge.ts";
 import { ensureAgent, nameOf, setState, state } from "./deck.ts";
 import { on } from "./line.ts";
 import type { Raise } from "./sync.ts";

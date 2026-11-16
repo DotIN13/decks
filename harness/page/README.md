@@ -38,7 +38,8 @@ Never `server/`, `apps/`, nor the old `packages/protocol`, `packages/api`, `pack
 7. Changing values live in a store in `state/`, never loose at the top of a file.
 8. Styles move first in their order, so the page looks the same; each is then scoped to its part,
    proven by pictures before and after in light and dark.
-9. Another folder reaches an area only through its `index.ts`.
+9. Another folder reaches an area only through its `index.ts`; `state/` alone reaches two of chat's files that
+   import nothing of it (`chat/stream/model.ts`, `chat/edge.ts`), so chat and state import in no loop.
 
 ## Check
 
