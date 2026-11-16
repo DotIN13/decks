@@ -88,33 +88,7 @@ export function PenBar(props: {
 					<Show when={entry.after}>
 						<span class="pen-rule" aria-hidden="true" />
 					</Show>
-					<button
-						type="button"
-						class="icon-button"
-						classList={{ "pen-more": !!entry.panel }}
-						data-tool={entry.tool}
-						data-insert-button={entry.panel ? "" : undefined}
-						data-on={penTool() === entry.tool || (entry.panel && besideTab() === entry.panel) ? "true" : undefined}
-						aria-pressed={penTool() === entry.tool}
-						aria-haspopup={entry.panel ? "dialog" : undefined}
-						title={entry.key ? `${entry.label} (${entry.key})` : entry.label}
-						aria-label={entry.label}
-						onClick={() => {
-							// Shapes and icons are picked in the insert panel first, which arms the tool (`Insert.tsx`).
-							if (entry.panel) {
-								setInsertPanel(besideTab() === entry.panel ? undefined : { tab: entry.panel });
-								props.onArm(entry.tool);
-								return;
-							}
-							// Pressing the armed tool again puts it down: selecting is what the canvas does with no tool in hand.
-							const next = penTool() === entry.tool ? "select" : entry.tool;
-							setInsertPanel(undefined);
-							setPenTool(next);
-							props.onArm(next);
-						}}
-					>
-						<Icon of={entry.icon} size={15} />
-					</button>
+					<ToolButton entry={entry} besideTab={besideTab} onArm={props.onArm} />
 					</>
 				)}
 			</For>
@@ -134,5 +108,38 @@ export function PenBar(props: {
 
 		<Properties doc={props.doc} onEdit={props.onEdit} onExport={props.onExport} />
 		</>
+	);
+}
+
+/** One tool in the column: arms it, puts it down when pressed again, or opens the insert panel at its tab. */
+function ToolButton(props: { entry: (typeof TOOLS)[number]; besideTab: () => "shapes" | "icons" | undefined; onArm: (tool: PenTool) => void }) {
+	return (
+		<button
+			type="button"
+			class="icon-button"
+			classList={{ "pen-more": !!props.entry.panel }}
+			data-tool={props.entry.tool}
+			data-insert-button={props.entry.panel ? "" : undefined}
+			data-on={penTool() === props.entry.tool || (props.entry.panel && props.besideTab() === props.entry.panel) ? "true" : undefined}
+			aria-pressed={penTool() === props.entry.tool}
+			aria-haspopup={props.entry.panel ? "dialog" : undefined}
+			title={props.entry.key ? `${props.entry.label} (${props.entry.key})` : props.entry.label}
+			aria-label={props.entry.label}
+			onClick={() => {
+				// Shapes and icons are picked in the insert panel first, which arms the tool (`Insert.tsx`).
+				if (props.entry.panel) {
+					setInsertPanel(props.besideTab() === props.entry.panel ? undefined : { tab: props.entry.panel });
+					props.onArm(props.entry.tool);
+					return;
+				}
+				// Pressing the armed tool again puts it down: selecting is what the canvas does with no tool in hand.
+				const next = penTool() === props.entry.tool ? "select" : props.entry.tool;
+				setInsertPanel(undefined);
+				setPenTool(next);
+				props.onArm(next);
+			}}
+		>
+			<Icon of={props.entry.icon} size={15} />
+		</button>
 	);
 }
