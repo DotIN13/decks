@@ -46,9 +46,12 @@ test("a pass's call with no canvas is filled in as its own; a card or file of an
 		assert.equal(listed.ok, true, JSON.stringify(listed));
 		assert.equal((await s.call("card.get", { card: "canvases/a/cards/note/index.html" }, PASS)).ok, true);
 		assert.equal((await s.call("card.get", { card: "canvases/b/cards/secret/index.html" }, PASS)).ok, false);
-		assert.equal((await s.call("file.read", { path: "canvases/b/canvas.json" }, PASS)).ok, false);
-		assert.equal((await s.call("file.read", { path: "notes/private.md" }, PASS)).ok, false);
-		assert.equal((await s.call("file.read", { path: "papers/paper.md" }, PASS)).ok, true, "a document its drawing places");
+		// The file call a card keeps is file.url (callsFor("card")); its path is held as the guard says.
+		assert.equal((await s.call("file.url", { path: "canvases/a/canvas.json" }, PASS)).ok, true, "its own canvas's folder");
+		assert.equal((await s.call("file.url", { path: "canvases/b/canvas.json" }, PASS)).ok, false);
+		assert.equal((await s.call("file.url", { path: "notes/private.md" }, PASS)).ok, false);
+		assert.equal((await s.call("file.url", { path: "papers/paper.md" }, PASS)).ok, true, "a document its drawing places");
+		assert.equal((await s.call("file.read", { path: "canvases/a/canvas.json" }, PASS)).ok, false, "not a card's call");
 		assert.equal((await s.call("agent.send", { agent: "x", task: "t", cards: ["canvases/b/cards/secret/index.html"] }, PASS)).ok, false);
 		assert.equal((await s.call("deck.get", {}, PASS)).ok, false, "outside the frame's and the cards' calls");
 	} finally {
