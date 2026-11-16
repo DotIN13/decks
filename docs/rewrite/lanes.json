@@ -70,7 +70,9 @@
 		"tools/checks/cards/",
 		"canvas/documents/",
 		"tools/checks/library/documents-typing.mjs",
-		"tools/checks/checks.json"
+		"tools/checks/checks.json",
+		"tools/checks/library/documents-drawn.mjs",
+		"tools/checks/library/documents-drawn/"
 	],
 	"Roster": [
 		"server/people/",
