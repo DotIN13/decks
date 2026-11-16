@@ -30,7 +30,7 @@ export function agentCalls(holder: Holder): Handled<Context>[] {
 		act: (ctx, { cards, phase, what, canvas }) => act(p(), ctx, cards, phase, what, canvas),
 		send: (ctx, { agent, task, cards }) => deliver(p(), ctx, agent, { task, ...(cards ? { cards } : {}) }, "send"),
 		queue: (ctx, { agent, task, cards, reply }) => deliver(p(), ctx, agent, { task, ...(cards ? { cards } : {}), ...(reply ? { reply } : {}) }, "queue"),
-		inbox: (ctx) => p().mail.inbox(p().self(ctx).id),
+		inbox: (ctx) => p().mail.inbox(p().actor(ctx).id),
 		news: (ctx, { canvas }) => takeNews(p(), ctx, canvas),
 	});
 }

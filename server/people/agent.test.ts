@@ -204,3 +204,15 @@ test("agent.act tells a start and a finish on a card's file, and records nothing
 	assert.deepEqual([acted[0]!.payload.phase, acted[0]!.payload.what, acted[0]!.payload.ids, acted[0]!.payload.canvas], ["start", "edit", ["canvases/a/cards/x/index.html"], "a"]);
 	await s.close();
 });
+
+test("from a card, agent.me and agent.inbox answer for the agent whose home is the card's canvas", async () => {
+	const { s } = await peopleServer();
+	await s.value<Agent>("agent.attach", { name: "Ann", canvas: "a" });
+	await s.value("agent.queue", { agent: "Ann", task: "From the card's button" }, person);
+	const card = { kind: "card" as const, id: "canvases/a/cards/x/index.html", name: "x", canvas: "a" };
+	assert.equal((await s.value<Agent>("agent.me", {}, card)).name, "Ann");
+	assert.deepEqual((await s.value<Message[]>("agent.inbox", {}, card)).map((m) => m.task), ["From the card's button"]);
+	const elsewhere = await s.call("agent.me", {}, { ...card, canvas: "b" });
+	assert.equal(elsewhere.ok ? "ok" : elsewhere.error.code, "not_found");
+	await s.close();
+});

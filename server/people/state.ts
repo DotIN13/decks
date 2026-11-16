@@ -69,12 +69,13 @@ export class People {
 		return client.id;
 	}
 
-	/** A line that spoke on a canvas has gone: the others there hear it leave. */
+	/** A line that spoke on a canvas has gone: the others there hear it leave, by the same kind and id
+	 * they knew it by, so a listener drops the right cursor. */
 	private left(client: string, who: Caller): void {
 		const canvas = this.presence.leave(client);
 		if (!canvas || !this.events) return;
 		const others = this.screens.drawing(canvas).map((s) => s.client).filter((c) => c !== client);
-		if (others.length) this.events.emit(events.viewChanged, { canvas, ids: [], by: who.id, rev: ++this.revs, gone: true }, { clients: others });
+		if (others.length) this.events.emit(events.viewChanged, { canvas, ids: [], by: who.id, rev: ++this.revs, gone: true, kind: who.kind === "agent" ? "agent" : "person" }, { clients: others });
 	}
 
 	/** An agent's change that worked is told as agent.acted, for its glow and cursor on what it touched. */
@@ -98,12 +99,21 @@ export class People {
 		return canvas && !person.canvas ? { ...person, canvas } : person;
 	}
 
-	/** The agent a call is about: the agent calling, or the one the person's screen follows, else the newest. */
+	/** The agent a call is about: the agent calling; for the person, the one their screen follows, else the
+	 * newest; for a card, the agent whose home is the card's canvas. */
 	actor(ctx: Context): AgentRecord {
+		if (ctx.caller.kind === "card") return this.homedOn(ctx.caller.canvas);
 		if (ctx.caller.kind !== "person") return this.self(ctx);
 		const follows = this.screens.newestOf(ctx.caller.id)?.follows;
 		const record = (follows ? this.roster.byIdOrUndefined(follows) : undefined) ?? this.roster.all().at(-1);
 		if (!record) throw new Refused("not_found", "There is no agent yet to answer for.", "agent.list");
+		return record;
+	}
+
+	/** The newest agent whose home is this canvas. */
+	private homedOn(canvas: string | undefined): AgentRecord {
+		const record = this.roster.all().filter((a) => canvas && a.canvas === canvas).at(-1);
+		if (!record) throw new Refused("not_found", `No agent has the canvas ${canvas ?? "(none)"} as its home.`, "agent.list");
 		return record;
 	}
 

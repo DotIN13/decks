@@ -144,3 +144,16 @@ test("a line's pointer and selection reach the canvas's other lines, in its colo
 	assert.ok(heardB.some((h) => h.name === "view.changed" && h.payload.gone === true), "B hears A leave");
 	await s.close();
 });
+
+test("a line that leaves is heard leaving by the same kind it spoke as, so its cursor goes", async () => {
+	const { on, listen, s } = await peopleServer();
+	const watcher = fakeClient("frame-b");
+	const heard = listen(watcher.id);
+	await on(watcher, "view.update", { camera: { x: 0, y: 0, zoom: 1 } }, { kind: "person", id: "person~frame-2", name: "you", canvas: "a" });
+	const line = fakeClient("frame-a");
+	await on(line, "view.update", { pointer: { x: 1, y: 2 } }, { kind: "person", id: "person~frame-1", name: "you", canvas: "a" });
+	line.close();
+	const said = heard.filter((h) => h.name === "view.changed" && h.payload.by === "person~frame-1").map((h) => [h.payload.kind, h.payload.gone ?? false]);
+	assert.deepEqual(said, [["person", false], ["person", true]]);
+	await s.close();
+});
