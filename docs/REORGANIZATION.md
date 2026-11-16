@@ -35,7 +35,7 @@ on the clients, as planned. `e2e/README.md`'s table of cut checks (§3.5) is lef
 headed "Gone" and says what went is in git, which is the one line the plan asked for.
 
 **Found on the way.** The server reaches into the canvas package by relative path
-(`apps/server/src/stage/native-shots.ts`, `stage/text.ts`, `calls/export.ts` import
+(`apps/server/src/canvas/native-shots.ts`, `canvas/text.ts`, `calls/export.ts` import
 `packages/canvas/src/look/font-files.ts`, `look/icons.ts` and `render/reader.ts` by `../../../../`),
 which the canvas package's typecheck cannot see and the entry-point test does not cover; the
 `render/` to `look/` move broke the server's typecheck for two commits. Either those three modules
@@ -236,13 +236,13 @@ cited from more than one place:
 
 | named | cited from |
 |---|---|
-| `wire/boards.ts` (7) | `agents/session.ts`, `auth/app-trust.ts`, `stage/canvas-ops.ts`, `calls/gestures.ts` |
+| `wire/boards.ts` (7) | `agents/session.ts`, `auth/app-trust.ts`, `canvas/canvas-ops.ts`, `calls/gestures.ts` |
 | `items/live-cards.ts` (5) | `camera/controller.ts`, `items/item-slot.tsx`, `render/device.ts`, `styles/canvas.css` |
 | `Inspector.tsx` (4) | `index.css`, `inspector.css`, `panel.css` |
 | `frame-gestures.ts` (4), `board/frame-gestures.ts` | `index.css`, `camera/touch.ts`, `app/viewport.ts` |
 | `canvas/BoardCallout.tsx` (4) | `e2e/checks/context.mjs`, `e2e/harness.mjs`, `styles/canvas.css` |
 | `board-news.ts` (3) | `deck/loader.ts`, `frame/inside/boot.ts`, `protocol/src/deck.ts` |
-| `share/pairing.ts` (6, three spellings) | `stage/service.ts`, `calls/misc.ts`, `connections/backend.ts`, `vite.config.ts`, `protocol/src/wire.ts`, `auth/hosts.ts` |
+| `share/pairing.ts` (6, three spellings) | `canvas/service.ts`, `calls/misc.ts`, `connections/backend.ts`, `vite.config.ts`, `protocol/src/wire.ts`, `auth/hosts.ts` |
 | `pen/layer.ts`, `canvas/pen/layer.ts`, `layer.ts` (8) | `edit/dom/pointer.ts`, `stage/Stage.tsx`, `stage/input.ts`, `render/engine.ts`, `edit/dom/TextEditing.tsx`, `styles/canvas.css` |
 | `markdown-layout.ts` (5) | `model/markdown.ts`, `styles/canvas.css`, `crates/text/src/card.rs` |
 | `paint.ts` (3) | `items/MediaPlayer.tsx`, `render/media-look.ts`, `stage/items-layer.tsx` |
@@ -445,7 +445,7 @@ well-described module. Three things belong in this pass, and one does not yet.
   over-exports, 22 of them in migrations that are not read again.
 - **The `wire/` directory** holds one file, `legacy.ts`, which is on the §3.10 list.
 - **Not in this pass**: `agents/session.ts` (2,153 lines, one class `DeckAgent`), `runtimes/claude/backend.ts`
-  (1,712), `stage/pens.ts` (1,334), `app.ts` (1,162). Each wants its own design with the behaviour
+  (1,712), `canvas/pens.ts` (1,334), `app.ts` (1,162). Each wants its own design with the behaviour
   it owns laid out first; splitting them by eye would be a reformat with risk and no test to show for it.
 
 ### 4.4 Measuring knobs and test probes: one registry

@@ -35,7 +35,7 @@ export interface Backend {
 
 /** What the line says about this canvas. */
 export type Heard =
-	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/src/stage/pens.ts`). */
+	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/src/canvas/pens.ts`). */
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
 	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
 	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }

@@ -24,7 +24,7 @@ import { join } from "node:path";
 import type { Duplex } from "node:stream";
 import type { WebAction, WebStatus } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
-import type { WebTarget } from "../stage/service.ts";
+import type { WebTarget } from "../canvas/service.ts";
 import { Relay } from "./relay.ts";
 
 /** How long a submit waits for the user before giving up. */

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, ChatItem, MessagePart, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
-import type { StageBridge } from "../stage/bridge.ts";
+import type { StageBridge } from "../canvas/bridge.ts";
 import type { AgentBackend, AgentBackendContext, ClaudeAccountSwitcher } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";

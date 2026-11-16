@@ -871,7 +871,7 @@ export class PictureService {
 
 	/**
 	 * The same browser, lent for something other than a board picture: a stage screenshot
-	 * (`stage/shots.ts`). Counted as running, so it is not closed under the borrower, and rested
+	 * (`canvas/shots.ts`). Counted as running, so it is not closed under the borrower, and rested
 	 * afterwards like any other use. Throws the sentence the pictures use when there is no Chromium.
 	 */
 	async borrow<T>(use: (browser: Browser) => Promise<T>): Promise<T> {

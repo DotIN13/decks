@@ -2,7 +2,7 @@ import { checkArgs, PERSON_VERB_BY_NAME, signature, VERB_BY_NAME } from "@decks/
 import type { ServerMessage } from "@decks/protocol";
 import { fromThisMachine } from "../auth/issue.ts";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
-import { penEditBy } from "../stage/pens.ts";
+import { penEditBy } from "../canvas/pens.ts";
 import { callerOf } from "./caller.ts";
 import { refusedForCanvas } from "./canvas-frame.ts";
 import type { CallsHost } from "./host.ts";

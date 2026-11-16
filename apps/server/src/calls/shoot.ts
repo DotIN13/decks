@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { imageKind, imageSize, type ShotFormat, type ShotOf } from "../stage/shots.ts";
+import { imageKind, imageSize, type ShotFormat, type ShotOf } from "../canvas/shots.ts";
 import type { VerbContext } from "./context.ts";
 
 /**

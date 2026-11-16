@@ -16,7 +16,7 @@
  * A canvas's drawing and its cards may point at its own folder, at the deck's `assets/`, `docs/`
  * and `apps/` by their deck path, and at web addresses and icons. Not at another canvas or the old
  * `frames/`, nothing outside the deck, no hidden folder and no `..` past the deck: placing a card
- * from another canvas copies it in (`stage/pens.ts`).
+ * from another canvas copies it in (`canvas/pens.ts`).
  *
  * Inside the harness a card is named by its deck path (`canvases/plan/cards/a/index.html`), as
  * every record, picture and route names it. A canvas's drawing names its cards relative to its own
@@ -163,7 +163,7 @@ export function resolveReference(name: string, reference: string): Resolution {
 /**
  * The reference a canvas writes for a deck path, the other way round:
  * `canvases/plan/cards/a/index.html` on `plan` is `cards/a/index.html`. Refused for a path the canvas
- * may not point at; a card from another canvas is copied in first (`stage/pens.ts`), and then has a
+ * may not point at; a card from another canvas is copied in first (`canvas/pens.ts`), and then has a
  * reference here.
  */
 export function referenceFor(name: string, deckPath: string): Resolution {

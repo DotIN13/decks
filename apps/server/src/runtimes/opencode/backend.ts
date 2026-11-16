@@ -27,7 +27,7 @@ import { opencodeManager, type OpencodeServerHandle } from "./manager.ts";
  * tools and plugins from the directory `OPENCODE_CONFIG_DIR` names, and Decks points that at
  * `runtime/opencode/`, which it ships: the Google Docs tools, and a plugin that puts the session
  * in each shell command's environment (`DECKS_SESSION`), so a `decks` command reaches the agent
- * the bridge registered that session to (`stage/bridge.ts`).
+ * the bridge registered that session to (`canvas/bridge.ts`).
  *
  * **Nothing per agent lives in the server's config.** When each agent had its own
  * process, `OPENCODE_CONFIG_CONTENT` could carry that agent's model, mode and briefing on

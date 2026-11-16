@@ -1,4 +1,4 @@
-import { canvasFile } from "../stage/canvas-files.ts";
+import { canvasFile } from "../canvas/canvas-files.ts";
 import { parse, serializeOuter } from "parse5";
 import type { DefaultTreeAdapterMap } from "parse5";
 import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";

@@ -1,5 +1,5 @@
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
-import { serverText } from "../stage/text.ts";
+import { serverText } from "../canvas/text.ts";
 import { withBox, type VerbContext } from "./context.ts";
 
 /**

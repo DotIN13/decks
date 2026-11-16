@@ -48,7 +48,7 @@ export interface AgentBackendContext {
 	 * The port Decks' own HTTP server is on.
 	 *
 	 * Only the out-of-process runtimes need it, and they need it for one thing: the canvas
-	 * tool's other end (`stage/bridge.ts`) is a route on that server, so a tool body running
+	 * tool's other end (`canvas/bridge.ts`) is a route on that server, so a tool body running
 	 * inside opencode's Bun or antigravity's Python has an address to call back on.
 	 */
 	port: number;
@@ -66,10 +66,10 @@ export interface AgentBackendContext {
 	 *
 	 * opencode shares one `opencode serve` across every opencode agent, so its tool cannot
 	 * carry a per-agent token any more — it sends the session id opencode gave it, and the
-	 * backend needs the bridge to bind that session to this agent (`stage/bridge.ts`). The
+	 * backend needs the bridge to bind that session to this agent (`canvas/bridge.ts`). The
 	 * in-process runtimes have no use for it and antigravity authenticates by token alone.
 	 */
-	stageBridge?: import("../stage/bridge.ts").StageBridge;
+	stageBridge?: import("../canvas/bridge.ts").StageBridge;
 	/** A session file to open instead of starting a new one — see `forkFrom`. */
 	resumeRef?: string;
 	/**

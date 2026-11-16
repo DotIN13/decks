@@ -83,7 +83,7 @@ export interface StageRow {
 	othersEdit?: true;
 	/**
 	 * The folders it had before, since this server started: the first name chosen for a canvas names
-	 * its folder (`stage/stage-admin.ts`), and a browser on it keeps its view rather than landing anew.
+	 * its folder (`canvas/admin.ts`), and a browser on it keeps its view rather than landing anew.
 	 */
 	formerly?: string[];
 }
@@ -444,7 +444,7 @@ export type ServerMessage =
 	| { type: "agent.context"; agentId: string; boards: string[]; inPlay: string[] }
 	| { type: "view.called"; call: StageCall }
 	/**
-	 * An agent's stage drawing, whole: its `.pen` document (`stage/pens.ts`). Sent when it changes,
+	 * An agent's stage drawing, whole: its `.pen` document (`canvas/pens.ts`). Sent when it changes,
 	 * by an edit or by hand, and to a browser opening that agent's chat. `error` says the file on
 	 * disk does not parse and `doc` is the last good version. `base` is the stage folder's URL,
 	 * which an image fill's relative `url` is read against.

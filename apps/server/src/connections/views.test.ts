@@ -10,7 +10,7 @@ import { DeckAgent } from "../agents/session.ts";
 import { AgentStore } from "../agents/store.ts";
 import { Deck } from "../deck/loader.ts";
 import { realPathOf } from "../deck/roots.ts";
-import type { StageService } from "../stage/service.ts";
+import type { StageService } from "../canvas/service.ts";
 import type { Hub, View } from "./tab-socket.ts";
 import { greet, handleTabRequest } from "./greeting.ts";
 

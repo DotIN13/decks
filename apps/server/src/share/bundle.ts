@@ -1,4 +1,4 @@
-import { CANVAS_FILE } from "../stage/canvas-files.ts";
+import { CANVAS_FILE } from "../canvas/canvas-files.ts";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
 import { isCardPath } from "@decks/hub/layout";

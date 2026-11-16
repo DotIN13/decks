@@ -5,7 +5,7 @@ import { join, dirname } from "node:path";
 import { test } from "node:test";
 import type { AgentChat, AgentKind, AgentMode, ServerMessage, ThinkingLevel } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
-import type { StageService } from "../stage/service.ts";
+import type { StageService } from "../canvas/service.ts";
 import { Registry } from "./registry.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import { DeckAgent } from "./session.ts";

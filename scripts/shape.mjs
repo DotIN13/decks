@@ -41,7 +41,7 @@ const LAYERS = [
 	["calls", ["calls/"]],
 	["agents", ["agents/", "runtimes/"]],
 	["features", ["cards/", "docs/", "apps/", "pictures/", "files/", "share/", "studio/", "google/", "browser/"]],
-	["canvas", ["canvas/", "stage/"]],
+	["canvas", ["canvas/"]],
 	["base", ["deck/", "auth/", "lib/", ""]],
 ];
 const layerOf = (path) => {

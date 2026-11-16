@@ -1,12 +1,12 @@
 import { identityReminder } from "../agents/identity-reminder.ts";
-import { canvasNameReminder } from "../stage/canvas-name.ts";
+import { canvasNameReminder } from "../canvas/canvas-name.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActBox, ActKind, AgentKind, AgentState, Camera, Identity } from "@decks/protocol";
 import { guidelinesFile } from "@decks/runtime";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { CreateSpec, QueuedWork, SendSpec, StageSnapshot } from "../agents/work.ts";
-import { penWriter } from "../stage/pens.ts";
-import type { StageService } from "../stage/service.ts";
+import { penWriter } from "../canvas/pens.ts";
+import type { StageService } from "../canvas/service.ts";
 import { verbContext } from "./context.ts";
 import { appsVerbs } from "./apps.ts";
 import { webVerbs } from "./web.ts";
@@ -84,7 +84,7 @@ export interface StageAgentHooks {
 	drew?(stage: string, ids: string[], boxes: ActBox[]): void;
 	/** Deck-relative path for an absolute one, or undefined if it is not a board. */
 	boardPathOf(file: string): string | undefined;
-	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
+	/** The folder this agent's stage drawing lives in, named on first use (`canvas/pens.ts`). Optional for hosts with no drawing. */
 	stageName?(): string | undefined;
 	/** Set when the caller is an app's own code (`calls/app-caller.ts`), not an agent: the app's name. */
 	app?: string;

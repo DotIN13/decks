@@ -190,7 +190,7 @@ export function resolveFileRequest(
 
 /**
  * The one hidden file the file routes hand out: a picture of a canvas the harness took
- * (`stage/shots.ts`), which a page opens in a tab by its address.
+ * (`canvas/shots.ts`), which a page opens in a tab by its address.
  */
 const SHOTS = /^\.decks\/shots\/[^/]+$/;
 

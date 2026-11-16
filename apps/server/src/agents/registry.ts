@@ -3,8 +3,8 @@ import { join } from "node:path";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ModelOption, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { nowWords, processZone } from "../lib/clock.ts";
-import type { StageBridge } from "../stage/bridge.ts";
-import type { StageService } from "../stage/service.ts";
+import type { StageBridge } from "../canvas/bridge.ts";
+import type { StageService } from "../canvas/service.ts";
 import type { Act } from "./acts.ts";
 import { numberedName } from "./names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
@@ -138,7 +138,7 @@ export class Registry {
 				// who is in which, and `roster` for the aggregation.
 				workspace: agent.workspace,
 				queued: agent.turns.queued,
-				// The stage it has open, so `decks.canvas.list()` can say who is on each (`stage/pens.ts`).
+				// The stage it has open, so `decks.canvas.list()` can say who is on each (`canvas/pens.ts`).
 				stage: agent.seat.stageName(),
 				// The picture it drew, `/api/avatar/<id>?rev=…`, for another front end's agent rows (Studio).
 				...(chat.avatar ? { avatar: chat.avatar } : {}),

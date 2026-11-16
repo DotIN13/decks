@@ -295,7 +295,7 @@ export class StagePens {
 
 	/**
 	 * How a canvas takes in a board or a frame from elsewhere: copied into its own folder
-	 * (`stage/copy-in.ts`). Replaced by the app, which also tells the deck about the copy.
+	 * (`canvas/copy-in.ts`). Replaced by the app, which also tells the deck about the copy.
 	 */
 	adopt: Adopt = {
 		board: (canvas, path) => this.copyIn(canvas, path),
@@ -344,7 +344,7 @@ export class StagePens {
 
 	/**
 	 * The card a canvas places for a deck path, copied in now when the canvas has no copy of it yet
-	 * (`stage/copy-in.ts`): what an agent's list of cards on its canvas is turned into, so another
+	 * (`canvas/copy-in.ts`): what an agent's list of cards on its canvas is turned into, so another
 	 * canvas's card asked for twice is one copy, not two. A path with no file is left as it is.
 	 */
 	ownPath(name: string, path: string): string {
@@ -419,7 +419,7 @@ export class StagePens {
 	/**
 	 * How a stage came by its name: the name, whether anybody chose it (`provisional` when it is the
 	 * agent's own, given at claim), and the boards it held when it was named — what an agent is
-	 * asked about when the canvas has since filled with other things (`stage/canvas-name.ts`).
+	 * asked about when the canvas has since filled with other things (`canvas/canvas-name.ts`).
 	 */
 	naming(name: string): { title?: string; provisional: boolean; boards?: string[] } {
 		try {

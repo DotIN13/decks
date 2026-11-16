@@ -1,5 +1,5 @@
 //! A picture of part of a stage, drawn here rather than in a browser: what the server's
-//! `canvas.screenshot` answers with when it can (`apps/server/src/stage/native-shots.ts`).
+//! `canvas.screenshot` answers with when it can (`apps/server/src/canvas/native-shots.ts`).
 //!
 //! The drawing is laid out and painted by the same crates as the page's engine (scene, text, paint)
 //! and drawn by the same wgpu backend the goldens are (`stage-gpu`, on this machine's own card), in

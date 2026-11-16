@@ -84,7 +84,7 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 		assert.ok(here.name, "an agent always has a canvas here");
 		const put = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }])).value;
 		assert.equal(put.type, "card");
-		// A card of another canvas is copied into this one, and is this canvas's copy from then on (`stage/copy-in.ts`).
+		// A card of another canvas is copied into this one, and is this canvas's copy from then on (`canvas/copy-in.ts`).
 		const a = `canvases/${here.name}/cards/a/index.html`;
 		const b = `canvases/${here.name}/cards/b/index.html`;
 		assert.equal(put.card, a);

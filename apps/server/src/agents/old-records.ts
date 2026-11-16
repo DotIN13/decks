@@ -67,7 +67,7 @@ export function fromSharedCanvas(record: AgentRecord, deckPath: string, exists: 
 }
 
 /**
- * 2026-10-16: which boards are on a canvas is the canvas file's alone (`stage/canvas-ops.ts`).
+ * 2026-10-16: which boards are on a canvas is the canvas file's alone (`canvas/canvas-ops.ts`).
  *
  * Before, each agent's record kept its own list (`inPlay` in `.decks/agents/<id>/meta.json`). A
  * restored record still carrying one has it written into its canvas file, once, and only when that

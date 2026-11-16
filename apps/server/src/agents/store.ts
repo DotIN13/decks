@@ -91,7 +91,7 @@ export interface AgentRecord {
 	/** The workspace the agent works in, as a slug (`workspaces.ts`). Its own fact, kept across restarts. */
 	workspace?: string;
 	/**
-	 * The folder its stage drawing lives in, `stages/<stage>/stage.pen` (`stage/pens.ts`).
+	 * The folder its stage drawing lives in, `stages/<stage>/stage.pen` (`canvas/pens.ts`).
 	 *
 	 * Named once, when the stage is first drawn on, and kept: the folder does not follow a rename.
 	 */

@@ -34,7 +34,7 @@ for (const dir of [deckDir]) {
 }
 
 const { Translator } = await import("../apps/server/src/agents/translator.ts");
-const { StageBridge } = await import("../apps/server/src/stage/bridge.ts");
+const { StageBridge } = await import("../apps/server/src/canvas/bridge.ts");
 const { Opencode2Backend } = await import("../apps/server/src/runtimes/opencode2/backend.ts");
 
 // The canvas: a stand-in for Decks' /api/stage/eval, routed through the real bridge.

@@ -2,8 +2,8 @@ import type { PenDocument } from "@decks/pen";
 import type { DeckState, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
-import { boardsOn, putOn, takeOff, type OnStage } from "../stage/canvas-ops.ts";
-import type { StageService } from "../stage/service.ts";
+import { boardsOn, putOn, takeOff, type OnStage } from "../canvas/canvas-ops.ts";
+import type { StageService } from "../canvas/service.ts";
 import { canvasNews } from "./canvas-news.ts";
 import { recordedBoardsToAdopt } from "./old-records.ts";
 import type { AgentRecord } from "./store.ts";
@@ -14,7 +14,7 @@ import type { AgentRecord } from "./store.ts";
  * Its home canvas (the one a call that names none acts on), the cards it holds, where it last had a
  * card it took off the canvas, and what it has seen of each canvas it works on, so it can be told
  * what others changed there since. The canvas's file is the one record of which cards are on it,
- * where, and how big (`stage/pens.ts`): the seat reads it when it needs them and writes each change
+ * where, and how big (`canvas/pens.ts`): the seat reads it when it needs them and writes each change
  * as one operation on one card, so several agents on one canvas, and a person on it, never put back
  * each other's work.
  */
@@ -93,7 +93,7 @@ export class Seat {
 	private places: Record<string, { x: number; y: number }> = {};
 	/** Where a new agent's first canvas comes from (`options.firstCanvas`); asked once, then let go. */
 	private firstCanvas: ((self: string) => string | undefined) | undefined;
-	/** The folder its stage drawing lives in, once it has one (`stage/pens.ts`). */
+	/** The folder its stage drawing lives in, once it has one (`canvas/pens.ts`). */
 	private folder: string | undefined;
 
 	/*
@@ -140,7 +140,7 @@ export class Seat {
 	}
 
 	/**
-	 * The folder this agent's stage drawing lives in (`stage/pens.ts`).
+	 * The folder this agent's stage drawing lives in (`canvas/pens.ts`).
 	 *
 	 * Named the first time it is needed with `claim`, from the agent's name at that moment, and
 	 * kept on the record — a rename later leaves the folder where it is.
@@ -152,13 +152,13 @@ export class Seat {
 		// A new agent joins the latest canvas of its workspace; with none, it gets one of its own.
 		const joined = this.firstCanvas?.(this.of.id);
 		this.firstCanvas = undefined;
-		// A placeholder until the canvas is named for what is on it, which names its folder too (`stage/stage-admin.ts`).
+		// A placeholder until the canvas is named for what is on it, which names its folder too (`canvas/admin.ts`).
 		this.folder = joined && pens.names().includes(joined) ? joined : pens.claim(UNTITLED, { provisional: true });
 		this.of.save();
 		return this.folder;
 	}
 
-	// --- the stage file (`stage/pens.ts`) ----------------------------------------------------------
+	// --- the stage file (`canvas/pens.ts`) ----------------------------------------------------------
 	/*
 	 * A stage is a `.pen` file, and its boards are pen `browser` items in it. The file is the one record
 	 * of which boards are on the stage, where, and how big: this session keeps no copy of them. It reads
@@ -304,7 +304,7 @@ export class Seat {
 	}
 
 	/**
-	 * A stage was renamed (`stage/stage-admin.ts`). If it is this agent's, it follows: the stage's
+	 * A stage was renamed (`canvas/admin.ts`). If it is this agent's, it follows: the stage's
 	 * name, and the paths of boards kept in its folder, wherever this session holds them.
 	 */
 	stageRenamed(from: string, to: string, repoint: (path: string) => string): void {

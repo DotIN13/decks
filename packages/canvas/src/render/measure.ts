@@ -1,7 +1,7 @@
 import { estimateText, isMarkdown, isMarkdownText, type MeasureText, type TextStyle } from "@decks/pen";
 
 /**
- * Words measured as the server measures them (`apps/server/src/stage/text.ts`): with the stage
+ * Words measured as the server measures them (`apps/server/src/canvas/text.ts`): with the stage
  * engine's own fonts and markdown reader (`PageEngine.measure`, the server's `TextMeasure`), and by
  * the estimate while the engine is not up or a font the words need has not landed, as the server
  * does then. A person's edit is laid out with this on the page ahead of the server's drawing

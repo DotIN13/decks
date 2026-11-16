@@ -1,7 +1,7 @@
 import type { Identity } from "@decks/protocol";
 import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
-import type { StageService } from "../stage/service.ts";
+import type { StageService } from "../canvas/service.ts";
 import type { CallsHost } from "./host.ts";
 import { createStageTool, type StageAgentHooks, type StageTool } from "./tool.ts";
 

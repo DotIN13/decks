@@ -152,7 +152,7 @@ async function setIdentity(ctx: VerbContext, patch: { name?: string; avatar?: { 
 		agent.rename(clean);
 	}
 	/*
-	 * An avatar is checked and repaired where it is written (`stage/avatar.ts`), and what it
+	 * An avatar is checked and repaired where it is written (`canvas/avatar.ts`), and what it
 	 * had to repair comes back here. An agent whose drawing was changed is told so in the
 	 * result: it is the only way a model finds out, and one that is never told draws the
 	 * same broken shape next time — which is exactly how an avatar with no `xmlns` went

@@ -56,7 +56,7 @@ export interface StageHost {
 	stagesChanged?(): void;
 	/** Say who last wrote a board, as the person's own edits do (`CardService.wrote`). */
 	wrote?(path: string, who: string): void;
-	/** Give a canvas a name; the first name anyone chooses names its folder too (`stage-admin.ts`). Returns the folder. */
+	/** Give a canvas a name; the first name anyone chooses names its folder too (`admin.ts`). Returns the folder. */
 	retitle?(name: string, title: string): string;
 	/** The camera the browser last reported for one agent's canvas. */
 	camera(agentId: string): Camera;
@@ -131,7 +131,7 @@ export class StageService {
 	 */
 	web: WebHost | undefined;
 	/**
-	 * Every agent's stage drawing, as `.pen` files (`stage/pens.ts`).
+	 * Every agent's stage drawing, as `.pen` files (`canvas/pens.ts`).
 	 *
 	 * On the service for the reason `web` is: one per server, and the stage tool is what reads it.
 	 * `undefined` in tests that build a service without a deck on disk.
@@ -145,7 +145,7 @@ export class StageService {
 	pairCode: (() => { code: string; expires: number }) | undefined;
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
-	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */
+	/** Pictures of a stage, taken in the server's own Chromium (`canvas/shots.ts`). */
 	shots: StageShots | undefined;
 	/** The server's own picture of a whole board, fresh from its file (`pictures/service.ts`): what a screenshot falls back to. */
 	boardPicture: ((path: string, scheme: "light" | "dark") => Promise<Buffer>) | undefined;

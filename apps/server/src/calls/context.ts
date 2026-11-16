@@ -1,5 +1,5 @@
 import { cleanWorkspace } from "../agents/workspaces.ts";
-import type { StageService, WebTarget } from "../stage/service.ts";
+import type { StageService, WebTarget } from "../canvas/service.ts";
 import type { StageAgentHooks } from "./tool.ts";
 
 /**

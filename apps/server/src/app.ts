@@ -1,4 +1,4 @@
-import { titleCanvas } from "./stage/stage-admin.ts";
+import { titleCanvas } from "./canvas/admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
 import { closeOldShapes } from "./deck/old-shapes.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -10,7 +10,7 @@ import { Acts } from "./agents/acts.ts";
 import { CardService } from "./cards/service.ts";
 import { AppTrust } from "./auth/app-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
-import { StageBridge } from "./stage/bridge.ts";
+import { StageBridge } from "./canvas/bridge.ts";
 import { SettingsStore } from "./settings.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
@@ -19,9 +19,9 @@ import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { studioLink } from "./studio/index.ts";
-import { StageShots } from "./stage/shots.ts";
-import { StageService } from "./stage/service.ts";
-import { PageCalls } from "./stage/page-calls.ts";
+import { StageShots } from "./canvas/shots.ts";
+import { StageService } from "./canvas/service.ts";
+import { PageCalls } from "./canvas/page-calls.ts";
 import { ClaudeAccounts } from "./runtimes/claude/accounts.ts";
 import { AccountList } from "./runtimes/claude/account-list.ts";
 import { DECK_DIR, type Config } from "./config.ts";
@@ -32,7 +32,7 @@ import { Cameras } from "./deck/cameras.ts";
 import { Broadcast } from "./connections/broadcast.ts";
 import type { Hub } from "./connections/tab-socket.ts";
 import type { DeckAgent } from "./agents/session.ts";
-import { StagePens, type PenEntry } from "./stage/pens.ts";
+import { StagePens, type PenEntry } from "./canvas/pens.ts";
 import { Forwards } from "./ports.ts";
 import { Apps } from "./apps/service.ts";
 import { checkApp } from "./apps/check.ts";
@@ -40,10 +40,10 @@ import { DocLibrary, DocService } from "@decks/docs/server";
 import { compileTex } from "./docs/compile.ts";
 import { gitSync } from "./docs/git.ts";
 import { GoogleDocs } from "./google/docs.ts";
-import { NativeShots } from "./stage/native-shots.ts";
+import { NativeShots } from "./canvas/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
 import { documentsOnCanvas } from "./docs/on-canvas.ts";
-import { canvasListMessage } from "./stage/canvas-list.ts";
+import { canvasListMessage } from "./canvas/canvas-list.ts";
 import { Writers } from "./docs/writers.ts";
 import { canvasShowsApp, canvasShowsDocument } from "./calls/app-caller.ts";
 import { deckImportPaths } from "./cards/cards.ts";
@@ -60,7 +60,7 @@ export class App {
 	deck: Deck;
 	readonly agents: Registry;
 	readonly stage: StageService;
-	/** Every agent's stage drawing, as `.pen` files under `canvases/` (`stage/pens.ts`). */
+	/** Every agent's stage drawing, as `.pen` files under `canvases/` (`canvas/pens.ts`). */
 	readonly pens: StagePens;
 	/** The ports agents have forwarded through this server (`ports.ts`). */
 	readonly forwards: Forwards;
@@ -133,12 +133,12 @@ export class App {
 	/** The user's own Chrome, shared through the Decks extension (`browser/bridge.ts`). */
 	readonly web: WebBridge;
 	readonly thumbs: PictureService;
-	/** Stage pictures drawn without a browser (`stage/native-shots.ts`). */
+	/** Stage pictures drawn without a browser (`canvas/native-shots.ts`). */
 	readonly nativeShots: NativeShots;
 	private unwatch: (() => void) | undefined;
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
-	/** What an agent asked the pages to do to a canvas, waiting on their answers (`stage/page-calls.ts`). */
+	/** What an agent asked the pages to do to a canvas, waiting on their answers (`canvas/page-calls.ts`). */
 	/** What is said to the pages, and who is listening (`connections/broadcast.ts`). */
 	readonly pages: Broadcast<DeckAgent> = new Broadcast<DeckAgent>({
 		looking: () => this.agents.looking(),
@@ -341,7 +341,7 @@ export class App {
 		this.thumbs.indexLater();
 		this.thumbs.cleanDaily();
 		/*
-		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the card pictures. The page
+		 * Pictures of a stage (`canvas/shots.ts`), in the same Chromium as the card pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by
 		 * Vite in development, whose port the dev scripts put in `DECKS_WEB_PORT`.
 		 */
@@ -612,7 +612,7 @@ export class App {
 		this.publishStages();
 	}
 
-	/** Every canvas and who is on it, for the pages' list (`stage/canvas-list.ts`). */
+	/** Every canvas and who is on it, for the pages' list (`canvas/canvas-list.ts`). */
 	stagesMessage(): ServerMessage {
 		return canvasListMessage(this.pens, this.agents?.all() ?? []);
 	}

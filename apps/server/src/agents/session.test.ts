@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { AgentModel, AgentUsage, ChatItem, ModelOption, ServerMessage } from "@decks/protocol";
 import { Cameras } from "../deck/cameras.ts";
 import { Deck } from "../deck/loader.ts";
-import type { StageService } from "../stage/service.ts";
+import type { StageService } from "../canvas/service.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";

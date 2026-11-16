@@ -1,13 +1,13 @@
-import { copySharedCanvas } from "../stage/copy-shared.ts";
+import { copySharedCanvas } from "../canvas/copy-shared.ts";
 import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
-import { canvasFile } from "../stage/canvas-files.ts";
-import { boardOf, CARD_ITEM, type ReadMore } from "../stage/pens.ts";
+import { canvasFile } from "../canvas/canvas-files.ts";
+import { boardOf, CARD_ITEM, type ReadMore } from "../canvas/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
-import { serverText } from "../stage/text.ts";
+import { serverText } from "../canvas/text.ts";
 import { cornerOf, GAP, placeBy, slug } from "@decks/deck-kit";
-import type { ShotFormat, ShotOf } from "../stage/shots.ts";
+import type { ShotFormat, ShotOf } from "../canvas/shots.ts";
 import { fitOn } from "./fit.ts";
 import { documentItemPath } from "../docs/item-path.ts";
 import { shootOn } from "./shoot.ts";
@@ -43,7 +43,7 @@ function colourDefaults(node: Record<string, unknown>): void {
  * The canvas calls: everything on one canvas, cards included, read and changed as items.
  *
  * A card on a canvas is pen's own `browser` item tagged `{ type: "decks.card", path }`
- * (`stage/pens.ts`); here it reads and is written as `{ type: "card", card: <path>, width? }`,
+ * (`canvas/pens.ts`); here it reads and is written as `{ type: "card", card: <path>, width? }`,
  * and anywhere an item's id is taken a card's path is taken too. Every call names its canvas or
  * means `decks.here()`; none changes which canvas anybody is on. Every change is one edit of the
  * canvas's file, all of a batch or none of it.
@@ -605,7 +605,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			},
 			file: async (options?: { canvas?: string }) => canvasFile(canvasOf(options?.canvas)),
 			list: async () => needPens().names().map(canvasRow),
-			/** Your own copy of a friend's canvas (`stage/copy-shared.ts`): a new canvas of yours, which syncs as yours. */
+			/** Your own copy of a friend's canvas (`canvas/copy-shared.ts`): a new canvas of yours, which syncs as yours. */
 			copyShared: async (options?: { canvas?: string; title?: string }) => {
 				const pens = needPens();
 				const from = canvasOf(options?.canvas);

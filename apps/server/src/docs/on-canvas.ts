@@ -1,5 +1,5 @@
 import type { Deck } from "../deck/loader.ts";
-import type { StagePens } from "../stage/pens.ts";
+import type { StagePens } from "../canvas/pens.ts";
 import { documentItemPath } from "./item-path.ts";
 import { resolveDoc } from "./resolve.ts";
 

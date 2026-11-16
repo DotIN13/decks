@@ -29,7 +29,7 @@ function open() {
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }
 
-/** A library board; each canvas it is put on places its own copy, as a card (`stage/copy-in.ts`). */
+/** A library board; each canvas it is put on places its own copy, as a card (`canvas/copy-in.ts`). */
 const PATH = "canvases/t/cards/plan/index.html";
 const settle = () => new Promise((done) => setTimeout(done, 250));
 

@@ -1,18 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Identity, MessagePart, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import type { StageService } from "../stage/service.ts";
+import type { StageService } from "../canvas/service.ts";
 import { createStageTool, type StageTool } from "../calls/tool.ts";
 import { PERSON, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot } from "./work.ts";
 import type { AgentStateStore } from "./agent-state.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
-import type { StageBridge } from "../stage/bridge.ts";
+import type { StageBridge } from "../canvas/bridge.ts";
 import type { Act } from "./acts.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
 import { identityReminder } from "./identity-reminder.ts";
-import { canvasNameReminder } from "../stage/canvas-name.ts";
+import { canvasNameReminder } from "../canvas/canvas-name.ts";
 import { Conversation } from "./conversation.ts";
 import { Inbox } from "./inbox.ts";
 import { cleanPlaces, Seat } from "./seat.ts";
@@ -197,7 +197,7 @@ export class DeckAgent {
 				/** An outside agent's own: its key, its app, when it last called and its waiting mail. */
 				outside?: NonNullable<AgentRecord["outside"]>;
 				workspace?: string;
-				/** The folder its stage drawing is in (`stage/pens.ts`). */
+				/** The folder its stage drawing is in (`canvas/pens.ts`). */
 				stage?: string;
 			};
 		},
@@ -586,7 +586,7 @@ export class DeckAgent {
 	 * an exact line: what others changed on its canvases since its last message (every way in comes
 	 * through here: a message typed, queued, sent into a running turn or handed over), who it has not
 	 * said it is, until it has (`agents/identity-reminder.ts`), and its canvas's name, while it has
-	 * none of its own or has outgrown it (`stage/canvas-name.ts`).
+	 * none of its own or has outgrown it (`canvas/canvas-name.ts`).
 	 */
 	private notesFor(slash: boolean): string[] {
 		const notes = this.pending.splice(0);

@@ -17,7 +17,7 @@ import { bearerOf, originOf } from "./guard.ts";
  * - **`decks login`**, in a terminal: `POST /api/login { code }`, the code from `decks pair code` on
  *   the harness's own machine (`PairCodes`), for a harness token that lasts `DECKS_TOKEN_DAYS` unused
  *   (30 days unless set), the one token that lasts longer than a day.
- * - **Agents**: made when the agent first starts and taken back when it stops (`stage/bridge.ts`); no
+ * - **Agents**: made when the agent first starts and taken back when it stops (`canvas/bridge.ts`); no
  *   request asks for one.
  * - **Pairing**: `POST /api/pair` trades a code, or a site this harness can place, for a harness token
  *   as that site, bound to the page's site, lasting a day unused; Decks Studio sends its key with it.
@@ -372,7 +372,7 @@ export function doorRoutes(app: App): express.Router {
 	/**
 	 * An opencode session's agent token, for the plugin that runs its shell commands
 	 * (`runtime/opencode/plugin`, `runtime/opencode2/plugin`): its server's own secret and the session id, which Decks made for one
-	 * agent (`stage/bridge.ts`). The shell is then given that agent's token, never the server's.
+	 * agent (`canvas/bridge.ts`). The shell is then given that agent's token, never the server's.
 	 */
 	api.post("/tokens/session", (req, res) => {
 		const sessionID = String(((req.body ?? {}) as { sessionID?: unknown }).sessionID ?? "");

@@ -628,7 +628,7 @@ export class HarnessSync {
 				continue;
 			}
 			if (this.shared(name)) this.writeMeta(name, { title: c.title, shared: { owner: c.owner, ownerName: c.ownerName ?? "", role: c.role } });
-			// One of yours that someone else may edit too: the harness runs no app inside it (`stage/pens.ts`, `yoursAlone`).
+			// One of yours that someone else may edit too: the harness runs no app inside it (`canvas/pens.ts`, `yoursAlone`).
 			else this.writeMeta(name, { othersEdit: c.othersEdit === true });
 			this.latest.set(c.id, Math.max(this.latest.get(c.id) ?? 0, c.rev));
 			await this.syncCanvas(name, c);

@@ -1,6 +1,6 @@
 import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
-import type { StagePens } from "../stage/pens.ts";
+import type { StagePens } from "../canvas/pens.ts";
 
 /**
  * Whose stage the person's click acts on.

@@ -8,7 +8,7 @@ import { FONT_COVERAGE } from "./font-coverage.ts";
 
 /**
  * Which font files a drawing's words need, and where they come from: the page's engine (`engine.ts`)
- * and the server's measure (`apps/server/src/stage/text.ts`) both fetch by this list, so the two
+ * and the server's measure (`apps/server/src/canvas/text.ts`) both fetch by this list, so the two
  * hold the same files and measure the same words alike. Nothing here touches a browser.
  *
  * The files come from Fontsource's CDN, which serves every Google font as TrueType. The fallback

@@ -4,7 +4,7 @@ import type { AppTrust } from "../auth/app-trust.ts";
 import type { CardService } from "../cards/service.ts";
 import type { Cameras } from "../deck/cameras.ts";
 import type { Deck } from "../deck/loader.ts";
-import type { StageService } from "../stage/service.ts";
+import type { StageService } from "../canvas/service.ts";
 
 /**
  * What the calls need of the harness to find who is calling and run a call for them: the agents,

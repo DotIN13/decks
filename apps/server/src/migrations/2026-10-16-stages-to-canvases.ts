@@ -1,12 +1,12 @@
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { slug } from "@decks/deck-kit";
-import { CANVAS_DIR, CANVAS_FILE, CANVAS_META, movedPath } from "../stage/canvas-files.ts";
+import { CANVAS_DIR, CANVAS_FILE, CANVAS_META, movedPath } from "../canvas/canvas-files.ts";
 
 /**
  * 2026-10-16: `stages/<name>/stage.pen` and `stage.json` become `canvases/<name>/canvas.pen` and
  * `canvas.json`. Before, most folders were named after the agent that first drew there; a canvas
- * is the deck's now, named for what is on it (`stage/canvas-files.ts`).
+ * is the deck's now, named for what is on it (`canvas/canvas-files.ts`).
  *
  * Runs at open (`migrations/index.ts`), and only when `stages/` exists and `canvases/` does not.
  */
@@ -17,7 +17,7 @@ const OLD_META = "stage.json";
 /**
  * Move a deck's `stages/` to `canvases/`, once. A canvas with a title gets a folder named from it;
  * one without keeps its folder and is marked as named by nobody, so the first title it is given
- * names the folder too (`stage/stage-admin.ts`). Agents' records are pointed at the new names, and
+ * names the folder too (`canvas/admin.ts`). Agents' records are pointed at the new names, and
  * board items whose board was kept in a canvas's own folder follow it. Returns old name → new name.
  */
 export function migrateStages(deck: string): Map<string, string> {

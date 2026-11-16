@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, sep } from "node:path";
-import { LINK, rewriteLinks } from "../stage/links.ts";
+import { LINK, rewriteLinks } from "../canvas/links.ts";
 import { canvasFolder, isHidden, plainSegment, urlFor } from "@decks/hub/layout";
 
 /**

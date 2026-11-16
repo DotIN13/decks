@@ -29,7 +29,7 @@ import { boardToCard, fileBoardSource, liveKind, measuredHeight } from "./2026-1
  * Then every board file in a canvas's `boards/` that no item names any more is deleted (the document
  * and app boards documents-and-apps left, boards copied in and never placed), unless a card links to
  * it. The library in the deck's `boards/`, on no canvas, is left as it is: placing one of its boards on
- * a canvas makes a card of it (`stage/copy-in.ts`).
+ * a canvas makes a card of it (`canvas/copy-in.ts`).
  *
  * Everything it changes or deletes is zipped first into `.decks/backups/`, and what it did, with every
  * board it could not convert and why, is written beside the zip as a report and in

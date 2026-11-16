@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { DeckAgent } from "../agents/session.ts";
 import { Deck } from "../deck/loader.ts";
 import { StagePens } from "./pens.ts";
-import { deleteStage, renameStage } from "./stage-admin.ts";
+import { deleteStage, renameStage } from "./admin.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {

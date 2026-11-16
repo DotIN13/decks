@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url"
  * `setup`, so they live together here. Everything else is the same bargain. This runs inside
  * OpenCode's own process, not inside Decks, so each tool is one HTTP call back to the Decks
  * server that spawned it, with the server's single token and the session id that names the
- * agent (`stage/bridge.ts`). The words a model sees are the files every runtime reads.
+ * agent (`canvas/bridge.ts`). The words a model sees are the files every runtime reads.
  *
  * `codemode: false` on each tool, or OpenCode 2 folds it into its `execute` tool and the call
  * never appears as itself in the transcript.

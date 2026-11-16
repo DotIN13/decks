@@ -98,7 +98,7 @@ small pan drawing), both passing alone. Named: nudge, arrows-steady and text-sho
 ### App bugs found and fixed
 
 - A card placed on a canvas from another canvas was copied as an old board (`boards/cards/<name>/index.html`, its
-  folder left behind); it is copied with its whole folder into `cards/<name>/` and stays a card (`stage/copy-in.ts`).
+  folder left behind); it is copied with its whole folder into `cards/<name>/` and stays a card (`canvas/copy-in.ts`).
 - A finger's tap on a live card selected nothing (the card passed touches on to the stage, which saw no picture under
   them); a finger's press on a card's content now picks it, and still pans (`card-surface.tsx`). context's phone tap.
 - A Shift- (or ⌘-) press on a live card picked it alone, dropping the selection; it goes to the editor as a press on

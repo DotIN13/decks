@@ -9,7 +9,7 @@ import { WebSocketServer } from "ws";
 import { Live, MemoryStore, syncHandler, type Who } from "@decks/hub";
 import { nodeHandler } from "@decks/hub/node";
 import { HarnessSync } from "@decks/sync-client";
-import { StagePens } from "../stage/pens.ts";
+import { StagePens } from "../canvas/pens.ts";
 
 /**
  * Two harnesses on one Studio account, one canvas: an edit on either is applied there at once, sent to

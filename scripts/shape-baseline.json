@@ -16,6 +16,11 @@
 		"apps/server/src/calls/person-table.ts -> apps/server/src/app.ts",
 		"apps/server/src/calls/person-table.ts -> apps/server/src/connections/routes/shared.ts",
 		"apps/server/src/calls/person-table.ts -> apps/server/src/connections/tab-socket.ts",
+		"apps/server/src/canvas/admin.ts -> apps/server/src/agents/session.ts",
+		"apps/server/src/canvas/pens.ts -> apps/server/src/agents/canvas-news.ts",
+		"apps/server/src/canvas/pens.ts -> apps/server/src/migrations/index.ts",
+		"apps/server/src/canvas/service.ts -> apps/server/src/apps/check.ts",
+		"apps/server/src/canvas/service.ts -> apps/server/src/apps/service.ts",
 		"apps/server/src/connections/http.ts -> apps/server/src/app.ts",
 		"apps/server/src/connections/line.ts -> apps/server/src/app.ts",
 		"apps/server/src/connections/routes/cards.ts -> apps/server/src/app.ts",
@@ -24,11 +29,6 @@
 		"apps/server/src/connections/tab-requests.ts -> apps/server/src/app.ts",
 		"apps/server/src/deck/loader.ts -> apps/server/src/cards/size.ts",
 		"apps/server/src/docs/writers.ts -> apps/server/src/agents/acts.ts",
-		"apps/server/src/runtimes/pi/extension.ts -> apps/server/src/calls/tool.ts",
-		"apps/server/src/stage/pens.ts -> apps/server/src/agents/canvas-news.ts",
-		"apps/server/src/stage/pens.ts -> apps/server/src/migrations/index.ts",
-		"apps/server/src/stage/service.ts -> apps/server/src/apps/check.ts",
-		"apps/server/src/stage/service.ts -> apps/server/src/apps/service.ts",
-		"apps/server/src/stage/stage-admin.ts -> apps/server/src/agents/session.ts"
+		"apps/server/src/runtimes/pi/extension.ts -> apps/server/src/calls/tool.ts"
 	]
 }

@@ -1,4 +1,4 @@
-import type { WebTarget } from "../stage/service.ts";
+import type { WebTarget } from "../canvas/service.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 

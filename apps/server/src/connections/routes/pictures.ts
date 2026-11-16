@@ -6,7 +6,7 @@ import { renderSnapshot } from "../../pictures/snapshot.ts";
 import { compressedName, squeezed, wireEncoding } from "../../pictures/compress.ts";
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { imageKind } from "../../stage/shots.ts";
+import { imageKind } from "../../canvas/shots.ts";
 import { keptWidth, pictureType } from "../../pictures/ladder.ts";
 import type { AppPage } from "../../pictures/service.ts";
 import type { Page as DeckPage } from "@decks/protocol";
@@ -147,7 +147,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	);
 
 	/**
-	 * A picture of a whole stage, for the manager's cards (`stage/shots.ts`).
+	 * A picture of a whole stage, for the manager's cards (`canvas/shots.ts`).
 	 *
 	 * The board thumbnails' bargain, one level up: the request waits for the picture because an
 	 * `<img>` cannot be told "later", `v` is the drawing's revision and is what makes the URL new
@@ -215,7 +215,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	);
 
 	/**
-	 * One stage, for `shot.html` to draw (`stage/shots.ts`): its `.pen` document, the folder its
+	 * One stage, for `shot.html` to draw (`canvas/shots.ts`): its `.pen` document, the folder its
 	 * image fills are read against, and where each board on it is.
 	 */
 	api.get("/stage-pen/:name", (req, res) => {
