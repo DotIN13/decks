@@ -5,7 +5,6 @@ import { deckFiles, layout } from "../../protocol/index.ts";
 import { deckPathFrom, toDeckPath, type Context, type Kernel, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { isPass, type Passes } from "./passes.ts";
 import { inCanvas, inSharedRoot } from "./paths.ts";
-import { placedOn } from "./placed.ts";
 
 const PASS_ROOT = "/api/t/";
 
@@ -62,8 +61,8 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined, ke
 			const canvas = passes.canvasOf(pass);
 			const base = url();
 			const forward = FORWARD[kind];
-			// Its canvas's folder and the shared roots, or what its canvas already places (an old page kept at the deck's root), as today.
-			const reaches = !!canvas && !!rest && (allowed(canvas, rest) || (await placedOn(kernel(), canvas, undefined, rest)));
+			// Its canvas's folder and the shared roots, or what its canvas already places (kernel.placed: an old page kept at the deck's root), as today.
+			const reaches = !!canvas && !!rest && (allowed(canvas, rest) || kernel()?.placed(canvas, rest) === true);
 			if (!canvas || !forward || !reaches || !base) return void res.writeHead(404, { "content-type": "text/plain" }).end("Not found.");
 			const params = new URLSearchParams(query);
 			params.set("pass", pass);

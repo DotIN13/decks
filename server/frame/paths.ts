@@ -8,9 +8,6 @@ import { inside, toDeckPath } from "../kernel/index.ts";
 /** The deck's roots every canvas reads from: assets, docs, apps and the card runtime's lib. */
 export const SHARED_ROOTS = ["assets", "docs", "apps", "lib"] as const;
 
-/** The parts a canvas keeps in its own folder, which an item may name from inside it (cards/x, files/a.png). */
-const OWN_TOPS = new Set<string>(layout.OWN_PARTS);
-
 /** A deck path as the kernel takes it, or undefined for a climb, a hidden part or anything outside the deck. */
 export function plainPath(path: unknown): string | undefined {
 	if (typeof path !== "string" || !path) return undefined;
@@ -36,15 +33,4 @@ export function inCanvas(canvas: string, path: unknown): boolean {
 export function inSharedRoot(path: unknown): boolean {
 	const plain = plainPath(path);
 	return !!plain && SHARED_ROOTS.some((root) => inside(plain, root) && plain !== root);
-}
-
-/**
- * Whether a path written inside an item a pass inserts or changes may stand: its own canvas's folder, a part
- * of that folder named from inside it (cards/x, files/a.png), or a shared root. Anything else, another
- * canvas's card or a document anywhere else in the deck, is refused (Reader's attack, 6).
- */
-export function itemPathOk(canvas: string, path: unknown): boolean {
-	const plain = plainPath(path);
-	if (!plain) return false;
-	return inCanvas(canvas, plain) || inSharedRoot(plain) || OWN_TOPS.has(plain.split("/")[0]!);
 }
