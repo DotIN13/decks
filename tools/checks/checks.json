@@ -292,6 +292,9 @@
 		"card-files-img": {
 			"path": "tools/checks/pictures/card-files-img.mjs"
 		},
+		"card-picture": {
+			"path": "tools/checks/pictures/card-picture.mjs"
+		},
 		"card-keys": {
 			"path": "tools/checks/library/card-keys.mjs"
 		},
