@@ -1,0 +1,774 @@
+{
+	"doc": {
+		"documentId": "doc1",
+		"title": "Every construct",
+		"revisionId": "r1",
+		"body": {
+			"content": [
+				{
+					"startIndex": 0,
+					"endIndex": 1,
+					"sectionBreak": {}
+				},
+				{
+					"startIndex": 1,
+					"endIndex": 9,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 1,
+								"endIndex": 9,
+								"textRun": {
+									"content": "A title\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "TITLE"
+						}
+					}
+				},
+				{
+					"startIndex": 9,
+					"endIndex": 21,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 9,
+								"endIndex": 21,
+								"textRun": {
+									"content": "Heading one\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "HEADING_1"
+						}
+					}
+				},
+				{
+					"startIndex": 21,
+					"endIndex": 99,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 21,
+								"endIndex": 28,
+								"textRun": {
+									"content": "Plain, ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 28,
+								"endIndex": 32,
+								"textRun": {
+									"content": "bold",
+									"textStyle": {
+										"bold": true
+									}
+								}
+							},
+							{
+								"startIndex": 32,
+								"endIndex": 34,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 34,
+								"endIndex": 40,
+								"textRun": {
+									"content": "italic",
+									"textStyle": {
+										"italic": true
+									}
+								}
+							},
+							{
+								"startIndex": 40,
+								"endIndex": 42,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 42,
+								"endIndex": 52,
+								"textRun": {
+									"content": "underlined",
+									"textStyle": {
+										"underline": true
+									}
+								}
+							},
+							{
+								"startIndex": 52,
+								"endIndex": 54,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 54,
+								"endIndex": 60,
+								"textRun": {
+									"content": "struck",
+									"textStyle": {
+										"strikethrough": true
+									}
+								}
+							},
+							{
+								"startIndex": 60,
+								"endIndex": 62,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 62,
+								"endIndex": 65,
+								"textRun": {
+									"content": "red",
+									"textStyle": {
+										"foregroundColor": {
+											"color": {
+												"rgbColor": {
+													"red": 1,
+													"green": 0,
+													"blue": 0
+												}
+											}
+										}
+									}
+								}
+							},
+							{
+								"startIndex": 65,
+								"endIndex": 67,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 67,
+								"endIndex": 74,
+								"textRun": {
+									"content": "highlit",
+									"textStyle": {
+										"backgroundColor": {
+											"color": {
+												"rgbColor": {
+													"red": 1,
+													"green": 1,
+													"blue": 0
+												}
+											}
+										}
+									}
+								}
+							},
+							{
+								"startIndex": 74,
+								"endIndex": 76,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 76,
+								"endIndex": 79,
+								"textRun": {
+									"content": "big",
+									"textStyle": {
+										"fontSize": {
+											"magnitude": 18,
+											"unit": "PT"
+										}
+									}
+								}
+							},
+							{
+								"startIndex": 79,
+								"endIndex": 81,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 81,
+								"endIndex": 85,
+								"textRun": {
+									"content": "mono",
+									"textStyle": {
+										"weightedFontFamily": {
+											"fontFamily": "Courier New"
+										}
+									}
+								}
+							},
+							{
+								"startIndex": 85,
+								"endIndex": 87,
+								"textRun": {
+									"content": ", ",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 87,
+								"endIndex": 93,
+								"textRun": {
+									"content": "a link",
+									"textStyle": {
+										"link": {
+											"url": "https://example.com"
+										},
+										"underline": true
+									}
+								}
+							},
+							{
+								"startIndex": 93,
+								"endIndex": 96,
+								"textRun": {
+									"content": ", x",
+									"textStyle": {}
+								}
+							},
+							{
+								"startIndex": 96,
+								"endIndex": 97,
+								"textRun": {
+									"content": "2",
+									"textStyle": {
+										"baselineOffset": "SUPERSCRIPT"
+									}
+								}
+							},
+							{
+								"startIndex": 97,
+								"endIndex": 99,
+								"textRun": {
+									"content": ".\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						}
+					}
+				},
+				{
+					"startIndex": 99,
+					"endIndex": 118,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 99,
+								"endIndex": 118,
+								"textRun": {
+									"content": "Centred and spaced\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT",
+							"alignment": "CENTER",
+							"spaceAbove": {
+								"magnitude": 12,
+								"unit": "PT"
+							},
+							"spaceBelow": {
+								"magnitude": 6,
+								"unit": "PT"
+							},
+							"lineSpacing": 150
+						}
+					}
+				},
+				{
+					"startIndex": 118,
+					"endIndex": 132,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 118,
+								"endIndex": 132,
+								"textRun": {
+									"content": "Right aligned\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT",
+							"alignment": "END"
+						}
+					}
+				},
+				{
+					"startIndex": 132,
+					"endIndex": 225,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 132,
+								"endIndex": 225,
+								"textRun": {
+									"content": "Justified text that runs on for a while so it wraps across the page and shows justification.\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT",
+							"alignment": "JUSTIFIED"
+						}
+					}
+				},
+				{
+					"startIndex": 225,
+					"endIndex": 260,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 225,
+								"endIndex": 260,
+								"textRun": {
+									"content": "Indented with a hanging first line\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT",
+							"indentStart": {
+								"magnitude": 36,
+								"unit": "PT"
+							},
+							"indentFirstLine": {
+								"magnitude": 18,
+								"unit": "PT"
+							},
+							"indentEnd": {
+								"magnitude": 24,
+								"unit": "PT"
+							}
+						}
+					}
+				},
+				{
+					"startIndex": 260,
+					"endIndex": 280,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 260,
+								"endIndex": 280,
+								"textRun": {
+									"content": "Shaded and bordered\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT",
+							"shading": {
+								"backgroundColor": {
+									"color": {
+										"rgbColor": {
+											"red": 0.9,
+											"green": 0.9,
+											"blue": 1
+										}
+									}
+								}
+							},
+							"borderLeft": {
+								"width": {
+									"magnitude": 3,
+									"unit": "PT"
+								},
+								"color": {
+									"color": {
+										"rgbColor": {
+											"red": 0,
+											"green": 0,
+											"blue": 1
+										}
+									}
+								},
+								"padding": {
+									"magnitude": 6,
+									"unit": "PT"
+								},
+								"dashStyle": "SOLID"
+							},
+							"borderTop": {
+								"width": {
+									"magnitude": 1,
+									"unit": "PT"
+								},
+								"color": {
+									"color": {
+										"rgbColor": {
+											"red": 0,
+											"green": 0,
+											"blue": 0
+										}
+									}
+								},
+								"padding": {
+									"magnitude": 2,
+									"unit": "PT"
+								},
+								"dashStyle": "DOT"
+							},
+							"borderBottom": {
+								"width": {
+									"magnitude": 0,
+									"unit": "PT"
+								}
+							},
+							"borderRight": {
+								"width": {
+									"magnitude": 1,
+									"unit": "PT"
+								},
+								"dashStyle": "DASH"
+							}
+						}
+					}
+				},
+				{
+					"startIndex": 280,
+					"endIndex": 294,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 280,
+								"endIndex": 294,
+								"textRun": {
+									"content": "Right to left\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT",
+							"direction": "RIGHT_TO_LEFT"
+						}
+					}
+				},
+				{
+					"startIndex": 294,
+					"endIndex": 305,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 294,
+								"endIndex": 305,
+								"textRun": {
+									"content": "Bullet one\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						},
+						"bullet": {
+							"listId": "kix.b",
+							"nestingLevel": 0
+						}
+					}
+				},
+				{
+					"startIndex": 305,
+					"endIndex": 326,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 305,
+								"endIndex": 326,
+								"textRun": {
+									"content": "Bullet one point one\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						},
+						"bullet": {
+							"listId": "kix.b",
+							"nestingLevel": 1
+						}
+					}
+				},
+				{
+					"startIndex": 326,
+					"endIndex": 337,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 326,
+								"endIndex": 337,
+								"textRun": {
+									"content": "Bullet two\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						},
+						"bullet": {
+							"listId": "kix.b",
+							"nestingLevel": 0
+						}
+					}
+				},
+				{
+					"startIndex": 337,
+					"endIndex": 348,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 337,
+								"endIndex": 348,
+								"textRun": {
+									"content": "Number one\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						},
+						"bullet": {
+							"listId": "kix.n",
+							"nestingLevel": 0
+						}
+					}
+				},
+				{
+					"startIndex": 348,
+					"endIndex": 359,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 348,
+								"endIndex": 359,
+								"textRun": {
+									"content": "Number two\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						},
+						"bullet": {
+							"listId": "kix.n",
+							"nestingLevel": 0
+						}
+					}
+				},
+				{
+					"startIndex": 359,
+					"endIndex": 373,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 359,
+								"endIndex": 373,
+								"textRun": {
+									"content": "Number two, a\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						},
+						"bullet": {
+							"listId": "kix.n",
+							"nestingLevel": 1
+						}
+					}
+				},
+				{
+					"startIndex": 373,
+					"endIndex": 374,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 373,
+								"endIndex": 374,
+								"textRun": {
+									"content": "\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						}
+					}
+				},
+				{
+					"startIndex": 374,
+					"endIndex": 419,
+					"paragraph": {
+						"elements": [
+							{
+								"startIndex": 374,
+								"endIndex": 419,
+								"textRun": {
+									"content": "After an empty paragraph, with a line\u000bbreak.\n",
+									"textStyle": {}
+								}
+							}
+						],
+						"paragraphStyle": {
+							"namedStyleType": "NORMAL_TEXT"
+						}
+					}
+				}
+			]
+		},
+		"lists": {
+			"kix.b": {
+				"listProperties": {
+					"nestingLevels": [
+						{
+							"glyphSymbol": "●",
+							"indentStart": {
+								"magnitude": 36,
+								"unit": "PT"
+							},
+							"indentFirstLine": {
+								"magnitude": 18,
+								"unit": "PT"
+							},
+							"startNumber": 1
+						},
+						{
+							"glyphSymbol": "○",
+							"indentStart": {
+								"magnitude": 72,
+								"unit": "PT"
+							},
+							"indentFirstLine": {
+								"magnitude": 54,
+								"unit": "PT"
+							},
+							"startNumber": 1
+						},
+						{
+							"glyphSymbol": "■",
+							"indentStart": {
+								"magnitude": 108,
+								"unit": "PT"
+							},
+							"indentFirstLine": {
+								"magnitude": 90,
+								"unit": "PT"
+							},
+							"startNumber": 1
+						}
+					]
+				}
+			},
+			"kix.n": {
+				"listProperties": {
+					"nestingLevels": [
+						{
+							"glyphType": "DECIMAL",
+							"glyphFormat": "%0.",
+							"indentStart": {
+								"magnitude": 36,
+								"unit": "PT"
+							},
+							"indentFirstLine": {
+								"magnitude": 18,
+								"unit": "PT"
+							},
+							"startNumber": 1
+						},
+						{
+							"glyphType": "ALPHA",
+							"glyphFormat": "%1.",
+							"indentStart": {
+								"magnitude": 72,
+								"unit": "PT"
+							},
+							"indentFirstLine": {
+								"magnitude": 54,
+								"unit": "PT"
+							},
+							"startNumber": 1
+						},
+						{
+							"glyphType": "ROMAN",
+							"glyphFormat": "%2.",
+							"indentStart": {
+								"magnitude": 108,
+								"unit": "PT"
+							},
+							"indentFirstLine": {
+								"magnitude": 90,
+								"unit": "PT"
+							},
+							"startNumber": 1
+						}
+					]
+				}
+			}
+		},
+		"documentStyle": {
+			"pageSize": {
+				"width": {
+					"magnitude": 612,
+					"unit": "PT"
+				},
+				"height": {
+					"magnitude": 792,
+					"unit": "PT"
+				}
+			},
+			"marginTop": {
+				"magnitude": 72,
+				"unit": "PT"
+			},
+			"marginBottom": {
+				"magnitude": 72,
+				"unit": "PT"
+			},
+			"marginLeft": {
+				"magnitude": 72,
+				"unit": "PT"
+			},
+			"marginRight": {
+				"magnitude": 72,
+				"unit": "PT"
+			}
+		}
+	},
+	"text": "A title\nHeading one\nPlain, bold, italic, underlined, struck, red, highlit, big, mono, a link, x2.\nCentred and spaced\nRight aligned\nJustified text that runs on for a while so it wraps across the page and shows justification.\nIndented with a hanging first line\nShaded and bordered\nRight to left\nBullet one\nBullet one point one\nBullet two\nNumber one\nNumber two\nNumber two, a\n\nAfter an empty paragraph, with a line\u000bbreak.\n"
+}

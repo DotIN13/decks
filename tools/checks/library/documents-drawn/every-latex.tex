@@ -1,0 +1,96 @@
+\documentclass{article}
+\usepackage{amsmath}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\title{Every construct, in \LaTeX}
+\author{Ann Writer \and Bo Reader}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A short abstract with \emph{emphasis} and a citation \cite{knuth84}.
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+Plain text with \textbf{bold}, \textit{italic}, \emph{emphasis}, \underline{underlined},
+\texttt{typewriter}, \textsc{small caps}, \sout{struck}, and \textbf{bold with \emph{emphasis} inside}.
+A tie~stays a space, a comment % this part is a comment
+ends the line, and an escaped \% sign, \& and \$ stay text.
+A link \href{https://example.com}{to an example} and a bare \url{https://example.org}.
+A footnote\footnote{The footnote's words.} and a line break \\ in a paragraph.
+
+Inline maths $x \in \R$, \(\norm{v} = 1\), and display maths:
+\[
+  \sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+\]
+
+\subsection{Numbered things}\label{sec:numbered}
+\begin{equation}\label{eq:first}
+  a^2 + b^2 = c^2
+\end{equation}
+As Section~\ref{sec:intro} and equation~\eqref{eq:first} say, and \autoref{eq:second} too.
+\begin{align}
+  x &= 1 \label{eq:second} \\
+  y &= 2 \nonumber \\
+  z &= 3
+\end{align}
+\begin{equation*}
+  \text{unnumbered}
+\end{equation*}
+
+\subsubsection{Lists}
+\begin{itemize}
+  \item First \textbf{item}
+  \item Second, with a nested list:
+  \begin{enumerate}
+    \item One
+    \item Two \label{item:two}
+  \end{enumerate}
+  \item[$\star$] A custom marker
+\end{itemize}
+\begin{description}
+  \item[Term] Its description.
+\end{description}
+
+\begin{theorem}[Pythagoras]\label{thm:p}
+For a right triangle, $a^2 + b^2 = c^2$.
+\end{theorem}
+\begin{proof}
+By Theorem~\ref{thm:p} itself, and Lemma~\ref{lem:x}.
+\end{proof}
+\begin{lemma}\label{lem:x}
+A lemma.
+\end{lemma}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.5\textwidth]{pictures/plot.pdf}
+  \caption{A plot, as Figure~\ref{fig:plot} says.}\label{fig:plot}
+\end{figure}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l|c|r}
+    Left & Centre & Right \\
+    \hline
+    a & \textbf{b} & $c$ \\
+    \multicolumn{2}{c}{spanned} & d \\
+  \end{tabular}
+  \caption{A table.}\label{tab:t}
+\end{table}
+
+\begin{verbatim}
+verbatim \textbf{stays} as written
+\end{verbatim}
+
+\paragraph{A paragraph heading} with words after it, citing \cite{lamport94,knuth84} and \citep{knuth84}.
+
+\begin{thebibliography}{9}
+\bibitem{lamport94} Leslie Lamport. \emph{LaTeX}. 1994.
+\bibitem{knuth84} Donald Knuth. \emph{The TeXbook}. 1984.
+\end{thebibliography}
+\end{document}

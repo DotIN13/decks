@@ -1,0 +1,30 @@
+\documentclass{article}
+\title{Edge cases}
+\begin{document}
+\maketitle
+\section{A heading
+whose brace never closes}
+\section{Inline}
+A comment % to the end of the line
+A styled \textbf{unclosed brace falls through, and \emph{closed} reads.
+Maths \(x + y\) inline, a break \\ here, escaped \% \& \$ \_ and a tie~here.
+Links \href{http://example.com}{text} and \url{http://example.com}, see \ref{sec:a}\label{sec:a} and \cite{knuth}.
+Dollars $a$ and $$b$$ and braces {grouped}. An unknown \command stays itself.
+\begin{itemize}
+\item one
+\begin{enumerate}
+\item nested
+\end{enumerate}
+\item two
+\end{itemize}
+\begin{theorem}
+A theorem.
+\end{theorem}
+\begin{proof}
+A proof.
+\end{proof}
+\begin{center}
+Centred.
+\end{center}
+A backslash at the very end \
+Last line ends in a backslash \
