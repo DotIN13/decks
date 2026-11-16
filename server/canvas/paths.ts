@@ -23,7 +23,7 @@ export function placedKeys(doc: PenDocument, canvas: string, kinds: Kinds): Set<
 
 /**
  * The deck paths a reference written without a known prefix may mean: itself from the deck's root (a
- * document at papers/paper.md, an old page at the deck's boards/), and itself from the canvas's folder
+ * document at papers/paper.md, an old page kept at the deck's root), and itself from the canvas's folder
  * when it climbs out of it (../../papers/paper.md). Only paths inside the deck, with no hidden part.
  */
 export function deckReadings(raw: string, canvas: string): string[] {
