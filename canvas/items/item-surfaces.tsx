@@ -104,13 +104,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		void ask(props.app).then(setAddress);
 	});
 	// What the app's own iframe says: what it saved in its browser storage, and a wheel it had no use for (`decks-canvas.js`).
-	const onMessage = (event: MessageEvent) => {
-		if (!frame || event.source !== frame.contentWindow) return;
-		const data = event.data as { type?: unknown; key?: unknown; value?: unknown } | null;
-		if (data?.type === "decks-wheel") return forwardWheel(frame, data as unknown as ForwardedWheel);
-		if (data?.type !== "decks-storage" || typeof data.key !== "string") return;
-		canvasHost().apps?.store?.(props.app, data.key, typeof data.value === "string" ? data.value : null);
-	};
+	const onMessage = (event: MessageEvent) => heardFromApp(frame, props.app, event);
 	// Whether it runs: read once, then heard from the harness as it changes (`apps.watch`), never polled.
 	const readStatus = () =>
 		void canvasHost()
@@ -153,21 +147,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} style={{ top: `${APP_BAR}px` }} on:dblclick={() => !url() && open()}>
 			<Show
 				when={url()}
-				fallback={
-					<div class="app-surface-body">
-						<Show when={canvasHost().apps} fallback={<p>This app opens from the Decks app.</p>}>
-							<p>{(() => {
-								const got = address();
-								if (got && "tab" in got) return got.tab;
-								if (live()) return `Opening ${about()?.title ?? props.app}…`;
-								return `${about()?.title ?? props.app} runs in a tab of its own.`;
-							})()}</p>
-							<button type="button" class="app-surface-open" on:click={open}>
-								Open
-							</button>
-						</Show>
-					</div>
-				}
+				fallback={<AppBody app={props.app} title={about()?.title} address={address()} live={live()} open={open} />}
 			>
 				<iframe
 					ref={(element) => (frame = element)}
@@ -180,6 +160,34 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 					style={{ "pointer-events": props.selected ? "auto" : "none" }}
 					on:load={() => setLoaded(true)}
 				/>
+			</Show>
+		</div>
+	);
+}
+
+/** What an app's own iframe says: what it saved in its browser storage, and a wheel it had no use for. */
+function heardFromApp(frame: HTMLIFrameElement | undefined, app: string, event: MessageEvent): void {
+	if (!frame || event.source !== frame.contentWindow) return;
+	const data = event.data as { type?: unknown; key?: unknown; value?: unknown } | null;
+	if (data?.type === "decks-wheel") return forwardWheel(frame, data as unknown as ForwardedWheel);
+	if (data?.type !== "decks-storage" || typeof data.key !== "string") return;
+	canvasHost().apps?.store?.(app, data.key, typeof data.value === "string" ? data.value : null);
+}
+
+/** An app's body while it does not run here: why, and Open, which the host's page does in a tab. */
+function AppBody(props: { app: string; title: string | undefined; address: { url: string } | { tab: string } | undefined; live: boolean; open: () => void }) {
+	return (
+		<div class="app-surface-body">
+			<Show when={canvasHost().apps} fallback={<p>This app opens from the Decks app.</p>}>
+				<p>{(() => {
+					const got = props.address;
+					if (got && "tab" in got) return got.tab;
+					if (props.live) return `Opening ${props.title ?? props.app}…`;
+					return `${props.title ?? props.app} runs in a tab of its own.`;
+				})()}</p>
+				<button type="button" class="app-surface-open" on:click={props.open}>
+					Open
+				</button>
 			</Show>
 		</div>
 	);
