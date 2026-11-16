@@ -50,6 +50,8 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 		call: (name, args, caller) => router.call(name, args, caller),
 		sees: (one) => void events.sees.push(one),
 		belongs: (one) => void events.belongs.push(one),
+		places: (answer) => router.places(answer),
+		placed: (canvas, path) => router.placed(canvas, path),
 		...(options.run ? { run: options.run } : {}),
 		...{ url: () => address.url, folder: () => options.deck.root, machine: () => machine, deckId: () => deckId },
 	};

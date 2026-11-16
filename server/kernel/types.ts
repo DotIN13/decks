@@ -201,6 +201,12 @@ export interface Kernel {
 	folder(): string | undefined;
 	/** The server's own address once a door listens, for apps and pictures; undefined before. */
 	url(): string | undefined;
+	/** Say whether a canvas places an item at a deck path (its card, document, page or file, or inside a
+	 *  placed card's folder). Given once, by the feature that keeps canvases. */
+	places(answer: (canvas: string, path: string) => boolean): void;
+	/** Whether a canvas places an item at a path, as places answers; false when nothing answers. One answer
+	 *  for the kernel's pass rule and every guard. */
+	placed(canvas: string, path: string): boolean;
 }
 
 /** What a scoped token (a pass) may reach: its canvas and only these calls, each when given, and only

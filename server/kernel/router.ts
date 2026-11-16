@@ -25,11 +25,27 @@ export class Router {
 	private guards: Guard[] = [];
 	private filters: Filter[] = [];
 	private hearers = new Set<(done: Done) => void>();
+	private placesAnswer: Placed | undefined;
+
+	/** Given once, by the feature that keeps canvases: whether a canvas places an item at a path. */
+	places(answer: Placed): void {
+		if (this.placesAnswer) throw new Error("Only one feature may say what a canvas places.");
+		this.placesAnswer = answer;
+	}
+
+	/** Whether a canvas places an item at a path; false when no feature says. */
+	placed(canvas: string, path: string): boolean {
+		try {
+			return this.placesAnswer?.(canvas, path) === true;
+		} catch {
+			return false;
+		}
+	}
 
 	// Answering a call: find it, check it, run or relay it, trim and check the answer.
 	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
 		if (!turned && this.translator && (!this.declared.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
-		const outside = this.declared.has(name) ? beyond(this.scopeOf?.(caller), name, args) : undefined;
+		const outside = this.declared.has(name) ? beyond(this.scopeOf?.(caller), name, args, (canvas, path) => this.placed(canvas, path)) : undefined;
 		if (outside) return refusal("refused", outside, "canvas.here");
 		const notes: string[] = [];
 		const found = this.find(name, caller, args ?? {}, notes);
@@ -134,22 +150,26 @@ export class Router {
 }
 
 /** Why a call falls outside a caller's scope: a call not in its list, or a canvas not its own. */
-function beyond(scope: Scope | undefined, name: string, args: unknown): string | undefined {
+function beyond(scope: Scope | undefined, name: string, args: unknown, placed: Placed): string | undefined {
 	if (!scope) return undefined;
 	if (scope.calls && !scope.calls.includes(name)) return `This pass may not call ${name}; it reaches only its canvas's calls.`;
 	const asked = typeof args === "object" && args !== null ? (args as { canvas?: unknown }).canvas : undefined;
 	if (scope.canvas !== undefined && asked !== undefined && asked !== scope.canvas) return `This pass reaches only the canvas ${scope.canvas}, not ${String(asked)}.`;
-	return scope.canvas === undefined ? undefined : outsideFolder(scope.canvas, args);
+	return scope.canvas === undefined ? undefined : outsideFolder(scope.canvas, args, placed);
 }
 
-/** Arguments that name where to write (to) or which card (card, cards); a pass's must be in its canvas. */
-const PLACED = ["to", "card", "cards"];
+/** Whether a canvas places an item at a path (Kernel.places, answered by the canvas feature). */
+type Placed = (canvas: string, path: string) => boolean;
 
-/** Why an argument naming a place lies outside a scoped canvas's folder, read through deckPathFrom. */
-function outsideFolder(canvas: string, args: unknown): string | undefined {
+/** Arguments that name a place: where to write (to, only its folder), or which card (card, cards: its
+ *  folder or a card its canvas already places, such as an old page from the deck's boards/). */
+const PLACES = { to: false, card: true, cards: true } as const;
+
+/** Why an argument naming a place lies outside what a scoped canvas reaches, read through deckPathFrom. */
+function outsideFolder(canvas: string, args: unknown, placed: Placed): string | undefined {
 	if (typeof args !== "object" || args === null) return undefined;
 	const folder = layout.canvasFolder(canvas);
-	for (const key of PLACED) {
+	for (const [key, mayBePlaced] of Object.entries(PLACES)) {
 		const given = (args as Record<string, unknown>)[key];
 		const values = typeof given === "string" ? [given] : Array.isArray(given) ? given.filter((one): one is string => typeof one === "string") : [];
 		for (const value of values) {
@@ -159,7 +179,7 @@ function outsideFolder(canvas: string, args: unknown): string | undefined {
 			} catch {
 				return `This pass's ${key}, ${value}, is not a path inside the deck.`;
 			}
-			if (!inside(path, folder)) return `This pass's ${key} must be inside ${folder}, not ${path}.`;
+			if (!inside(path, folder) && !(mayBePlaced && placed(canvas, path))) return `This pass's ${key} must be inside ${folder}${mayBePlaced ? " or placed on its canvas" : ""}, not ${path}.`;
 		}
 	}
 	return undefined;
