@@ -3,9 +3,9 @@ import { any, arr, int, lit, named, obj, opt, str, union } from "./schema.ts";
 
 // How a call travels, the same for every server and client. HTTP: POST
 // /api/v1/<name> with the arguments as one JSON object, answered with the
-// envelope. Socket: /api/v1/socket, JSON messages, hello first. A host gets
-// an ask for each harness call it offered and sends one reply; it tells the
-// harness's events, which the server fans out like its own.
+// envelope. Socket: /api/v1/socket, JSON messages, hello first, then a fresh
+// token when one is due. A host gets an ask for each harness call it offered and
+// replies; it tells the harness's events, which the server fans out as its own.
 
 // Where things are, and the environment a client reads.
 export const API = "/api/v1";
@@ -53,7 +53,9 @@ export const ClientMessage = named(
 	union(
 		obj({ type: lit("hello"), token: str(), protocol: str() }),
 		obj({ type: lit("call"), id: str(), name: str(), args: any() }),
-		obj({ type: lit("watch"), events: opt(arr(str())), canvas: opt(str()) }),
+		obj({ type: lit("watch"), events: opt(arr(str())), canvas: opt(str()), since: opt(int("With canvas: first replay item.changed for every revision after this one from the canvas's log, then go live.")) }),
+		/** A fresh token for the same caller and canvas, taken from then on and answered with a fresh hello; any other closes the socket, 4403. */
+		obj({ type: lit("token"), token: str() }),
 		obj({ type: lit("reply"), id: str(), envelope: Envelope }),
 		obj({ type: lit("tell"), name: str(), payload: any() }),
 	),

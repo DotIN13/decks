@@ -17,6 +17,7 @@ export const itemChanged = defineEvent("item.changed", "Items on a canvas change
 	/** The same change as pen's own edits (pen/diff.ts), arrow routes included: what turns the document at base into this revision's, for a client holding canvas.drawing. */
 	pen: opt(arr(PenOp)),
 	made: opt(arr(str("A client's own name for an edit this revision is the first to have."))),
+	missed: opt(bool("A watch's since is older than the canvas's log reaches: no edits follow for it; read canvas.drawing whole.")),
 	author: opt(ChangeAuthor),
 });
 export const cardChanged = defineEvent("card.changed", "A card's files changed, or it went.", { removed: opt(bool()), sized: opt(bool()) });
