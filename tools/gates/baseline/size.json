@@ -24,8 +24,6 @@
 	"canvas/ink/InkLayer.tsx: function StageInk over 80 lines": 1,
 	"canvas/input/canvas-input.ts: function (anonymous) over 80 lines": 1,
 	"canvas/input/canvas-input.ts: function createStageInput over 80 lines": 1,
-	"canvas/input/pointer.ts: function createPointer over 80 lines": 1,
-	"canvas/input/pointer.ts: function touchOnDrawing over 80 lines": 1,
 	"canvas/render/engine.ts: function fetchPicture over 80 lines": 1,
 	"canvas/render/engine.ts: function receive over 80 lines": 1,
 	"canvas/render/engine.ts: over 1000 lines": 1,

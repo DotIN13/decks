@@ -184,7 +184,7 @@
 	"canvas/input/item-keys.ts: stage": 6,
 	"canvas/input/keys.ts: board": 9,
 	"canvas/input/keys.ts: stage": 5,
-	"canvas/input/pointer.ts: board": 42,
+	"canvas/input/pointer.ts: board": 40,
 	"canvas/input/pointer.ts: stage": 33,
 	"canvas/items/awake.test.ts: board": 5,
 	"canvas/items/awake.test.ts: stage": 1,
