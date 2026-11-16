@@ -111,6 +111,7 @@ class RpcError extends Error {
  * @param {(name: string, args: unknown[]) => Promise<{ value: unknown, notes: string[], images?: Array<{ data: string, mimeType: string }> }>} host.call  One Decks call, as this session's caller.
  * @param {string} [host.tools]  Which calls are tools of their own (`toolsFor`).
  * @param {(client: { name?: string, title?: string, version?: string } | undefined) => Promise<string | undefined>} [host.joined]  The client said who it is (`initialize`): join the canvas, and answer a line for the brief (who you are here).
+ * @param {string} [host.brief]  What the client is told at connect, in place of Decks's own brief: for a host that answers other calls (Decks Studio).
  * @param {boolean} [host.news]  Add what waits for the caller (`agent.news`) to a tool's answer. For a session that is an agent.
  * @param {() => Array<{ name: string, description: string, text: string }>} [host.skills]
  */
@@ -214,7 +215,7 @@ export function createMcp(host) {
 				protocolVersion: PROTOCOLS.includes(params?.protocolVersion) ? params.protocolVersion : PROTOCOLS[0],
 				capabilities: { tools: {}, resources: {}, prompts: {} },
 				serverInfo: { name: "decks", title: "Decks", version: VERSION },
-				instructions: who ? `${BRIEF}\n\n${who}` : BRIEF,
+				instructions: [host.brief ?? BRIEF, who].filter(Boolean).join("\n\n"),
 			};
 		},
 		ping: async () => ({}),

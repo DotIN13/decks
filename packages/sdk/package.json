@@ -9,7 +9,11 @@
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
     },
-    "./verbs.json": "./src/verbs.json"
+    "./verbs.json": "./src/verbs.json",
+    "./mcp": {
+      "types": "./mcp/core.d.mts",
+      "default": "./mcp/core.mjs"
+    }
   },
   "files": [
     "src",

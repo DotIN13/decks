@@ -14,6 +14,8 @@ export interface McpHost {
 	tools?: string;
 	/** The client said who it is: join the canvas, and answer a line for the brief. */
 	joined?(client: { name?: string; title?: string; version?: string } | undefined): Promise<string | undefined>;
+	/** What the client is told at connect, in place of Decks's own brief. */
+	brief?: string;
 	/** Add what waits for the caller to a tool's answer. */
 	news?: boolean;
 	skills?(): Array<{ name: string; description: string; text: string }>;
