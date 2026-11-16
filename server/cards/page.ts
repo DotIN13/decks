@@ -1,4 +1,4 @@
-import { FILES_PATH, layout, Refused } from "../../protocol/index.ts";
+import { deckFiles, FILES_PATH, layout, Refused } from "../../protocol/index.ts";
 import type { Context, Route, RouteAnswer } from "../kernel/types.ts";
 import { fence } from "./fence.ts";
 import { titleOf } from "./cards.ts";
@@ -101,18 +101,8 @@ for (const u of __URLS__) {
 
 /** The deck's own import names, from assets/importmap.json; relative ones under /files/assets/. */
 async function deckImports(ctx: Context): Promise<Record<string, string>> {
-	try {
-		const given = JSON.parse(decoder.decode(await ctx.deck.read(fence("assets/importmap.json")))) as { imports?: Record<string, unknown> };
-		const out: Record<string, string> = {};
-		for (const [name, address] of Object.entries(given.imports ?? {})) {
-			if (typeof address !== "string") continue;
-			if (/^https:\/\//.test(address)) out[name] = address;
-			else if (!address.split("/").some((p) => p === ".." || p.startsWith("."))) out[name] = `${FILES}assets/${address.replace(/^\.\//, "")}`;
-		}
-		return out;
-	} catch {
-		return {};
-	}
+	const text = await ctx.deck.read(fence(deckFiles.IMPORT_MAP)).then((bytes) => decoder.decode(bytes), () => undefined);
+	return Object.fromEntries(Object.entries(deckFiles.importMap(text)).map(([name, address]) => [name, address.startsWith("https://") ? address : FILES + address]));
 }
 
 // --- what the page reads from a card ---

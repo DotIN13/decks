@@ -1,4 +1,4 @@
-import { layout, Refused, type Caller } from "../../protocol/index.ts";
+import { deckFiles, layout, Refused, type Caller } from "../../protocol/index.ts";
 import type { Deck, Item, ItemKind } from "../kernel/types.ts";
 import { freeCard, slug, titleOf } from "./cards.ts";
 import { fence } from "./fence.ts";
@@ -12,28 +12,17 @@ const decoder = new TextDecoder();
 export const DEFAULT_W = 1000;
 export const DEFAULT_H = 600;
 
-/** The size a card's meta tag declares: { w, h }, either missing when not said. */
+/** The size a card's meta tag declares: { w, h }, either missing when not said (protocol's cardMeta reads the tag). */
 export function metaSize(source: string): { w?: number; h?: number } {
-	const content = /<meta\s+name=["'][\w-]+["']\s+content='(\{[^']*)'/i.exec(source)?.[1];
-	try {
-		const { w, h } = JSON.parse(content ?? "{}") as { w?: unknown; h?: unknown };
-		return { ...(typeof w === "number" && w > 0 ? { w } : {}), ...(typeof h === "number" && h > 0 ? { h } : {}) };
-	} catch {
-		return {};
-	}
+	const meta = deckFiles.cardMeta(source);
+	return { ...(meta?.w ? { w: meta.w } : {}), ...(meta?.h ? { h: meta.h } : {}) };
 }
 
-/** The card's file with its meta tag saying w and h; a tag is added when it has none. */
+/** The card's file with its meta tag saying w and h, what else it says kept; a tag is added when it has none. */
 export function withSize(source: string, size: { w: number; h: number }): string {
-	const tag = /<meta\s+name=["']([\w-]+)["']\s+content='(\{[^']*)'\s*\/?>/i.exec(source);
-	if (!tag) return `<meta name="card" content='${JSON.stringify(size)}' />\n${source}`;
-	let given: Record<string, unknown> = {};
-	try {
-		given = JSON.parse(tag[2]!) as Record<string, unknown>;
-	} catch {
-		given = {};
-	}
-	return source.replace(tag[0], `<meta name="${tag[1]}" content='${JSON.stringify({ ...given, w: size.w, h: size.h })}' />`);
+	const meta = deckFiles.cardMeta(source);
+	if (!meta) return `<meta name="card" content='${JSON.stringify(size)}' />\n${source}`;
+	return source.replace(meta.tag, `<meta name="${meta.name}" content='${JSON.stringify({ ...meta.given, w: size.w, h: size.h })}' />`);
 }
 
 const num = (value: unknown): number | undefined => (typeof value === "number" && value > 0 ? value : undefined);
