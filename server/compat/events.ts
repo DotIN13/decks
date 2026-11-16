@@ -33,6 +33,8 @@ export async function told(
 	if (name === "view.changed") return presence(payload);
 	// A view call for the frame's canvas, told as today's view.called: a card's picture, an agent's cursor, a reload.
 	if (name === "view.requested") return viewCalled(payload);
+	if (name === "app.changed") return appChanged(payload);
+	if (name === "agent.acted") return agentAct(payload);
 	const old = OLD_OF.get(name);
 	return old ? { type: old, ...payload } : undefined;
 }
@@ -54,4 +56,31 @@ function presence(payload: Record<string, unknown>): Record<string, unknown> {
 	const by = { kind: payload.kind ?? "person", id: String(payload.by ?? ""), ...(payload.name ? { name: payload.name } : {}), ...(payload.color ? { color: payload.color } : {}) };
 	const said = Object.fromEntries(["pointer", "selection", "camera", "gone"].filter((k) => k in payload).map((k) => [k, payload[k]]));
 	return { type: "presence.changed", canvas: payload.canvas, by, ...said };
+}
+
+/** Today's app.changed: the app by name, which its windows on a canvas listen by, and its state. */
+export function appChanged(payload: Record<string, unknown>): Record<string, unknown> | undefined {
+	const name = Array.isArray(payload.ids) ? payload.ids[0] : undefined;
+	if (typeof name !== "string") return undefined;
+	return { type: "app.changed", name, status: payload.status, ...(typeof payload.title === "string" ? { title: payload.title } : {}) };
+}
+
+/**
+ * Today's agent.act: an agent's edit on a card, by the card's path and the agent, for its cursor and glow.
+ * An act with no card path is not told: the frame finds the card by its path.
+ */
+export function agentAct(payload: Record<string, unknown>): Record<string, unknown> | undefined {
+	const path = Array.isArray(payload.ids) ? payload.ids.find((id) => typeof id === "string" && id.includes("/")) : undefined;
+	if (typeof path !== "string") return undefined;
+	return {
+		type: "agent.act",
+		agentId: payload.by,
+		path,
+		phase: payload.phase,
+		what: payload.what,
+		label: payload.label,
+		color: payload.color,
+		...(Array.isArray(payload.boxes) ? { boxes: payload.boxes } : {}),
+		at: typeof payload.at === "number" ? payload.at : Date.now(),
+	};
 }
