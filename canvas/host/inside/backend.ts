@@ -141,6 +141,9 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 	};
 }
 
+/** The events the frame hears on its socket; a name joins when the frame first acts on it. */
+const FRAME_EVENTS = ["item.changed"] as const;
+
 /**
  * Who hears the canvas's messages. What comes before anyone listens (the frame's editor is made between
  * the drawing's read and its follow) is held and told to the first to listen, which passes over what
@@ -171,6 +174,7 @@ function drawingSocket(origin: string, token: () => string, canvas: string, tell
 		token,
 		canvas,
 		since,
+		events: FRAME_EVENTS,
 		hear: (name, payload) => {
 			const heard = drawingHeard(canvas, name, payload);
 			if (heard) tell(heard);

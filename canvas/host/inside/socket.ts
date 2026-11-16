@@ -16,6 +16,8 @@ interface SocketOptions {
 	canvas: string;
 	/** The revision held, when there is one: a watch after a drop replays what came after it. */
 	since?: () => number | undefined;
+	/** The events the frame hears: the watch asks for these alone, not every event the pass may see. */
+	events: readonly string[];
 	/** An event on the watched canvas. */
 	hear: (name: string, payload: Record<string, unknown>) => void;
 	/** The socket said hello (`again` after a drop), or closed. */
@@ -69,7 +71,7 @@ export function openSocket(options: SocketOptions): FrameSocket {
 				if (watching) return;
 				watching = true;
 				const since = options.since?.();
-				ws.send(JSON.stringify({ type: "watch", canvas: options.canvas, ...(since !== undefined && since >= 0 ? { since } : {}) } satisfies ClientMessage));
+				ws.send(JSON.stringify({ type: "watch", canvas: options.canvas, events: [...options.events], ...(since !== undefined && since >= 0 ? { since } : {}) } satisfies ClientMessage));
 				options.onState?.(true, everOpen);
 				everOpen = true;
 				while (queue.length) ws.send(JSON.stringify(queue.shift()));
