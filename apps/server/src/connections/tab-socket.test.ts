@@ -60,7 +60,8 @@ async function open() {
 			hub.close();
 			app.dispose();
 			await new Promise((done) => server.close(() => done(undefined)));
-			rmSync(dataDir, { recursive: true, force: true });
+			// Tried again for a moment: the greeting starts reads that may still be writing into the folder (pictures' index, an account's status) as it is removed.
+			rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
 		},
 	};
 }
