@@ -1,4 +1,5 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
+import { layout } from "@decks/protocol";
 import type { Page } from "@decks/protocol-old";
 import { isPage, itemKind } from "../../drawing/pages.ts";
 import type { FrameSocket } from "./socket.ts";
@@ -33,7 +34,8 @@ export function deckPathEdits(canvas: string, edits: readonly PenEdit[]): PenEdi
 	});
 }
 
-const folderOf = (canvas: string) => `canvases/${canvas}`;
+/** The canvas's folder in the deck: `canvases/<name>`, or a friend's `shared/canvases/<owner>/<name>` for `shared/<owner>/<name>`. */
+const folderOf = (canvas: string) => layout.canvasFolder(canvas);
 
 /** A card the canvas's folder holds, as the file names it: relative to that folder (documents and apps are items, not files). */
 const owned = (meta: Meta) => {
