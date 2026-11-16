@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { layout } from "../../protocol/index.ts";
@@ -23,8 +23,7 @@ export type NativeTaken = { bytes: Bytes } | { why: string };
 // Drawing a box natively, round by round.
 /** Draw the box natively; the picture's bytes, or why not. */
 export async function drawNatively(ctx: Context, native: Native, args: NativeArgs): Promise<NativeTaken> {
-	const dir = join(tmpdir(), "decks-native-shots", randomUUID());
-	await mkdir(dir, { recursive: true });
+	const dir = await mkdtemp(join(tmpdir(), "decks-native-shot-"));
 	try {
 		const out = join(dir, `out.${args.format === "jpeg" ? "jpg" : "png"}`);
 		const width = Math.round((args.box.x2 - args.box.x1) * args.factor);

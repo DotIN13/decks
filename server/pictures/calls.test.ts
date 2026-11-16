@@ -364,3 +364,10 @@ test("rule 18: a pass writes a picture or a page only into its canvas's exports/
 	await served.close();
 	await s.close();
 });
+
+test("rule 11: a document has no picture here: not found, not a fault", async () => {
+	const { picturedPath } = await import("./picture.ts");
+	assert.throws(() => picturedPath("docs/notes.md"), /document/);
+	assert.throws(() => picturedPath("canvases/work/files/paper.tex"), /document/);
+	assert.equal(picturedPath("canvases/work/cards/sales"), "canvases/work/cards/sales/index.html");
+});

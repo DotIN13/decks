@@ -17,6 +17,8 @@ export interface PictureTools {
 	native?(): Native | undefined;
 	/** Stop the native tool, when the server stops. */
 	shutdown?(): void;
+	/** Whether a canvas places an item at a deck path (the kernel's answer); false before the server starts. */
+	placed?(canvas: string, path: string): boolean;
 }
 
 const PICTURE_MS = 10 * 60_000;
@@ -32,6 +34,7 @@ export function pictureTools(browser: Browser, origin: () => string | undefined,
 		browser,
 		origin: known,
 		shutdown: () => tool?.stop(),
+		placed: (canvas, path) => kernel()?.placed(canvas, path) ?? false,
 		native() {
 			const binary = useNative ? nativeBinary() : undefined;
 			if (!binary) return undefined;

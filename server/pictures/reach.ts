@@ -5,11 +5,13 @@ import { deckPathFrom, inside, toDeckPath, type Context, type DeckPath, type Sco
 // card or page inside that canvas's folder. A path is made a deck path first (decoded once, a climb,
 // a hidden part or a second encoding refused), and only then tested for where it lies.
 
-/** Whether an address's path, as it came, names something inside the pass's canvas folder. */
-export function reachesPath(scope: Scope, raw: string): boolean {
+/** Whether an address's path, as it came, names something inside the pass's canvas folder, or
+ *  something its canvas places (a document, a page) when placed is given: the kernel's answer. */
+export function reachesPath(scope: Scope, raw: string, placed?: (canvas: string, path: string) => boolean): boolean {
 	if (scope.canvas === undefined) return false;
 	try {
-		return inside(deckPathFrom(raw), layout.canvasFolder(scope.canvas));
+		const path = deckPathFrom(raw);
+		return inside(path, layout.canvasFolder(scope.canvas)) || (placed?.(scope.canvas, path) ?? false);
 	} catch {
 		return false;
 	}

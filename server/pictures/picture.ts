@@ -16,7 +16,7 @@ export const TAKEN = "t2";
 /** The widest picture an export or a screenshot draws a card from. */
 const WIDEST = 2000;
 
-export const pictureRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: PICTURES, scoped: (scope, asked) => reachesPath(scope, asked.path.slice(PICTURES.length)), answer: (ctx, path, query) => answer(ctx, m(), path, query) });
+export const pictureRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: PICTURES, scoped: (scope, asked) => reachesPath(scope, asked.path.slice(PICTURES.length), m().placed), answer: (ctx, path, query) => answer(ctx, m(), path, query) });
 
 async function answer(ctx: Context, m: PictureTools, path: string, query: URLSearchParams): Promise<RouteAnswer> {
 	try {
@@ -83,6 +83,8 @@ export async function compressedPicture(ctx: Context, m: PictureTools, jpeg: Uin
 export function picturedPath(raw: string): DeckPath {
 	const trimmed = raw.replace(/\/+$/, "");
 	if (/\.html?$/i.test(trimmed) && !/\/index\.html$/i.test(trimmed)) return toDeckPath(trimmed);
+	// A document (.md, .tex, .docx) is drawn by the page, not pictured here: no picture, not a fault.
+	if (/\.[a-z0-9]{1,5}$/i.test(trimmed) && !/\/index\.html$/i.test(trimmed)) throw new Refused("not_found", `${trimmed} is a document; the server keeps no picture of it.`, "file.read");
 	return cardPath(trimmed);
 }
 
