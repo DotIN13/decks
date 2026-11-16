@@ -33,6 +33,7 @@ export async function drawNatively(ctx: Context, native: Native, args: NativeArg
 		const asked = await native.ask({ ...base, fontNeeds: true });
 		if (!asked.ok) return { why: `the native tool failed: ${asked.error}` };
 		const fonts = await fontsFor(asked.fontNeeds ?? []);
+		if ("why" in fonts) return fonts;
 		let more: Record<string, unknown> = { fonts };
 		for (let n = 0; n < ROUNDS; n++) {
 			const answer = await native.ask({ ...base, ...more });
@@ -63,15 +64,22 @@ async function cardsIn(ctx: Context, args: NativeArgs, dir: string): Promise<{ x
 	return out;
 }
 
-// The font files the words need: the protocol's list, fallback scripts and emoji included.
+// The font files the words need, from the protocol's list: Latin only, else the browser draws.
 const FONTS = process.env.DECKS_FONT_CACHE ?? join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "decks", "fonts");
 
-/** The fonts to hand the tool for a set of needs, each as a file on this machine; one not fetched is left out. */
-export async function fontsFor(needs: FontNeed[], path = fontPath): Promise<{ key: string; family: string; path: string; fallback: boolean }[]> {
+/** Fonts a native picture may use: Latin files only, until fallback scripts are proven against the browser. */
+const LATIN_FILE = /^[^/]+\/latin(-ext)?\//;
+
+/** The fonts to hand the tool for a set of needs, each a file on this machine; or why the browser must draw. */
+export async function fontsFor(needs: FontNeed[], path = fontPath): Promise<{ key: string; family: string; path: string; fallback: boolean }[] | { why: string }> {
+	const files = fontFiles(needs);
+	const beyond = files.find((file) => !LATIN_FILE.test(file.key));
+	if (beyond) return { why: `the words need ${beyond.family}, beyond Latin, which the browser draws` };
 	const out = [];
-	for (const file of fontFiles(needs)) {
+	for (const file of files) {
 		const at = await path(file);
-		if (at) out.push({ key: file.key, family: file.family, path: at, fallback: isFallbackFamily(file.family) });
+		if (!at) return { why: `the font ${file.family} could not be fetched` };
+		out.push({ key: file.key, family: file.family, path: at, fallback: isFallbackFamily(file.family) });
 	}
 	return out;
 }
