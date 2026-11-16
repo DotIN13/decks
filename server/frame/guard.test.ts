@@ -112,6 +112,8 @@ test("Reader's attack: an encoded climb, an agent call, and another canvas's pat
 		// (2) assets/ followed by an encoded climb into canvas b: refused before any prefix is compared.
 		const climb = await fetch(`${doors.url}/api/t/${pass}/card/assets/..%2fcanvases%2fb%2fcards%2fsecret%2findex.html`, { headers: { origin: "null" } });
 		assert.equal(climb.status, 404, "an encoded climb");
+		const twice = await fetch(`${doors.url}/api/t/${pass}/card/assets/%252e%252e%252fcanvases%252fb%252fcards%252fsecret%252findex.html`, { headers: { origin: "null" } });
+		assert.equal(twice.status, 404, "a climb encoded twice");
 		assert.equal((await fetch(`${doors.url}/api/t/${pass}/card/canvases/a/cards/note/index.html`, { headers: { origin: "null" } })).status, 200, "its own card");
 		// (5) agent.send and agent.queue are the page's, which asks the person: not the pass's.
 		const http = async (name: string, args: unknown) => (await fetch(`${doors.url}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${pass}`, "content-type": "application/json" }, body: JSON.stringify(args) })).json() as Promise<{ ok: boolean }>;

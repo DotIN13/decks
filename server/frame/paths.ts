@@ -1,7 +1,9 @@
-// Where a canvas pass may reach, by path: tested only after the path is plain. A path that climbs (..), names
-// a hidden part (.decks), is absolute, or has an empty, '.', backslash or NUL part is refused before any
-// prefix is compared, so assets/..%2fcanvases%2fb never passes as assets/ (Reader's attack, 2).
+// Where a canvas pass may reach, by path, on the kernel's own path rules: a path is first made a deck path
+// (toDeckPath: no climb, nothing hidden, nothing absolute; an address's path through deckPathFrom, which
+// decodes once and refuses what is encoded twice), and only then tested with inside(), never startsWith, so
+// assets/..%2fcanvases%2fb never passes as assets/ (Reader's attack, 2).
 import { layout } from "../../protocol/index.ts";
+import { inside, toDeckPath } from "../kernel/index.ts";
 
 /** The deck's roots every canvas reads from: assets, docs, apps and the card runtime's lib. */
 export const SHARED_ROOTS = ["assets", "docs", "apps", "lib"] as const;
@@ -9,29 +11,31 @@ export const SHARED_ROOTS = ["assets", "docs", "apps", "lib"] as const;
 /** The parts a canvas keeps in its own folder, which an item may name from inside it (cards/x, files/a.png). */
 const OWN_TOPS = new Set<string>(layout.OWN_PARTS);
 
-/** A path made of plain parts only, or undefined: no climb, nothing hidden, nothing absolute, nothing empty. */
+/** A deck path as the kernel takes it, or undefined for a climb, a hidden part or anything outside the deck. */
 export function plainPath(path: unknown): string | undefined {
-	if (typeof path !== "string" || !path || path.startsWith("/") || /^[a-z]:/i.test(path)) return undefined;
-	const parts = path.split("/");
-	if (parts.some((part) => !part || part === "." || part === ".." || part.startsWith(".") || /[\\\0]/.test(part))) return undefined;
-	return path;
+	if (typeof path !== "string" || !path) return undefined;
+	try {
+		return toDeckPath(path);
+	} catch {
+		return undefined;
+	}
 }
 
-/** Whether a deck path is plain and inside the canvas's own folder. */
+/** Whether a path is a deck path inside the canvas's own folder. */
 export function inCanvas(canvas: string, path: unknown): boolean {
 	const plain = plainPath(path);
 	if (!plain) return false;
 	try {
-		return plain.startsWith(`${layout.canvasFolder(canvas)}/`);
+		return inside(plain, layout.canvasFolder(canvas)) && plain !== layout.canvasFolder(canvas);
 	} catch {
 		return false;
 	}
 }
 
-/** Whether a deck path is plain and under one of the deck's shared roots. */
+/** Whether a path is a deck path under one of the deck's shared roots. */
 export function inSharedRoot(path: unknown): boolean {
 	const plain = plainPath(path);
-	return !!plain && (SHARED_ROOTS as readonly string[]).includes(plain.split("/")[0]!) && plain.includes("/");
+	return !!plain && SHARED_ROOTS.some((root) => inside(plain, root) && plain !== root);
 }
 
 /**

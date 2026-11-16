@@ -2,7 +2,7 @@
 // (README rules 2, 3). They are read through /files/ and /pictures/ on the same pass, so a card's
 // page, modules and picture come as those features make them.
 import { deckFiles, layout } from "../../protocol/index.ts";
-import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
+import { deckPathFrom, toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { isPass, type Passes } from "./passes.ts";
 import { inCanvas, inSharedRoot } from "./paths.ts";
 
@@ -57,7 +57,7 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 			const [path, query = ""] = (req.url ?? "").split("?");
 			const [pass = "", kind = "", ...parts] = path!.slice(PASS_ROOT.length).split("/");
 			// A canvas's lib/, assets/, docs/ and apps/ are the deck's, as today (servedAs); a card's folder at a revision is the folder.
-			const rest = decoded(parts.join("/")).replace(/@\d+(?=\/)/g, "").replace(/^(?:shared\/)?canvases\/(?:[^/]+\/)+?(lib|assets|docs|apps)\//, "$1/");
+			const rest = addressPath(parts.join("/")).replace(/@\d+(?=\/)/g, "").replace(/^(?:shared\/)?canvases\/(?:[^/]+\/)+?(lib|assets|docs|apps)\//, "$1/");
 			const canvas = passes.canvasOf(pass);
 			const base = url();
 			const forward = FORWARD[kind];
@@ -74,10 +74,10 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 	};
 }
 
-/** A path from the address, decoded; a malformed escape decodes to nothing, which no rule allows. */
-function decoded(path: string): string {
+/** A path from the address as a deck path (deckPathFrom: decoded once, no climb, nothing hidden); anything else is "", which no rule allows. */
+function addressPath(path: string): string {
 	try {
-		return decodeURIComponent(path);
+		return deckPathFrom(path);
 	} catch {
 		return "";
 	}

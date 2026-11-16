@@ -9,12 +9,15 @@ const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "
 export const uploadRoute: Route = {
 	method: "POST",
 	prefix: "/api/upload",
+	// A scoped caller (a pass) uploads only into its own canvas's files/: never assets/ or another canvas.
+	scoped: (scope, asked) => asked.method === "POST" && !!scope.canvas && (asked.query.get("canvas") ?? scope.canvas) === scope.canvas,
 	async answer(ctx, _path, query, body) {
 		const asked = query.get("canvas") || undefined;
-		const scoped = scopedCaller(ctx);
-		if (scoped && !ctx.caller.canvas) return json(403, { error: "A pass, card or app uploads only into its own canvas's files, and this one names no canvas." });
-		if (scoped && asked !== undefined && asked !== ctx.caller.canvas) return json(403, { error: `This pass is ${ctx.caller.canvas}'s: it uploads into ${ctx.caller.canvas}'s files only.` });
-		const canvas = scoped ? ctx.caller.canvas : asked;
+		const scoped = ctx.scope !== undefined || scopedCaller(ctx);
+		const own = ctx.scope?.canvas ?? ctx.caller.canvas;
+		if (scoped && !own) return json(403, { error: "A pass, card or app uploads only into its own canvas's files, and this one names no canvas." });
+		if (scoped && asked !== undefined && asked !== own) return json(403, { error: `This pass is ${own}'s: it uploads into ${own}'s files only.` });
+		const canvas = scoped ? own : asked;
 		// A pass's canvas was checked when the pass was issued; a whole caller's is asked for here.
 		if (canvas && !scoped && !(await ctx.call("canvas.get", { canvas }).then(() => true, () => false))) return json(404, { error: `There is no canvas ${canvas} to put the file in.` });
 		const folder = canvas ? `${layout.canvasFolder(canvas)}/files` : "assets";
