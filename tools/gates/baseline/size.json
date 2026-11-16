@@ -13,7 +13,6 @@
 	"canvas/chrome/Insert.tsx: function Insert over 80 lines": 1,
 	"canvas/chrome/InsertMenu.tsx: function createInsertMenu over 80 lines": 1,
 	"canvas/chrome/PenBar.tsx: function PenBar over 80 lines": 1,
-	"canvas/chrome/Properties.tsx: function Properties over 80 lines": 1,
 	"canvas/documents/google/view.ts: function paragraph over 80 lines": 1,
 	"canvas/documents/live/builder.ts: function block over 80 lines": 1,
 	"canvas/documents/live/builder.ts: function inlineMd over 80 lines": 1,

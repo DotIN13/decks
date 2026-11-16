@@ -65,7 +65,7 @@
 	"canvas/chrome/PenBar.tsx: board": 3,
 	"canvas/chrome/PenBar.tsx: stage": 1,
 	"canvas/chrome/Properties.tsx: board": 1,
-	"canvas/chrome/Properties.tsx: stage": 1,
+	"canvas/chrome/properties/state.ts: stage": 1,
 	"canvas/debug.ts: stage": 5,
 	"canvas/documents/build-live-doc.mjs: board": 1,
 	"canvas/documents/google/typing.ts: board": 1,
