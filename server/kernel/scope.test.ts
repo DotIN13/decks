@@ -112,6 +112,20 @@ test("a scoped caller hears canvasless events of paths in its canvas, and those 
 	await server.close();
 });
 
+test("a pass's to, card and cards must lie inside its canvas's folder, for any call", async () => {
+	const server = await testServer({ features: [probeFeature()] });
+	const pass = server.callers.resolve(server.callers.issue({ ...callers.person, id: "person~frame-7" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 }))!;
+	const code = async (args: Record<string, unknown>) => {
+		const answer = await server.call("port.list", args, pass);
+		return answer.ok ? "ok" : answer.error.code;
+	};
+	for (const args of [{ to: "assets/importmap.json" }, { to: "canvases/b/canvas.pen" }, { to: "canvases/a/../b/x" }, { card: "canvases/b/cards/real" }, { cards: ["canvases/a/cards/x", "canvases/b/cards/y"] }]) {
+		assert.equal(await code(args), "refused", JSON.stringify(args));
+	}
+	assert.equal(await code({ to: "canvases/a/files/shot.png" }), "invalid", "inside its folder it passes the scope (port.list then refuses the extra argument)");
+	await server.close();
+});
+
 test("a scoped token ends at its until, and is dropped from the kept tokens", async () => {
 	const at = { now: 1000 };
 	const server = await testServer({ clock: () => at.now });

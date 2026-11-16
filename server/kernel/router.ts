@@ -1,5 +1,5 @@
-import { CALL_BY_NAME, check, Refused, refusal, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
-import type { Client, Context, Done, Feature, Filter, Guard, Scope, Translator } from "./types.ts";
+import { CALL_BY_NAME, check, layout, Refused, refusal, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
+import { deckPathFrom, inside, type Client, type Context, type Done, type Feature, type Filter, type Guard, type Scope, type Translator } from "./types.ts";
 
 // Find the call, check who may call it, check the arguments against its
 // shape, run its handler, answer in the envelope. A declared call no feature
@@ -139,6 +139,29 @@ function beyond(scope: Scope | undefined, name: string, args: unknown): string |
 	if (scope.calls && !scope.calls.includes(name)) return `This pass may not call ${name}; it reaches only its canvas's calls.`;
 	const asked = typeof args === "object" && args !== null ? (args as { canvas?: unknown }).canvas : undefined;
 	if (scope.canvas !== undefined && asked !== undefined && asked !== scope.canvas) return `This pass reaches only the canvas ${scope.canvas}, not ${String(asked)}.`;
+	return scope.canvas === undefined ? undefined : outsideFolder(scope.canvas, args);
+}
+
+/** Arguments that name where to write (to) or which card (card, cards); a pass's must be in its canvas. */
+const PLACED = ["to", "card", "cards"];
+
+/** Why an argument naming a place lies outside a scoped canvas's folder, read through deckPathFrom. */
+function outsideFolder(canvas: string, args: unknown): string | undefined {
+	if (typeof args !== "object" || args === null) return undefined;
+	const folder = layout.canvasFolder(canvas);
+	for (const key of PLACED) {
+		const given = (args as Record<string, unknown>)[key];
+		const values = typeof given === "string" ? [given] : Array.isArray(given) ? given.filter((one): one is string => typeof one === "string") : [];
+		for (const value of values) {
+			let path: string;
+			try {
+				path = deckPathFrom(value);
+			} catch {
+				return `This pass's ${key}, ${value}, is not a path inside the deck.`;
+			}
+			if (!inside(path, folder)) return `This pass's ${key} must be inside ${folder}, not ${path}.`;
+		}
+	}
 	return undefined;
 }
 

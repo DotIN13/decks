@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cp, mkdir, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { start, type Started } from "./start.ts";
 
@@ -61,6 +61,10 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 			["card.get", { card: "canvases/b/cards/secret" }],
 			["canvas.read", { canvas: "b" }],
 			["view.goto", { canvas: "b" }],
+			["canvas.export", { of: "x", to: "assets/importmap.json" }],
+			["canvas.export", { of: "x", to: "canvases/b/canvas.pen" }],
+			["canvas.screenshot", { to: "canvases/b/cards/secret/index.html" }],
+			["canvas.screenshot", { to: "apps/x/server.js" }],
 		];
 		for (const [name, args] of calls) {
 			const p = await call(name, args);
@@ -79,6 +83,9 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 			const p = await get(path, how);
 			assert.ok(p.status !== 200 && !leaks(p), `GET ${path} gave a pass ${p.status}: ${p.text.slice(0, 120)}`);
 		}
+		const secretCard = await readFile(join(s.root, "canvases", "b", "cards", "secret", "index.html"), "utf8");
+		assert.ok(secretCard.includes(SECRET), "nothing a pass called overwrote b's card");
+		assert.equal(await stat(join(s.root, "assets", "importmap.json")).then(() => true, () => false), false, "a pass wrote assets/importmap.json");
 		const upload = await fetch(`${s.url}/api/upload?name=planted.txt`, { method: "POST", headers: { authorization: `Bearer ${pass}` }, body: "planted" });
 		const exists = (path: string) => stat(join(s.root, path)).then(() => true, () => false);
 		assert.equal(await exists("assets/planted.txt"), false, `a pass wrote into the deck's assets/ (upload answered ${upload.status})`);
