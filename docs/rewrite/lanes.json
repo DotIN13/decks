@@ -97,7 +97,10 @@
 		"engine/crates/apple/",
 		"engine/Cargo.toml",
 		"engine/Cargo.lock",
-		"engine/crates/"
+		"engine/crates/",
+		"engine/demo/",
+		"engine/build-web.sh",
+		"engine/fetch-fonts.mjs"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
