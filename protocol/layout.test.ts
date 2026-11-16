@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canvasFolder, cardOf, deckPathOk, isCardPath, ownerFolderBase, referenceFor, resolveReference } from "./layout.ts";
+import { canvasFolder, cardAt, cardIndex, cardOf, deckPathOk, isCardPath, ownerFolderBase, referenceFor, resolveReference } from "./layout.ts";
 
 // The deck's layout rules, from their sentences, in the order layout.ts states them.
 
@@ -35,4 +35,8 @@ test("a card is cards/<name>/index.html, and its files belong to it", () => {
 	assert.ok(isCardPath("canvases/plan/cards/a/index.html"));
 	assert.ok(!isCardPath("canvases/plan/cards/a/b.html"));
 	assert.equal(cardOf("canvases/plan/cards/a/chart.js"), "canvases/plan/cards/a/index.html");
+	assert.equal(cardIndex("canvases/plan/cards/a"), "canvases/plan/cards/a/index.html");
+	assert.equal(cardIndex("canvases/plan/cards/a/index.html/"), "canvases/plan/cards/a/index.html");
+	assert.equal(cardIndex("canvases/plan/files/a"), undefined);
+	assert.equal(cardAt("canvases/plan", "a"), "canvases/plan/cards/a/index.html");
 });

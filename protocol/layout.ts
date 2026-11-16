@@ -139,6 +139,18 @@ export function isCardPath(path: string): boolean {
 	return !!at && !path.includes("\0") && /^cards\/[^/]+\/index\.html$/i.test(at.rest);
 }
 
+/** A card named by its folder or its index.html, as its index.html; undefined when that is not a card. */
+export function cardIndex(raw: string): string | undefined {
+	const trimmed = clean(raw).replace(/\/+$/, "");
+	const index = /\/index\.html$/i.test(trimmed) ? trimmed : `${trimmed}/index.html`;
+	return isCardPath(index) ? index : undefined;
+}
+
+/** The index.html of the card called name in a canvas's folder. */
+export function cardAt(folder: string, name: string): string {
+	return `${folder}/cards/${name}/index.html`;
+}
+
 /** The card a file belongs to: .../cards/sales/chart.js is .../cards/sales/index.html. */
 export function cardOf(path: string): string | undefined {
 	const p = clean(path);
