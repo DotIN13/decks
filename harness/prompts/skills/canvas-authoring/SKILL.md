@@ -103,7 +103,7 @@ const file = await decks.canvas.file();               // "canvases/<name>/canvas
   `inside`, the items in its copy with their id paths and boxes.
 - **`beside` and `below`** take an item's id or a card's path and put the item 160 px clear of
   that item's box: `beside` to its right with the tops aligned, `below` under it with the lefts
-  aligned. They work for any item, a note under a card or a card beside a note.
+  aligned. They work for any item: a note `below` a card, say, or a card `beside` a note.
 - Each call answers with the item as it now is, box included; `batch` with one per op. A note says
   what happened that you did not ask for (a size the layout overrode, a place chosen because you
   gave none). If any op of a batch fails, none is saved, and the error names the op and why.
