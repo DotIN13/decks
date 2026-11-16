@@ -7,7 +7,7 @@ import { topBoxMap } from "./boxes.ts";
  */
 
 export type ItemKind = "board" | "note" | "text" | "shape" | "frame" | "ink" | "other";
-export type CanvasItem = { id: string; kind: ItemKind; label: string; /** A card's path, or `item:<id>` for a document or an app. */ path?: string; /** The old name of `path`, until the page reads `path`. */ board?: string; box: { x: number; y: number; w: number; h: number } };
+export type CanvasItem = { id: string; kind: ItemKind; label: string; /** A card's path, or `item:<id>` for a document or an app. */ path?: string; box: { x: number; y: number; w: number; h: number } };
 
 /**
  * `boxes: false` lists without laying anything out: an item sized by its content comes with its place
@@ -32,8 +32,8 @@ export function canvasItems(doc: PenDocument | undefined, query = "", options?: 
 		} else if (meta.type === "decks.document" || meta.type === "decks.app") {
 			// A document or an app item: listed with the cards, by its name, its file's or its app's.
 			const what = meta.type === "decks.app" ? String((meta as { name?: unknown }).name ?? "App") : String(meta.path ?? "Document").split("/").pop()!;
-			item = { id, box, kind: "board", label: named ?? clip(what, "Item"), path: `item:${id}`, board: `item:${id}` };
-		} else if (meta.type === "decks.board" || meta.type === "decks.card") item = { id, box, kind: "board", label: named ?? clip(meta.type === "decks.card" ? meta.path?.split("/").at(-2) : meta.path?.split("/").pop()?.replace(/\.html$/, ""), meta.type === "decks.card" ? "Card" : "Board"), ...(meta.path ? { path: meta.path, board: meta.path } : {}) };
+			item = { id, box, kind: "board", label: named ?? clip(what, "Item"), path: `item:${id}` };
+		} else if (meta.type === "decks.board" || meta.type === "decks.card") item = { id, box, kind: "board", label: named ?? clip(meta.type === "decks.card" ? meta.path?.split("/").at(-2) : meta.path?.split("/").pop()?.replace(/\.html$/, ""), meta.type === "decks.card" ? "Card" : "Board"), ...(meta.path ? { path: meta.path } : {}) };
 		else if (n.type === "note") item = { id, box, kind: "note", label: named ?? clip(n.content, "Note") };
 		else if (n.type === "text") item = { id, box, kind: "text", label: named ?? clip(n.content, "Text") };
 		else if (meta.type === "decks.ink" || n.type === "path") item = { id, box, kind: "ink", label: named ?? "Drawing" };
