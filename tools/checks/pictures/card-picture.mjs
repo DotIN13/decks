@@ -1,15 +1,13 @@
 /**
- * A card's picture, the one the canvas shows once zoomed out, looks like the card itself: its
- * card.css, its theme's --b-* tokens and its fonts are in it. The picture's page imports theme.css
- * and the fonts by relative addresses; once they were refused for want of a pass, and the picture
- * drew unstyled, in a serif font, with blocks black (server/pictures, 4117abd0).
+ * A card's picture, shown once zoomed out, looks like the card itself: card.css, its theme's --b-*
+ * tokens and fonts are in it. Its page imports them by relative addresses, once refused for want of
+ * a pass, which drew it unstyled, serif, with blocks black (server/pictures, 4117abd0).
  */
-import { API, asPerson, card, canvasFrame, flyToCard, open, resetStage, say, settle } from "../harness.mjs";
+import { API, asPerson, card, canvasFrame, flyToCard, open, say, settle } from "../harness.mjs";
 
 // The fixture's risks card: the theme's tokens, a table and code.
 const PATH = card("risks");
 const { browser, page, errors } = await open({ width: 1400, height: 1000, scheme: "light", cards: true });
-await resetStage(page);
 await settle(page, 900);
 await flyToCard(page, PATH);
 const frame = await canvasFrame(page);
