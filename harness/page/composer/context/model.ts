@@ -1,7 +1,9 @@
 import type { AgentUsage } from "@decks/protocol";
 
-/** Thousands separated, because these are read at a glance and not counted digit by digit. */
-export const figure = (value: number): string => value.toLocaleString("en-US");
+// The context dial's words: its spoken label and the rows of numbers behind it.
+
+/** The dial's spoken label. */
+export const dialLabel = (percent: number): string => `Context ${Math.round(percent)}% full, the numbers behind it`;
 
 /** The rows under the dial's percentage: what is used, the context size, and what the session cost. */
 export function usageRows(usage: AgentUsage | undefined): Array<{ key: string; value: string }> {
@@ -12,5 +14,5 @@ export function usageRows(usage: AgentUsage | undefined): Array<{ key: string; v
 	];
 }
 
-/** The dial's spoken label. */
-export const dialLabel = (percent: number): string => `Context ${Math.round(percent)}% full, the numbers behind it`;
+/** Thousands separated, because these are read at a glance and not counted digit by digit. */
+export const figure = (value: number): string => value.toLocaleString("en-US");

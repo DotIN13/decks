@@ -1,7 +1,6 @@
 import type { SlashCommand } from "@decks/protocol";
 
-/** Fifty at a time. */
-const MAX_MATCHES = 50;
+// The slash menu's rules: which commands match what is typed, and the badge on each row.
 
 /** Filter and rank: the exact name first, then prefixes, then substrings. */
 export function filterCommands(commands: SlashCommand[], query: string): SlashCommand[] {
@@ -18,6 +17,9 @@ export function filterCommands(commands: SlashCommand[], query: string): SlashCo
 	}
 	return [...exact, ...prefix, ...contains].slice(0, MAX_MATCHES);
 }
+
+/** Fifty at a time. */
+const MAX_MATCHES = 50;
 
 /** What the badge at the end of a row says. */
 export function badge(command: SlashCommand, runtime: string): string {

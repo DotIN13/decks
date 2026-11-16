@@ -1,6 +1,8 @@
 import { Show } from "solid-js";
 import { thisQueueKey } from "./actions.ts";
 
+// What the keyboard can do here, under the box.
+
 /** What the keyboard can do here, under the box. */
 export function Hints(props: {
 	/** While the slash menu is up the keyboard means something else, so the row says so. */

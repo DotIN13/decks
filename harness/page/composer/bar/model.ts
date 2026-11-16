@@ -1,8 +1,11 @@
 import { draftIsEmpty, normalize, parseDraft, type Draft } from "../draft/model.ts";
 
-/** What was being typed on each page, so that leaving a page never loses a message. */
+// The composer's rules: the drafts it keeps per page, and the small rules its menus,
+// recording clock, placeholder and queue follow.
 
+// The drafts kept per page.
 export const DRAFTS_KEY = "decks.drafts";
+
 /** Pages remembered at once. An agent that was closed leaves its draft behind; this is what clears it out. */
 export const DRAFTS_LIMIT = 40;
 
@@ -15,6 +18,7 @@ export function pageKey(agentId: string | undefined, canvas?: string): string {
 const formerKey = (page: string) => (page.includes("@") ? page.slice(0, page.indexOf("@")) : undefined);
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
 interface Parked {
 	draft: Draft;
 	at: number;
@@ -100,6 +104,13 @@ export function reconcilePills<M extends { type: "mention"; id: string }>(draft:
 	return normalize([...spaced, ...missing.map(pillFor)]);
 }
 
+/** The comments whose pills are no longer in the draft. */
+export function goneComments(inDraft: readonly string[], waiting: ReadonlyArray<{ id: string }>): string[] {
+	const here = new Set(inDraft);
+	return waiting.filter((comment) => !here.has(comment.id)).map((comment) => comment.id);
+}
+
+// The menus' queries.
 /** A draft that is exactly `/` and a command fragment: the fragment, else null (not the same as ""). */
 export function slashFragment(text: string): string | null {
 	const match = /^\/([a-z0-9_:.-]*)$/i.exec(text);
@@ -112,9 +123,6 @@ export function atQuery(text: string, caret: number): string | null {
 	return match ? match[2]! : null;
 }
 
-/** The arrows wrap: one ArrowUp from the top of a list is its bottom row. */
-export const wrapIndex = (at: number, step: number, length: number): number => (at + step + length) % length;
-
 /** The words with the `@` fragment at the caret replaced by the whole name and a space. */
 export function withMentionAt(whole: string, caret: number, query: string, name: string): string | undefined {
 	const at = caret - query.length - 1;
@@ -123,12 +131,10 @@ export function withMentionAt(whole: string, caret: number, query: string, name:
 	return `${whole.slice(0, at)}@${name}${after.startsWith(" ") ? "" : " "}${after}`;
 }
 
-/** How long a recording has run, as m:ss. */
-export function clockText(since: number, now: number): string {
-	const seconds = Math.max(0, Math.floor((now - since) / 1000));
-	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
+/** The arrows wrap: one ArrowUp from the top of a list is its bottom row. */
+export const wrapIndex = (at: number, step: number, length: number): number => (at + step + length) % length;
 
+// The words on the bar.
 /** Who the line goes to, for the placeholder and the queue's head. */
 export const recipientName = (dest: { kind: string; name?: string } | undefined): string => (dest?.kind === "prompt" && dest.name ? dest.name : "the agent");
 
@@ -141,8 +147,8 @@ export function queueNote(queued: { items: Array<{ text: string }>; held: boolea
 	return folded ? `next: ${queued.items[0]?.text ?? ""}` : "sent one per turn";
 }
 
-/** The comments whose pills are no longer in the draft. */
-export function goneComments(inDraft: readonly string[], waiting: ReadonlyArray<{ id: string }>): string[] {
-	const here = new Set(inDraft);
-	return waiting.filter((comment) => !here.has(comment.id)).map((comment) => comment.id);
+/** How long a recording has run, as m:ss. */
+export function clockText(since: number, now: number): string {
+	const seconds = Math.max(0, Math.floor((now - since) / 1000));
+	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

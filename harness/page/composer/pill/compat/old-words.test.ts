@@ -4,6 +4,8 @@ import type { DraftMention } from "../../draft/model.ts";
 import { readParts } from "../about.ts";
 import { cardKind } from "./old-words.ts";
 
+// Old messages read back in the new words.
+
 test("a mention saved as a board reads back as a card's pill", () => {
 	assert.equal(cardKind("board"), "card");
 	assert.equal(cardKind("item"), "item");

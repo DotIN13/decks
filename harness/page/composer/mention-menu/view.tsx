@@ -4,6 +4,8 @@ import { AgentFace } from "../../agents/index.ts";
 import { keepInView } from "./actions.ts";
 import type { Mentionable } from "./model.ts";
 
+// The @ menu: the agents an @ can name, under the caret's word.
+
 export type { Mentionable };
 
 /** The `@` completion: the same rows the recipient chip's menu shows, under the caret's word. */

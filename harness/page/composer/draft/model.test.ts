@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftLabel, draftText, fileMention, LABEL_LIMIT, mentionAddress, normalize, parseDraft, serializeDraft, shortLabel, textDraft, type Draft } from "./model.ts";
 
+// A draft: its pills, what it reads as and sends, and the clipboard round trip.
+
 const pill = (id: string, label = "“Keep it short.”") => ({ type: "mention" as const, kind: "comment" as const, id, label });
 
 test("equal drafts compare equal: text merged, empties dropped", () => {

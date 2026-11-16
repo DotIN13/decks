@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { joinHeard, micError } from "./voice.ts";
 
+// Heard words joined, and a microphone failure said plainly.
+
 const failure = (name: string, message = "") => Object.assign(new Error(message), { name });
 
 test("each way the browser refuses the microphone says its own reason", () => {

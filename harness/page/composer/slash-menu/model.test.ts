@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { SlashCommand } from "@decks/protocol";
 import { filterCommands } from "./model.ts";
 
+// Which commands match what is typed, in rank order.
+
 const cmd = (name: string, aliases?: string[]): SlashCommand => ({ name, ...(aliases ? { aliases } : {}) });
 
 test("what was typed in full is what Enter picks", () => {

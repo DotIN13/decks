@@ -5,10 +5,16 @@ import type { MessageMention, MessagePart } from "@decks/protocol";
 import { commentItem } from "../../markup/comments.ts";
 import type { WaitingComment } from "../../state/index.ts";
 
-/**
- * What a pill is about, for its tooltip and its card (the pill's card), what a sent
- * message keeps of its pills (`messageParts`), and a sent message read back into its pills.
- */
+// What a pill is about, in the bar and in a sent message: its name and card,
+// the parts a message is sent with, and a sent message read back into its pills.
+
+/** Looks a card's title up by its path; the app's cards know theirs. */
+export type TitleOf = (path: string) => string | undefined;
+
+/** Looks a drawn item's name up by its id: its own name, or a few of its words (the layers list's label). */
+export type ItemName = (id: string) => string | undefined;
+
+const none = () => undefined;
 
 /** A card's, a card's or a file's name from its path: `cards/sdk/index.html` is "sdk", the canvas "plan". */
 export function pathName(path: string): string {
@@ -16,13 +22,7 @@ export function pathName(path: string): string {
 	return (parts.pop() || path).replace(/\.html?$/, "");
 }
 
-/** Looks a card's title up by its path; the app's cards know theirs. */
-export type TitleOf = (path: string) => string | undefined;
-/** Looks a drawn item's name up by its id: its own name, or a few of its words (the layers list's label). */
-export type ItemName = (id: string) => string | undefined;
-
-const none = () => undefined;
-
+// What a pill in the bar is about.
 /**
  * What a comment is called: the title of the card or card it is on, or the drawn item it is on by its
  * name (`3 items` for several). A comment kept with a sent message has its name as its `title`.
@@ -68,13 +68,6 @@ export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleO
 	};
 }
 
-/** What a card, an item or a file is called: its title, its name or words, its file's name. */
-function addressName(node: DraftMention, titleOf: TitleOf = none, itemName: ItemName = none): string {
-	if (node.kind === "file") return node.name ?? (node.id.split("/").pop() || node.id);
-	if (node.kind === "item") return itemName(node.id) ?? node.name ?? node.label;
-	return titleOf(node.id) ?? node.name ?? node.label;
-}
-
 /** What a card, an item or a file pill is about. */
 export function aboutAddress(node: DraftMention, titleOf?: TitleOf, itemName?: ItemName): PillAbout {
 	const exact = mentionAddress(node);
@@ -84,6 +77,14 @@ export function aboutAddress(node: DraftMention, titleOf?: TitleOf, itemName?: I
 	return { name, of: "card", source: `On the canvas, a card: ${node.id}`, exact };
 }
 
+/** What a card, an item or a file is called: its title, its name or words, its file's name. */
+function addressName(node: DraftMention, titleOf: TitleOf = none, itemName: ItemName = none): string {
+	if (node.kind === "file") return node.name ?? (node.id.split("/").pop() || node.id);
+	if (node.kind === "item") return itemName(node.id) ?? node.name ?? node.label;
+	return titleOf(node.id) ?? node.name ?? node.label;
+}
+
+// The parts a message is sent with.
 // --- a sent message, kept as its parts --------------------------------------------------
 
 /**
@@ -133,19 +134,13 @@ export function messageParts(draft: Draft, comments: readonly WaitingComment[], 
 	return parts;
 }
 
-/** The comment a stored comment part was written from, for its card and for showing it. */
-function partComment(part: MessageMention): WaitingComment {
-	return {
-		id: part.id,
-		board: part.path ?? "",
-		quote: part.quote ?? "",
-		text: part.note ?? "",
-		at: 0,
-		title: part.name,
-		...(part.items?.length ? { items: [...part.items] } : {}),
-		...(part.component ? { component: part.component } : {}),
-		...(part.from === "canvas" ? { from: "canvas" as const } : {}),
-	};
+// A sent message read back into its pills.
+interface SentReading {
+	draft: Draft;
+	/** The comments the message carried, by their pills' ids. */
+	comments: Map<string, WaitingComment>;
+	/** Each comment's entry exactly as it was sent. */
+	exact: Map<string, string>;
 }
 
 /** A message's stored parts, read into the pills it was written with and what each is about. */
@@ -172,47 +167,19 @@ export function readParts(parts: readonly MessagePart[]): SentReading | undefine
 	return draft.some((node) => node.type === "mention") ? { draft, comments, exact } : undefined;
 }
 
-// --- a sent message, read back from its text (one sent before parts were kept) -------------
-
-const HEADS: Array<[RegExp, (match: RegExpExecArray) => number]> = [
-	...OLD_HEADS,
-	[/^A comment on items drawn on a canvas:$/, () => 1],
-	[/^(\d+) comments on items drawn on a canvas:$/, (m) => Number(m[1])],
-];
-
-/** One entry of `commentBlock`, read back into the comment it was written from. */
-function readEntry(lines: string[], n: number): WaitingComment {
-	const first = lines[0]!.slice(`${n}. `.length);
-	const rest = lines.slice(1).map((line) => line.slice(3));
-	const comment: WaitingComment = { id: `sent-${n}`, board: first, quote: "", text: "", at: 0 };
-	const drawn = /^on (.+?), items? ((?:"[^"]*"(?:, )?)+)(?: \("([\s\S]*)"\))?$/.exec(first);
-	if (drawn) {
-		comment.board = drawn[1]!;
-		comment.items = [...drawn[2]!.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
-		comment.quote = drawn[3] ?? "";
-	} else {
-		let where = first;
-		const whole = WHOLE_ENDS.find((end) => where.endsWith(end));
-		if (whole) where = where.slice(0, -whole.length);
-		else if (rest[0]?.startsWith("> ")) comment.quote = rest.shift()!.slice(2);
-		const inside = /^(.*), in #(\S+)$/.exec(where);
-		comment.board = inside ? inside[1]! : where;
-		if (inside) comment.component = inside[2]!;
-	}
-	comment.text = rest.join("\n");
-	return comment;
-}
-
-/** An `@` address in typed words: `@item:id`, or a path with a folder or an extension. A name (`@Sable`) is not one. */
-const ADDRESS = /(^|\s)@(item:[^\s]+|[^\s@]*\/[^\s]*|[^\s@/]+\.[A-Za-z0-9]{1,8})/g;
-const COMMENT_REF = /\[comment (\d+)\]/g;
-
-interface SentReading {
-	draft: Draft;
-	/** The comments the message carried, by their pills' ids. */
-	comments: Map<string, WaitingComment>;
-	/** Each comment's entry exactly as it was sent. */
-	exact: Map<string, string>;
+/** The comment a stored comment part was written from, for its card and for showing it. */
+function partComment(part: MessageMention): WaitingComment {
+	return {
+		id: part.id,
+		board: part.path ?? "",
+		quote: part.quote ?? "",
+		text: part.note ?? "",
+		at: 0,
+		title: part.name,
+		...(part.items?.length ? { items: [...part.items] } : {}),
+		...(part.component ? { component: part.component } : {}),
+		...(part.from === "canvas" ? { from: "canvas" as const } : {}),
+	};
 }
 
 /**
@@ -281,6 +248,42 @@ export function readSent(text: string, titleOf: TitleOf = none): SentReading | u
 	if (lead.length && said.trim()) lead.push({ type: "text", text: " " });
 	const whole = [...lead, ...draft].filter((node) => node.type !== "text" || node.text !== "");
 	return whole.some((node) => node.type === "mention") ? { draft: whole, comments, exact } : undefined;
+}
+
+// --- a sent message, read back from its text (one sent before parts were kept) -------------
+
+const HEADS: Array<[RegExp, (match: RegExpExecArray) => number]> = [
+	...OLD_HEADS,
+	[/^A comment on items drawn on a canvas:$/, () => 1],
+	[/^(\d+) comments on items drawn on a canvas:$/, (m) => Number(m[1])],
+];
+
+/** An `@` address in typed words: `@item:id`, or a path with a folder or an extension. A name (`@Sable`) is not one. */
+const ADDRESS = /(^|\s)@(item:[^\s]+|[^\s@]*\/[^\s]*|[^\s@/]+\.[A-Za-z0-9]{1,8})/g;
+
+const COMMENT_REF = /\[comment (\d+)\]/g;
+
+/** One entry of `commentBlock`, read back into the comment it was written from. */
+function readEntry(lines: string[], n: number): WaitingComment {
+	const first = lines[0]!.slice(`${n}. `.length);
+	const rest = lines.slice(1).map((line) => line.slice(3));
+	const comment: WaitingComment = { id: `sent-${n}`, board: first, quote: "", text: "", at: 0 };
+	const drawn = /^on (.+?), items? ((?:"[^"]*"(?:, )?)+)(?: \("([\s\S]*)"\))?$/.exec(first);
+	if (drawn) {
+		comment.board = drawn[1]!;
+		comment.items = [...drawn[2]!.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
+		comment.quote = drawn[3] ?? "";
+	} else {
+		let where = first;
+		const whole = WHOLE_ENDS.find((end) => where.endsWith(end));
+		if (whole) where = where.slice(0, -whole.length);
+		else if (rest[0]?.startsWith("> ")) comment.quote = rest.shift()!.slice(2);
+		const inside = /^(.*), in #(\S+)$/.exec(where);
+		comment.board = inside ? inside[1]! : where;
+		if (inside) comment.component = inside[2]!;
+	}
+	comment.text = rest.join("\n");
+	return comment;
 }
 
 /** What a pill in a sent message is about: as it was sent, by the name it had and the exact words it went as. */

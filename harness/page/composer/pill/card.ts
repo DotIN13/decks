@@ -2,10 +2,7 @@ import { createSignal } from "solid-js";
 import { onDismiss } from "@decks/ui";
 import { draftLabel, type DraftMention, type MentionKind } from "../draft/model.ts";
 
-/**
- * A pill, as it is drawn wherever one sits, in the field, and in a message you sent, and what it says
- * when you point at it or press it.
- */
+// A pill in the DOM: the element and its words, the card a press opens, and the wiring that opens it.
 
 /** What a pill is about, as its tooltip and card tell it. The host knows; this file only draws. */
 export interface PillAbout {
@@ -31,12 +28,14 @@ export interface PillHost {
 	remove?(node: DraftMention): void;
 }
 
+// The pill's element and its words.
 /*
  * Lucide's `message-square`, `layout-template`, `shapes` and `file`: a comment, a card or card, a thing
  * drawn on the canvas, a file. The wash behind each is its own colour too (`styles/ink.css`).
  */
 const svg = (body: string, size: number, slot: string) =>
 	`<svg data-slot="${slot}" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+
 const BODIES = {
 	comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
 	card: '<rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/>',
@@ -44,6 +43,7 @@ const BODIES = {
 	file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
 	x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
 };
+
 const PILL_ICONS: Record<MentionKind, string> = {
 	comment: svg(BODIES.comment, 11, "pill-icon"),
 	card: svg(BODIES.card, 11, "pill-icon"),
@@ -53,16 +53,6 @@ const PILL_ICONS: Record<MentionKind, string> = {
 
 /** The most of a name a pill shows: a long card title would otherwise wrap a sent message over lines. */
 export const PILL_LIMIT = 20;
-
-/** A pill's words, cut to `PILL_LIMIT` with an ellipsis. The whole name is in its tooltip and its card. */
-export function pillWords(label: string): string {
-	const flat = label.replace(/\s+/g, " ").trim();
-	if (flat.length <= PILL_LIMIT) return flat;
-	// A quotation keeps its closing mark, so it still reads as one.
-	const quoted = flat.startsWith("“") && flat.endsWith("”");
-	const cut = flat.slice(0, PILL_LIMIT - (quoted ? 2 : 1)).trimEnd();
-	return quoted ? `${cut.replace(/…$/, "")}…”` : `${cut}…`;
-}
 
 /** A mention, as the DOM holds it. Atomic in an editable field because the browser is told it is. */
 export function pillElement(node: DraftMention): HTMLElement {
@@ -81,8 +71,26 @@ export function pillElement(node: DraftMention): HTMLElement {
 	return span;
 }
 
+/** A pill's mention, read back from its element. */
+export function pillNode(el: HTMLElement): DraftMention | null {
+	const { mentionId: id, mentionLabel: label, mentionName: name, kind } = el.dataset;
+	if (!id || !label || !kind || !(kind in PILL_ICONS)) return null;
+	return { type: "mention", kind: kind as MentionKind, id, label, ...(name ? { name } : {}), ...(el.dataset.from === "canvas" ? { from: "canvas" as const } : {}) };
+}
+
+/** A pill's words, cut to `PILL_LIMIT` with an ellipsis. The whole name is in its tooltip and its card. */
+export function pillWords(label: string): string {
+	const flat = label.replace(/\s+/g, " ").trim();
+	if (flat.length <= PILL_LIMIT) return flat;
+	// A quotation keeps its closing mark, so it still reads as one.
+	const quoted = flat.startsWith("“") && flat.endsWith("”");
+	const cut = flat.slice(0, PILL_LIMIT - (quoted ? 2 : 1)).trimEnd();
+	return quoted ? `${cut.replace(/…$/, "")}…”` : `${cut}…`;
+}
+
 /** The most of a quote or a note the tooltip shows; the card shows a few lines, Exact text all of it. */
 const TIP_LIMIT = 160;
+
 const clip = (words: string) => {
 	const flat = words.replace(/\s+/g, " ").trim();
 	return flat.length > TIP_LIMIT ? `${flat.slice(0, TIP_LIMIT - 1).trimEnd()}…` : flat;
@@ -90,6 +98,7 @@ const clip = (words: string) => {
 
 /** The most of a name the tooltip shows; the card names it on one line, and its whole name shows there. */
 const TIP_NAME_LIMIT = 32;
+
 const clipName = (name: string) => {
 	const flat = name.replace(/\s+/g, " ").trim();
 	return flat.length > TIP_NAME_LIMIT ? `${flat.slice(0, TIP_NAME_LIMIT - 1).trimEnd()}…` : flat;
@@ -102,29 +111,55 @@ export function pillTip(about: PillAbout): { tip: string; sub: string } {
 	return { tip: said, sub: `${clipName(about.name)} · ${about.source} · click to read all` };
 }
 
+// The card a press opens.
 const [open, setOpen] = createSignal<{ pill: HTMLElement; card: HTMLElement; close: () => void } | undefined>();
 
-/** Put away the open card, if there is one. */
-export function closePillCard(): void {
-	open()?.close();
-}
-
-/** Above the pill, or below it when there is no room above; never off the window's sides. */
-function place(card: HTMLElement, pill: HTMLElement): void {
-	const r = pill.getBoundingClientRect();
-	const w = card.offsetWidth;
-	const h = card.offsetHeight;
-	card.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
-	card.style.top = `${r.top - h - 8 > 8 ? r.top - h - 8 : Math.min(r.bottom + 8, innerHeight - h - 8)}px`;
-}
-
-function button(className: string, html: string, label?: string): HTMLButtonElement {
-	const b = document.createElement("button");
-	b.type = "button";
-	b.className = className;
-	b.innerHTML = html;
-	if (label) b.setAttribute("aria-label", label);
-	return b;
+/**
+ * Pills under `root` answer pointing and pressing: the tooltip's words are written onto a pill as the
+ * pointer arrives (before the host's tooltip reads them, which listens on the document), and a press
+ * opens its card. Returns what takes the listeners off.
+ */
+export function wirePills(root: HTMLElement, host: () => PillHost | undefined, nodeOf: (el: HTMLElement) => DraftMention | null): () => void {
+	const pillAt = (target: EventTarget | null) => {
+		const pill = (target as Element | null)?.closest?.<HTMLElement>('[data-component="mention-pill"]');
+		return pill && root.contains(pill) ? pill : null;
+	};
+	const over = (event: PointerEvent) => {
+		const pill = pillAt(event.target);
+		const node = pill && nodeOf(pill);
+		const about = node && host()?.about(node);
+		if (!pill || !about) return;
+		const { tip, sub } = pillTip(about);
+		pill.dataset.tip = tip;
+		pill.dataset.tipSub = sub;
+		pill.dataset.side = "top";
+		pill.removeAttribute("title");
+		if (about.canvas) pill.dataset.from = "canvas";
+	};
+	const click = (event: MouseEvent) => {
+		const pill = pillAt(event.target);
+		const node = pill && nodeOf(pill);
+		const using = host();
+		if (!pill || !node || !using) return;
+		event.preventDefault();
+		// A press selects a pill whole (`user-select: all`); the caret goes after it, so the next key types
+		// beside the pill rather than over it.
+		const selection = getSelection();
+		if (selection?.containsNode(pill, true)) {
+			const range = document.createRange();
+			range.setStartAfter(pill);
+			range.collapse(true);
+			selection.removeAllRanges();
+			if (root.isContentEditable) selection.addRange(range);
+		}
+		openPillCard(pill, node, using);
+	};
+	root.addEventListener("pointerover", over);
+	root.addEventListener("click", click);
+	return () => {
+		root.removeEventListener("pointerover", over);
+		root.removeEventListener("click", click);
+	};
 }
 
 /** The card a press on a pill opens; a second press on the same pill puts it away. */
@@ -148,6 +183,11 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 	const close = dismissals(card, pill);
 	x.onclick = () => close(true);
 	setOpen({ pill, card, close: () => close() });
+}
+
+/** Put away the open card, if there is one. */
+export function closePillCard(): void {
+	open()?.close();
 }
 
 /** The first line names what the pill is about, with its kind's icon; a press shows it. */
@@ -269,57 +309,20 @@ function returnCaret(pill: HTMLElement): void {
 	getSelection()?.addRange(range);
 }
 
-/**
- * Pills under `root` answer pointing and pressing: the tooltip's words are written onto a pill as the
- * pointer arrives (before the host's tooltip reads them, which listens on the document), and a press
- * opens its card. Returns what takes the listeners off.
- */
-export function wirePills(root: HTMLElement, host: () => PillHost | undefined, nodeOf: (el: HTMLElement) => DraftMention | null): () => void {
-	const pillAt = (target: EventTarget | null) => {
-		const pill = (target as Element | null)?.closest?.<HTMLElement>('[data-component="mention-pill"]');
-		return pill && root.contains(pill) ? pill : null;
-	};
-	const over = (event: PointerEvent) => {
-		const pill = pillAt(event.target);
-		const node = pill && nodeOf(pill);
-		const about = node && host()?.about(node);
-		if (!pill || !about) return;
-		const { tip, sub } = pillTip(about);
-		pill.dataset.tip = tip;
-		pill.dataset.tipSub = sub;
-		pill.dataset.side = "top";
-		pill.removeAttribute("title");
-		if (about.canvas) pill.dataset.from = "canvas";
-	};
-	const click = (event: MouseEvent) => {
-		const pill = pillAt(event.target);
-		const node = pill && nodeOf(pill);
-		const using = host();
-		if (!pill || !node || !using) return;
-		event.preventDefault();
-		// A press selects a pill whole (`user-select: all`); the caret goes after it, so the next key types
-		// beside the pill rather than over it.
-		const selection = getSelection();
-		if (selection?.containsNode(pill, true)) {
-			const range = document.createRange();
-			range.setStartAfter(pill);
-			range.collapse(true);
-			selection.removeAllRanges();
-			if (root.isContentEditable) selection.addRange(range);
-		}
-		openPillCard(pill, node, using);
-	};
-	root.addEventListener("pointerover", over);
-	root.addEventListener("click", click);
-	return () => {
-		root.removeEventListener("pointerover", over);
-		root.removeEventListener("click", click);
-	};
+/** Above the pill, or below it when there is no room above; never off the window's sides. */
+function place(card: HTMLElement, pill: HTMLElement): void {
+	const r = pill.getBoundingClientRect();
+	const w = card.offsetWidth;
+	const h = card.offsetHeight;
+	card.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+	card.style.top = `${r.top - h - 8 > 8 ? r.top - h - 8 : Math.min(r.bottom + 8, innerHeight - h - 8)}px`;
 }
 
-/** A pill's mention, read back from its element. */
-export function pillNode(el: HTMLElement): DraftMention | null {
-	const { mentionId: id, mentionLabel: label, mentionName: name, kind } = el.dataset;
-	if (!id || !label || !kind || !(kind in PILL_ICONS)) return null;
-	return { type: "mention", kind: kind as MentionKind, id, label, ...(name ? { name } : {}), ...(el.dataset.from === "canvas" ? { from: "canvas" as const } : {}) };
+function button(className: string, html: string, label?: string): HTMLButtonElement {
+	const b = document.createElement("button");
+	b.type = "button";
+	b.className = className;
+	b.innerHTML = html;
+	if (label) b.setAttribute("aria-label", label);
+	return b;
 }

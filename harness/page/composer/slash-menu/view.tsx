@@ -3,6 +3,8 @@ import { createEffect, For, Show } from "solid-js";
 import { keepInView } from "./actions.ts";
 import { badge } from "./model.ts";
 
+// The slash menu, above the composer.
+
 /** The `/` menu, above the composer. */
 export function SlashMenu(props: {
 	commands: SlashCommand[];

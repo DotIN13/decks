@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { hintSet, queueKey } from "./model.ts";
 
+// The hints under the box, and the queue key.
+
 test("the queue key is Command on a Mac and Control elsewhere", () => {
 	assert.equal(queueKey("MacIntel"), "⌘");
 	assert.equal(queueKey("Win32"), "Ctrl");

@@ -10,8 +10,7 @@ import { Icon, Popover } from "@decks/ui";
 import { pickMode } from "./actions.ts";
 import { availableModes, currentMode, modeTinted, type ModeEntry } from "./model.ts";
 
-/** Each mode's glyph. A bolt for auto, so it never wears the model chip's sparkle beside it. */
-const ICONS: Record<AgentMode, LucideIcon> = { manual: Shield, acceptEdits: SquarePen, plan: ClipboardList, auto: Zap };
+// The mode chip and its menu, inside the box.
 
 /** Button two of three, inside the box: the mode chip and its menu. */
 export function ModeMenu(props: {
@@ -93,3 +92,6 @@ function ModeRow(props: { entry: ModeEntry; current: AgentMode | undefined; onPi
 		</button>
 	);
 }
+
+/** Each mode's glyph. A bolt for auto, so it never wears the model chip's sparkle beside it. */
+const ICONS: Record<AgentMode, LucideIcon> = { manual: Shield, acceptEdits: SquarePen, plan: ClipboardList, auto: Zap };

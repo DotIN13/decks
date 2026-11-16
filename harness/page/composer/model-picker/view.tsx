@@ -8,6 +8,8 @@ import { Icon, Popover } from "@decks/ui";
 import { pickModel } from "./actions.ts";
 import { isCurrent, levelsFor, makerName, makersOf, matchModels, modelLabel, optionFor } from "./model.ts";
 
+// The model chip and its card: which model, how hard it thinks, and which account it spends.
+
 /** What the shell gives the model chip. */
 export interface ModelPickerProps {
 	model: AgentModel | undefined;

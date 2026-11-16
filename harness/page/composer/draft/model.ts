@@ -1,9 +1,13 @@
-/** What the composer is holding, as a list of nodes rather than a string. */
+import { shortLabel } from "@decks/ui";
+
+// A draft: words and mentions of a card, an item, a file or a comment, as the composer holds them;
+// what it reads as, what the agent is sent, and how it crosses the clipboard.
 
 /** What a pill stands for. Each has its own colour and icon in the field. */
 export type MentionKind = "comment" | "card" | "item" | "file";
 
 const KINDS: readonly string[] = ["comment", "card", "item", "file"];
+
 /** Whether a string names a kind of pill: what a draft read back from the DOM or the clipboard is checked by. */
 export function isMentionKind(kind: unknown): kind is MentionKind {
 	return typeof kind === "string" && KINDS.includes(kind);
@@ -29,7 +33,10 @@ export type DraftNode =
 	  };
 
 export type Draft = DraftNode[];
+
 export type DraftMention = Extract<DraftNode, { type: "mention" }>;
+
+export { LABEL_LIMIT, shortLabel } from "@decks/ui";
 
 /** Adjacent text merged and empties dropped, so equal drafts compare equal. */
 export function normalize(draft: Draft): Draft {
@@ -48,13 +55,11 @@ export function normalize(draft: Draft): Draft {
 	return out;
 }
 
+// What a draft reads as.
 /** What a pill draws: the words it points at, and no `@`. */
 export function draftLabel(node: DraftMention): string {
 	return node.label;
 }
-
-export { LABEL_LIMIT, shortLabel } from "@decks/ui";
-import { shortLabel } from "@decks/ui";
 
 /** The start of a quotation, in quotes, short enough to sit in a sentence. */
 export function commentLabel(quote: string): string {
@@ -66,11 +71,27 @@ export function mentionAddress(node: DraftMention): string {
 	return node.kind === "card" || node.kind === "file" ? `@${node.id}` : `@item:${node.id}`;
 }
 
+/** A file's pill: its name, standing for its path in the deck. */
+export function fileMention(path: string): DraftMention {
+	const name = path.split("/").pop() || path;
+	return { type: "mention", kind: "file", id: path, label: name, name };
+}
+
 /** What the draft reads as, and what is sent as the typed part of the message. */
 export function draftText(draft: Draft): string {
 	return draft.map((node) => (node.type === "text" ? node.text : "")).join("");
 }
 
+/** Nothing typed and nothing mentioned. A comment, a card or an item alone is a message. */
+export function draftIsEmpty(draft: Draft): boolean {
+	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention");
+}
+
+export function textDraft(text: string): Draft {
+	return text === "" ? [] : [{ type: "text", text }];
+}
+
+// What the agent is sent.
 /** The typed part of the message as the agent reads it. */
 export function draftForAgent(draft: Draft): string {
 	let count = 0;
@@ -89,12 +110,6 @@ export function draftForAgent(draft: Draft): string {
 	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention" && node.kind !== "comment") ? "" : written;
 }
 
-/** A file's pill: its name, standing for its path in the deck. */
-export function fileMention(path: string): DraftMention {
-	const name = path.split("/").pop() || path;
-	return { type: "mention", kind: "file", id: path, label: name, name };
-}
-
 /** The comments the draft carries, in the order their pills sit in it, not the other pills. */
 export function draftComments(draft: Draft): string[] {
 	const ids: string[] = [];
@@ -102,15 +117,7 @@ export function draftComments(draft: Draft): string[] {
 	return ids;
 }
 
-/** Nothing typed and nothing mentioned. A comment, a card or an item alone is a message. */
-export function draftIsEmpty(draft: Draft): boolean {
-	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention");
-}
-
-export function textDraft(text: string): Draft {
-	return text === "" ? [] : [{ type: "text", text }];
-}
-
+// The clipboard.
 /** The clipboard type that carries pills between the composer and itself. */
 export const DRAFT_MIME = "application/x-decks-draft";
 

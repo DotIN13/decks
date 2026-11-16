@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { Draft } from "../draft/model.ts";
 import { DRAFTS_KEY, DRAFTS_LIMIT, pageKey, parkedDrafts, reconcilePills } from "./model.ts";
 
+// The composer's rules: drafts kept per page, then the menus' queries and the bar's words.
+
 const memory = () => {
 	const held = new Map<string, string>();
 	return { held, getItem: (key: string) => held.get(key) ?? null, setItem: (key: string, value: string) => void held.set(key, value), removeItem: (key: string) => void held.delete(key) };

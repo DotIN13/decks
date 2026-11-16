@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PILL_LIMIT, pillTip, pillWords } from "./card.ts";
 
+// A pill's words and its tooltip, cut to fit.
+
 test("a pill's words are cut to fit a sentence, a quotation keeping its closing mark", () => {
 	assert.equal(pillWords("plan.pdf"), "plan.pdf");
 	const title = pillWords("The chrome choice is who owns the canvas's behaviour rules");

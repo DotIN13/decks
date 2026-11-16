@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { availableModes, currentMode, modeTinted } from "./model.ts";
 
+// The modes a runtime offers, which the chip shows, and when it is tinted.
+
 test("only the modes the runtime offers are shown, in the chip's order", () => {
 	assert.deepEqual(availableModes(["auto", "manual"]).map((m) => m.mode), ["manual", "auto"]);
 });

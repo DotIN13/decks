@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { withMention } from "./mention.ts";
 
+// Words put in at the caret: the spacing either side.
+
 test("into an empty field, with a space after so the next word does not join it", () => {
 	assert.deepEqual(withMention("", 0, "@assets/a.png"), { text: "@assets/a.png ", caret: 14 });
 });

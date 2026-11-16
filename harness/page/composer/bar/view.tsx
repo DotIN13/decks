@@ -24,8 +24,12 @@ import { SlashMenu } from "../slash-menu/view.tsx";
 import { MentionMenu } from "../mention-menu/view.tsx";
 import type { Mentionable } from "../mention-menu/model.ts";
 import { Recipient, type RecipientProps } from "../recipient/view.tsx";
-import { createDraft, createIme, createMentions, createSlash, createVoice, dropHandlers, editQueued, fieldKeys, send, sendAllQueued, voiceKeys, type Bar, type FieldRef } from "./actions.ts";
+import { createDraft, createIme, createMentions, createSlash, dropHandlers, editQueued, fieldKeys, send, sendAllQueued, type Bar, type FieldRef } from "./actions.ts";
+import { createVoice, voiceKeys } from "../voice/session.ts";
 import { clockText, placeholder, queueNote, recipientName } from "./model.ts";
+
+// The composer floating over the canvas: the queue on top, the box with its field and controls,
+// and the hints on the canvas under it.
 
 /** What the shell gives the input bar. */
 export interface ComposerProps {

@@ -1,5 +1,7 @@
 import type { AgentChat } from "@decks/protocol";
 
+// Who gets the line: the name on the chip, the agent it is, and the chip's spoken words.
+
 /** The parts of a destination the chip reads: who it names, if anyone. */
 export type DestinationLike = { kind: "prompt"; id: string; name: string } | { kind: string };
 

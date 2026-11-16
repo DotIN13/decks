@@ -1,5 +1,7 @@
 import type { AgentMode } from "@decks/protocol";
 
+// How much the agent asks before acting: the modes, which the runtime offers, and which the chip shows.
+
 /** A mode the chip offers: its name, and what it means for the rest of the session. */
 export interface ModeEntry {
 	mode: AgentMode;

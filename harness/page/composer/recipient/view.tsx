@@ -7,6 +7,8 @@ import type { Destination } from "../../shell/index.ts";
 import { menuActions } from "./actions.ts";
 import { chipLabel, recipientChat, recipientName } from "./model.ts";
 
+// Who gets the line, as a chip in the controls row that can change it.
+
 export interface RecipientProps {
 	chats: AgentChat[];
 	identities: Record<string, Identity>;

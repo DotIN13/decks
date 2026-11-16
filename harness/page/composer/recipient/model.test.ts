@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { AgentChat } from "@decks/protocol";
 import { recipientChat, recipientName } from "./model.ts";
 
+// Who gets the line, as the chip names it.
+
 test("the chip names the agent, a card for a note, or nobody", () => {
 	assert.equal(recipientName({ kind: "prompt", id: "a", name: "Sable" }), "Sable");
 	assert.equal(recipientName({ kind: "note" }), "a card");

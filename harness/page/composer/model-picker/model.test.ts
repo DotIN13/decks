@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { ModelOption, ThinkingLevel } from "@decks/protocol";
 import { levelsFor, nearestLevel, optionFor, THINKING_LEVELS } from "./model.ts";
 
+// The thinking levels a model takes and the nearest kept, then the models a search keeps.
+
 const model = (provider: string, id: string, reasoning = true): ModelOption => ({ provider, model: id, label: id, reasoning });
 
 test("a level the new model already offers survives the switch untouched", () => {

@@ -1,6 +1,6 @@
 import type { SlashCommand } from "@decks/protocol";
-import { createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type Accessor } from "solid-js";
-import { notice, type WaitingComment } from "../../state/index.ts";
+import { createEffect, createMemo, createSignal, untrack, type Accessor } from "solid-js";
+import { type WaitingComment } from "../../state/index.ts";
 import { carriesFiles } from "../../files/index.ts";
 import { draftComments, draftForAgent, draftIsEmpty, draftText, fileMention, normalize, textDraft, type Draft } from "../draft/model.ts";
 import type { DraftFieldApi } from "../draft/view.tsx";
@@ -8,15 +8,27 @@ import type { PillHost } from "../pill/card.ts";
 import { aboutAddress, aboutComment, commentPill } from "../pill/about.ts";
 import { filterCommands } from "../slash-menu/model.ts";
 import { filterMentionables, type Mentionable } from "../mention-menu/model.ts";
-import { startRecording, type Recording } from "../voice/voice.ts";
 import { atQuery, goneComments, parkedDrafts, reconcilePills, slashFragment, withMentionAt, wrapIndex } from "./model.ts";
 import type { ComposerProps } from "./view.tsx";
+
+// What the composer does: its draft and the words handed to it, the slash and @ menus,
+// the keys and sending, the queue's buttons, and files dropped on it.
 
 /** The field's handle, once it has mounted. */
 export interface FieldRef {
 	api?: DraftFieldApi;
 }
 
+/** The parts the keys and the send button act on. */
+export interface Bar {
+	props: ComposerProps;
+	draft: DraftState;
+	slash: ReturnType<typeof createSlash>;
+	mentions: ReturnType<typeof createMentions>;
+	ime: ReturnType<typeof createIme>;
+}
+
+// The draft, kept per page, and words the deck hands over.
 /** What the field holds: a draft of words and pills, kept per page, and what each pill is about. */
 export function createDraft(props: ComposerProps, field: FieldRef) {
 	const [nodes, setNodes] = createSignal<Draft>([]);
@@ -88,6 +100,7 @@ function takeHandedDrafts(props: ComposerProps, field: FieldRef, put: (draft: Dr
 
 type DraftState = ReturnType<typeof createDraft>;
 
+// The slash and @ menus.
 /** The `/` menu: open on a bare command draft, its highlighted row reset as the list changes. */
 export function createSlash(props: ComposerProps, draft: DraftState, field: FieldRef) {
 	const fragment = createMemo(() => slashFragment(draft.text()));
@@ -136,84 +149,7 @@ export function createMentions(props: ComposerProps, draft: DraftState, field: F
 	return { setCaret, query, matches, open, index, setIndex, pick, dismiss: () => setDismissed(query()) };
 }
 
-/** Voice: the mic records, and what was said goes in at the caret when it stops. */
-export function createVoice(field: FieldRef) {
-	const [recording, setRecording] = createSignal<Recording | undefined>();
-	const [listening, setListening] = createSignal(false);
-	const [transcribing, setTranscribing] = createSignal(false);
-	const [levels, setLevels] = createSignal<number[]>([]);
-	const [heard, setHeard] = createSignal({ settled: "", pending: "" });
-	const [since, setSince] = createSignal(0);
-	const [now, setNow] = createSignal(0);
-	let clock: ReturnType<typeof setInterval> | undefined;
-	const stopClock = () => {
-		clearInterval(clock);
-		clock = undefined;
-		setListening(false);
-		setLevels([]);
-		setHeard({ settled: "", pending: "" });
-	};
-	const start = async () => {
-		if (listening() || transcribing()) return;
-		setListening(true);
-		try {
-			const started = await startRecording({ onLevel: (level) => setLevels((was) => [...was.slice(-47), level]), onHeard: (settled, pending) => setHeard({ settled, pending }) });
-			setRecording(started);
-			setSince(Date.now());
-			setNow(Date.now());
-			clock = setInterval(() => setNow(Date.now()), 250);
-		} catch (error) {
-			stopClock();
-			notice("warn", (error as Error).message);
-		}
-	};
-	const stop = async () => {
-		const running = recording();
-		if (!running) return;
-		setRecording(undefined);
-		stopClock();
-		setTranscribing(true);
-		try {
-			const words = await running.stop();
-			if (words) {
-				field.api?.focus();
-				field.api?.insertText(words);
-			}
-		} catch (error) {
-			notice("warn", (error as Error).message);
-		} finally {
-			setTranscribing(false);
-		}
-	};
-	const cancel = () => {
-		recording()?.cancel();
-		setRecording(undefined);
-		stopClock();
-	};
-	return { recording, listening, transcribing, levels, heard, since, now, start, stop, cancel };
-}
-
-/** Ctrl+M starts and stops the recording anywhere; Escape throws only the recording away. */
-export function voiceKeys(voice: ReturnType<typeof createVoice>): void {
-	onMount(() => {
-		const key = (event: KeyboardEvent) => {
-			if (event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === "m") {
-				event.preventDefault();
-				void (voice.recording() ? voice.stop() : voice.start());
-			} else if (event.key === "Escape" && voice.recording()) {
-				event.preventDefault();
-				event.stopPropagation();
-				voice.cancel();
-			}
-		};
-		document.addEventListener("keydown", key, true);
-		onCleanup(() => {
-			document.removeEventListener("keydown", key, true);
-			voice.cancel();
-		});
-	});
-}
-
+// The keys and sending.
 /** Telling an input method's Enter apart from the person's. */
 export function createIme() {
 	let composing = false;
@@ -225,15 +161,6 @@ export function createIme() {
 		},
 		owns: (event: KeyboardEvent) => event.isComposing || event.keyCode === 229 || composing || Date.now() - endedAt < 50,
 	};
-}
-
-/** The parts the keys and the send button act on. */
-export interface Bar {
-	props: ComposerProps;
-	draft: DraftState;
-	slash: ReturnType<typeof createSlash>;
-	mentions: ReturnType<typeof createMentions>;
-	ime: ReturnType<typeof createIme>;
 }
 
 /** Send the line, or queue it for the turn's end; an open menu completes its row instead. */
@@ -252,6 +179,21 @@ export function send(bar: Bar, queue = false): void {
 	else props.onSend(draftForAgent(nodes), draftComments(nodes), nodes);
 	// Forgetting the page's parked copy too, so a sent line never comes back.
 	draft.put([]);
+}
+
+/** The field's keys. Each is destructive, so the input method is asked first. */
+export function fieldKeys(bar: Bar, event: KeyboardEvent): void {
+	if (bar.ime.owns(event) || menuKeys(bar, event)) return;
+	if (event.key === "Escape") {
+		bar.draft.put([]);
+		bar.props.onCommentsGone?.((bar.props.comments ?? []).map((comment) => comment.id));
+		return;
+	}
+	if (event.key === "Enter" && !event.shiftKey) {
+		event.preventDefault();
+		// Ctrl or ⌘ with Enter queues for the turn's end; Enter alone steers it.
+		send(bar, event.ctrlKey || event.metaKey);
+	}
 }
 
 /** While a menu is up it owns the arrows (wrapping), Tab, and for the @ menu Escape. */
@@ -283,21 +225,7 @@ function menuKeys(bar: Bar, event: KeyboardEvent): boolean {
 	return false;
 }
 
-/** The field's keys. Each is destructive, so the input method is asked first. */
-export function fieldKeys(bar: Bar, event: KeyboardEvent): void {
-	if (bar.ime.owns(event) || menuKeys(bar, event)) return;
-	if (event.key === "Escape") {
-		bar.draft.put([]);
-		bar.props.onCommentsGone?.((bar.props.comments ?? []).map((comment) => comment.id));
-		return;
-	}
-	if (event.key === "Enter" && !event.shiftKey) {
-		event.preventDefault();
-		// Ctrl or ⌘ with Enter queues for the turn's end; Enter alone steers it.
-		send(bar, event.ctrlKey || event.metaKey);
-	}
-}
-
+// The queue, and files dropped on the box.
 /** A queued line put back in the box, after whatever is there. */
 export function editQueued(bar: Bar, field: FieldRef, item: { id: string; text: string }): void {
 	bar.props.onQueueAction?.("remove", item.id);

@@ -1,20 +1,9 @@
 import { draftText, normalize, type Draft, type DraftMention, type DraftNode } from "./model.ts";
 import { pillElement, pillNode } from "../pill/card.ts";
 
-// The field's DOM: a draft read from it and written into it, and where the caret is.
+// The draft field's DOM: a draft read from it and written into it, and where the caret and selection are.
 
-/** A mention, as the DOM holds it (the pill's card), with the host's `title` when it has no cards. */
-export function mentionElement(node: DraftMention, describe?: (node: DraftMention) => string | undefined): HTMLElement {
-	const span = pillElement(node);
-	const words = describe?.(node);
-	if (words) span.title = words;
-	return span;
-}
-
-export function nodeOf(el: Element): DraftNode | null {
-	return el instanceof HTMLElement ? pillNode(el) : null;
-}
-
+// The draft in the DOM, read and written.
 /** The model the DOM currently represents. */
 export function readDraft(root: HTMLElement): Draft {
 	const draft: Draft = [];
@@ -45,6 +34,10 @@ export function readDraft(root: HTMLElement): Draft {
 	return normalize(draft);
 }
 
+export function nodeOf(el: Element): DraftNode | null {
+	return el instanceof HTMLElement ? pillNode(el) : null;
+}
+
 /** A draft as DOM: mentions atomic, newlines as `<br>`, and nothing else. */
 export function draftFragment(draft: Draft, describe?: (node: DraftMention) => string | undefined): DocumentFragment {
 	const fragment = document.createDocumentFragment();
@@ -61,11 +54,20 @@ export function draftFragment(draft: Draft, describe?: (node: DraftMention) => s
 	return fragment;
 }
 
+/** A mention, as the DOM holds it (the pill's card), with the host's `title` when it has no cards. */
+export function mentionElement(node: DraftMention, describe?: (node: DraftMention) => string | undefined): HTMLElement {
+	const span = pillElement(node);
+	const words = describe?.(node);
+	if (words) span.title = words;
+	return span;
+}
+
 /** Write a draft into the element. Only for changes the user did not type. */
 export function writeDraft(root: HTMLElement, draft: Draft, describe?: (node: DraftMention) => string | undefined): void {
 	root.replaceChildren(draftFragment(draft, describe));
 }
 
+// The caret and the selection.
 /** How far into `draftText` the caret sits, counting a mention as its label. */
 export function caretOffset(root: HTMLElement): number {
 	const selection = window.getSelection();
@@ -99,6 +101,16 @@ export function caretOffset(root: HTMLElement): number {
 export function caretAfter(node: Node): void {
 	const range = document.createRange();
 	range.setStartAfter(node);
+	range.collapse(true);
+	const selection = window.getSelection();
+	selection?.removeAllRanges();
+	selection?.addRange(range);
+}
+
+/** Put the caret at the very start of the field. */
+export function caretAtStart(el: HTMLElement): void {
+	const range = document.createRange();
+	range.setStart(el, 0);
 	range.collapse(true);
 	const selection = window.getSelection();
 	selection?.removeAllRanges();
@@ -140,16 +152,6 @@ export function adjacentMention(root: HTMLElement, side: "before" | "after"): HT
 export function selectionInside(el: HTMLElement): boolean {
 	const selection = window.getSelection();
 	return !!selection && selection.rangeCount > 0 && el.contains(selection.getRangeAt(0).startContainer);
-}
-
-/** Put the caret at the very start of the field. */
-export function caretAtStart(el: HTMLElement): void {
-	const range = document.createRange();
-	range.setStart(el, 0);
-	range.collapse(true);
-	const selection = window.getSelection();
-	selection?.removeAllRanges();
-	selection?.addRange(range);
 }
 
 /** What is selected, as a draft, for the clipboard and for a drag. */

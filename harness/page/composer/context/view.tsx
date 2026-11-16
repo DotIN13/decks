@@ -7,6 +7,8 @@ import Gauge from "lucide-solid/icons/gauge";
 import { openUsage } from "./actions.ts";
 import { dialLabel, usageRows } from "./model.ts";
 
+// How full the agent's context is: a ring and its percentage, opening the numbers behind it.
+
 /** How full the context is, at the right end of the hint row. */
 export function ContextDial(props: {
 	usage: AgentUsage | undefined;

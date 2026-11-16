@@ -6,6 +6,8 @@ import { draftForAgent, draftComments, fileMention, type Draft, type DraftMentio
 import { withoutName } from "../../app/send-from-bar.ts";
 import { aboutAddress, aboutComment, aboutSent, commentName, commentPill, messageParts, pathName, readParts, readSent } from "./about.ts";
 
+// What a pill is about, and a sent message's parts out and back.
+
 const mine: WaitingComment = { id: "c1", board: "canvases/md/cards/sdk/index.html", component: "choices", quote: "Corner only", text: "Use this one.", at: 1 };
 const handed: WaitingComment = { id: "c2", board: "canvases/md/cards/sdk/index.html", quote: "SDK; each", text: "test note\nsecond line", at: 2, from: "canvas" };
 const drawn: WaitingComment = { id: "c3", board: "canvases/md/canvas.pen", items: ["note-4", "arrow-7"], quote: "hello", text: "", at: 3 };

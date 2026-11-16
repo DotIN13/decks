@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { AgentUsage } from "@decks/protocol";
 import { dialLabel, usageRows } from "./model.ts";
 
+// The context dial's rows and spoken label.
+
 test("the summary shows used, window and cost, in that order", () => {
 	const usage = { contextTokens: 12345, contextWindow: 200000, cost: 0.5 } as AgentUsage;
 	assert.deepEqual(usageRows(usage), [
