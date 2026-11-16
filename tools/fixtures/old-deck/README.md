@@ -10,3 +10,6 @@ studio.json, studio-sync.json, studio-hashes.json, sync/<id>.pen, backups, thumb
 The tokens are made up: the person's is `dk_old_deck_fixture_person_token`, Ada's agent token is
 `dk_old_deck_fixture_agent_token`; tokens.json keeps their sha256. studio.json's key is not a key, and
 its address (port 9) answers nothing. `.decks/` is ignored by git, so its files are added with `git add -f`.
+
+One canvas and its card have long non-Latin names (over 100 bytes each, made up), with a byline and a
+read mark in authors.json and seen.json, so stores keyed by a card path meet names longer than a file name.
