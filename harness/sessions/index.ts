@@ -1,5 +1,7 @@
 import { Session, type SessionDeps } from "./session.ts";
 import type { Spec } from "./identity.ts";
+import { fromDeck } from "./deck-history.ts";
+import type { Saved } from "./transcript.ts";
 
 // The sessions a harness holds, one per agent the server asked it to run.
 export { Session, type HostLink, type SessionDeps } from "./session.ts";
@@ -27,10 +29,19 @@ export class Sessions {
 			if (spec.token) known.retoken(spec.token);
 			return known;
 		}
-		const saved = this.deps.transcripts.read(spec.id);
+		const saved = this.deps.transcripts.read(spec.id) ?? this.fromDeck(spec);
 		const session = new Session(spec, this.deps, saved && saved.kind === spec.kind ? saved : undefined);
 		this.held.set(spec.id, session);
 		return session;
+	}
+
+	/** An agent from before the rewrite: its conversation read once from the deck (`deck-history.ts`) and kept as this harness's own. */
+	private fromDeck(spec: Spec): Saved | undefined {
+		const found = fromDeck(this.deps.deckPath, spec.id, spec.kind);
+		if (!found) return undefined;
+		this.deps.transcripts.write(found.saved);
+		this.deps.transcripts.archive(spec.id, found.archive);
+		return found.saved;
 	}
 
 	get(id: string): Session | undefined {

@@ -6,7 +6,8 @@ who it is and what it is given. A session knows nothing of where its agent sits 
 ## Owns
 
 `session.ts` (a turn: prompt, run, abort, report), `queue.ts`, `transcript.ts`, `timeline.ts`,
-`identity.ts`, `tools.ts`, and `index.ts`, the sessions a harness holds.
+`identity.ts`, `tools.ts`, `deck-history.ts` (an agent's conversation from before the rewrite, read
+once from the deck), and `index.ts`, the sessions a harness holds.
 
 ## May import
 
