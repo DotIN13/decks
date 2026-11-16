@@ -64,39 +64,39 @@ export function PenBar(props: {
 	return (
 		<>
 			<Show when={props.tools !== false}>
-			<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
-				{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
-				<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
-					<Icon of={GripHorizontal} size={14} />
+				<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
+					{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
+					<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
+						<Icon of={GripHorizontal} size={14} />
+					</div>
+					<For each={TOOLS}>
+						{(entry) => (
+							<>
+								{/* A file of any kind, chosen in the file picker and placed by what it is (`app/files.ts`, `fileAt`). */}
+								<Show when={entry.tool === "arrow" && props.onOpenFile}>
+									<button type="button" class="icon-button" data-writes data-file-button title="A file: a document, a picture, a film, a sound, anything" aria-label="Add a file" onClick={() => props.onOpenFile?.()}>
+										<Icon of={Paperclip} size={15} />
+									</button>
+								</Show>
+								<Show when={entry.after}>
+									<span class="pen-rule" aria-hidden="true" />
+								</Show>
+								<ToolButton entry={entry} besideTab={besideTab} onArm={props.onArm} />
+							</>
+						)}
+					</For>
+					<span class="pen-rule" aria-hidden="true" />
+					<button type="button" class="icon-button" title="Undo your last change to the drawing (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
+						<Icon of={Undo2} size={15} />
+					</button>
+					<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
+						<Icon of={Redo2} size={15} />
+					</button>
+					{/* Put away behind an edge, this is the part left showing, and the way back. */}
+					<button type="button" class="stowtab" data-stowtab aria-label="Bring the drawing tools back" title="Bring the drawing tools back" onClick={() => unstow()}>
+						<Icon of={ChevronLeft} size={14} />
+					</button>
 				</div>
-				<For each={TOOLS}>
-					{(entry) => (
-						<>
-							{/* A file of any kind, chosen in the file picker and placed by what it is (`app/files.ts`, `fileAt`). */}
-							<Show when={entry.tool === "arrow" && props.onOpenFile}>
-								<button type="button" class="icon-button" data-writes data-file-button title="A file: a document, a picture, a film, a sound, anything" aria-label="Add a file" onClick={() => props.onOpenFile?.()}>
-									<Icon of={Paperclip} size={15} />
-								</button>
-							</Show>
-							<Show when={entry.after}>
-								<span class="pen-rule" aria-hidden="true" />
-							</Show>
-							<ToolButton entry={entry} besideTab={besideTab} onArm={props.onArm} />
-						</>
-					)}
-				</For>
-				<span class="pen-rule" aria-hidden="true" />
-				<button type="button" class="icon-button" title="Undo your last change to the drawing (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
-					<Icon of={Undo2} size={15} />
-				</button>
-				<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
-					<Icon of={Redo2} size={15} />
-				</button>
-				{/* Put away behind an edge, this is the part left showing, and the way back. */}
-				<button type="button" class="stowtab" data-stowtab aria-label="Bring the drawing tools back" title="Bring the drawing tools back" onClick={() => unstow()}>
-					<Icon of={ChevronLeft} size={14} />
-				</button>
-			</div>
 			</Show>
 
 			<Properties doc={props.doc} onEdit={props.onEdit} onExport={props.onExport} />

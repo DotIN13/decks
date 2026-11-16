@@ -90,10 +90,10 @@ export function ColorPicker(props: {
 					</Show>
 				</div>
 				<Show when={props.adaptive !== false}>
-				<AdaptiveSwatches value={props.value} onPick={(name) => {
-					setHsv(hexToHsv(DECKS_COLORS[name]![scheme()]));
-					if (props.value !== `$${name}`) props.onCommit(`$${name}`);
-				}} />
+					<AdaptiveSwatches value={props.value} onPick={(name) => {
+						setHsv(hexToHsv(DECKS_COLORS[name]![scheme()]));
+						if (props.value !== `$${name}`) props.onCommit(`$${name}`);
+					}} />
 				</Show>
 				<PaletteSwatches picked={variable() ? undefined : hex()} onPick={(color) => {
 					setHsv(hexToHsv(color));
