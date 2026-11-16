@@ -114,3 +114,21 @@ test("a canvas pass hears a document's file events when its canvas shows that do
 	assert.deepEqual(heard, ["a file.changed:docs/notes.md", "a file.compiled:docs/notes.md"]);
 	await s.close();
 });
+
+test("rule 15: a pass opens and types only into a document its canvas holds or places (Reader, step 6)", async () => {
+	const deck = { ...seed, "docs/notes.md": "# Notes\n", "docs/evil.md": "safe\n", "docs/notes/evil.md": "safe\n", "docs/loose/evil.md": "safe\n", "assets/evil.md": "safe\n", "apps/evil.md": "safe\n", "canvases/a/files/own.md": "mine\n" };
+	const canvases = defineFeature({ name: "canvases", calls: [], start: (kernel) => kernel.places((canvas, path) => canvas === "a" && path === "docs/notes.md") });
+	const s = await testServer({ features: [canvases, documents({ pauseMs: 5 })], deck });
+	const pass = s.callers.resolve(s.callers.issue({ ...callers.person, id: "person~frame-3" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 }))!;
+	for (const path of ["docs/notes/evil.md", "docs/loose/evil.md", "docs/evil.md", "assets/evil.md", "apps/evil.md", "docs/../docs/evil.md", "canvases/b/files/x.md"]) {
+		const got = await s.call("file.open", { path, client: "c" }, pass);
+		assert.equal(got.ok ? "ok" : got.error.code, "refused", path);
+		const typed = await s.call("file.splice", { path, client: "c", rev: 0, batch: "b", splices: [{ at: 0, before: "", text: "PWNED" }] }, pass);
+		assert.equal(typed.ok, false, path);
+	}
+	assert.equal((await s.call("file.open", { path: "docs/notes.md", client: "c" }, pass)).ok, true, "a document its canvas places");
+	assert.equal((await s.call("file.open", { path: "canvases/a/files/own.md", client: "c" }, pass)).ok, true, "a document in its own folder");
+	assert.equal((await s.call("google.list", {}, pass)).ok, false, "a call that names no document");
+	assert.equal((await s.call("file.open", { path: "docs/evil.md", client: "c" }, callers.person)).ok, true, "the person, unscoped, as before");
+	await s.close();
+});

@@ -8,6 +8,7 @@ import type { GoogleAccount, GoogleDocs } from "./google.ts";
 import { tick, TICK_MS, type Remote } from "./links.ts";
 import { events } from "../../protocol/index.ts";
 import { documentKindWith } from "./place.ts";
+import { heldToCanvas, type Placed } from "./scope.ts";
 import type { Deck } from "../kernel/types.ts";
 
 // The documents feature: files you type into, their versions and review, Google Docs, and
@@ -22,14 +23,16 @@ export function documents(given: DocumentsOptions = {}): Feature {
 	let docs: Documents | undefined;
 	let deck: Deck | undefined;
 	let run: Kernel["run"] | undefined;
+	let placed: Placed | undefined;
 	return defineFeature({
 		name: "documents",
-		calls: [...documentCalls(() => docs), ...googleCalls(options.google, options.docs), ...latexCalls(() => run), ...gitCalls(() => run)],
+		calls: heldToCanvas([...documentCalls(() => docs), ...googleCalls(options.google, options.docs), ...latexCalls(() => run), ...gitCalls(() => run)], () => placed),
 		items: [documentKindWith(() => deck)],
 		...(made ? { routes: made.routes } : {}),
 		start(kernel) {
 			deck = kernel.deck;
 			run = kernel.run;
+			placed = (canvas, path) => kernel.placed(canvas, path);
 			// A pass hears a file's events when its canvas shows that document, though the file lives in docs/.
 			kernel.belongs((scope, event, payload) => (event === "file.changed" || event === "file.compiled") && !!scope.canvas && Array.isArray(payload.ids) && payload.ids.length > 0 && payload.ids.every((id) => kernel.placed(scope.canvas!, String(id))));
 			const store = kernel.store("documents");

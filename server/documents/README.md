@@ -48,6 +48,8 @@ and Google Docs.
    and the Doc's next pull into its mirror is credited to the editor, as a change to review.
 14. With a googleStore (today's `<data>/google/`: client.json, token.json), the sign-in and the
    Docs API are real: Docs and Drive over HTTPS, the mirror as Google's indices, agents' markdown.
+15. A pass (a scoped caller) reaches a document only in its canvas's folder or placed on its canvas
+   (scope.ts): every call here, latex/ and git/ included, refuses it any other path.
 
 Typesetting (file.compile) and git (file.repo, pull, push) are in latex/ and git/, each with its rules.
 
