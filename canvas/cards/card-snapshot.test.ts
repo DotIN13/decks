@@ -1,3 +1,4 @@
+// Tests of the card snapshot writer, run in a real Chromium page.
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";

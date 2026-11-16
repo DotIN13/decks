@@ -1,3 +1,5 @@
+// Tests of a card as a frame of items: a new card, its markdown and children both ways, its edits,
+// its Obsidian note and its file chips.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenNode } from "@decks/pen";
@@ -5,6 +7,11 @@ import { cardChildren, cardEdits, cardMarkdown, fileItem, markdownText, newCard,
 
 let n = 0;
 const options = { fresh: () => `new-${++n}`, inner: 288, size: (url: string) => (url === "wide.png" ? { w: 600, h: 300 } : undefined) };
+
+test("a new card is a column frame with one empty block", () => {
+	const card = newCard("c", "t");
+	assert.deepEqual([card.type, card.layout, card.metadata?.type, card.children?.length, card.children?.[0]?.metadata?.type], ["frame", "vertical", "decks.markdown-card", 1, "decks.markdown"]);
+});
 
 test("a card's markdown is split into one item per block, a picture as an image-filled rectangle", () => {
 	n = 0;
@@ -36,11 +43,6 @@ test("the markdown and the items go round: a picture written back with its width
 	const back = cardChildren(md, kids, options);
 	assert.deepEqual(back, kids);
 	assert.deepEqual(cardChildren("# Plan\n\n![Gate|200](gate.png)", kids, options).map((k) => k.id), ["a", "p"]);
-});
-
-test("a new card is a column frame with one empty block", () => {
-	const card = newCard("c", "t");
-	assert.deepEqual([card.type, card.layout, card.metadata?.type, card.children?.length, card.children?.[0]?.metadata?.type], ["frame", "vertical", "decks.markdown-card", 1, "decks.markdown"]);
 });
 
 test("a save is one edit per item that changed: delete, insert, move and update, and nothing for the rest", () => {

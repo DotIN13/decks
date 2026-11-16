@@ -1,3 +1,4 @@
+// Tests of how a card's file is fetched and mounted: a retry once, a stop, a missing file.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cardLoader } from "./card-load.ts";

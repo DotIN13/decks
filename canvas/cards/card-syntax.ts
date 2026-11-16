@@ -1,3 +1,5 @@
+// The markdown a card is written in: Obsidian's plus styled words and suggestions, as marked's
+// extensions and the one reader that uses them.
 import { Marked, type TokenizerExtension, type Tokens } from "marked";
 
 /**
@@ -21,6 +23,10 @@ import { Marked, type TokenizerExtension, type Tokens } from "marked";
  * card (`markdown.ts`) and the editor that types into one (`CardEditor.tsx`).
  */
 
+/** The one reader of a card's markdown. */
+export const cardMarked = (): Marked => new Marked({ gfm: true, breaks: false }, { extensions: [hiddenBlock, mathBlock, hidden, math, critic, wiki, colour, highlight] });
+
+// Styled words: colours, sizes and fonts
 export const COLOURS = ["red", "orange", "yellow", "green", "blue", "purple"] as const;
 export type Colour = (typeof COLOURS)[number];
 /** Obsidian's highlight colours, by the emoji that opens one. */
@@ -69,6 +75,8 @@ function spanAttributes(text: string): { colour?: Colour; size?: Size; face?: st
 	return out;
 }
 const SPAN = `\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]\\{([^{}\\n]+)\\}`;
+
+// The tokens marked reads, and the extensions that read them
 export interface WikiToken extends Tokens.Generic { type: "wiki"; target: string; alias?: string; embed: boolean; width?: number }
 export interface CriticToken extends Tokens.Generic { type: "critic"; op: "replace" | "add" | "remove" | "comment" | "highlight"; old: string; new: string }
 interface HiddenToken extends Tokens.Generic { type: "hidden"; text: string }
@@ -198,9 +206,7 @@ const mathBlock: TokenizerExtension = {
 	},
 };
 
-/** The one reader of a card's markdown. */
-export const cardMarked = (): Marked => new Marked({ gfm: true, breaks: false }, { extensions: [hiddenBlock, mathBlock, hidden, math, critic, wiki, colour, highlight] });
-
+// Pictures and callouts
 /** An image's alt with Obsidian's `|240` or `|240x120` taken off: its words and its width. */
 export function sizedAlt(alt: string): { alt: string; width?: number } {
 	const m = /^(.*?)\|(\d+)(?:x\d+)?$/.exec(alt);
@@ -218,6 +224,7 @@ export const CALLOUTS: Record<string, string> = {
 	quote: "gray", cite: "gray",
 };
 
+// Going to Obsidian
 /**
  * A card's markdown as Obsidian takes it: coloured words lose their colour, an open suggestion
  * goes out as the words it would replace, and its reason as a hidden `%%comment%%`.

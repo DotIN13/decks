@@ -1,3 +1,4 @@
+// Tests of reading a card's markdown into blocks and runs: GitHub's, Obsidian's and ours on top.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseMarkdown, wordsOf, type Block } from "./markdown.ts";

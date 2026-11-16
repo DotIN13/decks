@@ -1,3 +1,5 @@
+// A card's markdown read into the blocks and styled runs the engine lays out, and the words it will
+// draw, for fetching its fonts.
 import type { Token, Tokens } from "marked";
 import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Size, type CriticToken, type HighlightToken, type MathToken, type WikiToken } from "./card-syntax.ts";
 
@@ -67,25 +69,7 @@ export type Block =
 	/** `$$…$$` on lines of its own: a formula shown as a block, centred. */
 	| { kind: "math"; tex: string };
 
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", copy: "©", reg: "®", trade: "™", hellip: "…", mdash: "—", ndash: "–", larr: "←", rarr: "→", uarr: "↑", darr: "↓", times: "×", middot: "·", bull: "•", deg: "°" };
-export function decodeEntities(text: string): string {
-	return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
-		if (name[0] === "#") {
-			const code = name[1] === "x" || name[1] === "X" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
-			return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
-		}
-		return ENTITIES[name.toLowerCase()] ?? whole;
-	});
-}
-
-/** GitHub's shortcodes for the emoji people actually type. */
-const EMOJI: Record<string, string> = {
-	smile: "😄", smiley: "😃", grin: "😁", laughing: "😆", joy: "😂", wink: "😉", blush: "😊", heart_eyes: "😍", thinking: "🤔", neutral_face: "😐", confused: "😕", cry: "😢", sob: "😭", scream: "😱", sweat_smile: "😅", sunglasses: "😎", upside_down_face: "🙃", eyes: "👀",
-	"+1": "👍", thumbsup: "👍", "-1": "👎", thumbsdown: "👎", clap: "👏", wave: "👋", pray: "🙏", muscle: "💪", point_right: "👉", point_left: "👈", ok_hand: "👌", raised_hands: "🙌",
-	heart: "❤️", broken_heart: "💔", fire: "🔥", star: "⭐", sparkles: "✨", tada: "🎉", rocket: "🚀", zap: "⚡", boom: "💥", bulb: "💡", memo: "📝", pencil: "✏️", pushpin: "📌", link: "🔗", lock: "🔒", key: "🔑", bell: "🔔", mag: "🔍", bookmark: "🔖", books: "📚", book: "📖", calendar: "📅", clock: "🕐", hourglass: "⌛", chart_with_upwards_trend: "📈", chart_with_downwards_trend: "📉", bar_chart: "📊", package: "📦", gear: "⚙️", wrench: "🔧", hammer: "🔨", bug: "🐛", construction: "🚧", rotating_light: "🚨", warning: "⚠️", no_entry: "⛔", x: "❌", white_check_mark: "✅", heavy_check_mark: "✔️", ballot_box_with_check: "☑️", question: "❓", exclamation: "❗", information_source: "ℹ️", arrow_right: "➡️", arrow_left: "⬅️", arrow_up: "⬆️", arrow_down: "⬇️", recycle: "♻️", checkered_flag: "🏁", trophy: "🏆", gift: "🎁", art: "🎨", computer: "💻", iphone: "📱", globe_with_meridians: "🌐", earth_americas: "🌎", sun: "☀️", cloud: "☁️", umbrella: "☂️", snowflake: "❄️", coffee: "☕", pizza: "🍕", seedling: "🌱", herb: "🌿", money_with_wings: "💸", dollar: "💵", moneybag: "💰", speech_balloon: "💬", thought_balloon: "💭", lipstick: "💄", robot: "🤖", brain: "🧠", test_tube: "🧪", microscope: "🔬", telescope: "🔭", 100: "💯",
-};
-const emojify = (text: string) => text.replace(/:([a-z0-9_+-]+):/g, (whole, name: string) => EMOJI[name] ?? whole);
-
+// Blocks
 /** A card's markdown, as the blocks it is drawn in, top to bottom. */
 export function parseMarkdown(source: string): Block[] {
 	const { body, notes } = footnotesOf(source.replace(/\r\n?/g, "\n"));
@@ -189,6 +173,15 @@ function paragraphBlock(t: Tokens.Paragraph | Tokens.Text, notes: Map<string, nu
 	} else if (runs.some((run) => run.image || run.text.trim())) out.push({ kind: "paragraph", runs });
 }
 
+/** `![[file]]`, alone on its line: the file, or, for a picture, the picture at the width it gives. */
+function embedOf(tokens: readonly Token[] | undefined): Block | undefined {
+	const real = (tokens ?? []).filter((token) => !(token.type === "text" && !token.raw.trim()));
+	const only = real.length === 1 && real[0]!.type === "wiki" ? (real[0] as WikiToken) : undefined;
+	if (!only?.embed) return undefined;
+	if (/\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(only.target)) return { kind: "image", url: only.target, alt: only.alias ?? only.target, ...(only.width ? { width: only.width } : {}) };
+	return { kind: "embed", target: only.target };
+}
+
 /** A quote, or one of Obsidian's callouts: a first line of [!type], maybe folded (+ or -), maybe titled; GitHub's alerts are among them. */
 function quoteBlock(t: Tokens.Blockquote, notes: Map<string, number>): Block {
 	const inner = blocksOf(t.tokens, notes);
@@ -203,6 +196,7 @@ function quoteBlock(t: Tokens.Blockquote, notes: Map<string, number>): Block {
 	return { kind: "quote", alert: (CALLOUTS[type] ?? "blue") as Alert, title, blocks: inner };
 }
 
+// Runs within a line
 type Style = Omit<Run, "text" | "image">;
 
 /** Plain words, with their `[^label]` footnote marks and `:shortcodes:` turned into what they stand for. */
@@ -331,15 +325,27 @@ const sameStyle = (a: Run, b: Run) =>
 	!!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike && !!a.code === !!b.code && !!a.sup === !!b.sup && a.link === b.link &&
 	a.mark === b.mark && a.colour === b.colour && a.size === b.size && a.face === b.face && !!a.underline === !!b.underline && a.wiki === b.wiki && !!a.added === !!b.added && !!a.removed === !!b.removed && a.reason === b.reason;
 
-/** `![[file]]`, alone on its line: the file, or, for a picture, the picture at the width it gives. */
-function embedOf(tokens: readonly Token[] | undefined): Block | undefined {
-	const real = (tokens ?? []).filter((token) => !(token.type === "text" && !token.raw.trim()));
-	const only = real.length === 1 && real[0]!.type === "wiki" ? (real[0] as WikiToken) : undefined;
-	if (!only?.embed) return undefined;
-	if (/\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(only.target)) return { kind: "image", url: only.target, alt: only.alias ?? only.target, ...(only.width ? { width: only.width } : {}) };
-	return { kind: "embed", target: only.target };
+// Entities and emoji shortcodes
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", copy: "©", reg: "®", trade: "™", hellip: "…", mdash: "—", ndash: "–", larr: "←", rarr: "→", uarr: "↑", darr: "↓", times: "×", middot: "·", bull: "•", deg: "°" };
+export function decodeEntities(text: string): string {
+	return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
+		if (name[0] === "#") {
+			const code = name[1] === "x" || name[1] === "X" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+			return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
+		}
+		return ENTITIES[name.toLowerCase()] ?? whole;
+	});
 }
 
+/** GitHub's shortcodes for the emoji people actually type. */
+const EMOJI: Record<string, string> = {
+	smile: "😄", smiley: "😃", grin: "😁", laughing: "😆", joy: "😂", wink: "😉", blush: "😊", heart_eyes: "😍", thinking: "🤔", neutral_face: "😐", confused: "😕", cry: "😢", sob: "😭", scream: "😱", sweat_smile: "😅", sunglasses: "😎", upside_down_face: "🙃", eyes: "👀",
+	"+1": "👍", thumbsup: "👍", "-1": "👎", thumbsdown: "👎", clap: "👏", wave: "👋", pray: "🙏", muscle: "💪", point_right: "👉", point_left: "👈", ok_hand: "👌", raised_hands: "🙌",
+	heart: "❤️", broken_heart: "💔", fire: "🔥", star: "⭐", sparkles: "✨", tada: "🎉", rocket: "🚀", zap: "⚡", boom: "💥", bulb: "💡", memo: "📝", pencil: "✏️", pushpin: "📌", link: "🔗", lock: "🔒", key: "🔑", bell: "🔔", mag: "🔍", bookmark: "🔖", books: "📚", book: "📖", calendar: "📅", clock: "🕐", hourglass: "⌛", chart_with_upwards_trend: "📈", chart_with_downwards_trend: "📉", bar_chart: "📊", package: "📦", gear: "⚙️", wrench: "🔧", hammer: "🔨", bug: "🐛", construction: "🚧", rotating_light: "🚨", warning: "⚠️", no_entry: "⛔", x: "❌", white_check_mark: "✅", heavy_check_mark: "✔️", ballot_box_with_check: "☑️", question: "❓", exclamation: "❗", information_source: "ℹ️", arrow_right: "➡️", arrow_left: "⬅️", arrow_up: "⬆️", arrow_down: "⬇️", recycle: "♻️", checkered_flag: "🏁", trophy: "🏆", gift: "🎁", art: "🎨", computer: "💻", iphone: "📱", globe_with_meridians: "🌐", earth_americas: "🌎", sun: "☀️", cloud: "☁️", umbrella: "☂️", snowflake: "❄️", coffee: "☕", pizza: "🍕", seedling: "🌱", herb: "🌿", money_with_wings: "💸", dollar: "💵", moneybag: "💰", speech_balloon: "💬", thought_balloon: "💭", lipstick: "💄", robot: "🤖", brain: "🧠", test_tube: "🧪", microscope: "🔬", telescope: "🔭", 100: "💯",
+};
+const emojify = (text: string) => text.replace(/:([a-z0-9_+-]+):/g, (whole, name: string) => EMOJI[name] ?? whole);
+
+// Every word
 /** Every word a card will draw, for fetching the fonts it needs before it is laid out. */
 export function wordsOf(blocks: readonly Block[]): string {
 	const runs = (list: readonly Run[]) => list.map((run) => run.text).join("");

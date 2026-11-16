@@ -1,3 +1,4 @@
+// How a card's file is fetched and mounted, with one retry a moment later when it did not come.
 import { saysMissing } from "../items/missing.ts";
 
 /**

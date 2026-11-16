@@ -1,3 +1,5 @@
+// How a card reads, measured where it is drawn: its words, its smallest type, its spill, its cut-off
+// boxes and its overlapping labels, for decks.canvas.fit.
 /**
  * How a card reads (`card.ts`), for `decks.canvas.fit`: its words, its smallest type, how far it
  * spills past its width, the boxes that cut off their own content, and the labels in a drawing that
@@ -13,20 +15,6 @@
  * the agent taking a screenshot to find out. Visible text only, and only elements that hold
  * words of their own, so a wrapper's inherited size is not counted for its children.
  */
-/**
- * Words, for a budget that has to mean the same thing in Chinese as in English.
- *
- * Splitting on spaces counts a Chinese sentence as one word, so a board written in Chinese
- * read as a fifth of its length and was never told it was long. Han, kana and hangul are
- * counted by character and divided by 1.6, which is about how many characters carry what an
- * English word does; everything else is counted by spaces as before.
- */
-export function countWords(text: string): number {
-	const cjk = text.match(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g)?.length ?? 0;
-	const rest = text.replace(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g, " ").match(/[\p{L}\p{N}][^\s]*/gu)?.length ?? 0;
-	return rest + Math.round(cjk / 1.6);
-}
-
 /**
  * The same reading of a card (`card.ts`), whose content is a block in the stage's own page rather than
  * a document: its words, its smallest type, how far it spills past its width, the boxes that cut off
@@ -83,4 +71,18 @@ export function readingOfBody(body: HTMLElement, view: Window, spill: number): {
 		if (Number.isFinite(size) && (minFont === undefined || size < minFont)) minFont = size;
 	}
 	return minFont === undefined ? { words, ...overflowX, ...cut, ...overlaps } : { words, minFont: Math.round(minFont * 10) / 10, ...overflowX, ...cut, ...overlaps };
+}
+
+/**
+ * Words, for a budget that has to mean the same thing in Chinese as in English.
+ *
+ * Splitting on spaces counts a Chinese sentence as one word, so a board written in Chinese
+ * read as a fifth of its length and was never told it was long. Han, kana and hangul are
+ * counted by character and divided by 1.6, which is about how many characters carry what an
+ * English word does; everything else is counted by spaces as before.
+ */
+export function countWords(text: string): number {
+	const cjk = text.match(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g)?.length ?? 0;
+	const rest = text.replace(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g, " ").match(/[\p{L}\p{N}][^\s]*/gu)?.length ?? 0;
+	return rest + Math.round(cjk / 1.6);
 }

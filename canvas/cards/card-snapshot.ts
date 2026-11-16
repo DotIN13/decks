@@ -1,5 +1,7 @@
+// A card as it stands written out as a page, for the server's Chrome to draw when an agent takes a
+// screenshot of it.
 /**
- * A card as it stands, written out as a page the server's Chrome draws the same way (`boards/snapshot.ts`
+ * A card as it stands, written out as a page the server's Chrome draws the same way (`server/pictures/snapshot.ts`
  * on the server): what an agent's `decks canvas screenshot` of a card shows, so it has what the person
  * did in it. Boards had this as `snapshotOf` while the canvas ran their pages; a card is the same rules
  * over its shadow root.
@@ -10,7 +12,7 @@
  * drawn by one is not drawn a second time. Styles a script made without markup (a sheet built in script
  * and adopted, rules inserted into an empty `<style>`) are written out as `<style>`.
  *
- * The page is shaped as the server's own page of a card (`cardPage`, `boards/cards.ts`): card.css from
+ * The page is shaped as the server's own page of a card (`cardPage`, `server/cards/page.ts`): card.css from
  * the canvas's `lib/`, `body.board` at the card's width, the card in `#decks-card`. It is loaded at the
  * card's own address, so the card's relative addresses resolve as they do there.
  *
