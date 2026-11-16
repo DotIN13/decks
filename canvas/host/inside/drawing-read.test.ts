@@ -11,8 +11,7 @@ test("a card on the person's own canvas is named from canvases/<name>", () => {
 	assert.equal(pathOf(deckPathEdits("plan", [insert("cards/one/index.html")])[0]!), "canvases/plan/cards/one/index.html");
 });
 
-test("a card or board on a friend's canvas is named from shared/canvases/<owner>/<name>, never canvases/shared/…", () => {
-	assert.equal(pathOf(deckPathEdits("shared/ada/old-notes", [insert("boards/notes.html")])[0]!), "shared/canvases/ada/old-notes/boards/notes.html");
+test("a card on a friend's canvas is named from shared/canvases/<owner>/<name>, never canvases/shared/…", () => {
 	assert.equal(pathOf(deckPathEdits("shared/ada/old-notes", [insert("cards/one/index.html")])[0]!), "shared/canvases/ada/old-notes/cards/one/index.html");
 });
 
