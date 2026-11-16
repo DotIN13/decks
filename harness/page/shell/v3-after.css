@@ -207,7 +207,7 @@
 		background: var(--v3-fg);
 		opacity: 0.88;
 	}
-	/* The whole quote, scrolling when long: what Send now sends is what the box shows (`canvas-host.tsx`, QUOTE_MAX). */
+	/* The whole quote, scrolling when long: what Send now sends is what the box shows (`canvases/host.tsx`, QUOTE_MAX). */
 	body .comment-popup .comment-quote {
 		display: block;
 		max-height: 7.5em;

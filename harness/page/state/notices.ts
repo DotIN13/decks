@@ -19,7 +19,7 @@ export const notice = (level: Notice["level"], text: string) => {
 
 /**
  * A notice with a button: something the person may take or leave, such as an agent asking to
- * take them to another canvas (`app/view-requests.ts`). A newer offer with the same `key`
+ * take them to another canvas (`camera/view-requests.ts`). A newer offer with the same `key`
  * replaces the older one, pressing the button takes the notice away, and an offer not taken goes
  * after twelve seconds.
  */

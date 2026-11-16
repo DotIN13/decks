@@ -22,7 +22,7 @@ The page's `state/` modules, and `@decks/protocol`.
 3. A message the page never drew from is left alone.
 4. Compat mode is off unless the dev server runs with `DECKS_PAGE_COMPAT=1`; only the checks set it.
 5. Deleting this folder means deleting its imports in `shell/actions.ts`, `state/line.ts`,
-   `agents/actions.ts` and `app/camera-report.ts`.
+   `agents/actions.ts` and `camera/report.ts`.
 
 ## Check
 

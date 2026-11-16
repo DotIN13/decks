@@ -9,7 +9,7 @@ holds the canvas page, settings, connections, panels and pages. Pane owns it; `c
 - `shell/`: the page's frame. `view.tsx` lays out each area; `actions.ts` wires them once.
 - `state/`: every store and the one line to the server (`line.ts`, `sync.ts`), entered by
   `state/index.ts`; `state/compat/` hears today's socket messages for today's checks.
-- `agents/ canvases/ settings/ panel/ connections/ frame/ files/ markup/ lib/ perf/ app/`: the parts.
+- `agents/ canvases/ settings/ panel/ connections/ frame/ files/ markup/ lib/ perf/ camera/`: the parts.
 - `styles/`: the sheets in their cascade order, until each is scoped to its part.
 - `pages/`: the entry of each HTML page. `vite.config.ts`, `index.html`: the build and dev server.
 

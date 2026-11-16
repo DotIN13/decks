@@ -8,7 +8,7 @@ import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
 import { stageOf, stages } from "../state/canvases.ts";
-import { reportCamera, setCameraAndReport } from "./camera-report.ts";
+import { reportCamera, setCameraAndReport } from "./report.ts";
 
 /** What the landing reads of the page. */
 interface LandingInputs {

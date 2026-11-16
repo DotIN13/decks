@@ -675,7 +675,7 @@
  * know the height of the others.
  */
 /*
- * Under a sheet in the canvas frame (a phone's properties drawer, `canvas-host.tsx` underSheet): the
+ * Under a sheet in the canvas frame (a phone's properties drawer, `canvases/host.tsx` underSheet): the
  * drawer grows from the bottom of the screen over everything, the composer included, so the dock
  * goes under the frame until the sheet closes. It stays where it is: nothing slides.
  */

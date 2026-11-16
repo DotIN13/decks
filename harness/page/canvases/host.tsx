@@ -10,13 +10,13 @@ import { state } from "../state/deck.ts";
 import { stageOf, stages } from "../state/canvases.ts";
 import { setDrawingEditor } from "../state/decks.ts";
 import { mode, selected, setMode, setSelected } from "../state/selection.ts";
-import { reportCameraSoon } from "./camera-report.ts";
-import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "./frame-handoffs.ts";
+import { reportCameraSoon } from "../camera/report.ts";
+import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "./handoffs.ts";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
 import type { StageComment } from "@decks/canvas";
 import type { createFileDrops } from "../files/index.ts";
-import { rememberView } from "./remember-view.ts";
-import { openLinkedPage } from "./links.ts";
+import { rememberView } from "../camera/remember-view.ts";
+import { openLinkedPage } from "../camera/links.ts";
 
 /** What the canvas host needs of the page around it. */
 export interface CanvasHostInputs {

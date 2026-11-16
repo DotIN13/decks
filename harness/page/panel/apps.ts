@@ -4,7 +4,7 @@ import type { AppAction, PanelApp } from "../panel/AppRow.tsx";
 import { ask } from "../state/confirm.ts";
 import { act } from "../state/decks.ts";
 import { setSelected } from "../state/selection.ts";
-import { flyToPages } from "./links.ts";
+import { flyToPages } from "../camera/links.ts";
 
 /** The deck's apps, for the panel's Apps tab: asked for each time the tab opens. */
 export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path: string) => void) {

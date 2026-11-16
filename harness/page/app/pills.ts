@@ -13,7 +13,7 @@ import type { WaitingComment } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
 import { stageOf } from "../state/canvases.ts";
-import { flyTo } from "./links.ts";
+import { flyTo } from "../camera/links.ts";
 
 /** What finding a named thing on the canvas reads of the page. */
 interface PillInputs {

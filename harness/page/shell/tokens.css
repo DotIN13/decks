@@ -97,7 +97,7 @@
 :root {
 	/*
 	 * How much of the window the browser is covering from below — the on-screen
-	 * keyboard, mostly. Kept true by `app/viewport.ts`; 0 everywhere else, so every
+	 * keyboard, mostly. Kept true by `shell/viewport.ts`; 0 everywhere else, so every
 	 * rule that adds it reads exactly as it did before it existed.
 	 */
 	--keyboard: 0px;

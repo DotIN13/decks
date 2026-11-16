@@ -3,7 +3,7 @@ import { batch, createSignal } from "solid-js";
 
 /*
  * Where the canvas is looking, kept in the browser. The server keeps a reading of it
- * (`app/camera-report.ts`) and never moves it; each conversation parks its own view (`state/views.ts`).
+ * (`camera/report.ts`) and never moves it; each conversation parks its own view (`state/views.ts`).
  */
 const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
 

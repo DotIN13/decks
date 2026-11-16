@@ -1,7 +1,7 @@
 {
 	"canvas/host/inside/studio-line.ts: canvas may not import server (packages/hub)": 1,
 	"examples/share-site/src/page.ts: reaches past the entry of canvas": 1,
-	"harness/page/app/landing.ts: harness may not import pen (pen)": 1,
+	"harness/page/camera/landing.ts: harness may not import pen (pen)": 1,
 	"harness/page/connections/bundle.ts: harness may not import pen (pen)": 1,
 	"harness/page/panel/LeftPanel.tsx: harness may not import pen (pen)": 1,
 	"packages/api/src/api.test.ts: reaches past the entry of packages/protocol": 1,
