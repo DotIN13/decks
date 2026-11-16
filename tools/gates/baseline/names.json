@@ -195,7 +195,7 @@
 	"canvas/items/item-slot.tsx: stage": 11,
 	"canvas/items/item-surfaces.tsx: board": 2,
 	"canvas/items/item-surfaces.tsx: stage": 5,
-	"canvas/items/MediaPlayer.tsx: stage": 4,
+	"canvas/items/MediaPlayer.tsx: stage": 2,
 	"canvas/items/news.test.ts: board": 18,
 	"canvas/items/news.ts: board": 10,
 	"canvas/look/font-files.ts: stage": 3,

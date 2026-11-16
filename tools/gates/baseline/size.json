@@ -35,7 +35,6 @@
 	"canvas/input/pointer.ts: function createPointer over 80 lines": 1,
 	"canvas/input/pointer.ts: function touchOnDrawing over 80 lines": 1,
 	"canvas/items/item-slot.tsx: function ItemSlot over 80 lines": 1,
-	"canvas/items/MediaPlayer.tsx: function MediaPlayer over 80 lines": 1,
 	"canvas/render/engine.ts: function fetchPicture over 80 lines": 1,
 	"canvas/render/engine.ts: function receive over 80 lines": 1,
 	"canvas/render/engine.ts: over 1000 lines": 1,
