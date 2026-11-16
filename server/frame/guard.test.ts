@@ -50,6 +50,11 @@ test("a pass's call with no canvas is filled in as its own; a card or file of an
 		assert.equal((await s.call("file.url", { path: "canvases/a/canvas.json" }, PASS)).ok, true, "its own canvas's folder");
 		assert.equal((await s.call("file.url", { path: "canvases/b/canvas.json" }, PASS)).ok, false);
 		assert.equal((await s.call("file.url", { path: "notes/private.md" }, PASS)).ok, false);
+		// A document no canvas places, in the shared roots: not opened or written by a pass (Reader, step 6).
+		for (const path of ["docs/evil.md", "assets/evil.md", "apps/evil.md"]) {
+			assert.equal((await s.call("file.open", { path, client: "c1" }, PASS)).ok, false, `file.open ${path}`);
+			assert.equal((await s.call("file.splice", { path, client: "c1", rev: 0, batch: "b", splices: [{ at: 0, remove: 0, insert: "PWNED" }] }, PASS)).ok, false, `file.splice ${path}`);
+		}
 		assert.equal((await s.call("file.url", { path: "papers/paper.md" }, PASS)).ok, true, "a document its drawing places");
 		assert.equal((await s.call("file.read", { path: "canvases/a/canvas.json" }, PASS)).ok, false, "not a card's call");
 		assert.equal((await s.call("agent.send", { agent: "x", task: "t", cards: ["canvases/b/cards/secret/index.html"] }, PASS)).ok, false);

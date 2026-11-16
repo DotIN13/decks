@@ -30,7 +30,10 @@ export function passGuard(kernel: () => Kernel | undefined) {
 		if (name.startsWith("file.") || name === "frame.get" || (name.startsWith("google.") && args.path !== undefined)) {
 			const path = plainPath(args.path);
 			if (!path) throw refuse(name, `${String(args.path)} is not a plain path`);
-			if (!reaches(path) && !inSharedRoot(path)) throw refuse(name, `${path} is not in ${canvas}'s folder, the deck's shared roots, or placed on ${canvas}`);
+			// A document is opened, typed in and reviewed only where its canvas is or places it (Reader, step 6): never
+			// a document of the shared roots no canvas places. Only file.url, an address to read, reaches those roots.
+			const readOnly = name === "file.url";
+			if (!reaches(path) && !(readOnly && inSharedRoot(path))) throw refuse(name, `${path} is not in ${canvas}'s folder or placed on ${canvas}`);
 		}
 	};
 }
