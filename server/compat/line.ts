@@ -2,7 +2,8 @@
 // names, canvas.watch, and the old events down. Rules 2 to 5 of the README.
 import type { Caller } from "../../protocol/index.ts";
 import type { Deck, Peer, Route, SocketDoor, Stop } from "../kernel/index.ts";
-import { answerBack, turn, withEdit } from "./args.ts";
+import { answerBack, turn, withEdit } from "@decks/protocol/compat";
+import { GOES } from "./table.ts";
 import { docHeard } from "./docs.ts";
 import { HEARD, told } from "./events.ts";
 import { pagesOf, readDrawing, type News } from "./drawing.ts";
@@ -96,7 +97,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 	async function call(message: Said): Promise<void> {
 		const id = String(message.id);
 		const caller = state.caller!;
-		const turned = turn(String(message.verb ?? ""), message.args);
+		const turned = turn(String(message.verb ?? ""), message.args, { day: GOES });
 		if ("refusal" in turned) return send({ type: "call.answered", id, ok: false, error: turned.refusal.message });
 		const bound = boundTo(caller);
 		if (bound && turned.args.canvas !== undefined && turned.args.canvas !== bound) {

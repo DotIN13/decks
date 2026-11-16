@@ -4,10 +4,13 @@ import assert from "node:assert/strict";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
 import { penOps } from "../../protocol/index.ts";
-import { answerBack, keyed, turn, withEdit } from "./args.ts";
+import { answerBack, DROPPED, keyed, OLD_CALLS, turn as turnAny, withEdit } from "@decks/protocol/compat";
 
 const itemOp = penOps.itemOpOf;
-import { DROPPED, GOES, OLD_CALLS, OLD_EVENTS } from "./table.ts";
+import { GOES, OLD_EVENTS } from "./table.ts";
+
+/** Compat's turning: protocol's, with compat's day. */
+const turn = (old: string, raw: unknown, now?: number) => turnAny(old, raw, { day: GOES, ...(now !== undefined ? { now } : {}) });
 import { told } from "./events.ts";
 
 test("every old call reaches a new call the server knows", async () => {

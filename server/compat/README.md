@@ -5,9 +5,9 @@ checks speak them; they are how we know the new programs behave.
 
 ## Owns
 
-- `table.ts`: every old call and event of `docs/rewrite/calls.md`, the new name of each, the old
-  arguments in order, and `GOES`, the day the old names stop answering.
-- `args.ts`: an old call's arguments made into the new call's, and the answer made back.
+- `table.ts`: `GOES`, the day the old names stop answering programs on this line, and today's
+  event names. The call table itself is protocol's (`@decks/protocol/compat`).
+- `args.ts`: the kernel's translator, an old call turned by protocol's table with `GOES`.
 - `events.ts`: a new event told as the old one a watcher expects.
 - `line.ts`: today's line at `/compat/v1/socket` (`line.hello`, `line.call`, `canvas.watch`).
 - `tab.ts`: today's tab socket at `/ws` (the roster, an agent's drawing, the checks' dozen messages).
@@ -37,7 +37,8 @@ No feature imports compat, and compat imports no feature.
 5. A line opened with a canvas pass calls and watches that canvas alone.
 6. A host may leave a route to itself: `compatFeature({ leave: ["/api/upload"] })` (Studio checks
    an edit role on its own upload).
-7. Each alias carries `GOES`. After that day it answers `refused` naming the new call.
+7. Each alias carries `GOES` on this line. After that day it answers `refused` naming the new call.
+   `GOES` is compat's alone: a card's old calls, turned in the canvas frame by the same table, carry no date.
 
 ## Check
 
