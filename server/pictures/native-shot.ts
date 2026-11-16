@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { layout } from "../../protocol/index.ts";
 import { toDeckPath, type Bytes, type Context } from "../kernel/index.ts";
 import type { Box } from "./shapes.ts";
-import type { Answer, FontNeed, Native } from "./native.ts";
+import { fontFiles, isFallbackFamily, type FontFile, type FontNeed } from "@decks/protocol/fonts";
+import type { Answer, Native } from "./native.ts";
 import type { Writer } from "./marks.ts";
 
 // A canvas picture drawn by the engine's native tool (rule 17): the drawing, each card as its
@@ -31,13 +32,7 @@ export async function drawNatively(ctx: Context, native: Native, args: NativeArg
 		const base = { doc: args.text, dark: args.scheme === "dark", box: [args.box.x1, args.box.y1, args.box.x2, args.box.y2], scale: args.factor, width, height, paper: PAPER[args.scheme], cards: await cardsIn(ctx, args, dir), out, format: args.format, quality: 90, ...(args.writer ? { writer: args.writer } : {}) };
 		const asked = await native.ask({ ...base, fontNeeds: true });
 		if (!asked.ok) return { why: `the native tool failed: ${asked.error}` };
-		const files = fontFiles(asked.fontNeeds ?? []);
-		if ("why" in files) return files;
-		const fonts = [];
-		for (const file of files) {
-			const path = await fontPath(file);
-			if (path) fonts.push({ key: file.key, family: file.family, path, fallback: false });
-		}
+		const fonts = await fontsFor(asked.fontNeeds ?? []);
 		let more: Record<string, unknown> = { fonts };
 		for (let n = 0; n < ROUNDS; n++) {
 			const answer = await native.ask({ ...base, ...more });
@@ -68,44 +63,23 @@ async function cardsIn(ctx: Context, args: NativeArgs, dir: string): Promise<{ x
 	return out;
 }
 
-// The font files the words need.
-type FontFile = { key: string; family: string; urls: string[] };
-const FONT_CDN = "https://cdn.jsdelivr.net/fontsource/fonts";
+// The font files the words need: the protocol's list, fallback scripts and emoji included.
 const FONTS = process.env.DECKS_FONT_CACHE ?? join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "decks", "fonts");
-/** What fontsource's latin subset draws; latin-ext adds the Latin letters beyond it. */
-const LATIN = /^[\u0000-ÿıŒœʻʼˆ˚˜̩̄̈ -⁯€™↑↓−∕﻿�]$/u;
-const LATIN_EXT = /^[Ā-ɏḀ-ỿ]$/u;
 
-const id = (family: string) => family.trim().toLowerCase().replace(/\s+/g, "-");
-
-const round = (weight: number) => Math.min(900, Math.max(100, Math.round(weight / 100) * 100));
-
-/** The font files a set of needs takes, or the first character no Latin file draws. */
-export function fontFiles(needs: FontNeed[]): FontFile[] | { why: string } {
-	const files = new Map<string, FontFile>();
-	const want = (family: string, subset: string, weight: number, italic: boolean) => {
-		const style = italic ? "italic" : "normal";
-		const key = `${id(family)}/${subset}/${weight}/${style}`;
-		const urls = [`${FONT_CDN}/${id(family)}@latest/${subset}-${weight}-${style}.ttf`, `${FONT_CDN}/${id(family)}@latest/${subset}-400-normal.ttf`];
-		files.set(key, { key, family: subset === "latin" ? family : `${family} Ext`, urls });
-	};
-	want("Inter", "latin", 400, false);
-	for (const need of needs) {
-		for (const ch of need.text) {
-			if (!LATIN.test(ch) && !LATIN_EXT.test(ch) && ch !== "\n" && ch !== " ") return { why: `the words have ${JSON.stringify(ch)}, which only the browser's fonts draw` };
-		}
-		for (const family of new Set([need.family, "Inter"])) {
-			want(family, "latin", round(need.weight), need.italic);
-			if ([...need.text].some((ch) => LATIN_EXT.test(ch))) want(family, "latin-ext", round(need.weight), need.italic);
-		}
+/** The fonts to hand the tool for a set of needs, each as a file on this machine; one not fetched is left out. */
+export async function fontsFor(needs: FontNeed[], path = fontPath): Promise<{ key: string; family: string; path: string; fallback: boolean }[]> {
+	const out = [];
+	for (const file of fontFiles(needs)) {
+		const at = await path(file);
+		if (at) out.push({ key: file.key, family: file.family, path: at, fallback: isFallbackFamily(file.family) });
 	}
-	return [...files.values()];
+	return out;
 }
 
 async function fontPath(file: FontFile): Promise<string | undefined> {
 	const path = join(FONTS, `${file.key.replaceAll("/", "_")}.ttf`);
 	if (await readFile(path).then(() => true, () => false)) return path;
-	for (const url of file.urls) {
+	for (const url of file.fallback ? [file.url, file.fallback] : [file.url]) {
 		const answer = await fetch(url, { signal: AbortSignal.timeout(20_000) }).catch(() => undefined);
 		if (!answer?.ok) continue;
 		await mkdir(FONTS, { recursive: true });

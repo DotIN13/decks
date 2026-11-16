@@ -4,8 +4,7 @@ Pictures of what is on a canvas, and the one feature that drives a browser.
 
 ## Owns
 
-- `card.fit`: a card measured at its width on a canvas, its height set, notes said (fit.ts).
-- `canvas.screenshot` (shot.ts) and `canvas.export` (export.ts): a picture, a web page.
+- `card.fit` (fit.ts), `canvas.screenshot` (shot.ts) and `canvas.export` (export.ts).
 - Pictures by address: `/pictures/<card>`, `canvas-tile/`, `shot`, `snapshot` (rules 11 to 14).
 - The browser (browser.ts): one Chromium, started on first use, closed a minute after the last.
 
@@ -50,9 +49,10 @@ HTML; `playwright` for the browser. No other feature.
     edge in its last writer's colour (the accent for the person).
 16. `POST /pictures/extent { path, w, h, ... }` keeps what a canvas frame measured; card.fit
     answers from it while it is under 2 min old, at the card's width and newer than its last write.
-17. A canvas picture is drawn by the engine's native screenshot tool (DECKS_NATIVE_SHOT, else the
-    crate's release build), `how` "native", each card as its picture. A PDF, `live`, a lone card,
-    words beyond Latin, maths, markdown cards or icons fall back to the browser; the notes say why.
+17. A canvas picture is drawn by the engine's native tool (DECKS_NATIVE_SHOT, else its release
+    build), `how` "native", cards as pictures, fonts from the protocol's list. A PDF, `live`, a lone
+    card, maths, markdown cards or icons are the browser's; the notes say why.
+
 ## Check
 
 - `node tools/check.mjs server`

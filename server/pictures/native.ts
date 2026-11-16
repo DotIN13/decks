@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import type { FontNeed } from "@decks/protocol/fonts";
 import { fileURLToPath } from "node:url";
 
 // The engine's native screenshot tool (rule 17): one JSON request a line on its
@@ -10,7 +11,6 @@ const ANSWER_MS = 30_000;
 const IDLE_MS = 10 * 60_000;
 
 export type Answer = { ok: boolean; error?: string; fontNeeds?: FontNeed[]; needs?: { cards: string[]; pictures: string[]; icons: string[]; math: string[] }; problems?: string[]; file?: string; width?: number; height?: number };
-export type FontNeed = { family: string; weight: number; italic: boolean; text: string };
 
 /** The release binary: DECKS_NATIVE_SHOT, else the engine crate's own build. */
 export function nativeBinary(): string | undefined {
