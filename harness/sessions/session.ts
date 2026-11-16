@@ -114,7 +114,8 @@ export class Session {
 		await this.start();
 		if (!this.backend) return this.translator.notice("error", `Not started: ${this.failure ?? "unknown reason"}`);
 		this.translator.setState("thinking");
-		await this.mark(said.id);
+		// A slash command writes nothing: no marks to wait for before it goes.
+		if (!text.trimStart().startsWith("/")) await this.mark(said.id);
 		const sent = (await this.front(text)) ?? text;
 		this.sending += 1;
 		try {
