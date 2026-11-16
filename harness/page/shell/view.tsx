@@ -7,7 +7,7 @@ import { abortAgent, answerAgent, closeAgent, focusAgent, moveAgentTo, newAgent,
 import { Dialog } from "../agents/index.ts";
 import { CanvasHost, type CanvasHostInputs } from "../canvases/host.tsx";
 import { moreItems } from "./more-menu.ts";
-import { destination, destinationLabel } from "../app/send-from-bar.ts";
+import { destination, destinationLabel } from "../composer/index.ts";
 import { copyShared, deleteCanvas, moveConversation, newCanvas, openCanvas, renameCanvas, setStagesOpen, stagesOpen } from "../canvases/actions.ts";
 import { CanvasManager } from "../canvases/manager/view.tsx";
 import { CanvasOps } from "../canvases/CanvasOps.tsx";

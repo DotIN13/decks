@@ -9,7 +9,7 @@ import { focusAgent } from "../agents/actions.ts";
 import { syncRings } from "../agents/ring-sync.ts";
 import { createAlerts } from "../alerts/page.ts";
 import { createAppsPanel } from "../panel/apps.ts";
-import { createBar } from "../app/bar.ts";
+import { createBar } from "../composer/index.ts";
 import { createDock } from "./dock.ts";
 import { createFloats } from "./floats.ts";
 import { setCommentSender } from "../canvases/handoffs.ts";
