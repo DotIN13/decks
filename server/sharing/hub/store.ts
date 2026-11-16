@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
+import { hashOf } from "../hash.ts";
 import { emptyDocument, type PenDocument, type PenEdit } from "@decks/pen";
 
-// Studio's side of sync, kept in memory: canvases, their log, files, blobs
-// and who may see what. Studio's own repo brings the same calls on a database.
+// Studio's side of sync, kept in memory: people's names and roles, canvases and their log,
+// files and blobs, each harness's apps. Studio's own repo brings the same calls on a database.
 
 export type Role = "owner" | "edit" | "view";
 export type SyncCanvas = { id: string; name: string; title: string; rev: number; role: Role; owner: string; ownerName?: string };
@@ -37,8 +37,6 @@ export interface HubStore {
 /** A commit onto a revision the canvas has moved past. */
 export class Stale extends Error {}
 
-export const hashOf = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
-
 type Kept = { canvas: SyncCanvas; pen: PenDocument; log: Logged[]; files: Map<string, SyncFile>; people: Map<string, Role>; hashes: Set<string> };
 
 /** The most revisions the log keeps; older ones come whole. */
@@ -51,6 +49,7 @@ export class MemoryHub implements HubStore {
 	private readonly apps = new Map<string, App[]>();
 	private next = 1;
 
+	// People: their names and roles
 	name(user: string, name: string): void {
 		this.names.set(user, name);
 	}
@@ -63,6 +62,7 @@ export class MemoryHub implements HubStore {
 		return this.kept.get(canvas)?.people.get(user);
 	}
 
+	// Canvases and their log
 	canvases(user: string): SyncCanvas[] {
 		return [...this.kept.values()].filter((k) => k.people.has(user)).map((k) => ({ ...k.canvas, role: k.people.get(user)! }));
 	}
@@ -79,7 +79,6 @@ export class MemoryHub implements HubStore {
 		return k && { ...k.canvas, pen: k.pen };
 	}
 
-	/** The revisions after since, or undefined when the log no longer reaches back. */
 	changesSince(id: string, since: number): Logged[] | undefined {
 		const k = this.kept.get(id);
 		if (!k) return undefined;
@@ -98,6 +97,7 @@ export class MemoryHub implements HubStore {
 		return k.canvas.rev;
 	}
 
+	// Files and the bytes behind them
 	canvasFiles(id: string): SyncFile[] {
 		return [...(this.kept.get(id)?.files.values() ?? [])];
 	}
@@ -131,6 +131,7 @@ export class MemoryHub implements HubStore {
 		return undefined;
 	}
 
+	// Each harness's app list
 	setInventory(harness: string, apps: App[]): void {
 		this.apps.set(harness, apps);
 	}

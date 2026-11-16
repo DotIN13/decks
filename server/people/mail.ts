@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { shapes, Infer } from "../../protocol/index.ts";
+import { readJson, writeJson } from "../kernel/store.ts";
 import type { Store } from "../kernel/types.ts";
 
 // Each agent's mailbox, kept under mail/<agent id>. The server delivers
@@ -7,8 +8,6 @@ import type { Store } from "../kernel/types.ts";
 
 export type Message = Infer<typeof shapes.Message>;
 const KEY = "mail/";
-const enc = new TextEncoder();
-const dec = new TextDecoder();
 
 export class Mailboxes {
 	private boxes = new Map<string, Message[]>();
@@ -16,8 +15,7 @@ export class Mailboxes {
 
 	async load(): Promise<void> {
 		for (const key of await this.store.keys(KEY)) {
-			const bytes = await this.store.get(key);
-			if (bytes) this.boxes.set(key.slice(KEY.length), JSON.parse(dec.decode(bytes)) as Message[]);
+			this.boxes.set(key.slice(KEY.length), await readJson<Message[]>(this.store, key, []));
 		}
 	}
 
@@ -63,6 +61,6 @@ export class Mailboxes {
 			return;
 		}
 		this.boxes.set(agent, box);
-		await this.store.put(KEY + agent, enc.encode(JSON.stringify(box)));
+		await writeJson(this.store, KEY + agent, box);
 	}
 }

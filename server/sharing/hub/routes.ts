@@ -77,22 +77,9 @@ function routeTable(o: HubOptions): Map<string, Handler> {
 		const rev = hub.canvas(c.params.id!)!.rev;
 		return json(200, got ? { rev, changes: got.map((x) => x.edits) } : { rev, tooOld: true });
 	});
-	add(R.edits, async (c) => {
-		if (!mayEdit(hub.role(c.who.user.id, c.params.id!))) throw new HubError(403, "You may not edit this canvas.");
-		const sent = (await bodyOf(c.req, o.maxBytes)) as { edits?: unknown; client?: unknown };
-		if (!Array.isArray(sent.edits)) throw new HubError(400, "Send edits: a list from the pen diff.");
-		if (sent.edits.length > sync.EDITS_MAX) throw new HubError(413, `At most ${sync.EDITS_MAX} edits in one push.`);
-		const client = typeof sent.client === "string" ? sent.client : undefined;
-		return json(200, commitEdits(hub, live, c.params.id!, sent.edits as PenEdit[], by(c.who), client));
-	});
+	add(R.edits, async (c) => pushEdits(o, c, by(c.who)));
 	add(R.files, (c) => (roleOf(c), json(200, { files: hub.canvasFiles(c.params.id!) })));
-	add(R.putFile, async (c) => {
-		editable(c);
-		const path = pathOf(c.url);
-		const put = hub.putCanvasFile(c.params.id!, path, await bytesOf(c.req, o.maxBytes), baseOf(c.url));
-		if (put.current) live?.toCanvas(c.params.id!, { type: "file", canvas: c.params.id!, path, version: put.version, hash: put.hash, by: by(c.who) });
-		return json(200, { path, ...put });
-	});
+	add(R.putFile, async (c) => (editable(c), putFile(o, c, by(c.who))));
 	add(R.deleteFile, (c) => {
 		editable(c);
 		const path = pathOf(c.url);
@@ -105,13 +92,7 @@ function routeTable(o: HubOptions): Map<string, Handler> {
 		if (!bytes) throw new HubError(404, "No such blob.");
 		return new Response(bytes, { status: 200, headers: { "Content-Type": "application/octet-stream" } });
 	});
-	add(R.inventory, async ({ who, req }) => {
-		const got = (await bodyOf(req, o.maxBytes)) as { apps?: unknown };
-		if (!Array.isArray(got.apps)) throw new HubError(400, "Send { apps }.");
-		hub.setInventory(who.harness!.id, got.apps as { name: string; title: string; kind: string }[]);
-		live?.toUser(who.user.id, { type: "harnesses" });
-		return json(200, { apps: got.apps.length });
-	});
+	add(R.inventory, async (c) => putInventory(o, c));
 	return t;
 }
 
@@ -126,6 +107,34 @@ async function createCanvas(o: HubOptions, { who, req }: Ctx): Promise<Response>
 	return json(201, { canvas });
 }
 
+/** A push of drawing edits, merged onto the canvas as it is now. */
+async function pushEdits(o: HubOptions, c: Ctx, by: string): Promise<Response> {
+	if (!mayEdit(o.hub.role(c.who.user.id, c.params.id!))) throw new HubError(403, "You may not edit this canvas.");
+	const sent = (await bodyOf(c.req, o.maxBytes)) as { edits?: unknown; client?: unknown };
+	if (!Array.isArray(sent.edits)) throw new HubError(400, "Send edits: a list from the pen diff.");
+	if (sent.edits.length > sync.EDITS_MAX) throw new HubError(413, `At most ${sync.EDITS_MAX} edits in one push.`);
+	const client = typeof sent.client === "string" ? sent.client : undefined;
+	return json(200, commitEdits(o.hub, o.live, c.params.id!, sent.edits as PenEdit[], by, client));
+}
+
+/** One file of a canvas's bundle, put; the canvas's sockets hear of it when it is the current copy. */
+async function putFile(o: HubOptions, c: Ctx, by: string): Promise<Response> {
+	const path = pathOf(c.url);
+	const put = o.hub.putCanvasFile(c.params.id!, path, await bytesOf(c.req, o.maxBytes), baseOf(c.url));
+	if (put.current) o.live?.toCanvas(c.params.id!, { type: "file", canvas: c.params.id!, path, version: put.version, hash: put.hash, by });
+	return json(200, { path, ...put });
+}
+
+/** A harness's app list, for Studio to show what it can open. */
+async function putInventory(o: HubOptions, { who, req }: Ctx): Promise<Response> {
+	const got = (await bodyOf(req, o.maxBytes)) as { apps?: unknown };
+	if (!Array.isArray(got.apps)) throw new HubError(400, "Send { apps }.");
+	o.hub.setInventory(who.harness!.id, got.apps as { name: string; title: string; kind: string }[]);
+	o.live?.toUser(who.user.id, { type: "harnesses" });
+	return json(200, { apps: got.apps.length });
+}
+
+// Reading a request: the path, the base version, the body
 function pathOf(url: URL): string {
 	const path = url.searchParams.get("path");
 	if (!sync.safeSyncPath(path) || sync.secretLooking(path)) throw new HubError(400, "That path is not a file of a canvas's bundle.");

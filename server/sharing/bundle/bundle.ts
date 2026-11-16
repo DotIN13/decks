@@ -31,6 +31,12 @@ async function answer(ctx: Context, path: string): Promise<RouteAnswer> {
 	}
 }
 
+/** The download's name: the canvas's title, with what a file system refuses taken out. */
+export function bundleFileName(title: string): string {
+	const base = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "canvas";
+	return `${base}.decks`;
+}
+
 // Building the zip
 export async function buildBundle(ctx: Context, asked: string): Promise<{ bytes: Buffer; title: string }> {
 	const name = ctx.canvasName(asked);
@@ -53,10 +59,15 @@ export async function buildBundle(ctx: Context, asked: string): Promise<{ bytes:
 	return { bytes: zip(entries), title: canvas.title };
 }
 
-/** The download's name: the canvas's title, with what a file system refuses taken out. */
-export function bundleFileName(title: string): string {
-	const base = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "canvas";
-	return `${base}.decks`;
+async function filesUnder(ctx: Context, dir: string): Promise<string[]> {
+	const out: string[] = [];
+	const entries = await ctx.deck.list(toDeckPath(dir)).catch(() => []);
+	for (const e of entries) out.push(...(e.kind === "dir" ? await filesUnder(ctx, e.path) : [e.path]));
+	return out;
+}
+
+async function read(ctx: Context, path: string): Promise<Uint8Array | undefined> {
+	return ctx.deck.read(toDeckPath(path)).catch(() => undefined);
 }
 
 // The files a canvas's cards name
@@ -78,17 +89,6 @@ async function namedFiles(ctx: Context, cards: string[], files: Set<string>): Pr
 			if (/\.(?:css|svg)$/i.test(target)) queue.push(target);
 		}
 	}
-}
-
-async function filesUnder(ctx: Context, dir: string): Promise<string[]> {
-	const out: string[] = [];
-	const entries = await ctx.deck.list(toDeckPath(dir)).catch(() => []);
-	for (const e of entries) out.push(...(e.kind === "dir" ? await filesUnder(ctx, e.path) : [e.path]));
-	return out;
-}
-
-async function read(ctx: Context, path: string): Promise<Uint8Array | undefined> {
-	return ctx.deck.read(toDeckPath(path)).catch(() => undefined);
 }
 
 /** A reference read against the file that made it, as a deck path; undefined when it leaves the deck. */

@@ -7,8 +7,8 @@ import { bundleRoute } from "./bundle/bundle.ts";
 import { networkTransport } from "./client/network.ts";
 import { StudioError, type Transport } from "./client/transport.ts";
 
-// The sharing feature: studio.status, connect and disconnect, and the sync
-// client that runs while a key is kept. Only the person connects.
+// The sharing feature: studio.status, connect and disconnect, the sync client that runs while
+// a key is kept, and the route that gives a canvas away as a .decks file. Only the person connects.
 
 /** The calls handled here, named, so a call added to the noun for another feature stays unhandled. */
 const STUDIO_CALLS = (({ status, connect, disconnect }: typeof calls.studio) => ({ status, connect, disconnect }))(calls.studio);

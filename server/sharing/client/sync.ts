@@ -48,11 +48,35 @@ export class DeckSync {
 		return this.o.by ?? STUDIO;
 	}
 
+	// Lifecycle: who Studio takes this key for, and the live socket
 	/** Whether Studio takes this key: answers who it is for. */
 	hello(): Promise<{ user: { id: string }; harness?: { id: string } }> {
 		return this.api.call("GET", "/sync/v1/hello");
 	}
 
+	/** Open Studio's live socket: a change there starts a pass, a token ask is answered on it. */
+	async start(): Promise<void> {
+		this.stopped = false;
+		const link = this.api.live();
+		if (!link) return;
+		this.link = link;
+		link.onMessage((text) => void this.heard(link, text));
+		link.onClose((code, reason) => {
+			if (code === 4001) this.o.unlinked?.(reason || "revoked");
+			else if (!this.stopped) this.later(2000);
+		});
+	}
+
+	async stop(): Promise<void> {
+		this.stopped = true;
+		for (const timer of this.timers) clearTimeout(timer);
+		this.timers.clear();
+		this.link?.close();
+		this.link = undefined;
+		await this.running?.catch(() => undefined);
+	}
+
+	// Passes: one at a time, again when asked meanwhile
 	/** One pass at a time; a pass asked for meanwhile runs once after. */
 	sync(): Promise<void> {
 		if (this.running) {
@@ -67,6 +91,16 @@ export class DeckSync {
 			this.running = undefined;
 		})();
 		return this.running;
+	}
+
+	private later(ms: number): void {
+		if (this.stopped) return;
+		const timer = setTimeout(() => {
+			this.timers.delete(timer);
+			void this.sync().catch((error: Error) => this.o.log?.(`Studio sync failed: ${error.message}`));
+		}, ms);
+		timer.unref?.();
+		this.timers.add(timer);
 	}
 
 	private async pass(): Promise<void> {
@@ -118,29 +152,7 @@ export class DeckSync {
 		this.told = key;
 	}
 
-	private later(ms: number): void {
-		if (this.stopped) return;
-		const timer = setTimeout(() => {
-			this.timers.delete(timer);
-			void this.sync().catch((error: Error) => this.o.log?.(`Studio sync failed: ${error.message}`));
-		}, ms);
-		timer.unref?.();
-		this.timers.add(timer);
-	}
-
-	/** Open Studio's live socket: a change there starts a pass, a token ask is answered on it. */
-	async start(): Promise<void> {
-		this.stopped = false;
-		const link = this.api.live();
-		if (!link) return;
-		this.link = link;
-		link.onMessage((text) => void this.heard(link, text));
-		link.onClose((code, reason) => {
-			if (code === 4001) this.o.unlinked?.(reason || "revoked");
-			else if (!this.stopped) this.later(2000);
-		});
-	}
-
+	// What the live socket asks
 	private async heard(link: LiveLink, text: string): Promise<void> {
 		let got: { type?: string } & Partial<TokenAsk>;
 		try {
@@ -151,26 +163,22 @@ export class DeckSync {
 		if (got.type === "canvas" || got.type === "file" || got.type === "canvases") return this.later(100);
 		if (isAsk(got)) return this.reply(link, got);
 		if (got.type !== "token.ask" || !got.id || !got.user || !got.origin) return;
+		return this.giveToken(link, { id: got.id, user: got.user, origin: got.origin });
+	}
+
+	/** A token for a Studio person's browser, answered on the socket that asked. */
+	private async giveToken(link: LiveLink, ask: TokenAsk): Promise<void> {
 		try {
 			if (!this.o.issueToken) throw new Error("This server gives no tokens.");
-			const given = await this.o.issueToken({ id: got.id, user: got.user, origin: got.origin });
-			link.send(JSON.stringify({ type: "token", id: got.id, ...given }));
+			const given = await this.o.issueToken(ask);
+			link.send(JSON.stringify({ type: "token", id: ask.id, ...given }));
 		} catch (error) {
-			link.send(JSON.stringify({ type: "token", id: got.id, error: (error as Error).message }));
+			link.send(JSON.stringify({ type: "token", id: ask.id, error: (error as Error).message }));
 		}
 	}
 
 	private async reply(link: LiveLink, ask: Parameters<typeof answerAsk>[0]): Promise<void> {
 		const owner = (await readState(this.o.store)).user ?? (await this.hello().catch(() => undefined))?.user.id;
 		link.send(JSON.stringify({ type: "reply", id: ask.id, envelope: await answerAsk(ask, owner, this.o.run) }));
-	}
-
-	async stop(): Promise<void> {
-		this.stopped = true;
-		for (const timer of this.timers) clearTimeout(timer);
-		this.timers.clear();
-		this.link?.close();
-		this.link = undefined;
-		await this.running?.catch(() => undefined);
 	}
 }

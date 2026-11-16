@@ -1,13 +1,12 @@
 import type { Infer, shapes } from "../../protocol/index.ts";
+import { readJson, writeJson } from "../kernel/store.ts";
 import type { CanvasDoc, Change, ItemOp, Store } from "../kernel/types.ts";
 
-// How far each agent has read each canvas, kept under marks/<agent id>, and
-// what changed since: others' changes only, never the agent's own.
+// How far each agent has read each canvas, kept under marks/<agent id>, and what changed
+// since: others' changes only. agent-mail.ts answers agent.news with these and the mail.
 
 export type NewsChange = Infer<typeof shapes.News>["changes"][number];
 const KEY = "marks/";
-const enc = new TextEncoder();
-const dec = new TextDecoder();
 
 /** The ids an op touches. */
 export function idsOf(op: ItemOp): string[] {
@@ -32,8 +31,7 @@ export class Marks {
 
 	async load(): Promise<void> {
 		for (const key of await this.store.keys(KEY)) {
-			const bytes = await this.store.get(key);
-			if (bytes) this.byAgent.set(key.slice(KEY.length), JSON.parse(dec.decode(bytes)) as Record<string, number>);
+			this.byAgent.set(key.slice(KEY.length), await readJson<Record<string, number>>(this.store, key, {}));
 		}
 	}
 
@@ -44,7 +42,7 @@ export class Marks {
 	async move(agent: string, canvas: string, rev: number): Promise<void> {
 		const marks = { ...this.byAgent.get(agent), [canvas]: rev };
 		this.byAgent.set(agent, marks);
-		await this.store.put(KEY + agent, enc.encode(JSON.stringify(marks)));
+		await writeJson(this.store, KEY + agent, marks);
 	}
 
 	async drop(agent: string): Promise<void> {

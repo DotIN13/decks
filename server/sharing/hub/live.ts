@@ -30,6 +30,7 @@ export class Live {
 
 	constructor(private readonly store: HubStore) {}
 
+	// Connections: who is on the socket, and their going
 	add(ws: LiveSocket, who: Who): void {
 		const entry = { ws, who };
 		this.sockets.add(entry);
@@ -63,6 +64,16 @@ export class Live {
 		for (const canvas of pointed) this.fanOut(canvas, JSON.stringify({ type: "presence", canvas, by: me, gone: true }), entry);
 	}
 
+	/** Close a harness's sockets: its key was revoked. */
+	dropHarness(id: string): void {
+		for (const s of this.sockets) if (s.who.harness?.id === id) s.ws.close(4001, "revoked");
+	}
+
+	private socketOf(harness: string): Entry | undefined {
+		return [...this.sockets].reverse().find((s) => s.who.harness?.id === harness);
+	}
+
+	// Telling: what each socket may hear
 	private fanOut(canvas: string, text: string, from?: Entry): void {
 		for (const s of this.sockets) if (s !== from && this.store.role(s.who.user.id, canvas)) s.ws.send(text);
 	}
@@ -83,6 +94,7 @@ export class Live {
 		this.fanOut(change.id, Buffer.byteLength(inline) <= INLINE_MAX ? inline : JSON.stringify({ type: "canvas", ...rest }));
 	}
 
+	// Asking a harness: a token or a call, answered once
 	/** Ask a harness, over its own socket, for a token for a person's browser at origin. */
 	askToken(harness: string, user: { id: string; name: string }, origin: string, ms = ASK_MS): Promise<{ token: string; expires: number }> {
 		return this.ask(harness, { type: "token.ask", user, origin }, "token", ms, (got) => {
@@ -121,15 +133,6 @@ export class Live {
 	private answered(harness: string, got: Sent): void {
 		const ask = typeof got.id === "string" ? this.asks.get(got.id) : undefined;
 		if (ask && ask.harness === harness && ask.answer === got.type) ask.done(got);
-	}
-
-	private socketOf(harness: string): Entry | undefined {
-		return [...this.sockets].reverse().find((s) => s.who.harness?.id === harness);
-	}
-
-	/** Close a harness's sockets: its key was revoked. */
-	dropHarness(id: string): void {
-		for (const s of this.sockets) if (s.who.harness?.id === id) s.ws.close(4001, "revoked");
 	}
 }
 

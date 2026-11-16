@@ -1,11 +1,11 @@
 import { Refused, calls, events, type Handled, type Infer, type shapes } from "../../protocol/index.ts";
 import { handleAll, type Context } from "../kernel/types.ts";
-import { canvasName, followHome } from "./agent-calls.ts";
+import type { AgentRecord } from "./records.ts";
 import type { Holder, People } from "./state.ts";
 
 // What screens show. An agent's request reaches only the screens that follow
 // it; the person's, only their own screens; a card's or app's, the screens
-// showing its canvas. A screen says whom it follows with view.move.
+// showing its canvas; cursors, pictures and reloads, every line on the canvas.
 
 /** The calls handled here, named, so a call added to the noun for another feature stays unhandled. */
 const VIEW_CALLS = (({ get, move, focus, goto, cursor, screenshot, answer, update, reload }: typeof calls.view) => ({ get, move, focus, goto, cursor, screenshot, answer, update, reload }))(calls.view);
@@ -18,54 +18,20 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 	return handleAll(VIEW_CALLS, {
 		get: (ctx, { canvas }) => look(p(), ctx, here(p(), ctx, canvas)),
 		move: (ctx, args) => move(p(), ctx, args),
-		focus: async (ctx, { target, highlight, animate, canvas }) => {
-			const name = here(p(), ctx, canvas ?? canvasOfTarget(target));
-			const wanted = Array.isArray(target) ? target : [target];
-			if (!wanted.length) throw new Refused("invalid", "focus names an item's id or a card's path, or a list of them.", "item.list");
-			const items = ctx.canvas(name).read();
-			for (const one of wanted) {
-				if (!items.some((i) => i.id === one || i.card === one)) throw new Refused("not_found", `Nothing called ${one} is on the canvas ${name}.`, "item.list");
-			}
-			await goHome(p(), ctx, name);
-			return request(p(), ctx, name, "view.focus", { target, canvas: name, ...(highlight ? { highlight } : {}), ...(animate ? { animate } : {}) });
-		},
-		goto: async (ctx, { canvas }) => {
-			const name = canvasName(ctx, canvas);
-			if (!(await goHome(p(), ctx, name))) return request(p(), ctx, name, "view.goto", { canvas: name });
-			return answer(p(), ctx, name, recipients(p(), ctx, name));
-		},
-		cursor: (ctx, { card, at }) => {
-			const name = here(p(), ctx, canvasOfTarget(card));
-			const color = ctx.caller.kind === "agent" ? p().roster.byIdOrUndefined(ctx.caller.id)?.color : undefined;
-			const screens = p().screens.showing(name).map((s) => s.client);
-			const lines = p().screens.drawing(name).map((s) => s.client);
-			if (lines.length) p().tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.cursor", args: { card, at, label: ctx.caller.name, ...(color ? { color } : {}) } }, lines);
-			return { ...look(p(), ctx, name), moved: screens.length > 0 };
-		},
-		screenshot: async (ctx, { card, canvas }) => {
-			const name = here(p(), ctx, canvas ?? canvasOfTarget(card));
-			const screen = p().screens.drawing(name)[0];
-			if (!screen) throw new Refused("unavailable", `No screen is showing the canvas ${name}, so none can draw ${card}.`, "canvas.screenshot");
-			const { id, answer } = p().answers.ask(screen.client, `a picture of ${card}`);
-			p().tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.screenshot", args: { card }, id });
-			return (await answer) as Infer<typeof calls.view.screenshot.answer>;
-		},
-		answer: (ctx, { id, value, error }) => ({ ok: p().answers.answer(id, { ...(value !== undefined ? { value } : {}), ...(error !== undefined ? { error } : {}) }) }),
+		focus: (ctx, args) => focus(p(), ctx, args),
+		goto: (ctx, { canvas }) => goto(p(), ctx, canvas),
+		cursor: (ctx, args) => cursor(p(), ctx, args),
+		screenshot: (ctx, args) => screenshot(p(), ctx, args),
+		answer: (_ctx, { id, value, error }) => ({ ok: p().answers.answer(id, { ...(value !== undefined ? { value } : {}), ...(error !== undefined ? { error } : {}) }) }),
 		update: (ctx, args) => say(p(), ctx, args),
-		reload: (ctx, { card, canvas }) => {
-			const name = here(p(), ctx, canvas ?? (card ? canvasOfTarget(card) : undefined));
-			const screens = p().screens.showing(name).map((s) => s.client);
-			const lines = p().screens.drawing(name).map((s) => s.client);
-			if (lines.length) p().tell(ctx, events.viewRequested, { ids: card ? [card] : [], canvas: name, call: "view.reload", args: { ...(card ? { card } : {}), canvas: name } }, lines);
-			return screens.length;
-		},
+		reload: (ctx, args) => reload(p(), ctx, args),
 	});
 }
 
 // Which canvas a call means, and what its screen shows
 /** The canvas a call means: the one named, else the caller's here, else its home. */
 function here(people: People, ctx: Context, asked: string | undefined): string {
-	if (asked) return canvasName(ctx, asked);
+	if (asked) return ctx.canvasName(asked);
 	const home = ctx.caller.canvas ?? (ctx.caller.kind === "agent" ? people.roster.byIdOrUndefined(ctx.caller.id)?.canvas : undefined);
 	if (!home) throw new Refused("invalid", "Name a canvas: this caller has no canvas of its own.", "canvas.list");
 	return home;
@@ -101,6 +67,26 @@ function move(people: People, ctx: Context, args: Infer<typeof calls.view.move.i
 	return request(people, ctx, name, "view.move", { ...camera, canvas: name, ...(args.animate ? { animate: true } : {}) });
 }
 
+/** Fly to items or a card, on its canvas: one not the agent's home is gone to first. */
+async function focus(people: People, ctx: Context, { target, highlight, animate, canvas }: Infer<typeof calls.view.focus.input>): Promise<View> {
+	const name = here(people, ctx, canvas ?? canvasOfTarget(target));
+	const wanted = Array.isArray(target) ? target : [target];
+	if (!wanted.length) throw new Refused("invalid", "focus names an item's id or a card's path, or a list of them.", "item.list");
+	const items = ctx.canvas(name).read();
+	for (const one of wanted) {
+		if (!items.some((i) => i.id === one || i.card === one)) throw new Refused("not_found", `Nothing called ${one} is on the canvas ${name}.`, "item.list");
+	}
+	await goHome(people, ctx, name);
+	return request(people, ctx, name, "view.focus", { target, canvas: name, ...(highlight ? { highlight } : {}), ...(animate ? { animate } : {}) });
+}
+
+/** The agent acted for goes to the canvas; with none, the caller's own screens are asked to. */
+async function goto(people: People, ctx: Context, canvas: string): Promise<View> {
+	const name = ctx.canvasName(canvas);
+	if (!(await goHome(people, ctx, name))) return request(people, ctx, name, "view.goto", { canvas: name });
+	return answer(people, ctx, name, recipients(people, ctx, name));
+}
+
 /** The agent acted for moves its home to the canvas, with the screens following it; false for no agent. */
 async function goHome(people: People, ctx: Context, canvas: string): Promise<boolean> {
 	const follows = ctx.caller.kind === "person" ? people.screens.newestOf(ctx.caller.id)?.follows : undefined;
@@ -111,6 +97,12 @@ async function goHome(people: People, ctx: Context, canvas: string): Promise<boo
 	people.tell(ctx, events.agentChanged, { ids: [record.id] });
 	followHome(people, ctx, record);
 	return true;
+}
+
+/** The screens following an agent go to its new home. */
+export function followHome(people: People, ctx: Context, record: AgentRecord): void {
+	const screens = people.screens.following(record.id).map((s) => s.client);
+	if (screens.length && record.canvas) people.tell(ctx, events.viewRequested, { ids: [record.id], canvas: record.canvas, call: "view.goto", args: { canvas: record.canvas } }, screens);
 }
 
 /** Which screens a caller's view call reaches. */
@@ -133,6 +125,36 @@ function answer(people: People, ctx: Context, canvas: string, screens: string[])
 	const waiting = ctx.caller.kind === "agent" ? "no screen follows this agent; the person sees it when they open its conversation" : "no screen is showing this canvas";
 	ctx.note(`The view did not move: ${waiting}.`);
 	return { ...view, moved: false, waiting };
+}
+
+// The canvas's lines: cursors, pictures and reloads reach every line on it, frames included
+/** A labelled dot on a card, drawn by the canvas's lines. */
+function cursor(people: People, ctx: Context, { card, at }: Infer<typeof calls.view.cursor.input>): View {
+	const name = here(people, ctx, canvasOfTarget(card));
+	const color = ctx.caller.kind === "agent" ? people.roster.byIdOrUndefined(ctx.caller.id)?.color : undefined;
+	const screens = people.screens.showing(name).map((s) => s.client);
+	const lines = people.screens.drawing(name).map((s) => s.client);
+	if (lines.length) people.tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.cursor", args: { card, at, label: ctx.caller.name, ...(color ? { color } : {}) } }, lines);
+	return { ...look(people, ctx, name), moved: screens.length > 0 };
+}
+
+/** A card as a line on its canvas draws it now: the first answer to view.answer, or unavailable. */
+async function screenshot(people: People, ctx: Context, { card, canvas }: Infer<typeof calls.view.screenshot.input>): Promise<Infer<typeof calls.view.screenshot.answer>> {
+	const name = here(people, ctx, canvas ?? canvasOfTarget(card));
+	const screen = people.screens.drawing(name)[0];
+	if (!screen) throw new Refused("unavailable", `No screen is showing the canvas ${name}, so none can draw ${card}.`, "canvas.screenshot");
+	const { id, answer } = people.answers.ask(screen.client, `a picture of ${card}`);
+	people.tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.screenshot", args: { card }, id });
+	return (await answer) as Infer<typeof calls.view.screenshot.answer>;
+}
+
+/** Reload a card on every line showing its canvas; answers how many screens were asked. */
+function reload(people: People, ctx: Context, { card, canvas }: Infer<typeof calls.view.reload.input>): number {
+	const name = here(people, ctx, canvas ?? (card ? canvasOfTarget(card) : undefined));
+	const screens = people.screens.showing(name).map((s) => s.client);
+	const lines = people.screens.drawing(name).map((s) => s.client);
+	if (lines.length) people.tell(ctx, events.viewRequested, { ids: card ? [card] : [], canvas: name, call: "view.reload", args: { ...(card ? { card } : {}), canvas: name } }, lines);
+	return screens.length;
 }
 
 // Presence: where a line points and what it selected

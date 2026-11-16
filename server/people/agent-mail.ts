@@ -4,8 +4,8 @@ import type { Message } from "./mail.ts";
 import { changesSince } from "./news.ts";
 import type { People } from "./state.ts";
 
-// Mail and news. The server keeps the mail; a connected host hears of it and
-// delivers it into a turn. With no host, it waits for the agent's next news.
+// How a message reaches an agent: to its connected host at once, which delivers it into a
+// turn, or in the agent's next news, which brings the waiting mail with the canvas's changes.
 
 type Work = { task: string; cards?: string[]; reply?: boolean };
 

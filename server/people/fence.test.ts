@@ -7,7 +7,7 @@ import { join } from "node:path";
 // files and node's crypto, never a runtime, a model, a login or a transcript.
 
 const HERE = new URL(".", import.meta.url).pathname;
-const ALLOWED = [/^\.\.\/\.\.\/protocol\/index\.ts$/, /^\.\.\/kernel\/(types|testing|events|index)\.ts$/, /^\.\/[\w-]+(\.test)?\.ts$/, /^node:(crypto|test|assert\/strict|fs|path)$/];
+const ALLOWED = [/^\.\.\/\.\.\/protocol\/index\.ts$/, /^\.\.\/kernel\/(types|testing|events|index|store)\.ts$/, /^\.\/[\w-]+(\.test)?\.ts$/, /^node:(crypto|test|assert\/strict|fs|path)$/];
 
 test("nothing in server/people imports a runtime, a model or a transcript", () => {
 	const bad: string[] = [];

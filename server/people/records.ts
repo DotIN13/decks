@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { Refused, type Caller, type Infer, type shapes } from "../../protocol/index.ts";
+import { readJson, writeJson } from "../kernel/store.ts";
 import type { Store } from "../kernel/types.ts";
 import { avatarUrl, cleanName, cleanTags, cleanWorkspace, nextColour, numberedName } from "./clean.ts";
 
@@ -34,8 +35,6 @@ export interface AgentRecord {
 export type NewAgent = { name?: string; kind?: AgentKind; workspace?: string; tags?: string[]; canvas?: string; model?: string; thinking?: string; mode?: AgentChange["mode"]; attached?: boolean; host?: string; state?: string };
 
 const KEY = "agents/";
-const enc = new TextEncoder();
-const dec = new TextDecoder();
 
 export class Roster {
 	private byId = new Map<string, AgentRecord>();
@@ -43,9 +42,7 @@ export class Roster {
 
 	async load(): Promise<void> {
 		for (const key of await this.store.keys(KEY)) {
-			const bytes = await this.store.get(key);
-			if (!bytes) continue;
-			const record = JSON.parse(dec.decode(bytes)) as AgentRecord;
+			const record = await readJson<AgentRecord | undefined>(this.store, key, undefined);
 			if (record && typeof record.id === "string") this.byId.set(record.id, record);
 		}
 	}
@@ -126,7 +123,7 @@ export class Roster {
 
 	private async save(record: AgentRecord): Promise<void> {
 		this.byId.set(record.id, record);
-		await this.store.put(KEY + record.id, enc.encode(JSON.stringify(record)));
+		await writeJson(this.store, KEY + record.id, record);
 	}
 }
 

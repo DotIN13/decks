@@ -1,7 +1,8 @@
 import { toDeckPath } from "../../kernel/types.ts";
-import { hashOf, type SyncFile } from "../hub/store.ts";
+import { hashOf } from "../hash.ts";
+import type { SyncFile } from "../hub/store.ts";
 import type { Pass } from "./drawing.ts";
-import { bundleFiles, conflictName, readBytes } from "./folders.ts";
+import { bundleFiles, readBytes } from "./folders.ts";
 import type { CanvasState, SyncState } from "./link.ts";
 import { StudioError } from "./transport.ts";
 
@@ -69,6 +70,17 @@ async function conflict(p: FilePass, h: Here, path: string, mine: Uint8Array, th
 	await download(p, h, path, theirs);
 	p.conflicts.push(`${h.name}:${path}`);
 	await upload(p, h, copy, mine, undefined);
+}
+
+/** A copy's name beside the file: notes.conflict-20261103-0012.txt. */
+export function conflictName(path: string, now = new Date()): string {
+	const pad = (n: number) => String(n).padStart(2, "0");
+	const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}`;
+	const slash = path.lastIndexOf("/");
+	const name = path.slice(slash + 1);
+	const dot = name.lastIndexOf(".");
+	const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+	return `${path.slice(0, slash + 1)}${stem}.conflict-${stamp}${ext}`;
 }
 
 async function upload(p: FilePass, h: Here, path: string, bytes: Uint8Array, base: number | undefined): Promise<void> {

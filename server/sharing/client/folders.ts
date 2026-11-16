@@ -76,14 +76,3 @@ export async function bundleFiles(deck: Deck, folder: string): Promise<string[]>
 	for (const part of BUNDLE) await walk(`${folder}/${part}`);
 	return out.filter((p) => sync.safeSyncPath(p) && !sync.secretLooking(p)).sort();
 }
-
-/** A copy's name beside the file: notes.conflict-20261103-0012.txt. */
-export function conflictName(path: string, now = new Date()): string {
-	const pad = (n: number) => String(n).padStart(2, "0");
-	const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}`;
-	const slash = path.lastIndexOf("/");
-	const name = path.slice(slash + 1);
-	const dot = name.lastIndexOf(".");
-	const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
-	return `${path.slice(0, slash + 1)}${stem}.conflict-${stamp}${ext}`;
-}

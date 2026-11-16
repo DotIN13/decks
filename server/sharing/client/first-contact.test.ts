@@ -5,7 +5,7 @@ import type { Caller } from "../../../protocol/index.ts";
 import { MemoryDeck } from "../../kernel/memory-deck.ts";
 import { toDeckPath } from "../../kernel/types.ts";
 import { memoryStore, memoryStudio } from "../testing.ts";
-import { conflictName } from "./folders.ts";
+import { conflictName } from "./files.ts";
 import { DeckSync } from "./sync.ts";
 
 // A canvas is its Studio id, not its folder: a same-named canvas from a second

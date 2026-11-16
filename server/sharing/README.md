@@ -1,15 +1,16 @@
 # server/sharing
 
-Sync with Decks Studio, and the canvases friends shared. Handles `studio.status`, `studio.connect` and
-`studio.disconnect`. Built from today's `packages/hub` and `packages/sync-client`, on the deck interface.
+Giving a canvas to someone else: through Decks Studio (sync, and the canvases friends shared), or as
+one `.decks` file (`bundle/`). Handles `studio.status`, `studio.connect` and `studio.disconnect`.
 
 ## Owns
 
 - `feature.ts`: the feature, `sharingFeature(opts)`, and its three calls.
 - `client/link.ts`: Studio's key and the sync state, kept in the kernel's private `Store`.
 - `client/`: the sync client that keeps a deck in step with Studio, over a `Transport`.
-- `hub/`: Studio's side kept in memory: the store, the merge, the `/sync/v1` routes, the live socket. Its entry is `hub/index.ts`; a store is any `HubStore`.
-  Studio's own repo brings a database store; tests use `MemoryHub`.
+- `hub/`: Studio's side kept in memory: the store, the merge, the `/sync/v1` routes, the live socket.
+  Its entry is `hub/index.ts`; a store is any `HubStore`, a database in Studio's repo.
+- `hash.ts`: a file's hash as both sides name it.
 
 ## May import
 
