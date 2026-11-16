@@ -1,4 +1,5 @@
 import { mountDocPage } from "../documents/page.ts";
+import { protocolLine } from "../documents/line.ts";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { ownInput } from "../input/item-keys.ts";
 import { APP_BAR } from "../render/types.ts";
@@ -57,8 +58,8 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 		const lib = line.lib;
 		const page = mountDocPage(host, {
 			path: props.file,
-			send: (message) => line.send(message),
-			listen: (listener) => line.listen(listener as (message: unknown) => void),
+			// On the protocol when the host has it; the harness's line otherwise (Studio).
+			...(line.call && line.on ? protocolLine(line.call, line.on) : { send: (message) => line.send(message), listen: (listener) => line.listen(listener as (message: unknown) => void) }),
 			...(line.file ? { file: line.file } : {}),
 			...(lib ? { markdown: (into: HTMLElement, source: string) => markdown(lib, into, source), math: (into: HTMLElement) => maths(lib, into) } : {}),
 		});
