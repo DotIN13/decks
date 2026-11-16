@@ -104,10 +104,10 @@ test("rule 7: move and delete a file or a folder", async () => {
 	await s.close();
 });
 
-test("rule 8: a file's address, and a card may read but not write", async () => {
+test("rule 8: a file's address, and a card may neither read nor write", async () => {
 	const s = await start();
 	assert.equal(await s.value("file.url", { path: "assets/a.png" }), "/files/assets/a.png");
-	assert.equal(await code(s, "file.read", { path: "docs/notes.md" }, "card"), "ok");
+	assert.equal(await code(s, "file.read", { path: "docs/notes.md" }, "card"), "refused");
 	assert.equal(await code(s, "file.write", { path: "docs/notes.md", text: "" }, "card"), "refused");
 	await s.close();
 });
