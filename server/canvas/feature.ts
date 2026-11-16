@@ -19,5 +19,3 @@ export function canvasFeature(options: { clock?: () => number } = {}): Feature {
 		start: () => store.load(),
 	});
 }
-
-export default canvasFeature;
