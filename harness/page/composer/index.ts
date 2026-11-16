@@ -12,3 +12,6 @@ export * from "./pill/sent.ts";
 export * from "./pill/finding.ts";
 export * from "./voice/voice.ts";
 export * from "./model-picker/model.ts";
+export * from "./context/view.tsx";
+export * from "./context/model.ts";
+export * from "./host.ts";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { withComments } from "../../markup/comments.ts";
+import { withComments } from "@decks/canvas/comments";
 import { draftForAgent, draftComments, fileMention, type Draft, type DraftMention } from "../draft/model.ts";
 import { withoutName } from "../bar/destination.ts";
 import { commentPill } from "./about.ts";

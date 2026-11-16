@@ -2,8 +2,8 @@ import { type Draft, type DraftMention, mentionAddress, shortLabel } from "../dr
 import type { PillAbout } from "./card.ts";
 import { cardKind, OLD_HEADS, WHOLE_ENDS } from "./compat/old-words.ts";
 import type { MessageMention, MessagePart } from "@decks/protocol";
-import { commentItem } from "../../markup/comments.ts";
-import type { WaitingComment } from "../../state/index.ts";
+import { commentItem } from "@decks/canvas/comments";
+import type { WaitingComment } from "./about.ts";
 import { addressName, aboutAddress, aboutComment, commentName, commentPill, none, pathName, type ItemName, type TitleOf } from "./about.ts";
 
 // A message as it is sent and read back: the parts a draft goes out with,

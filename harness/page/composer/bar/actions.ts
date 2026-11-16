@@ -1,7 +1,6 @@
 import type { SlashCommand } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, untrack, type Accessor } from "solid-js";
-import { type WaitingComment } from "../../state/index.ts";
-import { carriesFiles } from "../../files/index.ts";
+import type { WaitingComment } from "../pill/about.ts";
 import { draftComments, draftForAgent, draftIsEmpty, draftText, fileMention, normalize, textDraft, type Draft } from "../draft/model.ts";
 import type { DraftFieldApi } from "../draft/view.tsx";
 import type { PillHost } from "../pill/card.ts";
@@ -239,6 +238,9 @@ export function sendAllQueued(props: ComposerProps, queued: { items: Array<{ id:
 	if (queued.held) return props.onQueueAction?.("release");
 	for (const item of queued.items) props.onQueueAction?.("send", item.id);
 }
+
+/** Whether a drag carries files: during a drag only its types can be read, and a file drag says "Files". */
+const carriesFiles = (transfer: DataTransfer | null): boolean => !!transfer && Array.from(transfer.types).includes("Files");
 
 /** Files dragged over the box: it says it will take them, and a drop hands them to the shell. */
 export function dropHandlers(props: ComposerProps, setDropping: (on: boolean) => void) {

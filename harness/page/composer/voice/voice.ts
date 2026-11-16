@@ -1,6 +1,5 @@
 import { createSignal } from "solid-js";
-import { api } from "../../connections/connection.ts";
-import { authHeaders } from "../../lib/session.ts";
+import { hostApi as api, hostHeaders as authHeaders } from "../host.ts";
 
 // Speech into words: which recogniser and language, the microphone, and a recording
 // sent to the server or heard by the browser.

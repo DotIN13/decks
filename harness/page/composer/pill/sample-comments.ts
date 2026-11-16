@@ -1,4 +1,4 @@
-import type { WaitingComment } from "../../state/index.ts";
+import type { WaitingComment } from "./about.ts";
 import type { DraftMention } from "../draft/model.ts";
 
 // The comments and pills the pill tests share: one written on a card, one the canvas handed over,

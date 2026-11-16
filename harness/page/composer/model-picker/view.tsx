@@ -1,5 +1,5 @@
 import type { AgentModel, ClaudeAccount, ModelOption, ThinkingLevel } from "@decks/protocol";
-import FiveHour from "../../settings/FiveHour.tsx";
+import { agentUiHost } from "../host.ts";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";
 import Sparkles from "lucide-solid/icons/sparkles";
@@ -166,4 +166,10 @@ function AccountRows(p: { accounts: ClaudeAccount[]; account: string | undefined
 			</div>
 		</div>
 	);
+}
+
+/** A subscription's five-hour reading, drawn by the host when it gives one. */
+function FiveHour(props: { reading: ClaudeAccount["fiveHour"] }) {
+	const Draw = agentUiHost().FiveHour;
+	return <>{Draw ? Draw(props) : null}</>;
 }

@@ -12,7 +12,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createSignal, For, Show } from "solid-js";
 import { Icon, ScribbleCatch } from "@decks/ui";
 import { joinHeard, micMissing } from "../voice/voice.ts";
-import type { WaitingComment } from "../../state/index.ts";
+import type { WaitingComment } from "../pill/about.ts";
 import { draftIsEmpty, type Draft, type DraftMention } from "../draft/model.ts";
 import { DraftField } from "../draft/view.tsx";
 import type { ItemName, TitleOf } from "../pill/about.ts";

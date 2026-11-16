@@ -1,7 +1,7 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
-import { createMemo, Show } from "solid-js";
+import { createMemo, Show, type JSX } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import { AgentFace, AgentMenu } from "../../agents/index.ts";
+import { agentUiHost, type AgentMenuProps, type FaceProps } from "../host.ts";
 import { Icon } from "@decks/ui";
 import type { Destination } from "../bar/destination.ts";
 import { menuActions } from "./actions.ts";
@@ -75,4 +75,18 @@ export function Recipient(props: RecipientProps) {
 			/>
 		</span>
 	);
+}
+
+/** An agent's face: the host's, or its initial in a circle when the host draws none. */
+export function AgentFace(props: FaceProps): JSX.Element {
+	const Draw = agentUiHost().AgentFace;
+	if (Draw) return Draw(props);
+	const initial = () => (props.identity?.name ?? props.chat.name ?? "?").slice(0, 1).toUpperCase();
+	return <span class={`agent-face ${props.class ?? ""}`} style={{ "--size": `${props.size ?? 20}px` }} aria-hidden="true">{initial()}</span>;
+}
+
+/** The agents menu behind the chip: the host's, or the chip alone when the host gives none. */
+function AgentMenu(props: AgentMenuProps): JSX.Element {
+	const Draw = agentUiHost().AgentMenu;
+	return Draw ? Draw(props) : props.trigger({ open: false, toggle: () => {}, ref: () => {} });
 }

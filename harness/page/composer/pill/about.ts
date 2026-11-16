@@ -1,10 +1,13 @@
 import { commentLabel, type DraftMention, mentionAddress, shortLabel } from "../draft/model.ts";
 import type { PillAbout } from "./card.ts";
-import { commentItem } from "../../markup/comments.ts";
-import type { WaitingComment } from "../../state/index.ts";
+import { commentItem } from "@decks/canvas/comments";
+import type { CardComment } from "@decks/canvas/comments";
 
 // What a pill is about: its name, and the words and address its card shows, for a comment,
 // a card, an item or a file.
+
+/** A comment waiting for the next message: one made on the canvas, or handed over by the canvas itself. */
+export type WaitingComment = CardComment & { from?: "canvas" };
 
 /** Looks a card's title up by its path; the app's cards know theirs. */
 export type TitleOf = (path: string) => string | undefined;

@@ -1,6 +1,6 @@
 import type { Identity } from "@decks/protocol";
 import { createEffect, For } from "solid-js";
-import { AgentFace } from "../../agents/index.ts";
+import { AgentFace } from "../recipient/view.tsx";
 import { keepInView } from "./actions.ts";
 import type { Mentionable } from "./model.ts";
 

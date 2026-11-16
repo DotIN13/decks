@@ -1,11 +1,10 @@
 import type { AgentUsage } from "@decks/protocol";
 import { For, Show } from "solid-js";
 import { Popover, Icon } from "@decks/ui";
-import { ContextRing } from "../../shell/index.ts";
-import { contextLevel, contextPercent } from "../../lib/index.ts";
+
 import Gauge from "lucide-solid/icons/gauge";
 import { openUsage } from "./actions.ts";
-import { dialLabel, usageRows } from "./model.ts";
+import { contextLevel, contextPercent, dialLabel, usageRows } from "./model.ts";
 
 // How full the agent's context is: a ring and its percentage, opening the numbers behind it.
 
@@ -113,6 +112,36 @@ export function ContextSummary(props: {
 						<span class="row-label">Usage and limits</span>
 					</button>
 				</>
+			)}
+		</Show>
+	);
+}
+
+/** How full the context is, as a ring: nothing while the reading is unknown, since a ring at zero would say empty. */
+export function ContextRing(props: { usage: AgentUsage | undefined; size?: number }) {
+	const size = () => props.size ?? 16;
+	/* The radius leaves room for the stroke: half of 2.4 on each side of the arc. */
+	const radius = () => size() / 2 - 2;
+	/** The circumference, so `stroke-dasharray` can be read as a percentage. */
+	const ring = () => 2 * Math.PI * radius();
+	return (
+		<Show when={contextPercent(props.usage)}>
+			{(value) => (
+				<svg class="ctx-ring" data-level={contextLevel(props.usage) ?? "normal"} width={size()} height={size()} viewBox={`0 0 ${size()} ${size()}`} aria-hidden="true">
+					<circle class="track" cx={size() / 2} cy={size() / 2} r={radius()} fill="none" stroke-width="2.4" />
+					<circle
+						class="fill"
+						cx={size() / 2}
+						cy={size() / 2}
+						r={radius()}
+						fill="none"
+						stroke-width="2.4"
+						stroke-linecap="round"
+						/* From twelve o'clock, filling clockwise, like every dial. */
+						transform={`rotate(-90 ${size() / 2} ${size() / 2})`}
+						stroke-dasharray={`${(Math.min(value(), 100) / 100) * ring()} ${ring()}`}
+					/>
+				</svg>
 			)}
 		</Show>
 	);

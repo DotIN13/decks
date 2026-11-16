@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { commentBlock } from "../../markup/comments.ts";
+import { commentBlock } from "@decks/canvas/comments";
 import { fileMention } from "../draft/model.ts";
 import { aboutAddress, aboutComment, commentName, commentPill, pathName } from "./about.ts";
 import { card, drawn, handed, item, itemName, longTitle, mine, titleOf } from "./sample-comments.ts";

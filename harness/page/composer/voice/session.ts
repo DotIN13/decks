@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount } from "solid-js";
-import { notice } from "../../state/index.ts";
+import { hostNotice as notice } from "../host.ts";
 import type { FieldRef } from "../bar/actions.ts";
 import { startRecording, type Recording } from "./voice.ts";
 
