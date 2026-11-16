@@ -1,3 +1,5 @@
+// A card's surface in its slot: the host its shadow root is made in, its file loaded and
+// mounted, and what the card's own root hears: its links, its words, its keys.
 import { probes } from "../debug.ts";
 import { createEffect, createMemo, on, onCleanup, untrack } from "solid-js";
 import { isCardSheet, mountCard, type MountedCard } from "./card.ts";
@@ -28,31 +30,7 @@ export function cardShot(path: string): CardShot | undefined {
  * module's and act through `card.decks` (`card.ts`), answered where the host says
  * (`CanvasHost.cardCall`). A card has no `data-eval` blocks.
  */
-export function CardSurface(props: {
-	page: string;
-	path: string;
-	trusted: boolean;
-	rev: number;
-	/** The revision is of a change of size alone: the card keeps the document it has (`Page.sized`). */
-	sized?: true | undefined;
-	reload?: number | undefined;
-	size: () => { w: number; h: number };
-	selected: boolean;
-	onSelect: () => void;
-	/**
-	 * A mouse or pen press with Shift (or ⌘) inside the card, offered to the editor as a press on the
-	 * card's edge is (`PageView.press`): it adds the card to the selection, or takes it out, rather
-	 * than picking it alone. True when the editor took it.
-	 */
-	onAddPress?: ((event: PointerEvent, on: HTMLElement) => boolean) | undefined;
-	onShown: () => void;
-	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenPage`), by its deck path. */
-	onOpenPage?: ((path: string) => void) | undefined;
-	/** The card's content height, for `decks.canvas.fit` (`card-reading.ts`): its file's height stays the floor. */
-	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
-	/** Words selected in the card, when a press or a key ends a selection: what to quote, the block they are in, and where they are. */
-	onWords?: ((words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void) | undefined;
-}) {
+export function CardSurface(props: CardSurfaceProps) {
 	let host!: HTMLDivElement;
 	// For the checks: how many surfaces were made for each card, and how many times each mounted its file.
 	const made = probes.made;
@@ -86,174 +64,222 @@ export function CardSurface(props: {
 	const mount = (html: string) => {
 		made[props.path]!.mounts++;
 		mounted?.dispose();
-		// A closed root is made once per element: a new file gets a new element.
-		const fresh = document.createElement("div");
-		fresh.className = "card-host";
-		// Sized here, not by the card's sheet: a root contained in size with no size of its own is nothing tall.
-		fresh.style.cssText = "width: 100%; height: 100%";
-		host.replaceChildren(fresh);
-		mounted = mountCard(fresh, {
-			html,
-			url: stamped(),
-			path: props.path,
-			trusted: props.trusted,
-			theme: untrack(scheme),
-			size: untrack(props.size),
-			...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
-		});
-		listen(mounted.root, fresh);
-		const root = mounted.root;
-		const url = stamped();
-		const shot = () => snapshotOfCard(root, { ...untrack(props.size), scheme: untrack(scheme), url, skip: isCardSheet });
-		shots.set(props.path, shot);
-		forget = () => shots.get(props.path) === shot && shots.delete(props.path);
-		// What fit reads (`card-reading.ts`): the height, and how the card reads at it.
-		const card = mounted;
-		mounted.onHeight((h) => {
-			const w = untrack(props.size).w;
-			props.onExtent?.({ w, h, at: w, page: h, ...card.reading() });
-		});
+		({ mounted, forget } = mountFresh(host, html, props, stamped, cardCall));
 		props.onShown();
 	};
-	/*
-	 * Loaded again when its file changes, not when only its size in the file did (`sized`): a card
-	 * resized by its edge wrote its size into its own tag, and a new revision for that had the card
-	 * fetched, parsed and its scripts started over, mid-use. The revision still names its picture.
-	 */
-	/*
-	 * What a load is for, each kept as a memo so only a change of its value runs the load: the file's
-	 * address without its query (the host's carries the revision as one, so it is a new string at
-	 * every change of the card), the revision of the card's words, which stays while the file's
-	 * changes are of its size alone (`sized`: a card resized by its edge wrote its size into its own
-	 * tag, and that had the card fetched and its scripts started over, mid-use), and the host's reloads
-	 * of this card alone (its record of every card's is a new object at each). The revision still names
-	 * its picture.
-	 */
-	const pageKey = createMemo(() => props.page.replace(/[?#].*$/, ""));
-	const contentRev = createMemo<number>((was) => (props.sized && was !== undefined ? was : props.rev), props.rev);
-	const reloads = createMemo(() => props.reload);
-	createEffect(on(() => [pageKey(), contentRev(), reloads()] as const, () => loader.load()));
-	/*
-	 * The scheme and the size are read before the card is asked: a card mounts later than these run
-	 * first, and `mounted?.setTheme(scheme())` reads nothing while `mounted` is unset, so the effect
-	 * would never run again and a card would keep the scheme it woke in.
-	 */
-	createEffect(() => {
-		const theme = scheme();
-		mounted?.setTheme(theme);
-	});
-	createEffect(() => {
-		const size = props.size();
-		mounted?.setSize(size);
-	});
+	loadOnChange(props, () => loader.load());
+	followSchemeAndSize(props, () => mounted);
 	onCleanup(() => {
 		loader.stop();
 		forget();
 		mounted?.dispose();
 	});
 
-	/** What the card's own root hears: the one rule (`ownInput`), and the card's links and words. */
-	const listen = (root: ShadowRoot, element: HTMLElement) => {
-		ownInput(root, element, { selected: () => props.selected, onSelect: () => props.onSelect(), onAddPress: props.onAddPress });
-		root.addEventListener("click", (event) => followLink(event as MouseEvent));
-		// A selection ends with a press let go, or a key with Shift: a moment later, it is read.
-		const readSoon = () => void setTimeout(() => readWords(root), 0);
-		root.addEventListener("pointerup", readSoon);
-		root.addEventListener("keyup", (event) => (event as KeyboardEvent).shiftKey && readSoon());
-	};
-
-	/**
-	 * The words selected in this card. A closed root hides its selection from the page's `getSelection()`,
-	 * which reports the host; `getComposedRanges`, handed the root, gives the range inside it.
-	 */
-	const readWords = (root: ShadowRoot) => {
-		if (!props.onWords) return;
-		const selection = document.getSelection() as (Selection & { getComposedRanges?: (...args: unknown[]) => StaticRange[] }) | null;
-		// Not `isCollapsed`: seen from the page, a selection inside a shadow root is collapsed at its host.
-		if (!selection || selection.rangeCount === 0 || typeof selection.getComposedRanges !== "function") return;
-		let ranges: StaticRange[];
-		try {
-			ranges = selection.getComposedRanges({ shadowRoots: [root] });
-		} catch {
-			// Safari 17's form: the roots as arguments.
-			ranges = selection.getComposedRanges(root);
-		}
-		const given = ranges[0];
-		if (!given || given.collapsed || !root.contains(given.startContainer) || !root.contains(given.endContainer)) return;
-		const range = document.createRange();
-		range.setStart(given.startContainer, given.startOffset);
-		range.setEnd(given.endContainer, given.endOffset);
-		const quote = range.toString().replace(/\s+/g, " ").trim();
-		if (!quote) return;
-		const at = given.startContainer instanceof Element ? given.startContainer : given.startContainer.parentElement;
-		const component = at?.closest("[data-id]")?.getAttribute("data-id") ?? undefined;
-		props.onWords({ quote, ...(component ? { component } : {}), anchor: () => (range.collapsed ? undefined : range.getBoundingClientRect()) });
-	};
-
-	/*
-	 * A link in a card never takes the app's own page away. Its address is read against the card's own
-	 * (`../../files/plan.html` is a file of the card's canvas), never against the page the card is drawn
-	 * in. A link to another card (`cards/<name>/index.html`) or a board opens it beside this one, as on a
-	 * board (`card.js`); a link with `download` saves the file, under the name it gives; any other link,
-	 * a file of the deck's among them, opens in a tab of its own.
-	 */
-	const followLink = (event: MouseEvent) => {
-		if (event.defaultPrevented || event.button !== 0) return;
-		const origin = event.composedPath()[0];
-		const link = origin instanceof Element ? origin.closest("a[href]") : null;
-		const href = link?.getAttribute("href");
-		if (!link || !href || href.startsWith("#")) return;
-		event.preventDefault();
-		let url: URL;
-		try {
-			url = new URL(href, stamped());
-		} catch {
-			return;
-		}
-		if (!/^(?:https?|blob|data):$/.test(url.protocol)) return;
-		const address = freshAddress(url.href);
-		if (link.hasAttribute("download")) return void saveFile(address, link.getAttribute("download") || decodeURIComponent(url.pathname.split("/").pop() ?? "") || "download");
-		const page = pageOf(url);
-		if (page && opensBeside(page) && props.onOpenPage) return props.onOpenPage(page);
-		openInTab(address);
-	};
-
-	/**
-	 * A file saved as a download from inside the canvas's frame: the browser saves a link's `download` only
-	 * for an address of the page's own origin, which the frame's blank origin never is, so the file is
-	 * fetched and saved from memory. One that cannot be fetched (another site's, which says no) opens in a tab.
-	 */
-	const saveFile = async (address: string, name: string) => {
-		try {
-			const response = await fetch(address);
-			if (!response.ok) throw new Error(String(response.status));
-			const blob = await response.blob();
-			const local = URL.createObjectURL(blob);
-			const anchor = document.createElement("a");
-			anchor.href = local;
-			anchor.download = name;
-			anchor.style.display = "none";
-			document.body.append(anchor);
-			anchor.click();
-			anchor.remove();
-			setTimeout(() => URL.revokeObjectURL(local), 60_000);
-		} catch {
-			openInTab(address);
-		}
-	};
-
-	/**
-	 * The deck path a link names: under the app's `/api/card/` on this
-	 * page's origin, or, in the canvas frame, under its pass's address, which only its host knows.
-	 */
-	const pageOf = (url: URL): string | undefined => {
-		const prefix = /\/api\/card\//.exec(url.pathname);
-		const named = url.origin === location.origin && prefix ? decodeURIComponent(url.pathname.slice(prefix.index + prefix[0].length)) : canvasHost().cardLink(url.href, location.href);
-		const path = named?.replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
-		return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;
-	};
-	/** Whether a deck path is one the canvas opens beside a card: another card, or a board. */
-	const opensBeside = (path: string) => /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path) || /(?:^|\/)boards\/.+\.html?$/i.test(path);
-
 	return <div class="card-surface" ref={(element) => (host = element)} style={{ width: "100%", height: "100%" }} />;
+}
+
+/** What a card's surface is given by its slot: its file, its place and size, and what to tell. */
+export type CardSurfaceProps = {
+	page: string;
+	path: string;
+	trusted: boolean;
+	rev: number;
+	/** The revision is of a change of size alone: the card keeps the document it has (`Page.sized`). */
+	sized?: true | undefined;
+	reload?: number | undefined;
+	size: () => { w: number; h: number };
+	selected: boolean;
+	onSelect: () => void;
+	/**
+	 * A mouse or pen press with Shift (or ⌘) inside the card, offered to the editor as a press on the
+	 * card's edge is (`PageView.press`): it adds the card to the selection, or takes it out, rather
+	 * than picking it alone. True when the editor took it.
+	 */
+	onAddPress?: ((event: PointerEvent, on: HTMLElement) => boolean) | undefined;
+	onShown: () => void;
+	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenPage`), by its deck path. */
+	onOpenPage?: ((path: string) => void) | undefined;
+	/** The card's content height, for `decks.canvas.fit` (`card-reading.ts`): its file's height stays the floor. */
+	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
+	/** Words selected in the card, when a press or a key ends a selection: what to quote, the block they are in, and where they are. */
+	onWords?: ((words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void) | undefined;
+};
+
+/** A fresh element for a new file, the card mounted in it, its words and links heard, its picture and extent told. */
+function mountFresh(host: HTMLElement, html: string, props: CardSurfaceProps, stamped: () => string, cardCall: ReturnType<typeof canvasHost>["cardCall"]): { mounted: MountedCard; forget: () => void } {
+	// A closed root is made once per element: a new file gets a new element.
+	const fresh = document.createElement("div");
+	fresh.className = "card-host";
+	// Sized here, not by the card's sheet: a root contained in size with no size of its own is nothing tall.
+	fresh.style.cssText = "width: 100%; height: 100%";
+	host.replaceChildren(fresh);
+	const mounted = mountCard(fresh, {
+		html,
+		url: stamped(),
+		path: props.path,
+		trusted: props.trusted,
+		theme: untrack(scheme),
+		size: untrack(props.size),
+		...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
+	});
+	listenToCard(mounted.root, fresh, props, stamped);
+	const root = mounted.root;
+	const url = stamped();
+	const shot = () => snapshotOfCard(root, { ...untrack(props.size), scheme: untrack(scheme), url, skip: isCardSheet });
+	shots.set(props.path, shot);
+	const forget = () => shots.get(props.path) === shot && shots.delete(props.path);
+	// What fit reads (`card-reading.ts`): the height, and how the card reads at it.
+	const card = mounted;
+	mounted.onHeight((h) => {
+		const w = untrack(props.size).w;
+		props.onExtent?.({ w, h, at: w, page: h, ...card.reading() });
+	});
+	return { mounted, forget };
+}
+
+/** Load the card's file again when it changes: not when only its size in it did. */
+function loadOnChange(props: CardSurfaceProps, load: () => void): void {
+/*
+ * Loaded again when its file changes, not when only its size in the file did (`sized`): a card
+ * resized by its edge wrote its size into its own tag, and a new revision for that had the card
+ * fetched, parsed and its scripts started over, mid-use. The revision still names its picture.
+ */
+/*
+ * What a load is for, each kept as a memo so only a change of its value runs the load: the file's
+ * address without its query (the host's carries the revision as one, so it is a new string at
+ * every change of the card), the revision of the card's words, which stays while the file's
+ * changes are of its size alone (`sized`: a card resized by its edge wrote its size into its own
+ * tag, and that had the card fetched and its scripts started over, mid-use), and the host's reloads
+ * of this card alone (its record of every card's is a new object at each). The revision still names
+ * its picture.
+ */
+const pageKey = createMemo(() => props.page.replace(/[?#].*$/, ""));
+const contentRev = createMemo<number>((was) => (props.sized && was !== undefined ? was : props.rev), props.rev);
+const reloads = createMemo(() => props.reload);
+	createEffect(on(() => [pageKey(), contentRev(), reloads()] as const, load));
+}
+
+/** The card told the scheme and its size as they change, read first so the effects run again once it mounts. */
+function followSchemeAndSize(props: CardSurfaceProps, mounted: () => MountedCard | undefined): void {
+/*
+ * The scheme and the size are read before the card is asked: a card mounts later than these run
+ * first, and `mounted?.setTheme(scheme())` reads nothing while `mounted` is unset, so the effect
+ * would never run again and a card would keep the scheme it woke in.
+ */
+createEffect(() => {
+	const theme = scheme();
+	mounted()?.setTheme(theme);
+});
+createEffect(() => {
+	const size = props.size();
+	mounted()?.setSize(size);
+});
+}
+
+/** What the card's own root hears: the one rule (`ownInput`), and the card's links and words. */
+function listenToCard(root: ShadowRoot, element: HTMLElement, props: CardSurfaceProps, base: () => string): void {
+	ownInput(root, element, { selected: () => props.selected, onSelect: () => props.onSelect(), onAddPress: props.onAddPress });
+	root.addEventListener("click", (event) => followLink(event as MouseEvent, base, props.onOpenPage));
+	// A selection ends with a press let go, or a key with Shift: a moment later, it is read.
+	const readSoon = () => void setTimeout(() => readWords(root, props.onWords), 0);
+	root.addEventListener("pointerup", readSoon);
+	root.addEventListener("keyup", (event) => (event as KeyboardEvent).shiftKey && readSoon());
+}
+
+// --- a card's own links and words
+
+/**
+ * The words selected in this card. A closed root hides its selection from the page's `getSelection()`,
+ * which reports the host; `getComposedRanges`, handed the root, gives the range inside it.
+ */
+function readWords(root: ShadowRoot, onWords: CardSurfaceProps["onWords"]): void {
+	if (!onWords) return;
+	const selection = document.getSelection() as (Selection & { getComposedRanges?: (...args: unknown[]) => StaticRange[] }) | null;
+	// Not `isCollapsed`: seen from the page, a selection inside a shadow root is collapsed at its host.
+	if (!selection || selection.rangeCount === 0 || typeof selection.getComposedRanges !== "function") return;
+	let ranges: StaticRange[];
+	try {
+		ranges = selection.getComposedRanges({ shadowRoots: [root] });
+	} catch {
+		// Safari 17's form: the roots as arguments.
+		ranges = selection.getComposedRanges(root);
+	}
+	const given = ranges[0];
+	if (!given || given.collapsed || !root.contains(given.startContainer) || !root.contains(given.endContainer)) return;
+	const range = document.createRange();
+	range.setStart(given.startContainer, given.startOffset);
+	range.setEnd(given.endContainer, given.endOffset);
+	const quote = range.toString().replace(/\s+/g, " ").trim();
+	if (!quote) return;
+	const at = given.startContainer instanceof Element ? given.startContainer : given.startContainer.parentElement;
+	const component = at?.closest("[data-id]")?.getAttribute("data-id") ?? undefined;
+	onWords({ quote, ...(component ? { component } : {}), anchor: () => (range.collapsed ? undefined : range.getBoundingClientRect()) });
+}
+
+/*
+ * A link in a card never takes the app's own page away. Its address is read against the card's own
+ * (`../../files/plan.html` is a file of the card's canvas), never against the page the card is drawn
+ * in. A link to another card (`cards/<name>/index.html`) or a board opens it beside this one, as on a
+ * board (`card.js`); a link with `download` saves the file, under the name it gives; any other link,
+ * a file of the deck's among them, opens in a tab of its own.
+ */
+function followLink(event: MouseEvent, base: () => string, onOpenPage: CardSurfaceProps["onOpenPage"]): void {
+	if (event.defaultPrevented || event.button !== 0) return;
+	const origin = event.composedPath()[0];
+	const link = origin instanceof Element ? origin.closest("a[href]") : null;
+	const href = link?.getAttribute("href");
+	if (!link || !href || href.startsWith("#")) return;
+	event.preventDefault();
+	let url: URL;
+	try {
+		url = new URL(href, base());
+	} catch {
+		return;
+	}
+	if (!/^(?:https?|blob|data):$/.test(url.protocol)) return;
+	const address = freshAddress(url.href);
+	if (link.hasAttribute("download")) return void saveFile(address, link.getAttribute("download") || decodeURIComponent(url.pathname.split("/").pop() ?? "") || "download");
+	const page = pageOf(url);
+	if (page && opensBeside(page) && onOpenPage) return onOpenPage(page);
+	openInTab(address);
+}
+
+/**
+ * A file saved as a download from inside the canvas's frame: the browser saves a link's `download` only
+ * for an address of the page's own origin, which the frame's blank origin never is, so the file is
+ * fetched and saved from memory. One that cannot be fetched (another site's, which says no) opens in a tab.
+ */
+async function saveFile(address: string, name: string): Promise<void> {
+	try {
+		const response = await fetch(address);
+		if (!response.ok) throw new Error(String(response.status));
+		const blob = await response.blob();
+		const local = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+		anchor.href = local;
+		anchor.download = name;
+		anchor.style.display = "none";
+		document.body.append(anchor);
+		anchor.click();
+		anchor.remove();
+		setTimeout(() => URL.revokeObjectURL(local), 60_000);
+	} catch {
+		openInTab(address);
+	}
+}
+
+/**
+ * The deck path a link names: under the app's `/api/card/` on this
+ * page's origin, or, in the canvas frame, under its pass's address, which only its host knows.
+ */
+function pageOf(url: URL): string | undefined {
+	const prefix = /\/api\/card\//.exec(url.pathname);
+	const named = url.origin === location.origin && prefix ? decodeURIComponent(url.pathname.slice(prefix.index + prefix[0].length)) : canvasHost().cardLink(url.href, location.href);
+	const path = named?.replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
+	return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;
+}
+
+/** Whether a deck path is one the canvas opens beside a card: another card, or a board. */
+function opensBeside(path: string): boolean {
+	return /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path) || /(?:^|\/)boards\/.+\.html?$/i.test(path);
 }

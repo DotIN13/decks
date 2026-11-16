@@ -1,5 +1,8 @@
+// A card mounted in a closed shadow root of the canvas's page: its HTML cleaned when a
+// friend's, its parts drawn, its scripts handed the card, and what it may reach.
 import { readingOfCard } from "./card-reading.ts";
 import { freshAddress, passless } from "../host/host.ts";
+
 /**
  * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
  * frame of its own.
@@ -17,7 +20,7 @@ import { freshAddress, passless } from "../host/host.ts";
  * ### A card's scripts
  *
  * Each inline script is a module, served at its own address beside the card (`sales.html.m0.js`,
- * the server's `boards/cards.ts`), so `import "./sales.js"` resolves from the card's folder and the
+ * the server's card routes), so `import "./sales.js"` resolves from the card's folder and the
  * page's import map names the shared libraries. A module runs once per address; its default export
  * is called for each placement of the card each time it wakes, with the card (`CardContext`), and
  * what it returns is called when the card sleeps or goes.
@@ -30,30 +33,6 @@ import { freshAddress, passless } from "../host/host.ts";
  * view and the time in the frame, the canvas's own calls by the harness, an agent's by the app's
  * page, which asks you before anything is sent to one, and nothing that reaches past the canvas.
  */
-
-/**
- * The SDK as a card has it: every call by its group and name, `card.decks.canvas.read()`, answering a
- * promise of its value. A call the canvas does not let a card make rejects with why.
- */
-type CardDecks = { [group: string]: { [call: string]: (...args: unknown[]) => Promise<unknown> } } & {
-	here(): Promise<unknown>;
-	now(): Promise<unknown>;
-};
-
-/** `card.decks`, its calls made by `call` with the dotted name: `decks.canvas.insert(…)` is `call("canvas.insert", […])`. */
-function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) | undefined): CardDecks {
-	const at = (path: readonly string[]): unknown =>
-		new Proxy(function () {}, {
-			// `then` is no call: awaiting `card.decks` or a group must not look like a promise.
-			get: (_target, key) => (typeof key === "string" && key !== "then" ? at([...path, key]) : undefined),
-			apply: (_target, _self, args: unknown[]) => {
-				const verb = path.join(".");
-				if (!call) return Promise.reject(new Error(`${verb}: this canvas gives cards no calls here.`));
-				return call(verb, args);
-			},
-		});
-	return at([]) as CardDecks;
-}
 
 /** What a card's script is handed: its own root, and what the stage knows of it. */
 export interface CardContext {
@@ -115,12 +94,250 @@ export interface MountedCard {
 	drawn: Promise<void>;
 }
 
+/**
+ * Put a card into `host`: its own closed root, card.css adopted, its HTML (cleaned first when it is
+ * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
+ * they arrive.
+ */
+export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
+	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
+	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
+	openRoots.add(root);
+	rootsByHost.set(host, root);
+	host.dataset.theme = source.theme;
+	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
+	const lib = new URL("../../lib/", source.url).href;
+	const sheetReady = cardSheet(lib).then((css) => {
+		if (css === undefined) return;
+		const style = document.createElement("style");
+		style.setAttribute(CARD_SHEET, "");
+		style.textContent = css;
+		root.prepend(style);
+	});
+
+	const { body, scripts } = cardBody(source);
+	root.append(body);
+
+	const controller = new AbortController();
+	const listeners = { theme: new Set<() => void>(), size: new Set<() => void>() };
+	const context = cardContext(root, body, source, registry, controller.signal, listeners);
+	const cleanups: Array<() => void> = [];
+	// Its markdown, maths, diagrams and code drawn, after card.css so a diagram takes the card's colours.
+	const partsDrawn = sheetReady.then(() => drawParts(host, root, body, lib));
+	if (source.trusted && scripts.length) runScripts(source, scripts, context, controller.signal, cleanups, sheetReady, partsDrawn);
+	const heights = watchHeight(body);
+	return {
+		root,
+		drawn: partsDrawn.then(() => undefined, () => undefined),
+		reading: () => readingOfCard(body),
+		onHeight(listener) {
+			heights.onHeight(listener);
+			if (heights.last()) listener(heights.last());
+		},
+		setTheme(theme) {
+			if (context.theme === theme) return;
+			context.theme = theme;
+			host.dataset.theme = theme;
+			for (const listener of listeners.theme) listener();
+		},
+		setSize(size) {
+			if (context.size.w === size.w && context.size.h === size.h) return;
+			context.size = { ...size };
+			for (const listener of listeners.size) listener();
+		},
+		dispose() {
+			heights.stop();
+			controller.abort();
+			for (const done of cleanups.splice(0)) {
+				try {
+					done();
+				} catch (error) {
+					console.error(`card ${source.path}`, error);
+				}
+			}
+			root.replaceChildren();
+			openRoots.delete(root);
+			rootsByHost.delete(host);
+		},
+	};
+}
+
+type Script = { src?: string; n?: number };
+
+/** The card's HTML parsed where nothing runs, its scripts taken out to run later, a friend's cleaned, in the body it shows in. */
+function cardBody(source: CardSource): { body: HTMLDivElement; scripts: Script[] } {
+	// Parsed where nothing runs: a template's content is inert, scripts and all.
+	const template = document.createElement("template");
+	template.innerHTML = source.html;
+	const fragment = template.content;
+	const scripts: Array<{ src?: string; n?: number }> = [];
+	let n = 0;
+	for (const script of [...fragment.querySelectorAll("script")]) {
+		if (!runs(script)) continue;
+		const src = script.getAttribute("src");
+		if (src) scripts.push({ src: new URL(src, source.url).href });
+		else scripts.push({ n: n++ });
+		script.remove();
+	}
+	/*
+	 * A friend's card keeps its own stylesheets, cleaned: each is fetched, its imports and outside
+	 * addresses taken out, and put in as a `<style>`, since a linked sheet's own `url()`s cannot be.
+	 */
+	addressesFromCard(fragment, source.url);
+	const sheetsToClean: Array<{ href: string; into: HTMLStyleElement }> = [];
+	if (!source.trusted) {
+		for (const link of [...fragment.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]')]) {
+			const href = link.getAttribute("href") ?? "";
+			if (!inDeck(href, source.url)) continue;
+			const into = document.createElement("style");
+			link.replaceWith(into);
+			sheetsToClean.push({ href: new URL(href, source.url).href, into });
+		}
+		clean(fragment, source.url);
+	}
+	for (const { href, into } of sheetsToClean)
+		void fetch(href)
+			.then((response) => (response.ok ? response.text() : ""))
+			.then((css) => (into.textContent = cleanCss(cssFromCard(css, href), href)))
+			.catch(() => undefined);
+	const body = document.createElement("div");
+	// Also `board`, so a board's own `.board .doc` rules match a card made from it.
+	body.className = "card-body board";
+	// Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`input/item-keys.ts`).
+	body.tabIndex = -1;
+	body.style.outline = "none";
+	body.append(fragment);
+	return { body, scripts };
+}
+
+/** What a card's scripts are handed: its root, its files, its theme and size, a store of its own, and its calls. */
+function cardContext(root: ShadowRoot, body: HTMLElement, source: CardSource, registry: CustomElementRegistry | undefined, signal: AbortSignal, listeners: { theme: Set<() => void>; size: Set<() => void> }): CardContext {
+	const store = {
+		getItem: (key: string) => localStorage.getItem(`decks.card:${source.path}:${key}`),
+		setItem: (key: string, value: string) => localStorage.setItem(`decks.card:${source.path}:${key}`, value),
+		removeItem: (key: string) => localStorage.removeItem(`decks.card:${source.path}:${key}`),
+	};
+	const context: CardContext = {
+		root,
+		document: asDocument(root, body),
+		signal,
+		url: source.url,
+		// On the canvas's pass now: a card reads a file long after it was loaded.
+		file: (name: string) => freshAddress(new URL(name, source.url).href),
+		theme: source.theme,
+		size: { ...source.size },
+		elements: registry ?? customElements,
+		store,
+		on: (what, listener) => void listeners[what].add(listener),
+		// A friend's card runs no script, so it never makes a call; the deck's own make them as themselves.
+		decks: cardDecks(source.trusted ? source.call : undefined),
+		path: source.path,
+	};
+	return context;
+}
+
+/**
+ * The SDK as a card has it: every call by its group and name, `card.decks.canvas.read()`, answering a
+ * promise of its value. A call the canvas does not let a card make rejects with why.
+ */
+type CardDecks = { [group: string]: { [call: string]: (...args: unknown[]) => Promise<unknown> } } & {
+	here(): Promise<unknown>;
+	now(): Promise<unknown>;
+};
+
+/** `card.decks`, its calls made by `call` with the dotted name: `decks.canvas.insert(…)` is `call("canvas.insert", […])`. */
+function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) | undefined): CardDecks {
+	const at = (path: readonly string[]): unknown =>
+		new Proxy(function () {}, {
+			// `then` is no call: awaiting `card.decks` or a group must not look like a promise.
+			get: (_target, key) => (typeof key === "string" && key !== "then" ? at([...path, key]) : undefined),
+			apply: (_target, _self, args: unknown[]) => {
+				const verb = path.join(".");
+				if (!call) return Promise.reject(new Error(`${verb}: this canvas gives cards no calls here.`));
+				return call(verb, args);
+			},
+		});
+	return at([]) as CardDecks;
+}
+
+/** The root, dressed as a document for a script written for a board. */
+function asDocument(root: ShadowRoot, body: HTMLElement): Document {
+	return new Proxy(document, {
+		get(target, key) {
+			if (key === "body" || key === "documentElement" || key === "head") return body;
+			if (key === "readyState") return "complete";
+			if (key === "querySelector" || key === "querySelectorAll" || key === "getElementById") return (root as unknown as Record<string, (...a: unknown[]) => unknown>)[key]!.bind(root);
+			if (key === "getElementsByClassName" || key === "getElementsByTagName") return (body as unknown as Record<string, (...a: unknown[]) => unknown>)[key]!.bind(body);
+			// A card is whole when its script runs: what waits for the page to load runs at once.
+			if (key === "addEventListener")
+				return (type: string, listener: EventListenerOrEventListenerObject, options?: AddEventListenerOptions | boolean) => {
+					if (type === "DOMContentLoaded" || type === "readystatechange") return void queueMicrotask(() => (typeof listener === "function" ? listener.call(root, new Event(type)) : listener.handleEvent(new Event(type))));
+					root.addEventListener(type, listener, options);
+				};
+			if (key === "removeEventListener") return root.removeEventListener.bind(root);
+			if (key === "activeElement") return root.activeElement;
+			const value = Reflect.get(target, key, target);
+			return typeof value === "function" ? value.bind(target) : value;
+		},
+	});
+}
+
+/** Each script the card runs, in order, once its sheet and parts are drawn; what one answers is how it stops. */
+function runScripts(source: CardSource, scripts: Script[], context: CardContext, signal: AbortSignal, cleanups: Array<() => void>, sheetReady: Promise<void>, partsDrawn: Promise<void>): void {
+	const base = source.url.replace(/[?#].*$/, "");
+	void (async () => {
+		// After card.css and the parts it draws, so a script that measures its card measures it as it shows.
+		await sheetReady;
+		await partsDrawn;
+		await deckImports(source.url);
+		for (const script of scripts) {
+			if (signal.aborted) return;
+			const address = script.src ?? `${base}.m${script.n}.js`;
+			try {
+				const module = await importOnce<{ default?: (card: CardContext) => CardCleanup | Promise<CardCleanup> }>(address);
+				if (signal.aborted || typeof module.default !== "function") continue;
+				const done = await module.default(context);
+				if (typeof done === "function") {
+					if (signal.aborted) done();
+					else cleanups.push(done);
+				}
+			} catch (error) {
+				console.error(`card ${source.path}: ${address}`, error);
+			}
+		}
+	})();
+}
+
+/** The card's height as it changes, told to whoever listens. */
+function watchHeight(body: HTMLElement): { onHeight(listener: (h: number) => void): void; last(): number; stop(): void } {
+	const heightListeners = new Set<(h: number) => void>();
+	let lastHeight = 0;
+	const sizes = new ResizeObserver(() => {
+		const h = Math.ceil(body.offsetHeight);
+		if (h === lastHeight || h === 0) return;
+		lastHeight = h;
+		for (const listener of heightListeners) listener(h);
+	});
+	sizes.observe(body);
+	return {
+		onHeight: (listener) => void heightListeners.add(listener),
+		last: () => lastHeight,
+		stop: () => {
+			sizes.disconnect();
+			heightListeners.clear();
+		},
+	};
+}
+
+// Cleaning a friend's card: what runs, what may be reached
 /** A script's type that is JavaScript a card runs: none, a module, or a plain script. The server counts the same ones. */
 const RUNS = /^(?:|module|text\/javascript|application\/javascript)$/i;
+
 const runs = (script: HTMLScriptElement) => RUNS.test(script.getAttribute("type") ?? "");
 
 /** Elements a shared card may not hold: anything that runs, or opens a page of its own. */
 const DROPPED = new Set(["script", "iframe", "frame", "object", "embed", "applet", "base", "meta", "link", "portal", "noscript"]);
+
 /** Attributes that hold an address. */
 const ADDRESSES = ["href", "src", "action", "formaction", "poster", "xlink:href", "srcset", "background", "data"];
 
@@ -215,6 +432,7 @@ function cssInDeck(css: string, base: string): boolean {
 	return true;
 }
 
+// The card sheet every card adopts
 /*
  * card.css for a shadow root: the board tokens and parts, with `:root` and the page's `html` and
  * `body.board` turned into the card's own host and element, and the fonts declared once in the page
@@ -227,10 +445,13 @@ function cssInDeck(css: string, base: string): boolean {
  * later, wins. The browser parses the same text once for every root that holds it.
  */
 const sheets = new Map<string, Promise<string | undefined>>();
+
 /** Kept for callers that skipped card.css among a root's adopted sheets: card.css is never one now (`CARD_SHEET`). */
 export const isCardSheet = (_sheet: CSSStyleSheet): boolean => false;
+
 /** The attribute on the `<style>` that holds card.css in a card's root: a card's snapshot loads card.css instead (`card-snapshot.ts`). */
 export const CARD_SHEET = "data-card-sheet";
+
 /**
  * The inherited properties a card's host starts from: a page's initial values, so nothing of the page
  * the host sits in (its font, its letter-spacing, a phone's text inflation) reaches the card's text.
@@ -239,9 +460,12 @@ const HOST_RESET =
 	"font: 16px/normal serif; font-kerning: auto; font-feature-settings: normal; font-variation-settings: normal; font-synthesis: weight style; letter-spacing: normal; word-spacing: normal; " +
 	"text-align: start; text-indent: 0; text-transform: none; text-shadow: none; text-rendering: auto; white-space: normal; hyphens: manual; " +
 	"-webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-font-smoothing: auto;";
+
 const fontsSaid = new Set<string>();
+
 /** A response's text, or a failure for one refused or missing. */
 const textOf = (response: Response): Promise<string> => (response.ok ? response.text() : Promise.reject(new Error(`${response.url}: ${response.status}`)));
+
 function cardSheet(lib: string): Promise<string | undefined> {
 	// One sheet whatever pass `lib` was read on (`host.ts`).
 	const key = passless(lib);
@@ -289,34 +513,14 @@ function cardSheet(lib: string): Promise<string | undefined> {
 	return made;
 }
 
-/** The root, dressed as a document for a script written for a board. */
-function asDocument(root: ShadowRoot, body: HTMLElement): Document {
-	return new Proxy(document, {
-		get(target, key) {
-			if (key === "body" || key === "documentElement" || key === "head") return body;
-			if (key === "readyState") return "complete";
-			if (key === "querySelector" || key === "querySelectorAll" || key === "getElementById") return (root as unknown as Record<string, (...a: unknown[]) => unknown>)[key]!.bind(root);
-			if (key === "getElementsByClassName" || key === "getElementsByTagName") return (body as unknown as Record<string, (...a: unknown[]) => unknown>)[key]!.bind(body);
-			// A card is whole when its script runs: what waits for the page to load runs at once.
-			if (key === "addEventListener")
-				return (type: string, listener: EventListenerOrEventListenerObject, options?: AddEventListenerOptions | boolean) => {
-					if (type === "DOMContentLoaded" || type === "readystatechange") return void queueMicrotask(() => (typeof listener === "function" ? listener.call(root, new Event(type)) : listener.handleEvent(new Event(type))));
-					root.addEventListener(type, listener, options);
-				};
-			if (key === "removeEventListener") return root.removeEventListener.bind(root);
-			if (key === "activeElement") return root.activeElement;
-			const value = Reflect.get(target, key, target);
-			return typeof value === "function" ? value.bind(target) : value;
-		},
-	});
-}
-
+// Drawing a card's parts: markdown, maths, code and diagrams
 /*
  * What `card.js` draws on a board, drawn in a card: `[data-md]` as markdown, maths in it and in a
  * `.doc`, `[data-mermaid]` as a diagram, and code in `<pre>` coloured. From the same vendored files in
  * the deck's `lib/`, each loaded once for the page whatever number of cards asks for it.
  */
 const loaded = new Map<string, Promise<unknown>>();
+
 function once<T>(given: string, make: () => Promise<T>): Promise<T> {
 	// Kept by the address without its pass: a renewed pass is the same file, not a second copy (`host.ts`).
 	const key = passless(given);
@@ -337,6 +541,7 @@ function once<T>(given: string, make: () => Promise<T>): Promise<T> {
  * same file on a renewed pass is a new address, so it would run a second time beside the first.
  */
 const modules = new Map<string, string>();
+
 async function importOnce<T>(address: string): Promise<T> {
 	const key = passless(address);
 	const first = modules.get(key) ?? address;
@@ -344,6 +549,7 @@ async function importOnce<T>(address: string): Promise<T> {
 	modules.set(key, first);
 	return module;
 }
+
 /** A classic script from `lib/`, put in the page once: the UMD builds set a global. */
 const pageScript = (lib: string, name: string) =>
 	once(`script:${lib}${name}`, () => new Promise<void>((resolve, reject) => {
@@ -353,7 +559,9 @@ const pageScript = (lib: string, name: string) =>
 		script.onerror = () => reject(new Error(`${name} did not load`));
 		document.head.append(script);
 	}));
+
 const pageModule = <T>(lib: string, name: string) => once(`module:${lib}${name}`, () => import(/* @vite-ignore */ new URL(name, lib).href) as Promise<T>);
+
 /** A stylesheet in the root, where its rules apply, and in the page, where its fonts do: a shadow root's `@font-face` is not used. */
 function rootStyle(root: ShadowRoot, lib: string, name: string): void {
 	const href = new URL(name, lib).href;
@@ -375,6 +583,31 @@ function dedent(text: string): string {
 	const indents = lines.filter((line) => line.trim()).map((line) => line.match(/^ */)![0].length);
 	const common = indents.length ? Math.min(...indents) : 0;
 	return lines.map((line) => line.slice(common)).join("\n").trim();
+}
+
+/** Draw a card's markdown, maths, diagrams and code, as `card.js` draws a board's. Never throws: a part that fails says so in place. */
+async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement, lib: string): Promise<void> {
+	const work: Promise<unknown>[] = [];
+	for (const element of body.querySelectorAll<HTMLElement>("[data-md], [data-mermaid]")) {
+		const source = element.textContent ?? "";
+		const diagram = element.dataset.mermaid !== undefined;
+		work.push(
+			(async () => {
+				if (diagram) return cardMermaid(host, element, lib, source);
+				await pageScript(lib, "marked.umd.js");
+				const marked = (window as unknown as { marked: { parse(text: string, o: unknown): string } }).marked;
+				element.innerHTML = marked.parse(dedent(source.replace(/^---\n[\s\S]*?\n---\n/, "")), { gfm: true, breaks: false });
+				await cardMath(root, element, lib);
+				await cardCode(element, lib);
+			})().catch((error) => {
+				if (diagram) element.textContent = `mermaid: ${error instanceof Error ? error.message : String(error)}`;
+				console.warn(`card ${diagram ? "mermaid" : "markdown"}:`, error);
+			}),
+		);
+	}
+	for (const doc of body.querySelectorAll(".doc")) work.push(cardMath(root, doc, lib).catch((error) => console.warn("card maths:", error)));
+	await Promise.allSettled(work);
+	await cardCode(body, lib).catch((error) => console.warn("card code:", error));
 }
 
 async function cardMath(root: ShadowRoot, target: Element, lib: string): Promise<void> {
@@ -463,31 +696,7 @@ async function cardMermaid(host: HTMLElement, target: HTMLElement, lib: string, 
 	}
 }
 
-/** Draw a card's markdown, maths, diagrams and code, as `card.js` draws a board's. Never throws: a part that fails says so in place. */
-async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement, lib: string): Promise<void> {
-	const work: Promise<unknown>[] = [];
-	for (const element of body.querySelectorAll<HTMLElement>("[data-md], [data-mermaid]")) {
-		const source = element.textContent ?? "";
-		const diagram = element.dataset.mermaid !== undefined;
-		work.push(
-			(async () => {
-				if (diagram) return cardMermaid(host, element, lib, source);
-				await pageScript(lib, "marked.umd.js");
-				const marked = (window as unknown as { marked: { parse(text: string, o: unknown): string } }).marked;
-				element.innerHTML = marked.parse(dedent(source.replace(/^---\n[\s\S]*?\n---\n/, "")), { gfm: true, breaks: false });
-				await cardMath(root, element, lib);
-				await cardCode(element, lib);
-			})().catch((error) => {
-				if (diagram) element.textContent = `mermaid: ${error instanceof Error ? error.message : String(error)}`;
-				console.warn(`card ${diagram ? "mermaid" : "markdown"}:`, error);
-			}),
-		);
-	}
-	for (const doc of body.querySelectorAll(".doc")) work.push(cardMath(root, doc, lib).catch((error) => console.warn("card maths:", error)));
-	await Promise.allSettled(work);
-	await cardCode(body, lib).catch((error) => console.warn("card code:", error));
-}
-
+// The deck's own imports for a card's modules
 /** Whether the host handed the deck's import map (`giveDeckImports`): then no card looks for it. */
 let deckImportsGiven = false;
 
@@ -546,6 +755,7 @@ function deckImports(cardUrl: string): Promise<void> {
 	});
 }
 
+// Roots: their own element registry, and words selected in them
 const registryPerRoot = (() => {
 	try {
 		const Registry = (globalThis as { CustomElementRegistry?: new () => CustomElementRegistry }).CustomElementRegistry;
@@ -589,166 +799,7 @@ export function wordsSelectedInCards(): boolean {
 	return roots.some((root) => ((root as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.()?.toString() ?? "").trim() !== "");
 }
 
-/**
- * Put a card into `host`: its own closed root, card.css adopted, its HTML (cleaned first when it is
- * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
- * they arrive.
- */
-export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
-	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
-	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
-	openRoots.add(root);
-	rootsByHost.set(host, root);
-	host.dataset.theme = source.theme;
-	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
-	const lib = new URL("../../lib/", source.url).href;
-	const sheetReady = cardSheet(lib).then((css) => {
-		if (css === undefined) return;
-		const style = document.createElement("style");
-		style.setAttribute(CARD_SHEET, "");
-		style.textContent = css;
-		root.prepend(style);
-	});
-
-	// Parsed where nothing runs: a template's content is inert, scripts and all.
-	const template = document.createElement("template");
-	template.innerHTML = source.html;
-	const fragment = template.content;
-	const scripts: Array<{ src?: string; n?: number }> = [];
-	let n = 0;
-	for (const script of [...fragment.querySelectorAll("script")]) {
-		if (!runs(script)) continue;
-		const src = script.getAttribute("src");
-		if (src) scripts.push({ src: new URL(src, source.url).href });
-		else scripts.push({ n: n++ });
-		script.remove();
-	}
-	/*
-	 * A friend's card keeps its own stylesheets, cleaned: each is fetched, its imports and outside
-	 * addresses taken out, and put in as a `<style>`, since a linked sheet's own `url()`s cannot be.
-	 */
-	addressesFromCard(fragment, source.url);
-	const sheetsToClean: Array<{ href: string; into: HTMLStyleElement }> = [];
-	if (!source.trusted) {
-		for (const link of [...fragment.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]')]) {
-			const href = link.getAttribute("href") ?? "";
-			if (!inDeck(href, source.url)) continue;
-			const into = document.createElement("style");
-			link.replaceWith(into);
-			sheetsToClean.push({ href: new URL(href, source.url).href, into });
-		}
-		clean(fragment, source.url);
-	}
-	for (const { href, into } of sheetsToClean)
-		void fetch(href)
-			.then((response) => (response.ok ? response.text() : ""))
-			.then((css) => (into.textContent = cleanCss(cssFromCard(css, href), href)))
-			.catch(() => undefined);
-	const body = document.createElement("div");
-	// Also `board`, so a board's own `.board .doc` rules match a card made from it.
-	body.className = "card-body board";
-	// Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`input/item-keys.ts`).
-	body.tabIndex = -1;
-	body.style.outline = "none";
-	body.append(fragment);
-	root.append(body);
-
-	const controller = new AbortController();
-	const listeners = { theme: new Set<() => void>(), size: new Set<() => void>() };
-	const store = {
-		getItem: (key: string) => localStorage.getItem(`decks.card:${source.path}:${key}`),
-		setItem: (key: string, value: string) => localStorage.setItem(`decks.card:${source.path}:${key}`, value),
-		removeItem: (key: string) => localStorage.removeItem(`decks.card:${source.path}:${key}`),
-	};
-	const context: CardContext = {
-		root,
-		document: asDocument(root, body),
-		signal: controller.signal,
-		url: source.url,
-		// On the canvas's pass now: a card reads a file long after it was loaded.
-		file: (name: string) => freshAddress(new URL(name, source.url).href),
-		theme: source.theme,
-		size: { ...source.size },
-		elements: registry ?? customElements,
-		store,
-		on: (what, listener) => void listeners[what].add(listener),
-		// A friend's card runs no script, so it never makes a call; the deck's own make them as themselves.
-		decks: cardDecks(source.trusted ? source.call : undefined),
-		path: source.path,
-	};
-	const cleanups: Array<() => void> = [];
-	// Its markdown, maths, diagrams and code drawn, after card.css so a diagram takes the card's colours.
-	const partsDrawn = sheetReady.then(() => drawParts(host, root, body, lib));
-	if (source.trusted && scripts.length) {
-		const base = source.url.replace(/[?#].*$/, "");
-		void (async () => {
-			// After card.css and the parts it draws, so a script that measures its card measures it as it shows.
-			await sheetReady;
-			await partsDrawn;
-			await deckImports(source.url);
-			for (const script of scripts) {
-				if (controller.signal.aborted) return;
-				const address = script.src ?? `${base}.m${script.n}.js`;
-				try {
-					const module = await importOnce<{ default?: (card: CardContext) => CardCleanup | Promise<CardCleanup> }>(address);
-					if (controller.signal.aborted || typeof module.default !== "function") continue;
-					const done = await module.default(context);
-					if (typeof done === "function") {
-						if (controller.signal.aborted) done();
-						else cleanups.push(done);
-					}
-				} catch (error) {
-					console.error(`card ${source.path}: ${address}`, error);
-				}
-			}
-		})();
-	}
-	const heightListeners = new Set<(h: number) => void>();
-	let lastHeight = 0;
-	const sizes = new ResizeObserver(() => {
-		const h = Math.ceil(body.offsetHeight);
-		if (h === lastHeight || h === 0) return;
-		lastHeight = h;
-		for (const listener of heightListeners) listener(h);
-	});
-	sizes.observe(body);
-	return {
-		root,
-		drawn: partsDrawn.then(() => undefined, () => undefined),
-		reading: () => readingOfCard(body),
-		onHeight(listener) {
-			heightListeners.add(listener);
-			if (lastHeight) listener(lastHeight);
-		},
-		setTheme(theme) {
-			if (context.theme === theme) return;
-			context.theme = theme;
-			host.dataset.theme = theme;
-			for (const listener of listeners.theme) listener();
-		},
-		setSize(size) {
-			if (context.size.w === size.w && context.size.h === size.h) return;
-			context.size = { ...size };
-			for (const listener of listeners.size) listener();
-		},
-		dispose() {
-			sizes.disconnect();
-			heightListeners.clear();
-			controller.abort();
-			for (const done of cleanups.splice(0)) {
-				try {
-					done();
-				} catch (error) {
-					console.error(`card ${source.path}`, error);
-				}
-			}
-			root.replaceChildren();
-			openRoots.delete(root);
-			rootsByHost.delete(host);
-		},
-	};
-}
-
+// A press inside a card
 /** Whether something in a card can scroll the way a wheel goes, from the element under it out to the card. */
 export function scrollsInside(path: EventTarget[], host: HTMLElement, dx: number, dy: number): boolean {
 	for (const target of path) {
