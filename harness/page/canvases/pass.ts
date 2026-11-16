@@ -20,21 +20,28 @@ export function canvasPass(canvas: string): Promise<CanvasPass> {
 	 */
 	const kept = passes.get(canvas);
 	if (kept && Date.now() < kept.until) return kept.pass;
-	const pass = askPass(canvas);
-	const entry = { pass, until: Date.now() + 25 * 60_000 };
+	// A renewal names the pass it renews, so the server keeps its caller and the frame's socket stays open.
+	const pass = askPass(canvas, kept?.token);
+	const entry: Kept = { pass, until: Date.now() + 25 * 60_000 };
 	passes.set(canvas, entry);
 	void pass.then(
-		(got) => (entry.until = Date.now() + (got.expires - Date.now()) / 2 - 60_000),
+		(got) => {
+			entry.token = got.token;
+			entry.until = Date.now() + (got.expires - Date.now()) / 2 - 60_000;
+		},
 		() => passes.get(canvas) === entry && passes.delete(canvas),
 	);
 	return pass;
 }
 
-/** The pass each canvas was last given, and until when it is given again. */
-const passes = new Map<string, { pass: Promise<CanvasPass>; until: number }>();
+/** A canvas's last pass, its token once it came, and until when it is given again. */
+type Kept = { pass: Promise<CanvasPass>; token?: string; until: number };
 
-async function askPass(canvas: string): Promise<CanvasPass> {
-	const response = await fetch(api("/passes"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ canvas }) });
+/** The pass each canvas was last given. */
+const passes = new Map<string, Kept>();
+
+async function askPass(canvas: string, renewing?: string): Promise<CanvasPass> {
+	const response = await fetch(api("/passes"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify(renewing ? { canvas, renewing } : { canvas }) });
 	const answer = (await response.json().catch(() => ({}))) as { pass?: string; expires?: number; error?: string; imports?: Record<string, string> };
 	if (!answer.pass) throw new Error(`No pass for the canvas ${canvas}: ${answer.error ?? response.status}`);
 	const at = (rest: string) => new URL(api(`/t/${answer.pass}/${rest}`), location.href).href;
