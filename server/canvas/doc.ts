@@ -5,7 +5,7 @@ import type { Kinds } from "./kinds.ts";
 import { Log } from "./log.ts";
 import { routeArrows } from "./arrows.ts";
 import { findId as findIn, step } from "./ops.ts";
-import { strayPath } from "./paths.ts";
+import { placedKeys, strayPath } from "./paths.ts";
 import { sourceOf, writeLike, type Source } from "./spans.ts";
 
 // One drawing in memory: read, changed only by apply (all or none), and
@@ -65,6 +65,7 @@ export class PenCanvas implements CanvasDoc {
 	apply(ops: ItemOp[], by: Caller, edit?: string, scoped = false): { items: Item[]; rev: number } {
 		if (!Array.isArray(ops) || !ops.length) throw new Refused("invalid", "Give at least one op.", "item.batch");
 		let work = this.doc;
+		const placed = scoped ? placedKeys(this.doc.children, this.name, this.kinds) : undefined;
 		const written: ItemOp[] = [];
 		const ids: string[] = [];
 		ops.forEach((op, i) => {
@@ -73,7 +74,7 @@ export class PenCanvas implements CanvasDoc {
 				work = done.doc;
 				written.push(done.op);
 				if (done.id) ids.push(done.id);
-				if (scoped && done.id && (op.op !== "update" || op.set) && op.op !== "delete" && op.op !== "move") this.keepsInside(work, done.id);
+				if (placed && done.id && (op.op !== "update" || op.set) && op.op !== "delete" && op.op !== "move") this.keepsInside(work, done.id, placed);
 			} catch (error) {
 				throw failed(error, i, op);
 			}
@@ -97,11 +98,11 @@ export class PenCanvas implements CanvasDoc {
 		this.saved(text, change, [...new Set(ids)], by, { pen, ...(edit ? { made: [edit] } : {}) });
 	}
 
-	/** Refuse, for a scoped caller, an item that names a path outside this canvas (README rule 9). */
-	private keepsInside(doc: PenDocument, id: string): void {
+	/** Refuse, for a scoped caller, an item naming a new place outside this canvas (README rule 9). */
+	private keepsInside(doc: PenDocument, id: string, placed: ReadonlySet<string>): void {
 		const node = [...walk(doc.children)].find((one) => one.id === id);
-		const stray = node ? strayPath([node], this.name, this.kinds) : undefined;
-		if (stray) throw new Refused("refused", `${id} names ${stray.path}, and ${stray.why}: a canvas points only at its own folder and the deck's assets/, docs/ and apps/.`, "item.paste");
+		const stray = node ? strayPath([node], this.name, this.kinds, placed) : undefined;
+		if (stray) throw new Refused("refused", `${id} names ${stray.path}, and ${stray.why}: a canvas pass reaches its canvas's folder and what its canvas already places; a new place is put by the person.`, "item.insert");
 	}
 
 	// Its log: since, undo and redo, and edits from outside

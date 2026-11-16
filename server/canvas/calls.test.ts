@@ -146,28 +146,34 @@ test("a watcher catching up gets every item.changed after its revision, as told 
 	await s.close();
 });
 
-test("for a scoped caller, an item naming a path outside its canvas is refused, however it is written", async () => {
+test("a pass reaches its canvas's folder and what its canvas already places, and names nothing new outside it", async () => {
 	const canvas = canvasFeature();
 	const s = await testServer({ features: [canvas, stickerFeature()], deck: { ...DECK, "canvases/other/cards/x/index.html": "<p>x</p>" } });
 	const doc = (canvas.canvases!(s.kernel) as CanvasStore).doc("plan");
-	const scoped = (ops: unknown[]) => {
+	const pass = (ops: unknown[]) => {
 		try {
 			doc.apply(ops as never, ann, undefined, true);
-			return false;
+			return "ok";
 		} catch (error) {
-			return (error as { code?: string }).code === "refused" && /points only at its own folder/.test((error as Error).message);
+			return (error as { code?: string }).code === "refused" && /a canvas pass reaches its canvas's folder/.test((error as Error).message) ? "refused" : (error as Error).message;
 		}
 	};
-	assert.ok(scoped([{ op: "insert", item: { type: "sticker", path: "canvases/other/cards/x/index.html" }, at: { x: 0, y: 900 } }]), "another canvas's card");
-	assert.ok(scoped([{ op: "insert", item: { type: "sticker", path: "assets/..%2fcanvases%2fother%2fcards%2fx%2findex.html" }, at: { x: 0, y: 900 } }]), "a climb, encoded");
-	assert.ok(scoped([{ op: "insert", item: { type: "rectangle", fill: { type: "image", url: "../other/files/a.png" } }, at: { x: 0, y: 900 } }]), "a picture outside");
-	assert.ok(scoped([{ op: "insert", item: { type: "note", id: "ok" } }, { op: "replace", id: "a", item: { type: "browser", url: "../../canvases/other/cards/x/index.html" } }]), "a replace in a batch");
-	assert.ok(scoped([{ op: "update", id: "a", set: { metadata: { path: "canvases/other/cards/x/index.html" } } }]), "an update that sets one");
-	assert.ok(scoped([{ op: "insert", item: { type: "browser", url: "/files/canvases/other/cards/x/index.html" }, at: { x: 0, y: 1300 } }]), "another route");
+	const put = (item: Record<string, unknown>) => [{ op: "insert", item, at: { x: 0, y: 1300 } }];
+	assert.equal(pass(put({ type: "sticker", path: "canvases/other/cards/x/index.html" })), "refused", "another canvas's card");
+	assert.equal(pass(put({ type: "sticker", path: "assets/..%2fcanvases%2fother%2fcards%2fx%2findex.html" })), "refused", "a climb, encoded");
+	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "../other/files/a.png" } })), "refused", "a picture outside");
+	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "assets/logo.png" } })), "refused", "a new file in assets/");
+	assert.equal(pass(put({ type: "browser", url: "/app/disk-cleaner/" })), "refused", "a new app");
+	assert.equal(pass(put({ type: "browser", url: "/files/canvases/other/cards/x/index.html" })), "refused", "another route");
+	assert.equal(pass([{ op: "insert", item: { type: "note", id: "ok" } }, { op: "replace", id: "a", item: { type: "browser", url: "../../canvases/other/cards/x/index.html" } }]), "refused", "a replace in a batch");
+	assert.equal(pass([{ op: "update", id: "a", set: { metadata: { path: "canvases/other/cards/x/index.html" } } }]), "refused", "an update that sets one");
 	assert.equal(doc.read().length, 2, "nothing changed");
-	for (const url of ["files/a.png", "assets/logo.png", "https://example.com/a.png", "/app/notes/"]) {
-		assert.equal(scoped([{ op: "insert", item: { type: "rectangle", fill: { type: "image", url } }, at: { x: 0, y: 1300 } }]), false, url);
-	}
+	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "files/a.png" } })), "ok", "its own files");
+	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "https://example.com/a.png" } })), "ok", "a web address");
+	// What the person placed, a pass may put in again: a copy, a paste back, an undone delete.
+	doc.apply([{ op: "insert", item: { type: "browser", id: "app1", url: "/app/review/" }, at: { x: 0, y: 1700 } }, { op: "insert", item: { type: "browser", id: "old1", url: "boards/apps/review.html" }, at: { x: 600, y: 1700 } }], ann);
+	assert.equal(pass(put({ type: "browser", url: "/app/review/" })), "ok", "an app the canvas already places");
+	assert.equal(pass([{ op: "copy", id: "old1", at: { x: 1200, y: 1700 } }]), "ok", "an old page the canvas already places");
 	await s.close();
 });
 
