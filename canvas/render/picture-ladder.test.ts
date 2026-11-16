@@ -1,3 +1,4 @@
+// Which picture a card gets, tested: the drawn width, the rung it needs, and when a sharper one is fetched.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { drawnWidth, rungFor, upgrades } from "./picture-ladder.ts";

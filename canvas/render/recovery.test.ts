@@ -1,3 +1,4 @@
+// Starting the engines again after an error, tested: a few times, then stopping and saying so.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Recovery } from "./recovery.ts";

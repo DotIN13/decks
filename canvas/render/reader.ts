@@ -1,3 +1,4 @@
+// The app's own readers handed to the engine: a card's markdown as blocks, with code highlighted and formulas typeset.
 import { highlight } from "../look/highlight.ts";
 import { parseMarkdown, type Block } from "../cards/markdown.ts";
 import { typesetFormula } from "../look/math.ts";

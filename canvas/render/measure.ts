@@ -1,3 +1,4 @@
+// Words measured on the page as the server measures them, for the drawing's layout.
 import { estimateText, isMarkdown, isMarkdownText, type MeasureText, type TextStyle } from "@decks/pen";
 
 /**

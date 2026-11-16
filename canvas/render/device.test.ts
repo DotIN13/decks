@@ -1,3 +1,4 @@
+// The device's kind and budget, tested: how the system is told, the GPU's class, the layer and picture rules per engine.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { browserEngine, deviceKind, gpuClass, isPhone, LAYERS, PICTURES } from "./device.ts";

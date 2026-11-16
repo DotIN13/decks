@@ -1,3 +1,4 @@
+// The packed R-tree, tested: what touches a rectangle.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BoxIndex, type Rect } from "./spatial.ts";

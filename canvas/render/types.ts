@@ -1,3 +1,5 @@
+// What crosses between the page's engine and its render worker, and what the canvas tells the engine: the messages, a
+// gesture's preview, a card as the engine places it.
 import type { Frame } from "@decks/pen";
 
 /** A drag or a resize in progress: moved by `dx dy`, and sized `w h` when resizing. */

@@ -15,6 +15,7 @@ interface Scope {
 }
 const scope = self as unknown as Scope;
 
+// What the worker holds: the engine, the scheme, the camera, and what it waits for before it paints.
 let engine: WorkerEngine | undefined;
 /** The scheme the engine's markdown reader reads in. */
 let dark = false;
@@ -46,6 +47,7 @@ const early: ToWorker[] = [];
 /** Taking the messages that came before the engine was up (`start`). */
 let replaying = false;
 
+// Painting: tiles for the camera, a few at a time, and what the page is told after.
 /**
  * Paint once the messages already here are taken (or in `ms`): fonts, pictures and icons that come
  * together are laid out and painted for once (the engine settles them at its next paint), not once each.
@@ -195,7 +197,7 @@ function report(): void {
 	if (wanted.length) scope.postMessage({ type: "wanted", urls: wanted });
 }
 
-// --- pictures --------------------------------------------------------------------------------------
+// Pictures: the image fills' files, fetched, decoded and asked for again when they fail.
 
 /*
  * Image fills and cards' pictures are fetched and decoded here, once, off the page's thread: the
@@ -265,6 +267,7 @@ async function decoded(blob: Blob, max: number): Promise<{ bitmap: ImageBitmap; 
 /** The widest and tallest picture the worker's device keeps. */
 let maxPicture = 4096;
 
+// Starting: the engine and its device, then the drawing, then every message the page sends.
 /** The engine loaded and the worker's device open (`boot`), before the drawing comes. */
 let booted: ReturnType<typeof boot> | undefined;
 function boot(message: { backend?: string; lowMemory?: boolean; module?: WebAssembly.Module }) {
