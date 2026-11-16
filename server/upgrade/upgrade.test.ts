@@ -26,8 +26,8 @@ const text = (deck: MemoryDeck, path: string) => deck.read(path as never).then((
 
 test("the fixture deck upgrades to the latest and keeps its friend's old board", async () => {
 	const deck = new MemoryDeck(fixtureFiles());
-	// The fixture is at the floor, as every deck from today is, so its old pages at the root (boards/) open.
-	const file = memoryVersion(readFileSync(join(FIXTURE, ".decks/migrations.json"), "utf8"));
+	// No version record, as a test deck has none: its old root pages beside canvas drawings are not an old shape.
+	const file = memoryVersion();
 	assert.deepEqual(await upgradeDeck(deck, file), []);
 	assert.equal((await readRecord(file)).version, LATEST);
 	assert.match(await text(deck, "shared/canvases/ada/old-notes/canvas.pen"), /decks\.board/);

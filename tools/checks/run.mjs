@@ -123,6 +123,9 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [], d
 	const deck = join(scratch, "deck");
 	const home = join(scratch, "home");
 	cpSync(FIXTURE, deck, { recursive: true });
+	// Every deck from today is at 0.5.1, which lets its old pages kept at the root open: the copy says so too.
+	mkdirSync(join(deck, ".decks"), { recursive: true });
+	if (!existsSync(join(deck, ".decks/migrations.json"))) writeFileSync(join(deck, ".decks/migrations.json"), '{\n\t"version": "0.5.1"\n}\n');
 	mkdirSync(home);
 	const started = [];
 	const running = new Map();

@@ -20,7 +20,10 @@ export const LATEST: Semver = MIGRATIONS.at(-1)?.version ?? FLOOR;
 export async function oldShapes(deck: Deck): Promise<string[]> {
 	const found: string[] = [];
 	if ((await names(deck, "stages")).length) found.push("canvases still in stages/ (0.1.0)");
-	if ((await names(deck, "boards")).some((p) => p.endsWith(".html"))) found.push("boards at the deck's root, not in their canvases (0.2.0)");
+	// Pages at the root are old only in a deck with no canvas drawing yet: one at 0.5.1 keeps them (the person's keeps 310).
+	const drawings = [];
+	for (const dir of await names(deck, "canvases")) if (await exists(deck, `${dir}/canvas.pen`)) drawings.push(dir);
+	if (!drawings.length && (await names(deck, "boards")).some((p) => p.endsWith(".html"))) found.push("boards at the deck's root, not in their canvases (0.2.0)");
 	for (const dir of await names(deck, "canvases")) {
 		const pen = `${dir}/canvas.pen`;
 		if (!(await exists(deck, pen))) continue;
