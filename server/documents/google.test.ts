@@ -112,3 +112,22 @@ test("without the Docs API, list and link answer unavailable", async () => {
 	}
 	await s.close();
 });
+
+test("rule 13: an agent reads a Doc and edits one exact piece; the change reaches the mirror as theirs", async () => {
+	const remote = new FakeLibrary("Alpha beta\nGamma beta\n");
+	const s = await testServer({ features: [documents({ docs: remote, tickMs: 10 })] });
+	const url = "https://docs.google.com/document/d/1abcdefghijklmnopqrstuvwxyz/edit";
+	const { path } = await s.value<{ path: string }>("google.link", { url }, "person");
+	await s.value("file.open", { path, client: "p" }, "person");
+	const read = await s.value<{ doc: string; title?: string; text: string }>("google.read", { doc: url }, "agent");
+	assert.deepEqual(read, { doc: "1abcdefghijklmnopqrstuvwxyz", title: "Field notes", text: "Alpha beta\nGamma beta\n" });
+	const twice = await s.call("google.edit", { doc: url, old: "beta", new: "delta" }, "agent");
+	assert.equal(twice.ok ? "ok" : twice.error.code, "invalid");
+	const done = await s.value<{ text: string }>("google.edit", { doc: "1abcdefghijklmnopqrstuvwxyz", old: "Gamma beta", new: "Gamma delta" }, callers.agent("ann"));
+	assert.equal(done.text, "Alpha beta\nGamma delta\n");
+	await new Promise((r) => setTimeout(r, 60));
+	const state = await s.value<{ text: string; changes: { by: string }[] }>("file.open", { path, client: "p" }, "person");
+	assert.equal(state.text, "Alpha beta\nGamma delta\n");
+	assert.deepEqual(state.changes.map((c) => c.by), ["ann"]);
+	await s.close();
+});

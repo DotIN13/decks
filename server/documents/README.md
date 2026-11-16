@@ -42,6 +42,9 @@ and Google Docs.
 12. A document item names its file from the deck's root. A name from the canvas's folder is taken
    for the file it means, with a note; a file named nowhere is made empty in the canvas's files/.
 
+13. `google.read` gives a Doc's words; `google.edit` replaces one exact piece of them, found once,
+   and the Doc's next pull into its mirror is credited to the editor, as a change to review.
+
 Typesetting, git, Google styles and comments are not built in wave 1: the router answers them `unavailable`.
 
 ## Check

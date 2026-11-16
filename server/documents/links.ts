@@ -46,9 +46,39 @@ export async function links(store: Store): Promise<Link[]> {
 }
 
 /** One round over the linked mirrors a page has open; a failed round waits for the next. */
-export async function tick(docs: GoogleDocs, deck: Deck, store: Store, isOpen: (path: string) => boolean): Promise<void> {
+export async function tick(docs: GoogleDocs, deck: Deck, store: Store, isOpen: (path: string) => boolean, now = Date.now()): Promise<void> {
 	for (const one of await links(store)) {
 		if (!isOpen(one.mirror)) continue;
-		await syncOnce(one, docs, deck, store, GOOGLE).catch(() => undefined);
+		await syncOnce(one, docs, deck, store, await creditOf(store, one.id, now)).catch(() => undefined);
 	}
+}
+
+// Rule 13: an agent reads a Doc as its text and edits it by one exact replacement. The edit goes
+// to Google; the next pull into its mirror is credited to that agent, so the page shows it as theirs.
+
+export const CREDIT_MS = 15_000;
+
+async function creditOf(store: Store, id: string, now: number): Promise<Caller> {
+	const kept = await store.get(`credit/${id}`);
+	const credit = kept ? (JSON.parse(decoder.decode(kept)) as { caller: Caller; until: number }) : undefined;
+	return credit && credit.until > now ? credit.caller : GOOGLE;
+}
+
+/** A Doc's words and title, by its address or id. */
+export async function readDoc(docs: GoogleDocs, url: string): Promise<{ doc: string; title?: string; text: string }> {
+	const id = docIdOf(url);
+	const [doc, title] = await Promise.all([docs.read(id), docs.title(id).catch(() => undefined)]);
+	return { doc: id, ...(title ? { title } : {}), text: doc.text };
+}
+
+/** Replace one exact piece of a Doc's words, all of it or none; the Doc's words as they now are. */
+export async function editDoc(docs: GoogleDocs, store: Store, url: string, old: string, next: string, by: Caller, now = Date.now()): Promise<{ doc: string; text: string }> {
+	const id = docIdOf(url);
+	const doc = await docs.read(id);
+	const count = old ? doc.text.split(old).length - 1 : 0;
+	if (count !== 1) throw new Refused("invalid", count === 0 ? "Those exact words are not in the Doc: google.read shows its words as they are now." : `Those words are in the Doc ${count} times: give more of them, so they are found once.`, "google.read");
+	const at = doc.text.indexOf(old);
+	await docs.write(id, [{ at, before: old, text: next }], doc.revision);
+	await store.put(`credit/${id}`, encoder.encode(JSON.stringify({ caller: by, until: now + CREDIT_MS })));
+	return { doc: id, text: (await docs.read(id)).text };
 }
