@@ -65,7 +65,7 @@ export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 
 export async function runCheck(file, i, { onlyServer = false } = {}) {
 	const log = [];
 	try {
-		return await runPrograms(async ({ ports, started, restart }) => {
+		return await runPrograms(async ({ ports, started, restart, refusals }) => {
 			const web = onlyServer ? ports.server : ports.web;
 			const control = await controlServer(ports.harness, restart);
 			// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
@@ -76,7 +76,13 @@ export async function runCheck(file, i, { onlyServer = false } = {}) {
 				const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
 				check.on("exit", (c) => (clearTimeout(timer), done(c)));
 			}).finally(() => control.close());
-			return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
+			// Every refusal the server gave a scoped caller (a pass) in this check: silent to the person, so said here.
+			const refused = refusalsOf(refusals);
+			for (const [what, n] of refused) log.push(`[runner] pass refused: ${what} x ${n}\n`);
+			const unexpected = refused.length > 0 && traitsOf(file).refusals !== true;
+			const ok = code === 0 && !unexpected;
+			const why = code !== 0 ? firstFailure(log, code) : unexpected ? `pass refused: ${refused.map(([what, n]) => `${what} x ${n}`).join("; ")}` : "";
+			return { file, ok, why, log };
 		}, { i, onlyServer, log, dist: onDev(file) ? null : RUN.dist });
 	} catch (error) {
 		return { file, ok: false, why: error.message, log };
@@ -104,6 +110,23 @@ function controlServer(port, restart) {
 	return new Promise((done, fail) => server.once("error", fail).listen(port, "127.0.0.1", () => done(server)));
 }
 
+/** The refusals a check's server wrote, counted by what was refused (a call's name, or a route's method and path). */
+export function refusalsOf(file) {
+	if (!existsSync(file)) return [];
+	const counts = new Map();
+	for (const line of readFileSync(file, "utf8").split("\n").filter(Boolean)) {
+		let one;
+		try {
+			one = JSON.parse(line);
+		} catch {
+			continue;
+		}
+		const what = String(one.call ?? one.route ?? "something");
+		counts.set(what, (counts.get(what) ?? 0) + 1);
+	}
+	return [...counts].sort((a, b) => b[1] - a[1]);
+}
+
 /** The first line of a check's output that says it failed, else the exit. */
 function firstFailure(log, code) {
 	const lines = log.join("").split("\n").filter((l) => l.startsWith("[check]"));
@@ -129,10 +152,12 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [], d
 	mkdirSync(home);
 	const started = [];
 	const running = new Map();
+	// The server writes here each refusal it gives a scoped caller (DECKS_REFUSALS, the kernel's), one JSON line each.
+	const refusals = join(scratch, "refusals.jsonl");
 	const ready = (name) => (name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server));
 	const start = async (name, extra = {}) => {
 		const spec = PROGRAMS[name]({ ...ports, deck, home, dist });
-		const child = launch(name, { ...spec, env: { ...spec.env, ...extra } }, log);
+		const child = launch(name, { ...spec, env: { ...spec.env, ...(name === "server" ? { DECKS_REFUSALS: refusals } : {}), ...extra } }, log);
 		started.push(child);
 		running.set(name, child);
 		remember(i, started);
@@ -155,7 +180,7 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [], d
 	};
 	try {
 		for (const name of onlyServer ? ["server"] : ["server", "harness", "page"]) await start(name);
-		return await work({ ports, deck, started, log, restart });
+		return await work({ ports, deck, started, log, restart, refusals });
 	} finally {
 		await Promise.all(started.reverse().map(stopAndWait));
 		// The slot goes back only once its ports are closed, so the next holder never meets these programs.
