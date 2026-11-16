@@ -19,6 +19,8 @@ export interface PictureTools {
 	shutdown?(): void;
 }
 
+const PICTURE_MS = 10 * 60_000;
+
 export function pictureTools(browser: Browser, origin: () => string | undefined, kernel: () => Kernel | undefined, useNative = true): PictureTools {
 	const known = () => {
 		const at = origin();
@@ -40,7 +42,8 @@ export function pictureTools(browser: Browser, origin: () => string | undefined,
 			const k = kernel();
 			if (!k) throw new Refused("unavailable", "The pictures feature has not started yet.", "card.get");
 			const who: Caller = { kind: "card", id: `picture-${randomUUID()}`, name: card, canvas };
-			const token = k.callers.issue(who, "picture");
+			// Its own canvas, no calls (the page only loads files), and an end: done, or ten minutes at most.
+			const token = k.callers.issue(who, "picture", { canvas, calls: [], until: Date.now() + PICTURE_MS });
 			return { url: `${known()}/files/${card.split("/").map(encodeURIComponent).join("/")}?pass=${encodeURIComponent(token)}`, done: () => k.callers.revoke(who.id) };
 		},
 	};

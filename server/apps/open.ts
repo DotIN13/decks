@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { layout } from "../../protocol/index.ts";
 import type { Context, Kernel, Route, RouteAnswer } from "../kernel/index.ts";
 import { APP_NAME, manifestOf } from "./manifest.ts";
@@ -9,9 +8,12 @@ import { APP_NAME, manifestOf } from "./manifest.ts";
 export const OPEN = "/app-pass/";
 const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value), headers: { "cache-control": "no-store" } });
 
-export const openRoute = (kernel: () => Kernel): Route => ({ method: "POST", prefix: OPEN, answer: (ctx, path) => answer(ctx, kernel(), path) });
+export function openRoute(kernel: () => Kernel): Route {
+	const given: Given = new Map();
+	return { method: "POST", prefix: OPEN, answer: (ctx, path) => answer(ctx, kernel(), given, path) };
+}
 
-async function answer(ctx: Context, kernel: Kernel, path: string): Promise<RouteAnswer> {
+async function answer(ctx: Context, kernel: Kernel, given: Given, path: string): Promise<RouteAnswer> {
 	const name = decodeURIComponent(path.slice(OPEN.length)).replace(/\/+$/, "");
 	if (!APP_NAME.test(name)) return json(404, { error: `There is no app called ${name}.` });
 	const canvas = ctx.caller.canvas;
@@ -21,8 +23,23 @@ async function answer(ctx: Context, kernel: Kernel, path: string): Promise<Route
 	if (!manifest) return json(404, { error: `There is no app called ${name}.` });
 	if (!(await placed(ctx, canvas, name))) return json(403, { error: `${name} is not placed on this canvas.` });
 	if (manifest.prefix) return json(409, { error: `${name} is told its base path, so it loads by absolute addresses; open it in a tab.`, tab: true });
-	const pass = kernel.callers.issue({ kind: "app", id: `${name}~${canvas}~${randomUUID()}`, name, canvas }, `app ${name} on ${canvas}`);
-	return json(200, { url: `/app/t/${pass}/${name}/` });
+	return json(200, { url: `/app/t/${issuePass(kernel, given, name, canvas)}/${name}/` });
+}
+
+const PASS_MS = 12 * 3600_000;
+const KEPT = 3;
+/** The passes given for each app on each canvas since the server started, newest last. */
+type Given = Map<string, string[]>;
+
+/** A pass for the app's page on one canvas: no calls, twelve hours, and only the newest three live. */
+function issuePass(kernel: Kernel, given: Given, name: string, canvas: string): string {
+	const id = `${name}~${canvas}`;
+	const live = given.get(id) ?? (kernel.callers.revoke(id), []);
+	const pass = kernel.callers.issue({ kind: "app", id, name, canvas }, `app ${name} on ${canvas}`, { canvas, calls: [], until: Date.now() + PASS_MS });
+	live.push(pass);
+	while (live.length > KEPT) kernel.callers.forget?.(live.shift()!);
+	given.set(id, live);
+	return pass;
 }
 
 async function placed(ctx: Context, canvas: string, name: string): Promise<boolean> {

@@ -12,6 +12,9 @@ import { openRoute } from "./open.ts";
 
 // The apps feature: app folders served, built or run, and forwarded ports.
 
+/** An app server's token ends when its app stops, sleeps or breaks; 30 days is only a backstop, as a run may last days. */
+const SERVER_TOKEN_MS = 30 * 24 * 3600_000;
+
 export type AppsFeatureOptions = { workdir?: string; clock?: () => number };
 
 /** Apps and ports. workdir is where in-deck apps' copies run: by default <machine>/app-run/<deck id>. */
@@ -36,12 +39,18 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 			const workdir = options.workdir ?? join(given.machine(), "app-run", given.deckId());
 			const env = (name: string): Record<string, string> => {
 				const url = given.url();
-				const token = given.callers.issue({ kind: "app", id: name, name }, "app server");
+				// One live token per app server: the last run's goes before a new run's is given.
+				given.callers.revoke(name);
+				const token = given.callers.issue({ kind: "app", id: name, name }, "app server", { until: Date.now() + SERVER_TOKEN_MS });
 				return { ...(url ? { DECKS_URL: url } : {}), DECKS_TOKEN: token };
 			};
 			apps = new Apps(given.deck, given.store("apps"), { workdir, env, clock });
 			let rev = 0;
-			apps.onChange = (name, status) => given.events.emit(events.appChanged, { ids: [name], by: name, rev: ++rev, ...(status ? { status } : {}) });
+			apps.onChange = (name, status) => {
+				// A server app that is not running holds no token.
+				if (status !== "running" && status !== "starting") given.callers.revoke(name);
+				given.events.emit(events.appChanged, { ids: [name], by: name, rev: ++rev, ...(status ? { status } : {}) });
+			};
 			const sweep = setInterval(() => void apps?.sleepUnseen(), 60_000);
 			sweep.unref();
 			return () => {

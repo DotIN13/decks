@@ -102,7 +102,7 @@ async function check(ctx: Context, apps: Apps, kernel: Kernel, name: string): Pr
 	const base = kernel.url();
 	if (!base) throw new Refused("unavailable", "app.check needs the server's own address, and this server is not listening.", "app.logs");
 	const id = `${name}.check`;
-	const pass = kernel.callers.issue({ kind: "app", id, name }, "app.check");
+	const pass = kernel.callers.issue({ kind: "app", id, name }, "app.check", { calls: [], until: Date.now() + 60_000 });
 	try {
 		return await checkInBrowser(`${base}/app/t/${encodeURIComponent(pass)}/${name}/`, `/app/${name}/`);
 	} finally {
