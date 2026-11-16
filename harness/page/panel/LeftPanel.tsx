@@ -35,9 +35,15 @@ import { agentSections, recentAgents, type AgentRow as AgentListRow, type AgentS
 import { DecksLineMark } from "./DecksLineMark.tsx";
 import { canvasItems, type CanvasItem, type ItemKind } from "@decks/canvas/tools";
 import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
+import { PANEL_TABS, tabBeside, type PanelTab } from "./model.ts";
+import { createPanelTab, createPanelWidth } from "./actions.ts";
+import { type AppAction, type PanelApp } from "./AppRow.tsx";
+import { AppsTab, CanvasTab } from "./tabs/view.tsx";
+import { AgentsTab, RecentTab, type Lists } from "./lists/view.tsx";
 
 /**
- * The left panel: one surface, **one list**, and a button that makes it go away.
+ * The left panel: four tabs (Recent, Canvas, Agents, Apps), one search over the tab showing,
+ * and a button that makes it go away.
  *
  * It replaces three things. The floating context rail, the floating agents panel and the
  * full-screen `AllBoards` modal all answered "what is on this canvas, and what else is
@@ -93,8 +99,6 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * note on the `chats` prop.
  */
 export type { PanelTab } from "./model.ts";
-import { PANEL_TABS, tabBeside, type PanelTab } from "./model.ts";
-import { createPanelTab, createPanelWidth } from "./actions.ts";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
@@ -102,9 +106,6 @@ const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: 
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type { PanelApp } from "./AppRow.tsx";
-import { type AppAction, type PanelApp } from "./AppRow.tsx";
-import { AppsTab, CanvasTab } from "./tabs/view.tsx";
-import { AgentsTab, RecentTab, type Lists } from "./lists/view.tsx";
 
 export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */

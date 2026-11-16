@@ -12,20 +12,13 @@ import { createSignal, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon, Popover } from "@decks/ui";
 
+// The Apps tab's pieces: one app's row, with its menu to show, start, stop or
+// delete it, and the small panel that shows an app's recent output.
+
 export type PanelApp = { name: string; title: string; status: string; board: string };
 
 /** What the ⋯ menu and a double-click ask of an app (the page's shell carries them out). */
 export type AppAction = "show" | "run-show" | "start" | "stop" | "restart" | "delete";
-
-/** Bright tiles, one per app by its name; no olive. */
-const TILES = ["#2563eb", "#0ea5e9", "#7c3aed", "#14b8a6", "#db2777", "#f97316", "#e11d48", "#9333ea"];
-function tileColour(name: string): string {
-	let h = 0;
-	for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-	return TILES[h % TILES.length] ?? TILES[0]!;
-}
-
-const WORD: Record<string, string> = { running: "Running", asleep: "Asleep", stopped: "Stopped", broken: "Broken", installing: "Installing…", building: "Building…", starting: "Starting…", stopping: "Stopping…" };
 
 /**
  * One app in the Apps tab, as the "Apps tab redesigned" mockup has it: a bright tile, its name, and
@@ -151,6 +144,16 @@ export function AppRow(props: {
 		</div>
 	);
 }
+
+/** Bright tiles, one per app by its name; no olive. */
+const TILES = ["#2563eb", "#0ea5e9", "#7c3aed", "#14b8a6", "#db2777", "#f97316", "#e11d48", "#9333ea"];
+function tileColour(name: string): string {
+	let h = 0;
+	for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+	return TILES[h % TILES.length] ?? TILES[0]!;
+}
+
+const WORD: Record<string, string> = { running: "Running", asleep: "Asleep", stopped: "Stopped", broken: "Broken", installing: "Installing…", building: "Building…", starting: "Starting…", stopping: "Stopping…" };
 
 /**
  * An app's recent output, in a small panel over the canvas's lower right, read again every two

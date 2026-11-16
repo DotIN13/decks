@@ -73,29 +73,6 @@ interface PanelInput {
 	pens?: DeckPen[];
 }
 
-/** The last segment of a deck-relative path: `boards/the-shell.html` → `the-shell.html`. */
-export function basename(path: string): string {
-	const cut = path.lastIndexOf("/");
-	return cut === -1 ? path : path.slice(cut + 1);
-}
-
-/**
- * Does this board match what was typed?
- *
- * Title and **basename**, not the whole path — every board in a deck lives under `boards/`,
- * so matching the path would make "boa" select the entire deck and make the count in the
- * foot say nothing. Substring and case-insensitive rather than fuzzy, for the reason
- * `AllBoards` gives: a deck's boards are named by the person who asked for them, so the
- * thing they type is usually a word that is really in the name.
- */
-export function matches(board: Page, needle: string): boolean {
-	if (!needle) return true;
-	return `${board.title}\n${basename(board.path)}`.toLowerCase().includes(needle);
-}
-
-/** The needle, once: trimmed and folded, so callers do not each do it differently. */
-const fold = (query?: string) => (query ?? "").trim().toLowerCase();
-
 /**
  * The panel's sections, in drawing order, with the empty ones left out.
  *
@@ -158,3 +135,26 @@ export function panelSections(input: PanelInput): PanelSection[] {
 
 	return sections;
 }
+
+/**
+ * Does this board match what was typed?
+ *
+ * Title and **basename**, not the whole path — every board in a deck lives under `boards/`,
+ * so matching the path would make "boa" select the entire deck and make the count in the
+ * foot say nothing. Substring and case-insensitive rather than fuzzy, for the reason
+ * `AllBoards` gives: a deck's boards are named by the person who asked for them, so the
+ * thing they type is usually a word that is really in the name.
+ */
+export function matches(board: Page, needle: string): boolean {
+	if (!needle) return true;
+	return `${board.title}\n${basename(board.path)}`.toLowerCase().includes(needle);
+}
+
+/** The last segment of a deck-relative path: `boards/the-shell.html` → `the-shell.html`. */
+export function basename(path: string): string {
+	const cut = path.lastIndexOf("/");
+	return cut === -1 ? path : path.slice(cut + 1);
+}
+
+/** The needle, once: trimmed and folded, so callers do not each do it differently. */
+const fold = (query?: string) => (query ?? "").trim().toLowerCase();

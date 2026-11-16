@@ -31,34 +31,15 @@ export type SettingsProps = {
 	onClose: () => void;
 };
 
-const ICONS: Record<Section, typeof Bell> = { general: SlidersHorizontal, notifications: Bell, accounts: User, voice: Mic, connections: Plug, chrome: Puzzle };
 type W = { props: SettingsProps; w: ReturnType<typeof createWindow> };
 
-function Body(p: W): JSX.Element {
-	const is = (id: Section) => p.w.section() === id;
+export function Settings(props: SettingsProps): JSX.Element {
+	const w = createWindow(props);
 	return (
-		<div class="sw-body">
-			<Switch>
-				<Match when={is("general")}>
-					<TimeSettings />
-					<CanvasSettings />
-				</Match>
-				<Match when={is("notifications")}>
-					<AlertSettings prefs={p.props.prefs} onChange={p.props.onPrefs} />
-				</Match>
-				<Match when={is("accounts")}>
-					<Accounts accounts={p.props.accounts} active={p.props.active} onAdd={p.props.onAdd} onForget={p.props.onForget} />
-				</Match>
-				<Match when={is("voice")}>
-					<VoiceSettings />
-				</Match>
-				<Match when={is("connections")}>
-					<Connections />
-				</Match>
-				<Match when={is("chrome")}>
-					<YourChrome web={p.props.web} onRepair={p.props.onWebRepair} onStop={p.props.onWebStop} />
-				</Match>
-			</Switch>
+		<div class="picker-backdrop sw-backdrop" data-layout={props.phone ? "sheet" : "window"} onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}>
+			<Show when={props.phone} fallback={<Window props={props} w={w} />}>
+				<Sheet props={props} w={w} />
+			</Show>
 		</div>
 	);
 }
@@ -117,13 +98,33 @@ function Sheet(p: W): JSX.Element {
 	);
 }
 
-export function Settings(props: SettingsProps): JSX.Element {
-	const w = createWindow(props);
+function Body(p: W): JSX.Element {
+	const is = (id: Section) => p.w.section() === id;
 	return (
-		<div class="picker-backdrop sw-backdrop" data-layout={props.phone ? "sheet" : "window"} onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}>
-			<Show when={props.phone} fallback={<Window props={props} w={w} />}>
-				<Sheet props={props} w={w} />
-			</Show>
+		<div class="sw-body">
+			<Switch>
+				<Match when={is("general")}>
+					<TimeSettings />
+					<CanvasSettings />
+				</Match>
+				<Match when={is("notifications")}>
+					<AlertSettings prefs={p.props.prefs} onChange={p.props.onPrefs} />
+				</Match>
+				<Match when={is("accounts")}>
+					<Accounts accounts={p.props.accounts} active={p.props.active} onAdd={p.props.onAdd} onForget={p.props.onForget} />
+				</Match>
+				<Match when={is("voice")}>
+					<VoiceSettings />
+				</Match>
+				<Match when={is("connections")}>
+					<Connections />
+				</Match>
+				<Match when={is("chrome")}>
+					<YourChrome web={p.props.web} onRepair={p.props.onWebRepair} onStop={p.props.onWebStop} />
+				</Match>
+			</Switch>
 		</div>
 	);
 }
+
+const ICONS: Record<Section, typeof Bell> = { general: SlidersHorizontal, notifications: Bell, accounts: User, voice: Mic, connections: Plug, chrome: Puzzle };

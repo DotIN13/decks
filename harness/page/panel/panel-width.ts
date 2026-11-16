@@ -24,14 +24,6 @@ export function clampPanelWidth(width: number, viewport: number): number {
 	return Math.round(Math.min(most, Math.max(PANEL_MIN, width)));
 }
 
-function store(storage?: Storage): Storage | undefined {
-	try {
-		return storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
-	} catch {
-		return undefined;
-	}
-}
-
 /** The remembered width, or the default when there is none or it is not a number. */
 export function loadPanelWidth(storage?: Storage): number {
 	try {
@@ -50,5 +42,13 @@ export function savePanelWidth(width: number, storage?: Storage): void {
 		else store(storage)?.setItem(PANEL_WIDTH_KEY, String(Math.round(width)));
 	} catch {
 		// Not remembered; it is still this wide for now.
+	}
+}
+
+function store(storage?: Storage): Storage | undefined {
+	try {
+		return storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
+	} catch {
+		return undefined;
 	}
 }

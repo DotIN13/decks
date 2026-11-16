@@ -6,31 +6,26 @@ import { clampPanelWidth, loadPanelWidth, PANEL_WIDTH, savePanelWidth } from "./
 // The side panel's behaviour: its width, set by dragging or arrowing its edge
 // and kept; the tab last shown and the folders folded, kept in this browser.
 
-const keep = (key: string, value: string) => {
-	try {
-		localStorage.setItem(key, value);
-	} catch {
-		// Private mode: it opens as it did before next time.
-	}
-};
-const kept = (key: string) => {
-	try {
-		return localStorage.getItem(key);
-	} catch {
-		return null;
-	}
-};
-
-export function createPanelTab() {
-	const [tab, setRaw] = createSignal<PanelTab>(tabOf(kept(TAB_KEY)));
-	const setTab = (next: PanelTab) => (setRaw(next), keep(TAB_KEY, next));
-	const [folded, setFolded] = createSignal<Set<string>>(foldedOf(kept(FOLDED_KEY)));
-	const toggleFolder = (id: string) => {
-		const next = toggled(folded(), id);
-		setFolded(next);
-		keep(FOLDED_KEY, JSON.stringify([...next]));
+export function createPanelWidth() {
+	const [width, setWidth] = createSignal(clampPanelWidth(loadPanelWidth(), window.innerWidth));
+	const [resizing, setResizing] = createSignal(false);
+	const resizeTo = (next: number) => setWidth(clampPanelWidth(next, window.innerWidth));
+	onMount(() => {
+		const onResize = () => setWidth(clampPanelWidth(loadPanelWidth(), window.innerWidth));
+		window.addEventListener("resize", onResize);
+		onCleanup(() => window.removeEventListener("resize", onResize));
+	});
+	const onHandleDown = (event: PointerEvent) => event.button === 0 && dragEdge(event, width, resizeTo, setResizing);
+	const onHandleKey = (event: KeyboardEvent) => {
+		const step = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
+		if (event.key === "Home") resizeTo(PANEL_WIDTH);
+		else if (step !== 0) resizeTo(width() + step);
+		else return;
+		event.preventDefault();
+		savePanelWidth(width());
 	};
-	return { tab, setTab, folded, toggleFolder };
+	const reset = () => (resizeTo(PANEL_WIDTH), savePanelWidth(width()));
+	return { width, resizing, onHandleDown, onHandleKey, reset };
 }
 
 /** One drag of the edge: the width follows the pointer, and ends however the button comes up. */
@@ -72,24 +67,29 @@ function dragEdge(event: PointerEvent, width: () => number, resizeTo: (next: num
 	handle.addEventListener("lostpointercapture", end);
 }
 
-export function createPanelWidth() {
-	const [width, setWidth] = createSignal(clampPanelWidth(loadPanelWidth(), window.innerWidth));
-	const [resizing, setResizing] = createSignal(false);
-	const resizeTo = (next: number) => setWidth(clampPanelWidth(next, window.innerWidth));
-	onMount(() => {
-		const onResize = () => setWidth(clampPanelWidth(loadPanelWidth(), window.innerWidth));
-		window.addEventListener("resize", onResize);
-		onCleanup(() => window.removeEventListener("resize", onResize));
-	});
-	const onHandleDown = (event: PointerEvent) => event.button === 0 && dragEdge(event, width, resizeTo, setResizing);
-	const onHandleKey = (event: KeyboardEvent) => {
-		const step = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
-		if (event.key === "Home") resizeTo(PANEL_WIDTH);
-		else if (step !== 0) resizeTo(width() + step);
-		else return;
-		event.preventDefault();
-		savePanelWidth(width());
+export function createPanelTab() {
+	const [tab, setRaw] = createSignal<PanelTab>(tabOf(kept(TAB_KEY)));
+	const setTab = (next: PanelTab) => (setRaw(next), keep(TAB_KEY, next));
+	const [folded, setFolded] = createSignal<Set<string>>(foldedOf(kept(FOLDED_KEY)));
+	const toggleFolder = (id: string) => {
+		const next = toggled(folded(), id);
+		setFolded(next);
+		keep(FOLDED_KEY, JSON.stringify([...next]));
 	};
-	const reset = () => (resizeTo(PANEL_WIDTH), savePanelWidth(width()));
-	return { width, resizing, onHandleDown, onHandleKey, reset };
+	return { tab, setTab, folded, toggleFolder };
 }
+
+const keep = (key: string, value: string) => {
+	try {
+		localStorage.setItem(key, value);
+	} catch {
+		// Private mode: it opens as it did before next time.
+	}
+};
+const kept = (key: string) => {
+	try {
+		return localStorage.getItem(key);
+	} catch {
+		return null;
+	}
+};

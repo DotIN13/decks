@@ -14,6 +14,24 @@ import { noLimitsWords, whoseLimits } from "./model.ts";
 export type UsageProps = { usage: AgentUsage | undefined; report: UsageReport | undefined; error: string | undefined; loading: boolean; at: number | undefined; onRefresh: () => void; onClose: () => void };
 type U = { props: UsageProps; u: ReturnType<typeof createUsage> };
 
+export function UsageModal(props: UsageProps): JSX.Element {
+	const u = createUsage(() => props.onClose());
+	return (
+		<div class="picker-backdrop" onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}>
+			<div class="panel-float usage-modal static flex max-h-[86%] w-[min(520px,calc(100vw-24px))] flex-col overflow-hidden p-0" role="dialog" aria-label="Usage">
+				<Head props={props} u={u} />
+				<div class="set-body">
+					<Show when={props.error}>{(message) => <p class="usage-stale">Could not read usage: {message()}</p>}</Show>
+					<Show when={props.loading && props.report && props.at}>{(at) => <p class="usage-reading">Reading again — figures from {ago(at(), u.now())}.</p>}</Show>
+					<Conversation props={props} u={u} />
+					<Limits props={props} u={u} />
+					<Uses props={props} u={u} />
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function Head(p: U): JSX.Element {
 	return (
 		<header class="set-head">
@@ -26,6 +44,37 @@ function Head(p: U): JSX.Element {
 				<Icon of={X} size={15} />
 			</button>
 		</header>
+	);
+}
+
+// This conversation: its figures and its models.
+function Conversation(p: U): JSX.Element {
+	const percent = () => contextPercent(p.props.usage);
+	return (
+		<section class="set-group" data-group="conversation">
+			<header>
+				<span class="set-title">This conversation</span>
+				<span class="set-note">what it has spent, and how full its window is</span>
+			</header>
+			<div class="usage-pad">
+				<Show when={percent() !== undefined} fallback={<p class="usage-empty">No reading yet. An agent reports its context after its first reply.</p>}>
+					<div class="usage-headline">
+						<span class="big">{Math.round(percent() ?? 0)}%</span>
+						<span class="meta">of the context window</span>
+					</div>
+					<div class="track" data-level={contextLevel(p.props.usage)}>
+						<i style={{ width: `${Math.min(percent() ?? 0, 100)}%` }} />
+					</div>
+					<p class="usage-note">
+						{exact(p.props.usage?.contextTokens ?? 0)} of {exact(p.props.usage?.contextWindow ?? 0)} tokens
+					</p>
+				</Show>
+				<Show when={p.props.report?.session} fallback={<Reading loading={p.props.loading} />}>
+					{(spend) => <Facts spend={spend()} />}
+				</Show>
+			</div>
+			<Models {...p} />
+		</section>
 	);
 }
 
@@ -59,103 +108,6 @@ function Models(p: U): JSX.Element {
 				</tbody>
 			</table>
 		</Show>
-	);
-}
-
-function Conversation(p: U): JSX.Element {
-	const percent = () => contextPercent(p.props.usage);
-	return (
-		<section class="set-group" data-group="conversation">
-			<header>
-				<span class="set-title">This conversation</span>
-				<span class="set-note">what it has spent, and how full its window is</span>
-			</header>
-			<div class="usage-pad">
-				<Show when={percent() !== undefined} fallback={<p class="usage-empty">No reading yet. An agent reports its context after its first reply.</p>}>
-					<div class="usage-headline">
-						<span class="big">{Math.round(percent() ?? 0)}%</span>
-						<span class="meta">of the context window</span>
-					</div>
-					<div class="track" data-level={contextLevel(p.props.usage)}>
-						<i style={{ width: `${Math.min(percent() ?? 0, 100)}%` }} />
-					</div>
-					<p class="usage-note">
-						{exact(p.props.usage?.contextTokens ?? 0)} of {exact(p.props.usage?.contextWindow ?? 0)} tokens
-					</p>
-				</Show>
-				<Show when={p.props.report?.session} fallback={<Reading loading={p.props.loading} />}>
-					{(spend) => <Facts spend={spend()} />}
-				</Show>
-			</div>
-			<Models {...p} />
-		</section>
-	);
-}
-
-function Limits(p: U): JSX.Element {
-	return (
-		<section class="set-group" data-group="limits">
-			<header>
-				<span class="set-title">Plan limits</span>
-				<Show when={whoseLimits(p.props.report)} fallback={<span class="set-note">what the subscription has left</span>}>
-					{(subject) => <span class="set-note">{subject()}</span>}
-				</Show>
-			</header>
-			<div class="usage-pad">
-				<Show when={p.props.report} fallback={<Reading loading={p.props.loading} />}>
-					{(report) => (
-						<Show when={report().limits?.length} fallback={<p class="usage-empty">{noLimitsWords(report())}</p>}>
-							<ul class="usage-limits">
-								<For each={report().limits ?? []}>{(limit) => <Limit limit={limit} now={p.u.now()} />}</For>
-							</ul>
-						</Show>
-					)}
-				</Show>
-			</div>
-		</section>
-	);
-}
-
-function Uses(p: U): JSX.Element {
-	const scan = () => (p.u.span() === "day" ? p.props.report?.behaviors?.day : p.props.report?.behaviors?.week);
-	return (
-		<Show when={p.props.report?.behaviors}>
-			<section class="set-group" data-group="behaviors">
-				<header>
-					<span class="set-title">What's using it</span>
-					<span class="set-note">as the runtime scans this machine</span>
-					<span class="flex-1" />
-					<div class="segmented">
-						<For each={["day", "week"] as const}>
-							{(option) => (
-								<button type="button" data-on={p.u.span() === option} onClick={() => p.u.setSpan(option)}>
-									{option === "day" ? "24 hours" : "7 days"}
-								</button>
-							)}
-						</For>
-					</div>
-				</header>
-				<Show when={scan()}>{(window) => <Behaviors window={window()} />}</Show>
-			</section>
-		</Show>
-	);
-}
-
-export function UsageModal(props: UsageProps): JSX.Element {
-	const u = createUsage(() => props.onClose());
-	return (
-		<div class="picker-backdrop" onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}>
-			<div class="panel-float usage-modal static flex max-h-[86%] w-[min(520px,calc(100vw-24px))] flex-col overflow-hidden p-0" role="dialog" aria-label="Usage">
-				<Head props={props} u={u} />
-				<div class="set-body">
-					<Show when={props.error}>{(message) => <p class="usage-stale">Could not read usage: {message()}</p>}</Show>
-					<Show when={props.loading && props.report && props.at}>{(at) => <p class="usage-reading">Reading again — figures from {ago(at(), u.now())}.</p>}</Show>
-					<Conversation props={props} u={u} />
-					<Limits props={props} u={u} />
-					<Uses props={props} u={u} />
-				</div>
-			</div>
-		</div>
 	);
 }
 
@@ -200,6 +152,31 @@ function Facts(props: { spend: SessionSpend }) {
 				)}
 			</For>
 		</dl>
+	);
+}
+
+// The plan's windows.
+function Limits(p: U): JSX.Element {
+	return (
+		<section class="set-group" data-group="limits">
+			<header>
+				<span class="set-title">Plan limits</span>
+				<Show when={whoseLimits(p.props.report)} fallback={<span class="set-note">what the subscription has left</span>}>
+					{(subject) => <span class="set-note">{subject()}</span>}
+				</Show>
+			</header>
+			<div class="usage-pad">
+				<Show when={p.props.report} fallback={<Reading loading={p.props.loading} />}>
+					{(report) => (
+						<Show when={report().limits?.length} fallback={<p class="usage-empty">{noLimitsWords(report())}</p>}>
+							<ul class="usage-limits">
+								<For each={report().limits ?? []}>{(limit) => <Limit limit={limit} now={p.u.now()} />}</For>
+							</ul>
+						</Show>
+					)}
+				</Show>
+			</div>
+		</section>
 	);
 }
 
@@ -263,6 +240,32 @@ function Meter(props: { percent: number | null; flat?: boolean }) {
 		>
 			<i style={{ width: `${value()}%` }} />
 		</div>
+	);
+}
+
+// What has been using them, over a day or a week.
+function Uses(p: U): JSX.Element {
+	const scan = () => (p.u.span() === "day" ? p.props.report?.behaviors?.day : p.props.report?.behaviors?.week);
+	return (
+		<Show when={p.props.report?.behaviors}>
+			<section class="set-group" data-group="behaviors">
+				<header>
+					<span class="set-title">What's using it</span>
+					<span class="set-note">as the runtime scans this machine</span>
+					<span class="flex-1" />
+					<div class="segmented">
+						<For each={["day", "week"] as const}>
+							{(option) => (
+								<button type="button" data-on={p.u.span() === option} onClick={() => p.u.setSpan(option)}>
+									{option === "day" ? "24 hours" : "7 days"}
+								</button>
+							)}
+						</For>
+					</div>
+				</header>
+				<Show when={scan()}>{(window) => <Behaviors window={window()} />}</Show>
+			</section>
+		</Show>
 	);
 }
 

@@ -16,6 +16,7 @@ import { ago, foldPaired } from "./model.ts";
 
 // The sections of Settings, each a group of rows: time and the canvas, accounts,
 // voice, who reaches this deck, and the shared Chrome tab.
+
 /** A plain button in a row. */
 function Btn(props: { children: JSX.Element; onClick: () => void; tone?: "danger"; title?: string; disabled?: boolean }) {
 	return (
@@ -24,9 +25,6 @@ function Btn(props: { children: JSX.Element; onClick: () => void; tone?: "danger
 		</button>
 	);
 }
-
-/** Copy some words, and say so on the button for a moment. */
-
 
 /* ---------------------------------------------------------------------------------------- */
 /* General                                                                                    */
@@ -208,8 +206,6 @@ export function VoiceSettings() {
 
 /* ---------------------------------------------------------------------------------------- */
 /* Connections                                                                                */
-
-
 
 /**
  * Who reaches this deck: its own address, Decks Studio when it is paired (Unpair deletes its key and

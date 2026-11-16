@@ -30,46 +30,7 @@ export type Lists = {
 	onAbortAgent?: (id: string) => void;
 };
 
-function PanelRow(p: { row: Row; l: Lists; size: number }): JSX.Element {
-	const { l } = p;
-	const id = () => p.row.chat.id;
-	return (
-		<AgentRow
-			row={p.row}
-			identity={l.identities?.[id()]}
-			onFocus={() => l.onFocusAgent?.(id())}
-			onClose={() => l.onCloseAgent?.(id())}
-			{...(l.onAgentTags ? { onTags: (tags: string[]) => l.onAgentTags?.(id(), tags) } : {})}
-			workspaces={l.workspaces}
-			{...(l.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => l.onAgentWorkspace?.(id(), workspace) } : {})}
-			{...(l.onAgentRename ? { onRename: (name: string) => l.onAgentRename?.(id(), name) } : {})}
-			taken={(name) => l.taken(name, id())}
-			{...(l.onAbortAgent ? { onAbort: () => l.onAbortAgent?.(id()) } : {})}
-			lines={l.lines}
-			size={p.size}
-			onHover={(at) => l.hover(id(), at)}
-		/>
-	);
-}
-
 type Folders = { folded: () => Set<string>; toggle: (id: string) => void; over: () => string | undefined; setOver: (fn: (was: string | undefined) => string | undefined) => void; allowance: (index: number) => number };
-
-function FolderHead(p: { section: AgentSection; l: Lists; f: Folders }): JSX.Element {
-	const shut = () => p.f.folded().has(p.section.id);
-	return (
-		<div class="v3-folder-head" data-folded={shut() ? "true" : undefined}>
-			<button type="button" class="v3-folder-toggle" aria-expanded={!shut()} title={shut() ? `Show ${p.section.label}` : `Fold ${p.section.label}`} onClick={() => p.f.toggle(p.section.id)}>
-				<Icon of={shut() ? ChevronRight : ChevronDown} size={13} class="v3-folder-chev" />
-				<Icon of={Folder} size={15} class="v3-folder-icon" />
-				<span class="v3-folder-name truncate">{p.section.label}</span>
-			</button>
-			<Show when={p.section.note}>{(note) => <span class="note">{note()}</span>}</Show>
-			<Show when={p.l.onNewAgent}>
-				<NewAgentButton onNew={(kind) => p.l.onNewAgent?.(workspaceOf(p.section) ?? undefined, kind)} label={addWords(p.section)} class="v3-folder-add" size={14} />
-			</Show>
-		</div>
-	);
-}
 
 export function AgentsTab(props: { sections: AgentSection[]; l: Lists; f: Folders }): JSX.Element {
 	return (
@@ -96,6 +57,23 @@ export function AgentsTab(props: { sections: AgentSection[]; l: Lists; f: Folder
 	);
 }
 
+function FolderHead(p: { section: AgentSection; l: Lists; f: Folders }): JSX.Element {
+	const shut = () => p.f.folded().has(p.section.id);
+	return (
+		<div class="v3-folder-head" data-folded={shut() ? "true" : undefined}>
+			<button type="button" class="v3-folder-toggle" aria-expanded={!shut()} title={shut() ? `Show ${p.section.label}` : `Fold ${p.section.label}`} onClick={() => p.f.toggle(p.section.id)}>
+				<Icon of={shut() ? ChevronRight : ChevronDown} size={13} class="v3-folder-chev" />
+				<Icon of={Folder} size={15} class="v3-folder-icon" />
+				<span class="v3-folder-name truncate">{p.section.label}</span>
+			</button>
+			<Show when={p.section.note}>{(note) => <span class="note">{note()}</span>}</Show>
+			<Show when={p.l.onNewAgent}>
+				<NewAgentButton onNew={(kind) => p.l.onNewAgent?.(workspaceOf(p.section) ?? undefined, kind)} label={addWords(p.section)} class="v3-folder-add" size={14} />
+			</Show>
+		</div>
+	);
+}
+
 export function RecentTab(props: { rows: Row[]; l: Lists }): JSX.Element {
 	return (
 		<>
@@ -113,5 +91,27 @@ export function RecentTab(props: { rows: Row[]; l: Lists }): JSX.Element {
 				<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{noAgentsWords(props.l.count, props.l.query, true)}</p>
 			</Show>
 		</>
+	);
+}
+
+function PanelRow(p: { row: Row; l: Lists; size: number }): JSX.Element {
+	const { l } = p;
+	const id = () => p.row.chat.id;
+	return (
+		<AgentRow
+			row={p.row}
+			identity={l.identities?.[id()]}
+			onFocus={() => l.onFocusAgent?.(id())}
+			onClose={() => l.onCloseAgent?.(id())}
+			{...(l.onAgentTags ? { onTags: (tags: string[]) => l.onAgentTags?.(id(), tags) } : {})}
+			workspaces={l.workspaces}
+			{...(l.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => l.onAgentWorkspace?.(id(), workspace) } : {})}
+			{...(l.onAgentRename ? { onRename: (name: string) => l.onAgentRename?.(id(), name) } : {})}
+			taken={(name) => l.taken(name, id())}
+			{...(l.onAbortAgent ? { onAbort: () => l.onAbortAgent?.(id()) } : {})}
+			lines={l.lines}
+			size={p.size}
+			onHover={(at) => l.hover(id(), at)}
+		/>
 	);
 }

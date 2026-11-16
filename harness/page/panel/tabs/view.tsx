@@ -15,28 +15,7 @@ import { cardsOf, drawnOf, itemLit, noAppsWords, noItemsWords } from "./model.ts
 // The side panel's Canvas tab (the cards and the drawing on the canvas, by
 // name) and its Apps tab (the deck's apps, each with its menu and logs).
 
-const ITEM_ICON: Record<ItemKind, typeof FileText> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
-
 type CanvasTabProps = { items: { items: CanvasItem[]; arrows: string[] }; selected: ReadonlySet<string>; current: string | undefined; query: string; onPick: (item: CanvasItem) => void; onPickArrows: (ids: string[]) => void };
-
-function ItemRow(p: { item: CanvasItem; lit: boolean; onPick: (item: CanvasItem) => void }): JSX.Element {
-	return (
-		<button type="button" class="v3-item" data-row data-kind={p.item.kind} data-on={p.lit ? "true" : undefined} title={p.item.label} onClick={() => p.onPick(p.item)}>
-			<Icon of={ITEM_ICON[p.item.kind]} size={14} class="v3-item-icon" />
-			<span class="v3-item-name truncate">{p.item.label}</span>
-		</button>
-	);
-}
-
-function Section(p: { label: string; count: number }): JSX.Element {
-	return (
-		<div class="v3-sec">
-			<span>{p.label}</span>
-			<span class="flex-1" />
-			<span class="v3-sec-n tabular-nums">{p.count}</span>
-		</div>
-	);
-}
 
 export function CanvasTab(props: CanvasTabProps): JSX.Element {
 	const cards = () => cardsOf(props.items.items);
@@ -62,6 +41,27 @@ export function CanvasTab(props: CanvasTabProps): JSX.Element {
 			<Show when={props.items.items.length === 0 && props.items.arrows.length === 0}>
 				<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{noItemsWords(props.query)}</p>
 			</Show>
+		</div>
+	);
+}
+
+function ItemRow(p: { item: CanvasItem; lit: boolean; onPick: (item: CanvasItem) => void }): JSX.Element {
+	return (
+		<button type="button" class="v3-item" data-row data-kind={p.item.kind} data-on={p.lit ? "true" : undefined} title={p.item.label} onClick={() => p.onPick(p.item)}>
+			<Icon of={ITEM_ICON[p.item.kind]} size={14} class="v3-item-icon" />
+			<span class="v3-item-name truncate">{p.item.label}</span>
+		</button>
+	);
+}
+
+const ITEM_ICON: Record<ItemKind, typeof FileText> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
+
+function Section(p: { label: string; count: number }): JSX.Element {
+	return (
+		<div class="v3-sec">
+			<span>{p.label}</span>
+			<span class="flex-1" />
+			<span class="v3-sec-n tabular-nums">{p.count}</span>
 		</div>
 	);
 }
