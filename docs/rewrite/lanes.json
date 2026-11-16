@@ -7,7 +7,10 @@
 		"docs/rewrite/calls.md",
 		"clients/",
 		"tools/clients/",
-		"protocol/"
+		"protocol/",
+		"canvas/input/",
+		"canvas/ink/",
+		"canvas/items/"
 	],
 	"Warden": [
 		"tools/gates/",
@@ -73,7 +76,9 @@
 		"harness/sessions/",
 		"harness/runtimes/",
 		"harness/accounts/",
-		"harness/prompts/"
+		"harness/prompts/",
+		"canvas/cards/CardEditor.tsx",
+		"canvas/cards/editor/"
 	],
 	"Pane": [
 		"harness/page/",
@@ -101,7 +106,8 @@
 		"engine/crates/",
 		"engine/demo/",
 		"engine/build-web.sh",
-		"engine/fetch-fonts.mjs"
+		"engine/fetch-fonts.mjs",
+		"canvas/render/"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
