@@ -1,8 +1,9 @@
+import type { Envelope } from "./call.ts";
 import type { Node } from "./schema.ts";
 
-// Plain JSON Schema for a shape, every named shape written out where it is
-// used: what MCP clients read as a tool's input. One copy, for the server's
-// MCP door, the relay and the generators.
+// What an MCP client is shown: a tool's input as plain JSON Schema, and an
+// answer as text. One copy, for the server's MCP door, the stdio relay and
+// the generators.
 
 export function jsonSchemaOf(node: Node): Record<string, unknown> {
 	const description = node.doc ? { description: node.doc } : {};
@@ -32,4 +33,15 @@ export function jsonSchemaOf(node: Node): Record<string, unknown> {
 				...description,
 			};
 	}
+}
+
+/** A call's answer as a tool's text: the value and its notes, or the refusal's sentence, code and hint. */
+export function toolText(envelope: Envelope<unknown>): { text: string; isError: boolean } {
+	if (!envelope.ok) {
+		const { message, code, hint } = envelope.error;
+		return { text: [`${message} (${code})`, ...(hint ? [`Try ${hint}.`] : []), ...envelope.notes].join("\n"), isError: true };
+	}
+	const { value } = envelope;
+	const text = value === undefined || value === null ? "(done)" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
+	return { text: [text, ...envelope.notes].join("\n"), isError: false };
 }

@@ -6,11 +6,11 @@ import { argsOf, Usage } from "./args.ts";
 import { help } from "./help.ts";
 import { login, logout } from "./login.ts";
 
-export { login };
-
 // The decks command: decks <noun> <verb> for every call, and help, events,
 // login, logout, serve, attach and detach. The value goes to stdout, a
 // string as it is and anything else as JSON; notes and refusals to stderr.
+
+export { login };
 
 export type Io = { out(text: string): void; err(text: string): void; stdin(): string };
 
@@ -55,7 +55,7 @@ const callOf = (words: string[]) => CALL_BY_NAME.get(`${words[0]}.${words[1]}`) 
 async function special(words: string[], io: Io): Promise<number | undefined> {
 	const [first, ...rest] = words;
 	if (first === "login") return io.err(await login(rest, await tokensFile())), 0;
-	if (first === "logout") return io.err(logout((await find({})).url, await tokensFile())), 0;
+	if (first === "logout") return io.err(await logout((await find({})).url, await tokensFile())), 0;
 	if (first === "attach" || first === "detach") {
 		const attach = await import("../attach/index.ts");
 		io.err(await (first === "attach" ? attach.attach(rest) : attach.detach(rest)));

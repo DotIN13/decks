@@ -22,6 +22,13 @@ export function argsOf(call: AnyCall, words: string[], stdin: () => string): Rec
 		for (const part of keys.slice(0, -1)) target = (target[part] ??= {}) as Record<string, unknown>;
 		target[keys[keys.length - 1]!] = valueOf(raw, shapeAt(input, keys), stdin);
 	}
+	const left = fillWords(input, args, rest, stdin);
+	if (left.length) throw new Usage(`"${left.join(" ")}" is left over: decks help ${call.name} says what it takes.`);
+	return args;
+}
+
+/** Plain words fill the plain arguments flags did not, in declared order; a last list takes the rest. Answers the words left over. */
+function fillWords(input: Obj, args: Record<string, unknown>, rest: string[], stdin: () => string): string[] {
 	const isOption = (key: string) => (key === "canvas" || key === "frame") && !input.required.includes(key);
 	const wordKeys = Object.keys(input.props).filter((key) => !(key in args) && !isOption(key) && plain(input.props[key]!));
 	let next = 0;
@@ -34,8 +41,7 @@ export function argsOf(call: AnyCall, words: string[], stdin: () => string): Rec
 			next = rest.length;
 		} else args[key] = valueOf(rest[next++]!, node, stdin);
 	}
-	if (next < rest.length) throw new Usage(`"${rest.slice(next).join(" ")}" is left over: decks help ${call.name} says what it takes.`);
-	return args;
+	return rest.slice(next);
 }
 
 // The words and flags of a command line.

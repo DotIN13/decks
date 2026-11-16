@@ -32,12 +32,17 @@ export async function tokensFile(): Promise<string> {
 }
 
 export async function savedToken(url: string): Promise<string | undefined> {
+	return (await readTokens(await tokensFile()))[url];
+}
+
+/** The tokens decks login kept, by server address; none when the file is missing or unreadable. */
+export async function readTokens(file: string): Promise<Record<string, string>> {
 	const { readFileSync } = await import("node:fs");
 	try {
-		const tokens = JSON.parse(readFileSync(await tokensFile(), "utf8")) as Record<string, string>;
-		return tokens[url];
+		const saved = JSON.parse(readFileSync(file, "utf8")) as unknown;
+		return saved && typeof saved === "object" ? (saved as Record<string, string>) : {};
 	} catch {
-		return undefined;
+		return {};
 	}
 }
 

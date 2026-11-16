@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { CALLS, ENV, PROTOCOL_VERSION, type AnyCall, jsonSchemaOf } from "../../protocol/index.ts";
+import { CALLS, ENV, PROTOCOL_VERSION, type AnyCall, jsonSchemaOf, refusalFrom, toolText } from "../../protocol/index.ts";
 import { connect, DecksError, type Client } from "../sdk/index.ts";
 
 // The MCP relay: JSON-RPC 2.0 over stdio. Each server call an agent may make
@@ -71,13 +71,12 @@ export async function callTool(client: Client, name: string, input: unknown, fil
 	if (!shownCalls(filter).some((call) => call.name === name)) {
 		return { content: [{ type: "text", text: `There is no tool called ${name}. (not_found)` }], isError: true };
 	}
+	let shown: { text: string; isError: boolean };
 	try {
 		const { value, notes } = await client.call(name, input ?? {});
-		const text = value === undefined || value === null ? "(done)" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
-		return { content: [{ type: "text", text: [text, ...notes].join("\n") }], isError: false };
+		shown = toolText({ ok: true, value, notes });
 	} catch (error) {
-		const e = error instanceof DecksError ? error : new DecksError({ code: "unavailable", message: String((error as Error)?.message ?? error) });
-		const text = [`${e.message} (${e.code})`, ...(e.hint ? [`Try ${e.hint}.`] : []), ...e.notes].join("\n");
-		return { content: [{ type: "text", text }], isError: true };
+		shown = toolText(refusalFrom(error, error instanceof DecksError ? error.notes : []));
 	}
+	return { content: [{ type: "text", text: shown.text }], isError: shown.isError };
 }

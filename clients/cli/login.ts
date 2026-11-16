@@ -1,8 +1,8 @@
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname } from "node:path";
 import { LOGIN_PATH } from "../../protocol/index.ts";
-import { DecksError, find } from "../sdk/index.ts";
+import { DecksError, find, readTokens } from "../sdk/index.ts";
 
 // decks login [code]: the person at a terminal gets a token of its own,
 // with a code from decks deck pair, or on the server's machine with the
@@ -26,27 +26,17 @@ export async function login(words: string[], file: string): Promise<string> {
 	const body = (await response.json().catch(() => ({}))) as { ok?: boolean; value?: { token?: string; name?: string }; error?: { code: never; message: string; hint?: string } };
 	const answer = { ...body.value, error: body.error };
 	if (!answer.token) throw new DecksError(answer.error ?? { code: "refused", message: `Decks at ${found.url} gave no token (${response.status}).`, hint: "deck.pair" });
-	const tokens = { ...tokensFromFile(file), [found.url]: answer.token };
+	const tokens = { ...(await readTokens(file)), [found.url]: answer.token };
 	mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
 	writeFileSync(file, `${JSON.stringify(tokens, null, "\t")}\n`, { mode: 0o600 });
 	chmodSync(file, 0o600);
 	return `Logged in to ${answer.name ?? found.url}. The token is in ${file}.`;
 }
 
-export function logout(url: string, file: string): string {
-	const tokens = tokensFromFile(file);
+export async function logout(url: string, file: string): Promise<string> {
+	const tokens = await readTokens(file);
 	if (!tokens[url]) return `Not logged in to ${url}.`;
 	delete tokens[url];
 	writeFileSync(file, `${JSON.stringify(tokens, null, "\t")}\n`, { mode: 0o600 });
 	return `Logged out of ${url}.`;
-}
-
-/** The tokens decks login kept, by server address. */
-function tokensFromFile(file: string): Record<string, string> {
-	try {
-		const saved = JSON.parse(readFileSync(file, "utf8")) as unknown;
-		return saved && typeof saved === "object" ? (saved as Record<string, string>) : {};
-	} catch {
-		return {};
-	}
 }

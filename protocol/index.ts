@@ -9,7 +9,7 @@ import type * as wireModule from "./wire.ts";
 
 export * from "./schema.ts";
 export { check } from "./validate.ts";
-export { jsonSchemaOf } from "./json-schema.ts";
+export { jsonSchemaOf, toolText } from "./mcp.ts";
 export * from "./call.ts";
 export * from "./event.ts";
 export * as shapes from "./shapes.ts";

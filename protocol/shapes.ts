@@ -1,10 +1,10 @@
 import { AgentKind, AgentMode, ChatItem } from "./chat.ts";
 import { any, arr, bool, int, lit, named, nul, num, obj, opt, rec, str, union, type Infer } from "./schema.ts";
 
-export { AgentKind, AgentMode, ChatItem };
-
 // The shapes calls take and give. Each is named, so the generators declare it
 // once. One geometry: Box, Size, Point. A path starts at the deck's root.
+
+export { AgentKind, AgentMode, ChatItem };
 
 // Geometry, and what a delete answers.
 export const Box = named("Box", obj({ x1: num(), y1: num(), x2: num(), y2: num() }), "A box on a canvas: both corners.");
