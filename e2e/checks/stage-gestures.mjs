@@ -97,7 +97,7 @@ link.edit(agentId, [
 		{ op: "insert", node: { type: "rectangle", id: "g-b", fill: "#fde68a" }, box: { x1: B.x, y1: B.y + Math.round(40 / m.a), x2: B.x + size.w, y2: B.y + Math.round(40 / m.a) + size.h } },
 	]);
 const frame = await until(() => link.drawings(agentId).filter((msg) => msg.doc.children.some((n) => n.id === "g-b")).at(-1));
-const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.canvas, "canvas.pen") : "";
 // The last whole read: a read that lands while the server is writing sees half a file.
 let lastRead = { children: [] };
 const onDisk = () => {

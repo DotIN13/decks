@@ -66,8 +66,8 @@ link.edit(agentId, [
 		{ op: "insert", node: { type: "path", id: "e2e-arrow", metadata: { type: "decks.arrow", from: "e2e-note", to: firstCard } } },
 	]);
 const frame = await until(() => link.drawings(agentId).filter((m) => m.doc.children.some((n) => n.id === "e2e-note")).at(-1));
-say("an edit comes back as a stage.pen frame", !!frame);
-const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
+say("an edit comes back as the canvas's drawing", !!frame);
+const file = frame ? join(deck.path, "canvases", frame.canvas, "canvas.pen") : "";
 /*
  * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
  * polling, and reading it mid-write once crashed a whole check on a JSON error. The last good

@@ -32,7 +32,7 @@ const agentId = await until(() => link.last("agent.list")?.focused);
 // The stage's file, found from the frame the server sends after the first edit.
 link.edit(agentId, [{ op: "insert", node: { type: "note", id: "shapes-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }]);
 const frame = await until(() => link.drawings(agentId).filter((m) => m.doc.children.some((n) => n.id === "shapes-anchor")).at(-1));
-const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.canvas, "canvas.pen") : "";
 // Read mid-write the file is cut short: the last whole read stands until the next one parses.
 let lastDisk = { children: [] };
 const onDisk = () => {

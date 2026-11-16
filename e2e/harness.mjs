@@ -582,10 +582,11 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
  *   reads every revision the same way; `drawn` is every revision of every canvas. Every canvas in the
  *   list is asked for whole once.
  *
- * What a card call acts on, when it names no canvas, is the canvas of the agent this line is on. A
- * new line starts on the conversation last opened anywhere, which is the page's own when a check has
- * just opened one; a check that drives cards for a particular agent calls `agent.focus` first, which
- * moves this line alone.
+ * Each call names the agent this line is on and that agent's canvas, as the page's calls name the
+ * conversation and the canvas on screen, so a card call that names no canvas acts there. A new line
+ * starts on the conversation last opened anywhere, which is the page's own when a check has just
+ * opened one; a check that drives cards for a particular agent calls `agent.focus` first, which moves
+ * this line alone.
  */
 export async function socket(api) {
 	api = typeof api === "string" ? api : API;
@@ -603,12 +604,16 @@ export async function socket(api) {
 	const asked = new Set();
 	const waiting = new Map();
 	let calls = 0;
+	/** The agent this line is on: the one its greeting named, then whichever it focused. */
+	let screen;
 	ws.onmessage = (event) => {
 		const message = JSON.parse(String(event.data));
 		received.push(message);
 		if (message.type === "call.answered") {
 			waiting.get(message.id)?.(message);
 			waiting.delete(message.id);
+		} else if (message.type === "agent.list") {
+			screen ??= message.focused;
 		} else if (message.type === "canvas.list") {
 			for (const row of message.stages ?? []) {
 				if (asked.has(row.name)) continue;
@@ -636,13 +641,16 @@ export async function socket(api) {
 		new Promise((resolve) => {
 			const id = `c${++calls}`;
 			waiting.set(id, resolve);
-			say({ type: "line.call", id, verb, args, ...on });
+			if (verb === "agent.focus") screen = args[0];
+			const agent = "agent" in on ? on.agent : screen;
+			const stage = "stage" in on ? on.stage : canvasOf(screen);
+			say({ type: "line.call", id, verb, args, ...(agent ? { agent } : {}), ...(stage ? { stage } : {}) });
 		});
 	return {
 		received,
 		last,
 		call,
-		edit: (agent, ops) => call("canvas.edit", [ops, { agent }], { agent }),
+		edit: (agent, ops) => call("canvas.edit", [ops, { agent }], { agent, stage: canvasOf(agent) }),
 		canvasOf,
 		drawing: (of) => held.get(canvasOf(of) ?? of),
 		drawings: (of) => drawn.filter((one) => one.canvas === (canvasOf(of) ?? of)),
