@@ -45,6 +45,8 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 				return { ...(url ? { DECKS_URL: url } : {}), DECKS_TOKEN: token };
 			};
 			apps = new Apps(given.deck, given.store("apps"), { workdir, env, clock });
+			// A canvas pass hears app.changed for an app placed on its canvas: the app's window there listens.
+			given.belongs((scope, event, payload) => event === "app.changed" && scope.canvas !== undefined && placedOn(given, scope.canvas, (payload.ids as string[] | undefined)?.[0]));
 			let rev = 0;
 			apps.onChange = (name, status) => {
 				// A server app that is not running holds no token.
@@ -61,17 +63,31 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 	});
 }
 
+/** Whether an app is placed on a canvas, read from the drawing as it is now. */
+function placedOn(kernel: Kernel, canvas: string, app: string | undefined): boolean {
+	if (!app) return false;
+	try {
+		return kernel.canvas(canvas).read().some((item) => item.type === "app" && item.app === app);
+	} catch {
+		return false;
+	}
+}
+
 function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
 	const app: Route = {
 		method: "ANY",
 		prefix: "/app/",
 		tokenOf: passInPath,
+		// A pass reaches an app's pages; serveApp holds it to the app it was issued for.
+		scoped: () => true,
 		serve: (ctx, req, res) => serveApp(ctx, apps(), req, res),
 		upgrade: (req, socket, head, door) => upgradeApp(apps(), req, socket, head, door),
 	};
 	const forward = (prefix: string): Route => ({
 		method: "ANY",
 		prefix,
+		// Forwarded ports are the person's own local servers, which cards on a canvas frame.
+		scoped: () => true,
 		serve: (ctx: Context, req, res) => serveForward(ctx, req, res),
 		upgrade: (req, socket, head, door) => upgradeForward(req, socket, head, door),
 	});

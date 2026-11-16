@@ -23,6 +23,7 @@ export async function serveApp(ctx: Context, apps: Apps, req: IncomingMessage, r
 	const url = new URL(req.url ?? "/", "http://decks.local");
 	const at = parseAppPath(url.pathname);
 	if (!at) return send(res, plain(404, "An app's address is /app/<name>/."));
+	if (ctx.scope && !(ctx.caller.kind === "app" && ctx.caller.name === at.name)) return send(res, plain(403, `This pass does not open the app ${at.name}.`));
 	if (!at.slash) return send(res, { status: 308, type: "text/plain", body: "", headers: { location: `/app/${at.name}/${url.search}` } });
 	const manifest = await apps.manifest(at.name).catch(() => undefined);
 	if (!manifest) return send(res, plain(404, `There is no app called ${at.name}.`));
@@ -50,7 +51,8 @@ export function upgradeApp(apps: Apps, req: IncomingMessage, socket: Duplex, hea
 	const carried = passInPath(asked);
 	const url = carried ? new URL(`${carried.path}${asked.search}`, asked) : asked;
 	const at = parseAppPath(url.pathname);
-	if (!at || !door.resolve(carried?.token ?? url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+	const caller = door.resolve(carried?.token ?? url.searchParams.get("pass") ?? undefined);
+	if (!at || !caller || (caller.kind === "app" && caller.name !== at.name)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
 	void apps.manifest(at.name)
 		.then((manifest) => (manifest.kind === "server" ? serverTarget(apps, at.name, manifest, at.inner, url.search) : undefined))
 		.catch(() => undefined)

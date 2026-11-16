@@ -2,6 +2,7 @@ import { Refused } from "../../protocol/index.ts";
 import type { Context, Route, RouteAnswer } from "../kernel/index.ts";
 import type { PictureTools } from "./tools.ts";
 import { take, type ShotArgs } from "./shot.ts";
+import { reachesCanvas } from "./reach.ts";
 
 // A picture to download (rule 13): GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&live=&name=.
 // Taken as canvas.screenshot takes it, answered as bytes and kept nowhere.
@@ -9,7 +10,7 @@ import { take, type ShotArgs } from "./shot.ts";
 export const SHOT = "/pictures/shot";
 const TYPES = { png: "image/png", jpeg: "image/jpeg", pdf: "application/pdf" } as const;
 
-export const shotRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: SHOT, answer: (ctx, _path, query) => answer(ctx, m(), query) });
+export const shotRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: SHOT, scoped: (scope, asked) => !asked.query.has("agent") && reachesCanvas(scope, asked.query.get("canvas")), answer: (ctx, _path, query) => answer(ctx, m(), query) });
 
 async function answer(ctx: Context, m: PictureTools, query: URLSearchParams): Promise<RouteAnswer> {
 	const text = (status: number, body: string): RouteAnswer => ({ status, type: "text/plain; charset=utf-8", body });

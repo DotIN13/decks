@@ -2,6 +2,7 @@ import { layout, Refused } from "../../protocol/index.ts";
 import type { Bytes, Context, Route, RouteAnswer } from "../kernel/index.ts";
 import type { PictureTools } from "./tools.ts";
 import { picturedPath } from "./picture.ts";
+import { reachesPath } from "./reach.ts";
 
 // A card drawn from markup the reader's page posted (rule 14): POST /pictures/snapshot?path=&w=&h=&scheme=.
 // The markup is drawn at the card's own address, so its relative files load as on the canvas.
@@ -11,7 +12,7 @@ const LIMIT = 24 * 1024 * 1024;
 const text = (status: number, body: string): RouteAnswer => ({ status, type: "text/plain; charset=utf-8", body });
 const escapeAttr = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-export const snapshotRoute = (m: () => PictureTools): Route => ({ method: "POST", prefix: SNAPSHOT, answer: (ctx, _path, query, body) => answer(ctx, m(), query, body) });
+export const snapshotRoute = (m: () => PictureTools): Route => ({ method: "POST", prefix: SNAPSHOT, scoped: (scope, asked) => reachesPath(scope, asked.query.get("path") ?? ""), answer: (ctx, _path, query, body) => answer(ctx, m(), query, body) });
 
 async function answer(ctx: Context, m: PictureTools, query: URLSearchParams, body: Bytes): Promise<RouteAnswer> {
 	try {

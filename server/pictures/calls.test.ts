@@ -308,3 +308,21 @@ test("rule 16: fit answers from a fresh frame report at the card's width, withou
 	await served.close();
 	await s.close();
 });
+
+test("rule 18: a canvas pass pictures only its own canvas and its cards", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	await s.value("file.write", { path: "canvases/other/cards/x/index.html", text: "<title>X</title><p>x</p>" }, ann);
+	const served = await s.listen();
+	const pass = s.callers.issue({ kind: "person", id: "person~frame-9", name: "you" }, "canvas pass", { canvas: "work", calls: [], until: Date.now() + 60_000 });
+	const get = async (path: string) => (await fetch(`${served.url}${path}`, { headers: { authorization: `Bearer ${pass}` } })).status;
+	assert.equal(await get(`/pictures/${CARD}?w=480`), 200, "its own card");
+	assert.equal(await get("/pictures/canvases/other/cards/x/index.html?w=480"), 403, "another canvas's card");
+	assert.equal(await get("/pictures/canvases/work/..%2fother/cards/x/index.html?w=480"), 403, "a climb out of its folder");
+	assert.equal(await get("/pictures/canvas-tile/other?scheme=light"), 403);
+	assert.equal(await get("/pictures/shot?canvas=other&scale=1"), 403);
+	assert.equal(await get("/pictures/shot?agent=someone&scale=1"), 403, "an agent's home is not named by a pass");
+	assert.equal(await get("/pictures/shot?canvas=work&scale=1"), 200, "its own canvas");
+	await served.close();
+	await s.close();
+});

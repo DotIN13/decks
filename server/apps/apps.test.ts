@@ -125,6 +125,8 @@ test("an app page gets decks-canvas.js, and a canvas pass opens a placed app ins
 	assert.match(opened.url, /^\/app\/t\/[^/]+\/inside\/$/);
 	assert.equal((await fetch(t.url(opened.url))).status, 200, "the address with its pass loads the app");
 	const appPass = opened.url.split("/")[3]!;
+	await t.s.value("app.create", { name: "neighbour" }, ann);
+	assert.equal((await fetch(t.url(`/app/t/${appPass}/neighbour/`))).status, 403, "an app's pass opens only its own app");
 	const called = (await (await fetch(t.url("/api/v1/app.list"), { method: "POST", headers: { authorization: `Bearer ${appPass}` } })).json()) as { ok: boolean };
 	assert.equal(called.ok, false, "the app's pass makes no calls");
 	for (let i = 0; i < 3; i++) await open(pass);

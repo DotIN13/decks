@@ -1,5 +1,6 @@
 import type { Bytes, Context, Route, RouteAnswer } from "../kernel/index.ts";
 import type { Reading } from "./reading.ts";
+import { reachesPath } from "./reach.ts";
 
 // What a canvas frame showing a card measured (rule 15): POST /pictures/extent { path, w, h, ... }.
 // card.fit answers from it, without a browser, while it is fresh and the card unchanged since.
@@ -26,7 +27,7 @@ export class Extents {
 	}
 }
 
-export const extentRoute = (extents: Extents): Route => ({ method: "POST", prefix: EXTENT, answer: (ctx, _path, _query, body) => answer(ctx, extents, body) });
+export const extentRoute = (extents: Extents): Route => ({ method: "POST", prefix: EXTENT, scoped: (_scope, asked) => asked.method === "POST", answer: (ctx, _path, _query, body) => answer(ctx, extents, body) });
 
 async function answer(ctx: Context, extents: Extents, body: Bytes): Promise<RouteAnswer> {
 	const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value) });
@@ -38,7 +39,7 @@ async function answer(ctx: Context, extents: Extents, body: Bytes): Promise<Rout
 	}
 	const report = reportOf(parsed);
 	if (!report) return json(400, { ok: false, error: "Send { path, w, h }, and what else was measured." });
-	if (ctx.caller.canvas && !report.path.includes(`/${ctx.caller.canvas}/`)) return json(403, { ok: false, error: "A frame reports only the cards of its own canvas." });
+	if (ctx.scope && !reachesPath(ctx.scope, report.path)) return json(403, { ok: false, error: "A frame reports only the cards of its own canvas." });
 	extents.note(report.path, report.w, report.reading);
 	return json(200, { ok: true });
 }

@@ -4,6 +4,7 @@ import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kerne
 import type { PictureTools } from "./tools.ts";
 import { TAKEN } from "./picture.ts";
 import { canvasShot } from "./shot.ts";
+import { reachesCanvas } from "./reach.ts";
 
 // A canvas's tile picture (rule 12): the whole canvas, its long side 480 px,
 // a JPEG kept in the store by the drawing's bytes and the scheme.
@@ -11,7 +12,7 @@ import { canvasShot } from "./shot.ts";
 export const TILES = "/pictures/canvas-tile/";
 const LONG_SIDE = 480;
 
-export const tileRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: TILES, answer: (ctx, path, query) => answer(ctx, m(), path, query) });
+export const tileRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: TILES, scoped: (scope, asked) => reachesCanvas(scope, asked.path.slice(TILES.length)), answer: (ctx, path, query) => answer(ctx, m(), path, query) });
 
 async function answer(ctx: Context, m: PictureTools, path: string, query: URLSearchParams): Promise<RouteAnswer> {
 	try {

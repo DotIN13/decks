@@ -3,6 +3,7 @@ import { deckFiles, layout, PICTURE_LADDER, Refused } from "../../protocol/index
 import { toDeckPath, type Context, type DeckPath, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { ASTC_TYPE, compress, encoder, LEVELS } from "./astc.ts";
 import type { PictureTools } from "./tools.ts";
+import { reachesPath } from "./reach.ts";
 
 // A card's picture for the canvas at /pictures/ (rule 11): its page at a rung of
 // the canvas's ladder, kept in the store, and compressed for the GPU when asked.
@@ -15,7 +16,7 @@ export const TAKEN = "t2";
 /** The widest picture an export or a screenshot draws a card from. */
 const WIDEST = 2000;
 
-export const pictureRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: PICTURES, answer: (ctx, path, query) => answer(ctx, m(), path, query) });
+export const pictureRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: PICTURES, scoped: (scope, asked) => reachesPath(scope, asked.path.slice(PICTURES.length)), answer: (ctx, path, query) => answer(ctx, m(), path, query) });
 
 async function answer(ctx: Context, m: PictureTools, path: string, query: URLSearchParams): Promise<RouteAnswer> {
 	try {

@@ -4,8 +4,7 @@ Pictures of what is on a canvas, and the one feature that drives a browser.
 
 ## Owns
 
-- `card.fit` (fit.ts), `canvas.screenshot` (shot.ts) and `canvas.export` (export.ts).
-- Pictures by address (rules 11 to 16); the browser (browser.ts), closed a minute after its last use.
+- `card.fit`, `canvas.screenshot`, `canvas.export`; pictures by address (rules 11 to 16); the browser.
 
 ## May import
 
@@ -52,9 +51,10 @@ HTML; `playwright` for the browser. No other feature.
     build), `how` "native", cards as pictures, Latin fonts from the protocol's list. Words beyond
     Latin, a font not fetched, a PDF, `live`, a lone card, maths, markdown cards or icons are the
     browser's; the notes say why.
+18. A canvas pass reaches only its canvas (reach.ts): a card or snapshot inside its folder, a shot
+    or tile of it, its cards' extents. Every other picture route refuses it.
 
 ## Check
 
 - `node tools/check.mjs server`
-- Heavy: `node tools/heavy.mjs --wait -- env DECKS_HEAVY=1 node --import tsx --test server/pictures/browser.test.ts`
-- `node tools/gates/run.mjs`
+- `node tools/gates/run.mjs`; heavy: `DECKS_HEAVY=1 node --import tsx --test server/pictures/browser.test.ts`

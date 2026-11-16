@@ -10,7 +10,7 @@ const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "
 
 export function openRoute(kernel: () => Kernel): Route {
 	const given: Given = new Map();
-	return { method: "POST", prefix: OPEN, answer: (ctx, path) => answer(ctx, kernel(), given, path) };
+	return { method: "POST", prefix: OPEN, scoped: (_scope, asked) => asked.method === "POST", answer: (ctx, path) => answer(ctx, kernel(), given, path) };
 }
 
 async function answer(ctx: Context, kernel: Kernel, given: Given, path: string): Promise<RouteAnswer> {
