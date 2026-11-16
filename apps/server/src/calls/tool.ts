@@ -26,7 +26,7 @@ import { renamedVerb } from "./renamed.ts";
 import { gestures, type Gestures } from "./gestures.ts";
 
 /**
- * One caller's stage (DESIGN §6.3): the verbs bound to an agent, the person, a board or an app.
+ * One caller's stage (DESIGN §6.3): the verbs bound to an agent, the person or an app.
  *
  * The verbs themselves are in `calls/`, a module per group, given a `VerbContext` built here; this
  * file puts them on one object, answers `call` (what `/api/v1/<verb>` runs) with the value, the
@@ -141,12 +141,12 @@ export interface StageAgentHooks {
 	 * bytes are the same revision.
 	 */
 	recordRevision(path: string): string | undefined;
-	/** What waits for the caller: its messages (taken, for an agent that works outside Decks) and its canvases' news. Optional: a card's button has neither. */
+	/** What waits for the caller: its messages (taken, for an agent that works outside Decks) and its canvases' news. Optional: an app has neither. */
 	news?(): { messages: QueuedWork[]; changes: string[] };
 	/**
 	 * The agent worked on this board: it becomes its writer, and the board joins what the turn
 	 * reports. Called by `decks.card.create`, `decks.canvas.fit` and `decks.agent.claim`. Optional so a host
-	 * with no deck record (a board actor) can leave it out.
+	 * with no deck record (an app) can leave it out.
 	 */
 	worked?(path: string): void;
 	/** The agent acted on a board with a stage verb: the canvas draws its cursor there (`agents/acts.ts`). */
@@ -162,8 +162,8 @@ export interface StageAgentHooks {
 	boardPathOf(file: string): string | undefined;
 	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
 	stageName?(): string | undefined;
-	/** Set when the caller is a board's own code (`calls/caller-actor.ts`), not an agent. */
-	board?: string;
+	/** Set when the caller is an app's own code (`calls/app-caller.ts`), not an agent: the app's name. */
+	app?: string;
 	/**
 	 * Set when the caller is the person, in the browser, acting on this agent's stage (`calls/person.ts`):
 	 * their change is theirs, so it draws no agent cursor, is undoable, and hears no agent's reminders.
@@ -175,7 +175,7 @@ export interface StageAgentHooks {
 	newStage?(title: string): string;
 	/**
 	 * The canvas this caller is on when a call names none (`decks.here()`), where that is not its own
-	 * stage: a board's button is on the board's canvas. Left out, it is `stageName()`.
+	 * stage: an app is on a canvas that shows it. Left out, it is `stageName()`.
 	 */
 	here?(): string | undefined;
 	/** Deliver a message now: steer the running turn, start one, or queue it (`agent.send`). */
@@ -211,8 +211,8 @@ export interface StageTool {
 	/** The guidelines appended to every agent's context (`runtime/guidelines.txt`). */
 	readonly guidelines: string[];
 	/**
-	 * The `stage` object the verbs act through, bound to this caller: an agent, or a board or app
-	 * acting for a conversation (`calls/caller-actor.ts`).
+	 * The `stage` object the verbs act through, bound to this caller: an agent, the person, or an
+	 * app acting for a conversation (`calls/app-caller.ts`).
 	 */
 	readonly stage: Stage;
 	/**

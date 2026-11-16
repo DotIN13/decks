@@ -1,7 +1,7 @@
 import { VERB_BY_NAME } from "@decks/api";
 import type { Request } from "express";
 import type { Principal } from "../auth/principal.ts";
-import { appActor, callerTool, conversationFor } from "./caller-run.ts";
+import { appTool, conversationForApp } from "./app-caller.ts";
 import type { CallsHost } from "./host.ts";
 import { personAgent } from "./person.ts";
 import type { StageCallResult, StageTool } from "./tool.ts";
@@ -80,9 +80,8 @@ async function appCaller(app: CallsHost, name: string): Promise<Caller> {
 	if (!app.apps.exists(name)) return { status: 404, error: `There is no app called ${name}.` };
 	// Trusted under `apps/<name>` as it always was, so an "Always allow" given before still holds.
 	const key = `apps/${name}`;
-	const board = appActor(name);
 	if (!app.appTrust.allows(key) && !app.appsAllowedOnce.has(key)) {
-		const answer = await conversationFor(app, { board }).bridge.choose({
+		const answer = await conversationForApp(app, name).bridge.choose({
 			title: "Let this app use the stage?",
 			message: `The app ${name} wants to call stage verbs: write cards, move the canvas, message agents.`,
 			options: [
@@ -95,15 +94,12 @@ async function appCaller(app: CallsHost, name: string): Promise<Caller> {
 		else if (answer === "Allow until Decks restarts") app.appsAllowedOnce.add(key);
 		else return { status: 403, error: `The person did not let ${name} use the stage.` };
 	}
-	const { tool, focused } = callerTool(
-		{ agents: app.agents, cameras: app.cameras, boards: app.boards, stage: app.stage, port: app.port },
-		{ board, name: `app ${name}`, mayCreate: true },
-	);
+	const { tool, conversation } = appTool(app, name);
 	return {
 		tool,
 		announce: (verb, answer) => {
-			if (answer.ok) focused.translator.notice("info", `app ${name} called ${verb}`);
-			else focused.translator.notice("error", `app ${name} called ${verb} and failed: ${answer.error}`);
+			if (answer.ok) conversation.translator.notice("info", `app ${name} called ${verb}`);
+			else conversation.translator.notice("error", `app ${name} called ${verb} and failed: ${answer.error}`);
 		},
 	};
 }

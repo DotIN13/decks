@@ -2,13 +2,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Which apps (and, from before cards, which boards) this install has allowed to call the stage
- * verbs: keys like `apps/<name>`. Was `EvalTrust`, from when boards ran code through data-eval.
+ * Which apps this install has allowed to call the stage verbs: keys like `apps/<name>`.
  *
- * A board's code calls the stage verbs an agent has (`calls/caller-run.ts`), deliberately,
- * because the agent that wrote the board already has `bash`. What is new here is the *trigger*:
- * the code runs because a person pressed something on a board, and a board is a file that may
- * have been written by an agent that had just read a web page. So the click is not the permission. This is.
+ * An app's code calls the verbs an agent has (`calls/app-caller.ts`), deliberately, because the
+ * agent that wrote the app already has `bash`. What is new here is the *trigger*: the code runs
+ * because a person opened something, and an app is files that may have been written by an agent
+ * that had just read a web page. So opening it is not the permission. This is.
  *
  * One list, on the install rather than on a deck, for the reason `browser/bridge.ts` gives about
  * the pairing code: what a machine trusts should not have to be re-granted per deck. It is

@@ -9,7 +9,7 @@ import type { VerbContext } from "./context.ts";
  */
 export async function moveHome(ctx: VerbContext, name: string): Promise<{ moved: boolean; onScreen: boolean; offered?: string }> {
 	const { service, agent } = ctx;
-	if (!agent.setHome || agent.board) throw new Error("Only an agent has a home canvas to change.");
+	if (!agent.setHome || agent.app) throw new Error("Only an agent has a home canvas to change.");
 	const may = await service.mayMove(agent.id, name, agent.person === true);
 	// There already: nothing moves, and the answer still says whether the person is looking at it.
 	if (agent.stageName?.() === name) return { moved: false, onScreen: may.onScreen };

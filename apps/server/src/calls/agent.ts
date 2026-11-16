@@ -41,7 +41,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 		const row = agent.agents().find((one) => one.id === agent.id);
 		const home = agent.stageName?.();
 		return {
-			...(agent.board ? {} : { id: agent.id }),
+			...(agent.app ? {} : { id: agent.id }),
 			name: identity.name,
 			...(identity.avatar ? { avatar: identity.avatar } : {}),
 			color: identity.color,
@@ -110,7 +110,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 				return { queued, position };
 			},
 			create: async (spec: { name: string; kind?: string; model?: string; thinking?: string; mode?: string; workspace?: string; tags?: string[]; canvas?: string }) => {
-				if (!agent.create) throw new Error(agent.board ? "A board's button cannot make agents." : "This deck cannot make agents.");
+				if (!agent.create) throw new Error("This deck cannot make agents.");
 				const name = String(spec?.name ?? "").trim();
 				if (!name) throw new Error('A new agent needs a name: decks agent create --name Rune.');
 				if (agent.agents().some((one) => one.name.toLowerCase() === name.toLowerCase())) throw new Error(`Another agent is already called ${name}. Pick a different name, or send it work.`);

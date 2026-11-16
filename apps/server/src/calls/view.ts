@@ -23,7 +23,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 			 */
 			goto: async (canvas: string) => {
 				const name = canvasOf(canvas);
-				if (!agent.setHome || agent.board) {
+				if (!agent.setHome || agent.app) {
 					throw new Error("Only an agent's conversation moves to a canvas: decks view focus shows a card on the canvas on screen.");
 				}
 				const was = agent.stageName?.();
@@ -42,7 +42,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 				const fromPath = options?.canvas ? undefined : wanted.map((one) => canvasOfPath(one)).find((one) => one !== undefined);
 				const name = canvasOf(options?.canvas ?? fromPath);
 				let arrived = false;
-				if (agent.setHome && !agent.board && agent.stageName?.() !== name) {
+				if (agent.setHome && !agent.app && agent.stageName?.() !== name) {
 					const moved = await moveHome(ctx, name);
 					if (moved.offered) {
 						notes.push(`The view did not move: ${moved.offered}.`);

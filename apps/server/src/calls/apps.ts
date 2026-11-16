@@ -36,7 +36,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 				return apps;
 			};
 			const agentOnly = (what: string) => {
-				if (agent.board) throw new Error(`A board's own code cannot ${what} an app; ask an agent.`);
+				if (agent.app) throw new Error(`An app's own code cannot ${what} an app; ask an agent.`);
 			};
 			const known = (name: unknown) => {
 				const apps = service_();
@@ -106,7 +106,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					const text = known(name);
 					const folder = service_().folder(text);
 					if (!isRepo(folder)) {
-						if (agent.board) throw new Error(`A board's own code cannot put an app in git; ask an agent.`);
+						if (agent.app) throw new Error(`An app's own code cannot put an app in git; ask an agent.`);
 						await initRepo(folder, `Keep ${text} in git`);
 					}
 					return repoState(folder);

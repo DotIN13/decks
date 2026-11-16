@@ -21,7 +21,7 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 			const forwards = service.forwards;
 			if (!forwards) throw new Error("This server forwards no ports.");
 			if (change && (change.open !== undefined || change.close !== undefined)) {
-				if (agent.board) throw new Error("A board's own code cannot open or close ports; ask an agent.");
+				if (agent.app) throw new Error("An app's own code cannot open or close ports; ask an agent.");
 				if (change.open !== undefined) forwards.open(change.open, { ...(change.label ? { label: change.label } : {}), by: agent.identity().name });
 				if (change.close !== undefined && !forwards.close(change.close)) throw new Error(`Port ${change.close} was not forwarded.`);
 			}
@@ -60,7 +60,7 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 		 */
 		pair: {
 			code: async () => {
-				if (agent.board) throw new Error("A board's own code cannot make a pairing code.");
+				if (agent.app) throw new Error("An app's own code cannot make a pairing code.");
 				if (!service.pairCode) throw new Error("This server pairs with no one.");
 				const made = service.pairCode();
 				ctx.notes.push(`Type it where the other Decks asks for a code, within ${Math.round((made.expires - Date.now()) / 60_000)} minutes. It works once.`);

@@ -134,7 +134,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 			...(!shared && pens.studioId(name) ? { studio: pens.studioId(name) } : {}),
 			open: agent
 				.agents()
-				.filter((other) => (other.id === agent.id && !agent.board ? mine : other.stage) === name)
+				.filter((other) => (other.id === agent.id && !agent.app ? mine : other.stage) === name)
 				.map((other) => other.name),
 			cards,
 		};

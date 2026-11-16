@@ -1,6 +1,6 @@
 import { cardCalls, VERB_BY_NAME } from "@decks/api";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
-import { appActor, canvasHolds } from "./caller-run.ts";
+import { canvasShowsApp } from "./app-caller.ts";
 import type { CallsHost } from "./host.ts";
 
 /**
@@ -117,7 +117,7 @@ export function onCanvas(app: Pick<CallsHost, "stage" | "agents" | "documentsOn"
 	// An agent at work on a card: the frame showing the canvas it is on draws the agent's cursor there.
 	if (message.type === "agent.act") return typeof message.path === "string" && boardOnCanvas(app, message.path, canvas);
 	// An app's state, for a canvas holding an item of that app.
-	if (message.type === "app.changed") return typeof message.name === "string" && canvasHolds(app.stage.pens, canvas, appActor(message.name));
+	if (message.type === "app.changed") return typeof message.name === "string" && canvasShowsApp(app.stage.pens, canvas, message.name);
 	if (message.type === "card.changed") {
 		const board = message.card as { path?: unknown } | undefined;
 		const path = typeof board?.path === "string" ? board.path : typeof message.path === "string" ? message.path : undefined;

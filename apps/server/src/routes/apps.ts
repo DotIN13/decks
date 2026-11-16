@@ -1,5 +1,5 @@
 import { SDK_FILE } from "../apps/service.ts";
-import { appActor, canvasHolds } from "../calls/caller-run.ts";
+import { canvasShowsApp } from "../calls/app-caller.ts";
 import { type RouteDeps } from "./shared.ts";
 import { type Request, type Response, type Router } from "express";
 import { runVerb } from "../calls/run.ts";
@@ -73,7 +73,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			res.status(403).json({ error: "Apps open inside a canvas only on a canvas that is yours alone; on this one, open it in a tab.", tab: true });
 			return;
 		}
-		if (!canvasHolds(pens, principal.canvas, appActor(name))) {
+		if (!canvasShowsApp(pens, principal.canvas, name)) {
 			res.status(403).json({ error: `${name} is not placed on this canvas.` });
 			return;
 		}
