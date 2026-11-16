@@ -372,6 +372,26 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 | `Camera` as a type (stage.ts) | `Camera` (`protocol/shapes.ts`, type export) | `x, y, zoom`. The old optional `width` and `height` are the screen's size, `View.screen`, a `Size`. |
 | `cardCalls(route)` (`@decks/api`, verbs.ts) | `callsFor("card")` (`protocol/calls/index.ts`) | The calls a card may make, by who may call. The old route is the frame's to choose: `view.*` it answers itself, `agent.*` goes through the page, and the rest go to the server on the canvas's pass. |
 
+## Drafted, not yet declared: a document's compile, git and Google Docs
+
+The canvas library's document messages on the old line (today's `doc.compile`, `doc.git`, `doc.gstyle`, `doc.gcomment`, told back
+as `doc.compiled`, `doc.repo`, `doc.remote`, `doc.gdoc`, `doc.gcomments`) were missed by the table above; Warden's
+`server/compat/messages.gaps.ts` lists them. Lexicon's draft, from the shapes at tag `rewrite-stop-3`; each is declared
+when Quire (compile, git) or Folio (Google Docs) agrees its rules.
+
+| Today (line message) | Drafted as | Who | What changes |
+|---|---|---|---|
+| `doc.compile` | `file.compile { path }` -> `Compiled { path, ok, pdf?, errors: [{ message, line? }], at, ms, error? }` | person, agent, app | A call that answers; `pdf` is a deck path, not an absolute one. |
+| `doc.compiled` | event `file.compiled { path, ok, pdf?, errors, ms, error? }` (heard by everyone on the canvas) | | Told to every page on the document, not only the one that asked. |
+| `doc.git` `status` | `file.repo { path }` -> `Repo { branch, upstream?, remote?, label?, ahead, behind, changed }` or nothing | person, agent | Status is a read of its own. |
+| `doc.git` `pull`, `push` | `file.pull { path }`, `file.push { path }` -> `GitResult { ok, message, status? }` | person, agent | Two calls, one verb each; what a pull changed arrives as `file.changed`. |
+| `doc.repo` | dropped | | It was the answer to `doc.git`; the three calls answer. |
+| `doc.remote` | `file.changed { part: "remote", remote: { state, at?, message? } }` | | `remote` added to `file.changed`. |
+| `doc.gstyle` | `google.style { path, requests, text? }` -> `{ path, rev }` | person, agent | Docs requests at the page's indices, made after the typing before them. |
+| `doc.gcomment` | `google.comment { path, action: create, reply or resolve, comment?, content?, quote? }` -> `GoogleComment[]` | person, agent | Answers the open comments as they now are. |
+| `doc.gdoc` | `google.get { path }` -> `{ path, document, text }`, and `file.changed { part: "google" }` to say it moved | person, agent | A snapshot becomes a call. |
+| `doc.gcomments` | `google.comments { path }` -> `GoogleComment[]`, and `file.changed { part: "comments" }` | person, agent | A snapshot becomes a call. |
+
 ## Where the grammar bends, and what is still open
 
 - `view.reload` and `chat.restore` answer a count, not a thing: each changes many things at once (rule 5).
