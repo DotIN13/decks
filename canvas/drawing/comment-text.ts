@@ -1,7 +1,7 @@
 /**
- * A comment on a board: the words a person selected while browsing, and what they said about them.
+ * A comment on a card: the words a person selected while browsing, and what they said about them.
  *
- * A comment is a message to the agent, not a mark in the file. It names the board, the
+ * A comment is a message to the agent, not a mark in the file. It names the card, the
  * component the words are in and the words themselves, which is what the agent needs to find
  * the place, and then carries what was typed. It goes one of two ways, and the person picks
  * at the moment of writing: **now**, as a message of its own, or **with the next message**,
@@ -27,7 +27,7 @@ export interface CardComment {
 	/** What was said; empty when the comment only points at the place, for the message to talk about. */
 	text: string;
 	at: number;
-	/** The board's title, for a comment on a whole board: what its pill in the composer says. */
+	/** The card's title, for a comment on a whole card: what its pill in the composer says. */
 	title?: string;
 }
 

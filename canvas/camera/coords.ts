@@ -1,17 +1,8 @@
 /**
  * Every conversion between coordinate spaces, in one file.
  *
- * There were nine of these written by hand across four files, and four of the bugs recorded
- * in this codebase's comments came from them: a pinch that walked the canvas 90 px sideways
- * and down (the stage's offset subtracted twice), a 60 px drag that moved the camera 30
- * (board pixels used where screen pixels were meant), a title bar 88 px tall at 27% zoom
- * (`24 / zoom` where only part of the value scales), and a forced layout on every event of a
- * gesture (a conversion that measured the DOM instead of asking the camera).
- *
- * They are not nine problems. Three of them crossed a boundary that is the identity — see
- * `stagePoint` — and five are the same three sums written five times. This file is those
- * three sums, named so the direction is in the name, and **the only place outside
- * `camera.ts` allowed to multiply or divide by a zoom.**
+ * The only place outside `camera.ts` that multiplies or divides by a zoom; each function says its
+ * direction in its name, and a point and a delta convert differently (below).
  *
  * ### The spaces
  *

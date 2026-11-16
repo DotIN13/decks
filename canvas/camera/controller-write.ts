@@ -52,22 +52,9 @@ export interface CameraRun {
 	panning: Accessor<boolean>;
 	setPanning: Setter<boolean>;
 	/**
-	 * Whether the camera's *scale* is changing right now, as opposed to its position.
-	 *
-	 * The two are not the same kind of work, and the difference is the whole reason this
-	 * signal exists. Moving the world is a transform the compositor already holds pictures
-	 * for, so a pan costs almost nothing however many boards are on the canvas. Scaling it
-	 * asks every board's document to be drawn again at a size it has never been drawn at —
-	 * and a board is an iframe, which is a whole document to redraw. Measured on twelve
-	 * boards at 4× CPU throttle: 69ms of work per finger movement while panning, 134ms
-	 * while pinching, and the gap grows with the number of boards in view.
-	 *
-	 * So while the scale is moving, the boards are put on layers of their own
-	 * (`index.css`), which lets the compositor stretch the picture it already has instead
-	 * of the main thread drawing a new one: 134ms → 56ms, with nothing to see at rest
-	 * (measured: 0.2% of pixels differ, at the edges of letters). It is switched off again
-	 * a moment after the gesture stops, because a layer is a texture held in memory and a
-	 * canvas of them is not free.
+	 * Whether the camera's scale is changing now, as opposed to its position. A pan moves pictures the
+	 * compositor holds; a zoom redraws every awake card at a new size, so while the scale moves the
+	 * cards sit on layers of their own and are stretched, and the layers go a moment after it stops.
 	 */
 	scaling: Accessor<boolean>;
 	setScaling: Setter<boolean>;
@@ -149,6 +136,13 @@ export function writeTransform(c: CameraRun, cam: Camera): void {
 	c.host.place(cam);
 }
 
+/** Say the camera is moving, and stop saying it 160 ms after the last step. */
+export function nowMoving(c: CameraRun): void {
+	if (!c.moving()) c.setMoving(true);
+	clearTimeout(c.moveSettle);
+	c.moveSettle = setTimeout(() => c.setMoving(false), 160);
+}
+
 /**
  * Say the scale is moving, and arrange to notice when it stops.
  *
@@ -157,12 +151,6 @@ export function writeTransform(c: CameraRun, cam: Camera): void {
  * one gesture would pay for them twice. 300ms is longer than any gap inside a gesture
  * and shorter than anyone would notice holding.
  */
-export function nowMoving(c: CameraRun): void {
-	if (!c.moving()) c.setMoving(true);
-	clearTimeout(c.moveSettle);
-	c.moveSettle = setTimeout(() => c.setMoving(false), 160);
-}
-
 export function nowScaling(c: CameraRun): void {
 	if (!c.scaling()) c.setScaling(true);
 	clearTimeout(c.scaleSettle);

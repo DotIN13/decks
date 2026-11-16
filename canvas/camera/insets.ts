@@ -1,36 +1,11 @@
 import { createSignal, onCleanup } from "solid-js";
 
 /**
- * How much of the window the chrome is covering, on each edge.
+ * How much of the window the chrome covers, on each edge, measured rather than stated: one
+ * ResizeObserver over every element with `data-inset`, the largest extent per edge winning.
  *
- * The chrome declares itself — `data-inset="left"` on the boards panel, `"top"` on the two
- * top clusters — and this **measures** what it declared. That
- * is the whole point and it is worth being blunt about it: the width of a panel must not be
- * stated twice. A constant beside a stylesheet drifts the first time someone changes the
- * padding, and every camera bug that follows looks like a camera bug.
- *
- * So: one `ResizeObserver` over everything carrying the attribute, and the largest extent
- * per edge wins. An element that is display:none, or transformed off-screen, measures zero
- * on its own — nothing has to remember to unregister it.
- *
- * ### What is deliberately *not* an inset
- *
- * The floating conversation. It is a column of cards over the boards with click-through
- * gaps, and a board is allowed to sit under it — see `boards/the-conversation-panel-drawn`.
- *
- * The inspector, which used to be the `"right"` in that list. The rule was *a surface that
- * arrives on its own must be subtracted; a surface you summoned may overlap*, and on that
- * reading the inspector qualified: it appears when you select something, asked for or not.
- * What the reading missed is that it is no longer a column — it is a 320px card in the
- * top-right corner, under the tool cluster — and subtracting its width moved the input bar
- * 160px sideways on every click on a component. So the rule the chrome actually keeps is
- * about geometry, not intent: **a surface that stands beside the canvas is subtracted; one
- * that floats over a corner of it is not.** The boards panel is a column and insets; the
- * cluster and the inspector float and do not.
- *
- * A bottom sheet on a phone is not an inset either, for the same reason. It covers the
- * canvas rather than standing beside it, and subtracting it fitted a 1600px board into the
- * strip above the sheet at 3.7%.
+ * A surface standing beside the canvas (the side panel) is an inset; one floating over a corner
+ * of it (the tool cluster, the inspector, the conversation, a phone's bottom sheet) is not.
  */
 export interface Insets {
 	left: number;
@@ -116,6 +91,39 @@ interface Watch {
 	resync: boolean;
 }
 
+/**
+ * Start watching. Called once, from `App`.
+ *
+ * A `MutationObserver` as well as the resize one, because the chrome comes and goes: the
+ * inspector is mounted on selection and the panel is unmounted when folded, and an observer
+ * that only watched the elements present at startup would keep measuring a panel that has
+ * since left the document.
+ */
+export function watchInsets(root: HTMLElement = document.body): void {
+	const w: Watch = { root, sizes: new ResizeObserver(() => soon(w, false)), tracked: new Set(), band: { left: 0, right: 0 }, frame: 0, resync: false };
+	const resized = () => soon(w, false);
+	const tree = new MutationObserver((records) => {
+		for (const record of records) {
+			if (record.type === "attributes" || [...record.addedNodes].some(isChrome) || [...record.removedNodes].some(isChrome)) {
+				soon(w, true);
+				return;
+			}
+		}
+	});
+	tree.observe(root, { childList: true, subtree: true, attributeFilter: ["data-inset"] });
+	window.addEventListener("resize", resized);
+	// The first reading is taken at once: the camera's first fit is waiting on it.
+	sync(w);
+
+	onCleanup(() => {
+		if (w.frame) cancelAnimationFrame(w.frame);
+		tree.disconnect();
+		w.sizes.disconnect();
+		w.sizes = new ResizeObserver(() => {});
+		window.removeEventListener("resize", resized);
+	});
+}
+
 /** Where the chrome stands: the four insets, and the clear span of the top band between its clusters. */
 function edgesOf(tracked: Set<Element>): { next: Insets; bandLeft: number; bandRight: number } {
 	const view = { width: window.innerWidth, height: window.innerHeight };
@@ -138,7 +146,7 @@ function edgesOf(tracked: Set<Element>): { next: Insets; bandLeft: number; bandR
 		 *
 		 * Layout coordinates say where a surface *is* rather than where it is currently
 		 * drawn, which is also the honest answer for a camera: a panel arriving is a panel
-		 * the boards should already be making room for.
+		 * the cards should already be making room for.
 		 *
 		 * These elements are all `position: fixed` with no positioned ancestor, so their
 		 * offsets are viewport coordinates.
@@ -241,43 +249,10 @@ function soon(w: Watch, withSync: boolean): void {
 
 /*
  * Only a change that adds or drops chrome: the tree observer sees every node the app adds, and
- * measuring reads layout, which during a board drag (guides, handles, a board's move) was a
+ * measuring reads layout, which during a card drag (guides, handles, a card's move) was a
  * forced layout on every frame, 10 ms each.
  */
 const isChrome = (node: Node) => node instanceof Element && (node.hasAttribute("data-inset") || node.querySelector("[data-inset]") !== null);
-
-/**
- * Start watching. Called once, from `App`.
- *
- * A `MutationObserver` as well as the resize one, because the chrome comes and goes: the
- * inspector is mounted on selection and the panel is unmounted when folded, and an observer
- * that only watched the elements present at startup would keep measuring a panel that has
- * since left the document.
- */
-export function watchInsets(root: HTMLElement = document.body): void {
-	const w: Watch = { root, sizes: new ResizeObserver(() => soon(w, false)), tracked: new Set(), band: { left: 0, right: 0 }, frame: 0, resync: false };
-	const resized = () => soon(w, false);
-	const tree = new MutationObserver((records) => {
-		for (const record of records) {
-			if (record.type === "attributes" || [...record.addedNodes].some(isChrome) || [...record.removedNodes].some(isChrome)) {
-				soon(w, true);
-				return;
-			}
-		}
-	});
-	tree.observe(root, { childList: true, subtree: true, attributeFilter: ["data-inset"] });
-	window.addEventListener("resize", resized);
-	// The first reading is taken at once: the camera's first fit is waiting on it.
-	sync(w);
-
-	onCleanup(() => {
-		if (w.frame) cancelAnimationFrame(w.frame);
-		tree.disconnect();
-		w.sizes.disconnect();
-		w.sizes = new ResizeObserver(() => {});
-		window.removeEventListener("resize", resized);
-	});
-}
 
 /**
  * Insets told rather than measured: in the canvas frame the chrome standing beside the canvas is the

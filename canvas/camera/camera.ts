@@ -4,7 +4,7 @@ import type { Page, Camera } from "@decks/protocol-old";
  * The camera, and the two conversions everything else is built on.
  *
  * `camera.x`/`y` is the world point under the centre of the viewport, not the
- * top-left. Centre-based is what makes zooming about a point and fitting a board
+ * top-left. Centre-based is what makes zooming about a point and fitting a card
  * both come out as two lines instead of six — and it means a resized window keeps
  * looking at the same thing.
  */
@@ -130,7 +130,7 @@ const spread = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
  * The camera moved as little as it can to bring a world box into view.
  *
  * For the on-screen keyboard, which is the only thing that has ever needed it: a
- * `contenteditable` in a board is focused, the keyboard takes the bottom half of the
+ * `contenteditable` in a card is focused, the keyboard takes the bottom half of the
  * screen, and the words being typed are behind it. The room left over is the visual
  * viewport (`window.visualViewport`), which arrives here as insets in screen pixels.
  *
@@ -197,7 +197,7 @@ export const breathingRoom = (view: Viewport) => Math.min(96, view.width / 8, vi
  * The region is the canvas column: the window minus whatever the chrome is covering, which
  * `camera/insets.ts` measures. Two things follow, and only the first is obvious.
  *
- * The zoom comes from the region, not the window — otherwise `fit` frames boards into a
+ * The zoom comes from the region, not the window — otherwise `fit` frames cards into a
  * width that includes 500px of panel and half of what it framed is behind one.
  *
  * And the camera has to be *offset*, which is the part that is easy to miss: `camera.x` is
@@ -223,17 +223,9 @@ export function fitInto(
 }
 
 /**
- * The smallest gap left between a board and the chrome beside it.
- *
- * This constant is a bug fix with a name. `fit` pads by `breathingRoom`, up to 96px a
- * side, which is right when the whole window is the canvas — and wrong once the chrome
- * insets it, because then the padding is counted *on top of* a 264px panel and a 240px
- * inspector. A board flown to on a laptop landed at 42%, below `LIVE_ZOOM`, where a
- * board takes no pointer events: clicking the thing you had just asked to look at did
- * nothing at all.
- *
- * **The chrome is the breathing room.** So when there is chrome to subtract, all that is
- * wanted is a floor — enough that a board does not appear to touch a panel's edge.
+ * The smallest gap left between a card and the chrome beside it. When chrome insets the canvas it
+ * is the breathing room, so a fit into what is left pads by this floor alone, not `breathingRoom`
+ * on top of the panels (which shrank a fitted card below `LIVE_ZOOM`).
  */
 export const EDGE_FLOOR = 24;
 
@@ -243,11 +235,11 @@ export const boxOf = (board: Page) => ({ x: board.x, y: board.y, w: board.w, h: 
  * Whether a camera has any of these boxes on screen.
  *
  * For deciding whether a *remembered* view is still a view of anything. A saved camera keeps
- * pointing wherever it pointed, and the boards under it can be moved, hidden or deleted while
+ * pointing wherever it pointed, and the cards under it can be moved, hidden or deleted while
  * you are reading another conversation — so coming back to it can mean landing on empty
  * canvas, which is the same failure as not remembering it at all.
  *
- * Any overlap counts, deliberately: a board half off the edge is a board you can see, and a
+ * Any overlap counts, deliberately: a card half off the edge is a card you can see, and a
  * margin here would be a second opinion about what "looking at it" means.
  */
 export function frames(camera: Camera, view: Viewport, boxes: Array<{ x: number; y: number; w: number; h: number }>): boolean {
@@ -260,30 +252,30 @@ export function frames(camera: Camera, view: Viewport, boxes: Array<{ x: number;
 
 // Arriving on a canvas
 /**
- * What an arrival looks at: a few boards at once, not one board's words.
+ * What an arrival looks at: a few cards at once, not one card's words.
  *
- * Below `LIVE_ZOOM` a board takes no pointer events, so this is deliberately a *looking*
- * scale and not a working one — you land seeing what the stage holds and zoom into the board you
+ * Below `LIVE_ZOOM` a card takes no pointer events, so this is deliberately a *looking*
+ * scale and not a working one — you land seeing what the stage holds and zoom into the card you
  * came for. A landing that could be typed into straight away would have to be a landing on one
- * board, and the manager's whole job is the other question.
+ * card, and the manager's whole job is the other question.
  */
 export const STAGE_ZOOM = 0.3;
 
 /**
  * Where to stand when you arrive on a stage you have not been on: the middle of its work.
  *
- * **Not `fit`.** Fitting everything a stage holds is right for two or three boards and wrong the
- * moment one of them is parked far out — a single stray board takes a whole stage to a few per
+ * **Not `fit`.** Fitting everything a stage holds is right for two or three cards and wrong the
+ * moment one of them is parked far out — a single stray card takes a whole stage to a few per
  * cent and the arrival is a blank grey field.
  *
- * **And not the average, either.** An average is dragged by the same stray board: weighting by a
- * board's area helps and does not fix it, because a small board 40,000px away still moves the
- * landing by a page and a half. So it is the **median** of the boards' centres, which a board out
+ * **And not the average, either.** An average is dragged by the same stray card: weighting by a
+ * card's area helps and does not fix it, because a small card 40,000px away still moves the
+ * landing by a page and a half. So it is the **median** of the cards' centres, which a card out
  * on its own cannot move at all: you land where most of the work is, and the outlier is somewhere
  * off to one side, findable by panning.
  *
- * The zoom is a flat `STAGE_ZOOM` rather than something computed from the boards. Arriving is a
- * question of "what is here", which is a few boards at once and not one board to read — and a
+ * The zoom is a flat `STAGE_ZOOM` rather than something computed from the cards. Arriving is a
+ * question of "what is here", which is a few cards at once and not one card to read — and a
  * zoom that depends on the stage would make every arrival a different scale, so the gesture would
  * never settle into a habit.
  */

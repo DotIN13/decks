@@ -57,20 +57,10 @@ export function glideTo(c: CameraRun, to: Camera, ms: number): void {
 		return;
 	}
 	const mine = ++c.glideToken;
+	// `performance.now()`, not the frame's own timestamp: a frame starts before the press it carries was
+	// handled, so that clock would put the first step behind the start and stall it.
 	const at = performance.now();
 	c.setGliding(true);
-	/*
-	 * `performance.now()`, not the timestamp `requestAnimationFrame` hands the callback.
-	 *
-	 * They are different clocks, and `at` above is a `performance.now()`. The frame's own
-	 * timestamp is when the frame *started*, which is routinely **before** the moment the press
-	 * that started this glide was handled — a press arrives during a frame. So `now - at` came out
-	 * negative on the first frame, the number was clamped to zero, and the move spent its first
-	 * frames re-drawing where it already was: on a loaded machine that cost 20% of the travel,
-	 * measured — the camera sat at the start for 50ms and then finished late. It was invisible in
-	 * a frame-by-frame assertion, which is happy to see *some* intermediate value, and obvious in
-	 * a chart of the curve the samples were supposed to be on.
-	 */
 	// iOS's spring, no bounce: away at once, settling into place (`spring.ts`).
 	const curve = springCurve(ms);
 	const step = () => {
@@ -113,26 +103,26 @@ export function followAsked(c: CameraRun): void {
 		}
 		if (moved) {
 			cancelGlide(c);
-				/*
-				 * A move the app made (the opening camera, a fit, an agent's focus) is a step like a finger's:
-				 * the scale and the motion settle as after a gesture. Without this a zoom that came this way
-				 * never counted as scaling, so the stage never heard it rest: a zoom it had held still (the
-				 * world and the drawing's canvas left where they were, the drawing drawn at the camera into
-				 * them) stayed held for good. Every pan after that moved the canvas with the scroll and the
-				 * drawing was drawn again at the new camera into the moved canvas, so it drifted from the
-				 * camera by each pan: an agent's cursor and a fit landed a pan's width from what they aimed
-				 * at, the canvas's margin ran out at one edge and pans showed bare strips, until a pinch or a
-				 * wheel zoom placed everything again.
-				 */
+			/*
+			 * A move the app made (the opening camera, a fit, an agent's focus) is a step like a finger's:
+			 * the scale and the motion settle as after a gesture. Without this a zoom that came this way
+			 * never counted as scaling, so the stage never heard it rest: a zoom it had held still (the
+			 * world and the drawing's canvas left where they were, the drawing drawn at the camera into
+			 * them) stayed held for good. Every pan after that moved the canvas with the scroll and the
+			 * drawing was drawn again at the new camera into the moved canvas, so it drifted from the
+			 * camera by each pan: an agent's cursor and a fit landed a pan's width from what they aimed
+			 * at, the canvas's margin ran out at one edge and pans showed bare strips, until a pinch or a
+			 * wheel zoom placed everything again.
+			 */
 			if (target.zoom !== c.localCamera.zoom) nowScaling(c);
 			nowMoving(c);
 			c.localCamera = target;
 		}
-			/*
-			 * Our own frame coming back (`writeCamera` put it on screen and then told the app) is already
-			 * drawn: placing it again drew nothing new but posted the camera to the worker and looked for
-			 * card pictures a second time each frame. A resize still re-frames.
-			 */
+		/*
+		 * Our own frame coming back (`writeTransform` put it on screen and then told the app) is already
+		 * drawn: placing it again drew nothing new but posted the camera to the worker and looked for
+		 * card pictures a second time each frame. A resize still re-frames.
+		 */
 		const v = c.host.view();
 		const w = c.written;
 		const same = !moved && w !== undefined && w.cam.x === target.x && w.cam.y === target.y && w.cam.zoom === target.zoom && w.width === v.width && w.height === v.height;
@@ -189,6 +179,8 @@ export function cancelCoast(c: CameraRun): void {
  */
 export const PINCH_TRAVEL = 64;
 export const WHEEL_TRAVEL = 80;
+
+/** A wheel step or a trackpad's: a zoom about the pointer when it zooms, else a pan. */
 export function wheel(c: CameraRun, gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean; pinch?: boolean }): void {
 	const travel = gesture.pinch ? PINCH_TRAVEL : WHEEL_TRAVEL;
 	if (gesture.zooming) {

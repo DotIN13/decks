@@ -2,23 +2,9 @@ import type { Page, Camera } from "@decks/protocol-old";
 import { boxOf, fitInto, frames } from "./camera.ts";
 
 /**
- * What a conversation remembers about the canvas, and what switching to it should do.
- *
- * The canvas has always been per agent — it is the focused agent's in-play set and nothing
- * else — while the camera was one value for the whole app. So switching swapped every board
- * on screen and left the camera exactly where the last conversation had it, and nothing
- * refitted, because the only automatic fit in the app runs once per page load. Two agents
- * working in different corners of a deck meant coming back to one of them and looking at
- * empty canvas 3000px from anything.
- *
- * The rule is not "fit on switch". A fit is a different gesture and you already have it on
- * `0`; what you want back is **the view you left**, position and zoom, so that returning to
- * a conversation is returning rather than re-finding. That is only possible when there is a
- * view to return to, which is why this is three cases rather than one.
- *
- * Pure, and tested in `agent-view.test.ts`. The alternative — deciding it inside
- * `focusAgent` — makes "what happens when the remembered boards are gone" a question you
- * can only answer by deleting a board and switching.
+ * What a conversation remembers about the canvas, and what switching to it does: nothing when it
+ * shows no cards, the view it left when that still shows one of them, else a fit of what it shows.
+ * Pure, and tested in `agent-view.test.ts`.
  */
 
 /** What is remembered per agent. Not persisted: a reload starts over — see the page's shell. */

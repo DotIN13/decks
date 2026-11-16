@@ -7,8 +7,8 @@ import { glidePending, stopped, write, type CameraRun } from "./controller-write
 /**
  * The camera as everything that is not glued to the screen should see it: the camera itself,
  * except that a pan at one zoom reaches it only once it has gone an eighth of the window since it
- * last did, and exactly once the camera has stopped. Nothing a board shows changes with a pan (the
- * world's transform moves its page), and what is decided from the camera (which boards are near
+ * last did, and exactly once the camera has stopped. Nothing a card shows changes with a pan (the
+ * world's transform moves its page), and what is decided from the camera (which cards are near
  * the screen, which may load a page, where a pill goes) looks a whole window past the screen or
  * waits for a rest anyway: so each pan step reaches none of it. A zoom reaches it at once.
  *
