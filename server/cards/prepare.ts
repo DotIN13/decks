@@ -46,7 +46,7 @@ async function writeHtml(deck: Deck, canvas: string, item: Item, caller: Caller)
 	const folder = layout.canvasFolder(canvas);
 	const base = slug(title);
 	for (let n = 1; n < 1000; n++) {
-		const path = fence(`${folder}/cards/${n === 1 ? base : `${base}-${n}`}/index.html`);
+		const path = fence(layout.cardAt(folder, n === 1 ? base : `${base}-${n}`));
 		if (await stat(deck, fence(path.slice(0, -"/index.html".length)))) continue;
 		const source = /<title[\s>]/i.test(html) ? html : `<title>${title.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</title>\n${html}`;
 		await deck.write(path, encoder.encode(source), caller);
@@ -57,10 +57,10 @@ async function writeHtml(deck: Deck, canvas: string, item: Item, caller: Caller)
 
 /** A card named by its folder or index.html, from the deck's root or the canvas's folder, as its index.html. */
 function asCardPath(card: string, canvas: string): string {
-	const index = (path: string) => (/\/index\.html$/i.test(path) ? path : `${path.replace(/\/+$/, "")}/index.html`);
-	if (layout.isCardPath(index(card))) return index(card);
+	const asDeck = layout.cardIndex(card);
+	if (asDeck) return asDeck;
 	const resolved = layout.resolveReference(canvas, card);
-	return "path" in resolved && layout.isCardPath(index(resolved.path)) ? index(resolved.path) : card;
+	return ("path" in resolved && layout.cardIndex(resolved.path)) || card;
 }
 
 /** A card item made ready to place: written when given as html, sized from its file when it has no box. */

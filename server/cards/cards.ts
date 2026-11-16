@@ -13,8 +13,8 @@ const decoder = new TextDecoder();
 /** A card named by its folder or its index.html, as its index.html. Rule 9. */
 export function cardPath(raw: unknown): DeckPath {
 	const path = fence(raw, "card");
-	const index = /\/index\.html$/i.test(path) ? path : `${path}/index.html`;
-	if (!layout.isCardPath(index)) throw new Refused("invalid", `${String(raw)} is not a card: a card is canvases/<canvas>/cards/<name>/index.html.`, "card.list");
+	const index = layout.cardIndex(path);
+	if (!index) throw new Refused("invalid", `${String(raw)} is not a card: a card is canvases/<canvas>/cards/<name>/index.html.`, "card.list");
 	return fence(index);
 }
 
@@ -66,7 +66,7 @@ export async function createCard(deck: Deck, canvas: string, title: string, size
 	if (!(await stat(deck, fence(folder)))) throw new Refused("not_found", `There is no canvas ${canvas}.`, "canvas.list");
 	const base = slug(title);
 	for (let n = 1; n < 1000; n++) {
-		const path = fence(`${folder}/cards/${n === 1 ? base : `${base}-${n}`}/index.html`);
+		const path = fence(layout.cardAt(folder, n === 1 ? base : `${base}-${n}`));
 		if (await stat(deck, fence(path.slice(0, -"/index.html".length)))) continue;
 		await deck.write(path, encoder.encode(cardShell(title.trim(), size)), by);
 		return path;
@@ -81,7 +81,7 @@ export async function listCards(deck: Deck): Promise<DeckPath[]> {
 	for (const owner of await names(deck, "shared/canvases")) for (const n of await names(deck, `shared/canvases/${owner}`)) folders.push(`shared/canvases/${owner}/${n}`);
 	for (const folder of folders) {
 		for (const name of await names(deck, `${folder}/cards`)) {
-			const index = fence(`${folder}/cards/${name}/index.html`);
+			const index = fence(layout.cardAt(folder, name));
 			if ((await stat(deck, index))?.kind === "file") out.push(index);
 		}
 	}
