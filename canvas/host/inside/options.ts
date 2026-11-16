@@ -21,7 +21,7 @@ import type { Rect } from "../messages.ts";
  * cards' `card.decks` calls.
  */
 export function installHost(ctx: FrameContext): void {
-	const { start, end, studio, backend, address, inFolder, folder, docListeners } = ctx;
+	const { start, end, studio, backend, address, inFolder, folder, docListeners, docEvents } = ctx;
 	setCanvasHost({
 		fileUrl: (path, rev) => `${address(inFolder(path))}${rev === undefined ? "" : `?rev=${rev}`}`,
 		/*
@@ -64,6 +64,12 @@ export function installHost(ctx: FrameContext): void {
 						listen: (listener: (message: unknown) => void) => {
 							docListeners.add(listener);
 							return () => docListeners.delete(listener);
+						},
+						// On the protocol: a document's calls as the canvas pass, and its file events off the frame's socket.
+						call: (name: string, args: Record<string, unknown>) => backend.act(name, args),
+						on: (listener: (name: string, payload: Record<string, unknown>) => void) => {
+							docEvents.add(listener);
+							return () => docEvents.delete(listener);
 						},
 						// The canvas's own `lib/`, beside its cards, as a card reads it.
 						lib: address(inFolder("lib/")),

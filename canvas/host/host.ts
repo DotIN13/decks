@@ -39,6 +39,10 @@ export interface CanvasHost {
 	documents?: {
 		send(message: unknown): void;
 		listen(listener: (message: unknown) => void): () => void;
+		/** One call on the protocol (`file.*`, `google.*`) as this canvas's pass, answered in its envelope. */
+		call?(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
+		/** The socket's `file.changed` and `file.compiled`, which carry back the `client` a page gave its call. */
+		on?(listener: (name: string, payload: Record<string, unknown>) => void): () => void;
 		/** A file's bytes, for a Word page or a picture in a document. */
 		file?(path: string): Promise<ArrayBuffer>;
 		/** The deck's `lib/`, for markdown and maths in a document. */

@@ -152,7 +152,7 @@ function postOnLine(line: LineClient, route: string, body: unknown): { ok: boole
 }
 
 /** The socket's events the frame acts on itself, beside the drawing's `item.changed`. */
-const SOCKET_EVENTS = new Set(["view.requested", "view.changed", "agent.acted", "app.changed"]);
+const SOCKET_EVENTS = new Set(["view.requested", "view.changed", "agent.acted", "app.changed", "file.changed", "file.compiled"]);
 /** The events heard on the socket and told as the frame's own messages. */
 const TOLD_EVENTS = ["card.changed"];
 /** The events the frame hears on its socket; a name joins when the frame first acts on it. */

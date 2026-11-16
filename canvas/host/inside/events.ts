@@ -241,6 +241,7 @@ function heardEvent(ctx: FrameContext, handle: Handle, name: string, payload: Re
 		if (call) viewCall(ctx, handle, call);
 	} else if (name === "view.changed") ctx.presence?.hearView(payload);
 	else if (name === "agent.acted") agentActed(ctx, handle, payload);
+	else if (name === "file.changed" || name === "file.compiled") for (const listener of ctx.docEvents) listener(name, payload);
 	else if (name === "app.changed") {
 		// Its windows hear it (`apps.watch`), and nothing asks the server again.
 		const app = Array.isArray(payload.ids) ? payload.ids[0] : undefined;

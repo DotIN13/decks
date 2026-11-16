@@ -68,6 +68,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	const hearDoc = (message: unknown) => {
 		for (const listener of docListeners) listener(message);
 	};
+	/** Who hears the documents' file events on the socket (`documents.on`): each document page on this canvas. */
+	const docEvents = new Set<(name: string, payload: Record<string, unknown>) => void>();
 	/** Who is watching each app's state (`apps.watch`): its windows on this canvas, told as the stream says (`app.state`). */
 	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
 	return {
@@ -96,6 +98,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		...at,
 		docListeners,
 		hearDoc,
+		docEvents,
 		...editor,
 	};
 }
