@@ -62,7 +62,8 @@
 		"canvas/entries/camera.ts",
 		"canvas/types.ts",
 		"tools/checks/library/smooth-edits.mjs",
-		"tools/checks/page/per-agent.mjs"
+		"tools/checks/page/per-agent.mjs",
+		"canvas/editor/core/imports.test.ts"
 	],
 	"Folio": [
 		"server/cards/",
