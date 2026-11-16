@@ -1,5 +1,5 @@
 // What a canvas places, by path: a pass reaches its canvas's folder, the shared roots, and whatever its
-// canvas's drawing already names, as today's passCovers did: an old page at the deck's root boards/, a
+// canvas's drawing already names, as today's passCovers did: an old page kept at the deck's root, a
 // document opened from elsewhere in the deck. Each name the drawing holds (a url, path, card or file field,
 // a metadata path) is read in every spelling the canvas resolves it to, and compared as a deck path.
 import { layout, type Caller } from "../../protocol/index.ts";

@@ -62,7 +62,7 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined, ke
 			const canvas = passes.canvasOf(pass);
 			const base = url();
 			const forward = FORWARD[kind];
-			// Its canvas's folder and the shared roots, or what its canvas already places (an old page at the deck's root boards/), as today.
+			// Its canvas's folder and the shared roots, or what its canvas already places (an old page kept at the deck's root), as today.
 			const reaches = !!canvas && !!rest && (allowed(canvas, rest) || (await placedOn(kernel(), canvas, undefined, rest)));
 			if (!canvas || !forward || !reaches || !base) return void res.writeHead(404, { "content-type": "text/plain" }).end("Not found.");
 			const params = new URLSearchParams(query);
