@@ -2285,6 +2285,326 @@
   ]
  },
  {
+  "name": "file.list",
+  "command": [
+   "file",
+   "list"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "read",
+  "summary": "The files and folders in a folder of the deck (\"\" is the deck itself), folders marked `dir`; `deep` lists everything under it. Hidden folders, dependencies and build output are left out.",
+  "signature": "file.list(path?: string, options?: { deep?: boolean; limit?: number })",
+  "returns": "DeckFile[]",
+  "params": [
+   {
+    "name": "path",
+    "optional": true,
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ deep?: boolean; limit?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "deep": {
+       "type": "boolean"
+      },
+      "limit": {
+       "type": "integer"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "file.find",
+  "command": [
+   "file",
+   "find"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "read",
+  "summary": "Files whose path matches a pattern, under `path` or the whole deck: `*` within a name, `**` across folders, as in \"*.md\" or \"assets/*.png\". A pattern with no slash matches a file's name anywhere.",
+  "signature": "file.find(pattern: string, options?: { path?: string; limit?: number })",
+  "returns": "DeckFile[]",
+  "params": [
+   {
+    "name": "pattern",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ path?: string; limit?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string"
+      },
+      "limit": {
+       "type": "integer"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "file.read",
+  "command": [
+   "file",
+   "read"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "read",
+  "summary": "A text file's words, with `at` to name as `rev` in a later write; `from` and `lines` read part of a long one. Text only, up to 1 MB: a picture or a film is shown by its address (file.url).",
+  "signature": "file.read(path: string, options?: { from?: number; lines?: number })",
+  "returns": "FileText",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ from?: number; lines?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "integer"
+      },
+      "lines": {
+       "type": "integer"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "file.write",
+  "command": [
+   "file",
+   "write"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Write a whole text file in the deck, making its folders: a card's index.html, its stylesheet, its data. With `rev` (the `at` a read answered) the write is refused if the file has changed since. An open card redraws by itself. Never lib/, a hidden folder, or anything outside the deck.",
+  "signature": "file.write(path: string, text: string, options?: { rev?: number })",
+  "returns": "DeckFile",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "text",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ rev?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "rev": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "file.edit",
+  "command": [
+   "file",
+   "edit"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Replace exact words in a text file: each edit's `find` must occur once (or every time, with `all`), and all the edits land or none. `rev` as for file.write.",
+  "signature": "file.edit(path: string, edits: TextEdit[], options?: { rev?: number })",
+  "returns": "DeckFile",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "edits",
+    "type": "TextEdit[]",
+    "schema": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "find": {
+        "type": "string"
+       },
+       "replace": {
+        "type": "string"
+       },
+       "all": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "find",
+       "replace"
+      ],
+      "additionalProperties": false,
+      "description": "Replace exact words in a file: `find` must occur once, or every time with `all`."
+     }
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ rev?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "rev": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "file.grep",
+  "command": [
+   "file",
+   "grep"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "read",
+  "summary": "Lines that match a regular expression, in the text files under `path` or the whole deck; `glob` keeps only files that match it, `ignoreCase` matches either case.",
+  "signature": "file.grep(pattern: string, options?: { path?: string; glob?: string; limit?: number; ignoreCase?: boolean })",
+  "returns": "FileMatch[]",
+  "params": [
+   {
+    "name": "pattern",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ path?: string; glob?: string; limit?: number; ignoreCase?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string"
+      },
+      "glob": {
+       "type": "string"
+      },
+      "limit": {
+       "type": "integer"
+      },
+      "ignoreCase": {
+       "type": "boolean"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "file.move",
+  "command": [
+   "file",
+   "move"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Move or rename a file or folder inside the deck. Refused when something is already at `to`. A card that is on a canvas is moved with decks canvas calls, not this.",
+  "signature": "file.move(path: string, to: string)",
+  "returns": "DeckFile",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "to",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "file.delete",
+  "command": [
+   "file",
+   "delete"
+  ],
+  "group": "file",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Delete a file or folder by moving it to the deck's trash (.decks/trash/files), from where it can be moved back by hand.",
+  "signature": "file.delete(path: string)",
+  "returns": "{ deleted: string; trash: string }",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
   "name": "agent.me",
   "command": [
    "agent",
@@ -2424,6 +2744,20 @@
   "summary": "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.",
   "signature": "agent.inbox()",
   "returns": "Message[]",
+  "params": []
+ },
+ {
+  "name": "agent.news",
+  "command": [
+   "agent",
+   "news"
+  ],
+  "group": "agent",
+  "touches": "agents",
+  "effect": "change",
+  "summary": "What waits for you: `messages` handed to you or written to you by the person, and `changes`, what others did on your canvases since you last asked. For an agent that works outside Decks this is how mail arrives, and reading it takes it from the inbox; an agent Decks runs gets both with its next message and needs no call.",
+  "signature": "agent.news()",
+  "returns": "{ messages: Message[]; changes: string[] }",
   "params": []
  },
  {

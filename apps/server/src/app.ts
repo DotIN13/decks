@@ -693,6 +693,8 @@ export class App {
 		 * deck.
 		 */
 		if (this.agents.restore() === 0) this.agents.create();
+		// The turns the last stop cut go on by themselves (`agents/working.ts`).
+		this.agents.resumeInterrupted();
 		/*
 		 * After the rows are back: drop per-agent account links for agents this install no
 		 * longer has. `remove` covers the ordinary close; this covers a chat pruned while the

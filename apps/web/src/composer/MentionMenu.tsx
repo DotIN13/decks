@@ -63,7 +63,7 @@ export function MentionMenu(props: {
 					>
 						<AgentFace chat={one.chat} identity={props.identities[one.chat.id]} size={20} ring={1.5} />
 						<span class="row-label row-name block truncate">{one.name}</span>
-						<span class="kind">{one.chat.kind}</span>
+						<span class="kind">{one.chat.outside?.client ?? one.chat.kind}</span>
 					</button>
 				)}
 			</For>

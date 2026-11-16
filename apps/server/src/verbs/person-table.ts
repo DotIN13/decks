@@ -100,6 +100,24 @@ export function personTable(app: App): Record<string, Impl> {
 			app.publishStages();
 			return { id: agent.id };
 		},
+		"agent.attach": async ([spec]) => {
+			const given = (spec ?? {}) as { key?: string; client?: string; name?: string; workspace?: string; canvas?: string };
+			const { agent, made, token } = agents().attach({ key: String(given.key ?? ""), ...(given.client ? { client: given.client } : {}), ...(given.name ? { name: given.name } : {}), ...(given.workspace ? { workspace: given.workspace } : {}) });
+			if (!token) throw new Error("This harness hands out no agent tokens.");
+			// Its home canvas: the one asked for, else as a new agent's is found, the latest of its workspace or one of its own.
+			if (given.canvas || (made && !agent.stageName())) {
+				try {
+					const latest = given.canvas ?? agents().latestCanvas(agent.workspace, agent.id);
+					if (latest) agent.openStage(latest);
+					else agent.newStage?.(agent.chat().name, { provisional: true });
+				} catch {
+					/* a canvas gone meanwhile: it has one once it draws */
+				}
+				app.publishStages();
+			}
+			const canvas = agent.stageName();
+			return { id: agent.id, name: agent.chat().name, token, made, ...(canvas ? { canvas } : {}) };
+		},
 		"agent.set": async ([id, patch], call) => {
 			const agent = need(id);
 			const change = (patch ?? {}) as { name?: string; tags?: string[]; workspace?: string | null; model?: { provider: string; model: string; thinking?: string }; thinking?: string; mode?: string; canvas?: string };

@@ -390,7 +390,7 @@ export type ServerMessage =
 	 * one means absent. That is what keeps it from becoming a second, disagreeing account of a
 	 * row — the failure this protocol has already had once.
 	 */
-	| { type: "agent.row"; id: string; lastLine?: string; lastAt?: number; dormant?: true; mode?: AgentMode }
+	| { type: "agent.row"; id: string; lastLine?: string; lastAt?: number; dormant?: true; mode?: AgentMode; outside?: { client: string; seen: number; waiting: number } }
 	/** An agent is off the list; anything the browser kept for it can go. */
 	| { type: "agent.removed"; id: string }
 	| { type: "agent.identity"; id: string; identity: Identity }

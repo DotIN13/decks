@@ -54,8 +54,9 @@ export const Agent = named(
 		thinking: opt(str()),
 		mode: opt(str()),
 		avatarChanged: opt(str()),
+		outside: opt(obj({ client: str(), seen: num(), waiting: num() })),
 	}),
-	"Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how much is waiting for it.",
+	"Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how much is waiting for it. `outside` marks an agent that works in its own app (Claude Code, Codex): the app, when it last called, and how many messages wait for its next call.",
 );
 
 export const Message = named(
@@ -112,6 +113,19 @@ export const PenEdit = named(
 	),
 	'An edit to a .pen file, as the old pen.edit took it. Items are named by id; one inside an instance by its path, "card-1/label".',
 );
+
+export const DeckFile = named(
+	"DeckFile",
+	obj({ path: str(), size: num(), at: num(), dir: opt(lit(true)) }),
+	"A file or folder in the deck: its path from the deck's root, its size in bytes, and `at`, when it last changed (epoch milliseconds), which is also the `rev` a later write can name.",
+);
+export const FileText = named(
+	"FileText",
+	obj({ path: str(), size: num(), at: num(), text: str(), from: num(), lines: num(), more: opt(lit(true)) }),
+	"A text file's words: `text` from line `from`, of `lines` in all; `more` when lines after them were left out.",
+);
+export const FileMatch = named("FileMatch", obj({ path: str(), line: num(), text: str() }), "A line that matched a search: the file, the line's number from 1, and the line.");
+export const TextEdit = named("TextEdit", obj({ find: str(), replace: str(), all: opt(bool()) }), "Replace exact words in a file: `find` must occur once, or every time with `all`.");
 
 export const WebTarget = named("WebTarget", union(str(), obj({ ref: str() }), obj({ name: str(), nth: opt(int()) })), 'A field or button: its label, { ref: "e42" } from read, or { name, nth }.');
 

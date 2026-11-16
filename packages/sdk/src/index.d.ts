@@ -40,10 +40,25 @@ export type Card = { path: string; title: string; lastWrittenBy?: string };
  */
 export type Placement = { card: string; canvas: string; box: Box; clipped?: boolean };
 /**
- * Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how
- * much is waiting for it.
+ * A file or folder in the deck: its path from the deck's root, its size in bytes, and `at`, when it
+ * last changed (epoch milliseconds), which is also the `rev` a later write can name.
  */
-export type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
+export type DeckFile = { path: string; size: number; at: number; dir?: true };
+/**
+ * A text file's words: `text` from line `from`, of `lines` in all; `more` when lines after them
+ * were left out.
+ */
+export type FileText = { path: string; size: number; at: number; text: string; from: number; lines: number; more?: true };
+/** Replace exact words in a file: `find` must occur once, or every time with `all`. */
+export type TextEdit = { find: string; replace: string; all?: boolean };
+/** A line that matched a search: the file, the line's number from 1, and the line. */
+export type FileMatch = { path: string; line: number; text: string };
+/**
+ * Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how
+ * much is waiting for it. `outside` marks an agent that works in its own app (Claude Code, Codex):
+ * the app, when it last called, and how many messages wait for its next call.
+ */
+export type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string; outside?: { client: string; seen: number; waiting: number } };
 /**
  * A hand-off in an inbox: who sent it, the task, the cards it names, when, and whether they want a
  * reply.
@@ -262,6 +277,48 @@ export interface Verbs {
 	file: {
 		/** A file on disk, as the address a card embeds. */
 		url(file: string): Promise<string>;
+		/**
+		 * The files and folders in a folder of the deck ("" is the deck itself), folders marked `dir`;
+		 * `deep` lists everything under it. Hidden folders, dependencies and build output are left out.
+		 */
+		list(path?: string, options?: { deep?: boolean; limit?: number }): Promise<DeckFile[]>;
+		/**
+		 * Files whose path matches a pattern, under `path` or the whole deck: `*` within a name, `**`
+		 * across folders, as in "*.md" or "assets/*.png". A pattern with no slash matches a file's name
+		 * anywhere.
+		 */
+		find(pattern: string, options?: { path?: string; limit?: number }): Promise<DeckFile[]>;
+		/**
+		 * A text file's words, with `at` to name as `rev` in a later write; `from` and `lines` read part of
+		 * a long one. Text only, up to 1 MB: a picture or a film is shown by its address (file.url).
+		 */
+		read(path: string, options?: { from?: number; lines?: number }): Promise<FileText>;
+		/**
+		 * Write a whole text file in the deck, making its folders: a card's index.html, its stylesheet, its
+		 * data. With `rev` (the `at` a read answered) the write is refused if the file has changed since.
+		 * An open card redraws by itself. Never lib/, a hidden folder, or anything outside the deck.
+		 */
+		write(path: string, text: string, options?: { rev?: number }): Promise<DeckFile>;
+		/**
+		 * Replace exact words in a text file: each edit's `find` must occur once (or every time, with
+		 * `all`), and all the edits land or none. `rev` as for file.write.
+		 */
+		edit(path: string, edits: TextEdit[], options?: { rev?: number }): Promise<DeckFile>;
+		/**
+		 * Lines that match a regular expression, in the text files under `path` or the whole deck; `glob`
+		 * keeps only files that match it, `ignoreCase` matches either case.
+		 */
+		grep(pattern: string, options?: { path?: string; glob?: string; limit?: number; ignoreCase?: boolean }): Promise<FileMatch[]>;
+		/**
+		 * Move or rename a file or folder inside the deck. Refused when something is already at `to`. A
+		 * card that is on a canvas is moved with decks canvas calls, not this.
+		 */
+		move(path: string, to: string): Promise<DeckFile>;
+		/**
+		 * Delete a file or folder by moving it to the deck's trash (.decks/trash/files), from where it can
+		 * be moved back by hand.
+		 */
+		delete(path: string): Promise<{ deleted: string; trash: string }>;
 	};
 	agent: {
 		/** You: name, avatar, colour, workspace, tags and home canvas. */
@@ -281,6 +338,13 @@ export interface Verbs {
 		 * with your next message.
 		 */
 		inbox(): Promise<Message[]>;
+		/**
+		 * What waits for you: `messages` handed to you or written to you by the person, and `changes`, what
+		 * others did on your canvases since you last asked. For an agent that works outside Decks this is
+		 * how mail arrives, and reading it takes it from the inbox; an agent Decks runs gets both with its
+		 * next message and needs no call.
+		 */
+		news(): Promise<{ messages: Message[]; changes: string[] }>;
 		/**
 		 * Every agent, or the ones on one project (`workspace`), with what each is doing and how much waits
 		 * for it.

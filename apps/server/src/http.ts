@@ -19,6 +19,7 @@ import { Relay } from "./share/relay.ts";
 import { asyncRoute } from "./routes/shared.ts";
 import { register as registerAgents } from "./routes/agents.ts";
 import { register as registerApps } from "./routes/apps.ts";
+import { registerMcp } from "./routes/mcp.ts";
 import { register as registerCardPath } from "./routes/card-path.ts";
 import { register as registerDeck } from "./routes/deck.ts";
 import { register as registerFiles } from "./routes/files.ts";
@@ -114,6 +115,11 @@ export function createHttpApp(app: App): Express {
 	registerFiles(api, deps);
 	registerGoogle(api, deps);
 	registerApps(api, deps);
+	// Decks as an MCP server at a web address (`routes/mcp.ts`): `/api/mcp`, and `/mcp` for short.
+	registerMcp(api, deps);
+	const mcpShort = express.Router();
+	registerMcp(mcpShort, deps);
+	server.use(mcpShort);
 
 	server.use("/api", api);
 

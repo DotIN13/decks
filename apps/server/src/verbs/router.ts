@@ -239,6 +239,13 @@ export async function runVerb(app: App, principal: Principal | undefined, header
 	return { status: answer.ok ? 200 : 422, answer };
 }
 
+/** One changing call by an outside agent, as a line in its conversation: the command, and the card or item it named. */
+function actLine(name: string, answer: StageCallResult): string {
+	const value = answer.value as { path?: unknown; card?: unknown; id?: unknown; name?: unknown; deleted?: unknown } | undefined;
+	const what = value && typeof value === "object" ? [value.path, value.card, value.name, value.deleted, value.id].find((one) => typeof one === "string") : undefined;
+	return `decks ${name.replace(/\./g, " ")}${what ? `: ${what}` : ""}`;
+}
+
 /**
  * Why a caller may not say something of a card (that it was read, how it measured): the card must exist,
  * and a canvas frame speaks only of cards on its own canvas; the person and a paired site of any.
@@ -275,7 +282,13 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 		case "agent": {
 			const agent = app.agents.get(principal.id);
 			if (!agent) return { status: 401, error: "The agent this token was made for is gone." };
-			return { tool: agent.stageTool() };
+			// An agent that works outside Decks is here while it calls, and what it changes is said in its conversation.
+			agent.touch();
+			return { tool: agent.stageTool(), ...(agent.outsideKey ? { announce: (name: string, answer: StageCallResult) => {
+						if (answer.ok && VERB_BY_NAME.get(name)?.effect === "change" && name !== "agent.news") agent.noteAct(actLine(name, answer));
+					},
+				}
+				: {}) };
 		}
 		case "app":
 			return appCaller(app, principal.name, allowedOnce);

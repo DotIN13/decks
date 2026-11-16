@@ -18,7 +18,10 @@ import { RUNTIMES, runtimeList, runtimeOf } from "./registry.ts";
  */
 
 test("every kind in the protocol has a descriptor, and no others", () => {
-	assert.deepEqual(Object.keys(RUNTIMES).sort(), [...AGENT_KINDS].sort());
+	// The runtimes Decks starts, and the one kind it does not: an agent that joined from its own app.
+	assert.deepEqual(Object.keys(RUNTIMES).sort(), [...AGENT_KINDS, "outside"].sort());
+	assert.equal(runtimeOf("outside").availability().available, false, "an outside agent is never offered as a new agent");
+	assert.ok(!runtimeList().some((one) => (one.kind as string) === "outside"));
 });
 
 test("a descriptor's kind matches the key it is filed under", () => {

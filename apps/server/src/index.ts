@@ -2,6 +2,7 @@ import { socketPrincipal, verifyOn } from "./auth/guard.ts";
 import { actsAsPerson } from "./auth/principal.ts";
 import { extraHosts, hostAllowed } from "./auth/hosts.ts";
 import { writeCliToken, type CliToken } from "./auth/cli-token.ts";
+import { claimAddress, type Claim } from "./address.ts";
 import { createServer } from "node:http";
 import { appUpgrade } from "./apps/route.ts";
 import { forwardUpgrade } from "./ports.ts";
@@ -149,6 +150,8 @@ httpServer.on("error", (error) => {
 
 // `decks login` with no code, on this machine (`auth/cli-token.ts`): a token for this start, taken back at stop.
 let cliToken: CliToken | undefined;
+// Where this user's Decks is, for a client with nothing in its environment (`address.ts`).
+let address: Claim | undefined;
 httpServer.listen(config.port, config.host, () => {
 	console.log(`[decks] ${app.deck.name} — http://${config.host}:${config.port}`);
 	console.log(`[decks] data: ${config.dataDir}`);
@@ -159,10 +162,12 @@ httpServer.listen(config.port, config.host, () => {
 	} catch (error) {
 		console.warn(`[decks] could not write the token for decks login: ${(error as Error).message}`);
 	}
+	address = claimAddress(`http://${local}:${config.port}`, config.dataDir);
 });
 
 const shutdown = () => {
 	cliToken?.stop();
+	address?.stop();
 	app.cliTokenId = undefined;
 	void studio.stop();
 	app.dispose();

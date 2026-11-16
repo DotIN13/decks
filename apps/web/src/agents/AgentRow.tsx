@@ -11,7 +11,7 @@ import { Portal } from "solid-js/web";
 import { AgentEdit } from "./AgentEdit.tsx";
 import { Icon, Popover } from "@decks/ui";
 import { AgentFace } from "./AgentPill.tsx";
-import { closeWords, rowWords, since, statusWords } from "./agent-order.ts";
+import { closeWords, outsideWords, rowWords, since, statusWords } from "./agent-order.ts";
 import { canHover } from "../lib/media.ts";
 import { carryAgent } from "./agent-drag.ts";
 import type { AgentRow as Row } from "./agent-sections.ts";
@@ -116,8 +116,10 @@ export function AgentRow(props: {
 	 */
 	const touch = !canHover();
 	/** Asking, working, or finished and unread: worth a swatch, and worth reading before the name's time. */
-	const busy = () => !chat().dormant && props.row.status !== "idle";
+	const busy = () => !chat().dormant && !chat().outside && props.row.status !== "idle";
 	const stateWords = () => {
+		// An agent that works in its own app: where, when it last called, what waits for it.
+		if (chat().outside) return outsideWords(chat().outside!, true);
 		const base = chat().dormant ? "Dormant" : statusWords(props.row.status, chat().state);
 		return touch && chat().lastAt !== undefined ? `${base} · ${since(chat().lastAt)}` : base;
 	};
@@ -134,7 +136,7 @@ export function AgentRow(props: {
 	 * in words for anyone who rests on it.
 	 */
 	/* The row's end: what it is doing, or compactly how long ago (`rowWords`); a parked agent the same. */
-	const shortState = () => (chat().dormant ? rowWords("idle", chat().state, chat().lastAt) : rowWords(props.row.status, chat().state, chat().lastAt));
+	const shortState = () => (chat().outside ? outsideWords(chat().outside!) : chat().dormant ? rowWords("idle", chat().state, chat().lastAt) : rowWords(props.row.status, chat().state, chat().lastAt));
 
 	/**
 	 * The tags on the second line: the agent's own first, then yours — what it says it is doing,
@@ -236,7 +238,7 @@ export function AgentRow(props: {
 				<span class="agent-body">
 					<span class="agent-line">
 						<span class="row-label block truncate">{name()}</span>
-						<span class="kind" data-dormant={chat().dormant ? "true" : undefined}>{chat().kind}</span>
+						<span class="kind" data-dormant={chat().dormant ? "true" : undefined} data-outside={chat().outside ? "true" : undefined}>{chat().outside?.client ?? chat().kind}</span>
 						{/*
 								Where the time was. `data-yield` is what hands this column to the buttons on
 								approach (`chrome.css`), and it is the column the hover card puts its own

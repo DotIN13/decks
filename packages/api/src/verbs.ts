@@ -13,6 +13,9 @@ import {
 	Canvas,
 	CanvasOp,
 	Corner,
+	DeckFile,
+	FileMatch,
+	FileText,
 	Fit,
 	Item,
 	Message,
@@ -24,6 +27,7 @@ import {
 	Point,
 	Screenshot,
 	Size,
+	TextEdit,
 	WebTarget,
 } from "./types.ts";
 
@@ -51,7 +55,7 @@ import {
 
 export type Effect = "change" | "read";
 export type Touches = "deck" | "screen" | "agents" | "outside";
-export type Group = "canvas" | "card" | "agent" | "view" | "apps" | "web" | "misc";
+export type Group = "canvas" | "card" | "file" | "agent" | "view" | "apps" | "web" | "misc";
 
 export interface Param {
 	name: string;
@@ -331,6 +335,73 @@ export const VERBS: readonly Verb[] = [
 	},
 	{ name: "file.url", card: "canvas", group: "card", ...deckRead, summary: "A file on disk, as the address a card embeds.", params: [p("file", str())], result: str() },
 
+	// --- files: the deck's files, for a caller with no disk -------------------------------------
+	{
+		name: "file.list",
+		group: "file",
+		...deckRead,
+		summary: 'The files and folders in a folder of the deck ("" is the deck itself), folders marked `dir`; `deep` lists everything under it. Hidden folders, dependencies and build output are left out.',
+		params: [o("path", str()), o("options", obj({ deep: opt(bool()), limit: opt(int()) }))],
+		result: arr(DeckFile),
+	},
+	{
+		name: "file.find",
+		group: "file",
+		...deckRead,
+		summary: 'Files whose path matches a pattern, under `path` or the whole deck: `*` within a name, `**` across folders, as in "*.md" or "assets/*.png". A pattern with no slash matches a file\'s name anywhere.',
+		params: [p("pattern", str()), o("options", obj({ path: opt(str()), limit: opt(int()) }))],
+		result: arr(DeckFile),
+	},
+	{
+		name: "file.read",
+		group: "file",
+		...deckRead,
+		summary: "A text file's words, with `at` to name as `rev` in a later write; `from` and `lines` read part of a long one. Text only, up to 1 MB: a picture or a film is shown by its address (file.url).",
+		params: [p("path", str()), o("options", obj({ from: opt(int()), lines: opt(int()) }))],
+		result: FileText,
+	},
+	{
+		name: "file.write",
+		group: "file",
+		...deckChange,
+		summary:
+			"Write a whole text file in the deck, making its folders: a card's index.html, its stylesheet, its data. With `rev` (the `at` a read answered) the write is refused if the file has changed since. An open card redraws by itself. Never lib/, a hidden folder, or anything outside the deck.",
+		params: [p("path", str()), p("text", str()), o("options", obj({ rev: opt(num()) }))],
+		result: DeckFile,
+	},
+	{
+		name: "file.edit",
+		group: "file",
+		...deckChange,
+		summary: "Replace exact words in a text file: each edit's `find` must occur once (or every time, with `all`), and all the edits land or none. `rev` as for file.write.",
+		params: [p("path", str()), p("edits", arr(TextEdit)), o("options", obj({ rev: opt(num()) }))],
+		result: DeckFile,
+	},
+	{
+		name: "file.grep",
+		group: "file",
+		...deckRead,
+		summary: "Lines that match a regular expression, in the text files under `path` or the whole deck; `glob` keeps only files that match it, `ignoreCase` matches either case.",
+		params: [p("pattern", str()), o("options", obj({ path: opt(str()), glob: opt(str()), limit: opt(int()), ignoreCase: opt(bool()) }))],
+		result: arr(FileMatch),
+	},
+	{
+		name: "file.move",
+		group: "file",
+		...deckChange,
+		summary: "Move or rename a file or folder inside the deck. Refused when something is already at `to`. A card that is on a canvas is moved with decks canvas calls, not this.",
+		params: [p("path", str()), p("to", str())],
+		result: DeckFile,
+	},
+	{
+		name: "file.delete",
+		group: "file",
+		...deckChange,
+		summary: "Delete a file or folder by moving it to the deck's trash (.decks/trash/files), from where it can be moved back by hand.",
+		params: [p("path", str())],
+		result: obj({ deleted: str(), trash: str() }),
+	},
+
 	// --- agent: who works --------------------------------------------------------------------
 	{ name: "agent.me", card: "page", group: "agent", ...agentsRead, summary: "You: name, avatar, colour, workspace, tags and home canvas.", params: [], result: Agent },
 	{
@@ -353,6 +424,15 @@ export const VERBS: readonly Verb[] = [
 	},
 	{ name: "agent.claim", group: "agent", ...agentsChange, summary: "Say these cards carry your work, without showing them: you become their writer.", params: [paths("cards")], result: arr(str()) },
 	{ name: "agent.inbox", card: "page", group: "agent", ...agentsRead, summary: "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.", params: [], result: arr(Message) },
+	{
+		name: "agent.news",
+		group: "agent",
+		...agentsChange,
+		summary:
+			"What waits for you: `messages` handed to you or written to you by the person, and `changes`, what others did on your canvases since you last asked. For an agent that works outside Decks this is how mail arrives, and reading it takes it from the inbox; an agent Decks runs gets both with its next message and needs no call.",
+		params: [],
+		result: obj({ messages: arr(Message), changes: arr(str()) }),
+	},
 	{
 		name: "agent.list",
 		card: "page",

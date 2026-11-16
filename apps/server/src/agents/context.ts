@@ -46,6 +46,8 @@ function timeLine(): string {
  * pair, which is the only thing an agent can usefully do about it.
  */
 export function apiFor(api: string, options: { web: boolean }): string {
+	// The file calls are for a caller with no disk; an agent Decks runs has a shell in the deck folder.
+	api = api.replace(/<!-- file -->[\s\S]*?<!-- \/file -->\n*/, "");
 	const start = api.indexOf("<!-- web -->");
 	const end = api.indexOf("<!-- /web -->");
 	if (start < 0 || end < 0) return api;

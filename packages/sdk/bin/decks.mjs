@@ -30,13 +30,63 @@ import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { connect, DecksError } from "../src/index.js";
+import { ensureServer, locate, logFiles, serverStatus, startServer, stopServer } from "../src/server.js";
 
 const VERBS = JSON.parse(readFileSync(new URL("../src/verbs.json", import.meta.url), "utf8"));
 
-/** Where Decks is: `DECKS_URL`, else this machine at `DECKS_PORT`. */
+/** Where Decks is: `DECKS_URL`, else this machine at `DECKS_PORT`, else what the server wrote in `~/.decks/server.json` (`src/server.js`). */
 function harness() {
-	const env = process.env;
-	return (env.DECKS_URL || `http://127.0.0.1:${env.DECKS_PORT || 4329}`).replace(/\/+$/, "");
+	return locate().url;
+}
+
+/**
+ * `decks server [status|start|stop|restart|logs]`: this user's Decks, found through the address
+ * file. `logs [n]` prints the last n lines (40) of what it wrote.
+ */
+async function server(words) {
+	const what = words[0] ?? "status";
+	if (what === "status") {
+		const status = await serverStatus();
+		out(JSON.stringify(status, null, 2));
+		return status.running ? 0 : 1;
+	}
+	if (what === "start") {
+		const started = await startServer();
+		err(started.started ? `Decks is at ${started.url}: ${started.how}.` : `Decks is at ${started.url}: ${started.how}.`);
+		return 0;
+	}
+	if (what === "stop") {
+		const stopped = await stopServer();
+		err(stopped.stopped ? `Stopped Decks (process ${stopped.pid}).${stopped.note ? ` ${stopped.note}` : ""}` : stopped.why);
+		return stopped.stopped ? 0 : 1;
+	}
+	if (what === "restart") {
+		const stopped = await stopServer();
+		if (!stopped.stopped && !/No running Decks/.test(stopped.why ?? "")) {
+			err(stopped.why);
+			return 1;
+		}
+		const started = await startServer();
+		err(`Decks is at ${started.url}: ${started.how}.`);
+		return 0;
+	}
+	if (what === "logs") {
+		const count = Number(words[1]) > 0 ? Number(words[1]) : 40;
+		for (const file of await logFiles()) {
+			let text;
+			try {
+				text = readFileSync(file, "utf8");
+			} catch {
+				err(`${file}: nothing there yet.`);
+				continue;
+			}
+			err(`${file}:`);
+			out(text.trimEnd().split("\n").slice(-count).join("\n"));
+		}
+		return 0;
+	}
+	err(`decks server: no "${what}". It takes status, start, stop, restart or logs.`);
+	return 1;
 }
 
 /** The connection a command calls through: its token is the SDK's to find (`DECKS_TOKEN`, then `~/.decks/token`). */
@@ -187,6 +237,8 @@ export function help(verb) {
 		lines.push("");
 	}
 	lines.push("decks events [type…] prints every change as it happens, one JSON line each.");
+	lines.push("decks mcp is Decks as an MCP server for Claude Code, Codex or Cursor (claude mcp add decks -- decks mcp): it finds or starts Decks, and joins the canvas as an agent named for the client and its folder.");
+	lines.push("decks server [status|start|stop|restart|logs] finds this user's Decks and starts or stops it. A command at a terminal starts it by itself when none is running.");
 	lines.push("decks login [code] signs this terminal in as the person: with no code on the harness's own machine, else with a code from decks pair code; decks logout signs it out.");
 	lines.push("decks help <command> says more about one. DECKS_URL says where Decks is; DECKS_TOKEN, or the token decks login kept, says who is calling.");
 	return lines.join("\n");
@@ -307,6 +359,18 @@ async function main(argv) {
 		const found = verbOf(words.slice(1));
 		out(found ? help(found.verb) : help());
 		return found ? 0 : 1;
+	}
+	if (words[0] === "server") return server(words.slice(1));
+	// Decks as an MCP server on stdin and stdout, for a client that starts it: claude mcp add decks -- decks mcp
+	if (words[0] === "mcp") {
+		const { serve } = await import("../mcp/server.mjs");
+		await serve();
+		return 0;
+	}
+	// A terminal the environment told nothing: find this user's Decks, and start it when there is none.
+	if (!process.env.DECKS_URL && process.env.DECKS_AUTOSTART !== "0") {
+		const ready = await ensureServer();
+		if (ready.started) err(`decks: no Decks was running, so ${ready.how}.`);
 	}
 	if (words[0] === "login") {
 		err(await login(words.slice(1)));

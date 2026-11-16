@@ -153,7 +153,7 @@ export function AgentHoverCard(props: {
 						On the status line rather than beside the name, because it is the same *kind*
 						of fact — what this agent is, not what it is called.
 					*/}
-					<span class="kind" data-dormant={props.chat.dormant ? "true" : undefined}>{props.chat.kind}</span>
+					<span class="kind" data-dormant={props.chat.dormant ? "true" : undefined}>{props.chat.outside?.client ?? props.chat.kind}</span>
 				</div>
 
 				{/*

@@ -140,6 +140,23 @@ export interface AgentRecord {
 	lastLine?: string;
 	/** Ordering, and the time the preview above was said. */
 	lastAt: number;
+	/**
+	 * For an agent that works outside Decks: `key`, by which the same session finds itself again
+	 * (`Registry.attach`), the app it runs in, when it last called, and the messages waiting for its
+	 * next call, kept here because nothing else holds them across a restart.
+	 */
+	outside?: { key: string; client: string; seen: number; inbox: OutsideMail[] };
+}
+
+/** A message waiting for an outside agent: `QueuedWork` (`stage/tool.ts`) as it is written down. */
+export interface OutsideMail {
+	from: string;
+	fromName: string;
+	task: string;
+	boards: string[];
+	at: number;
+	reply?: boolean;
+	person?: true;
 }
 
 export class AgentStore {
@@ -490,7 +507,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 		 * provider, says the model is not available any more, and falls back to pi's own default.
 		 * The record is then written back as `pi`, so the runtime is lost for good.
 		 */
-		kind: AGENT_KINDS.includes(source.kind as AgentKind) ? (source.kind as AgentKind) : "pi",
+		kind: source.kind === "outside" || (AGENT_KINDS as readonly string[]).includes(source.kind as string) ? (source.kind as AgentKind) : "pi",
 		...(typeof source.resumeRef === "string" ? { resumeRef: source.resumeRef } : {}),
 		name: typeof source.name === "string" && source.name ? source.name : "Agent",
 		...(typeof source.avatar === "string" ? { avatar: source.avatar } : {}),
@@ -521,7 +538,19 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(userTags.length > 0 ? { userTags } : {}),
 		...(lastLine ? { lastLine } : {}),
 		lastAt: finite(source.lastAt, created),
+		...(outsideOf(source.outside) ? { outside: outsideOf(source.outside)! } : {}),
 	};
+}
+
+/** An outside agent's part of its record, read back: its key and app, and the mail that is whole. */
+function outsideOf(raw: unknown): AgentRecord["outside"] | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const source = raw as Record<string, unknown>;
+	if (typeof source.key !== "string" || !source.key) return undefined;
+	const inbox = (Array.isArray(source.inbox) ? source.inbox : [])
+		.filter((one): one is OutsideMail => !!one && typeof one === "object" && typeof (one as OutsideMail).task === "string" && typeof (one as OutsideMail).fromName === "string")
+		.map((one) => ({ from: String(one.from ?? ""), fromName: one.fromName, task: one.task, boards: Array.isArray(one.boards) ? one.boards.filter((path) => typeof path === "string") : [], at: Number(one.at) || 0, ...(one.reply ? { reply: true } : {}), ...(one.person ? { person: true as const } : {}) }));
+	return { key: source.key, client: typeof source.client === "string" && source.client ? source.client : "an MCP client", seen: Number(source.seen) || 0, inbox };
 }
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];

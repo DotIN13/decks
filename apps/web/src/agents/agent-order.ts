@@ -173,6 +173,19 @@ export function statusWords(status: AgentStatus, state: AgentState): string {
  * or asks, and otherwise only how long ago, compactly ("9h", "3d", "now"), or "new" if it never ran.
  * Whether a finished turn is unread is the face's ring's to say; the full state is the row's title.
  */
+/**
+ * An agent that works outside Decks, in the row's register: `here` while it is calling (its last
+ * call under a minute ago), else `away` and how long, and what waits for its next call.
+ * `long` is the sentence for the row's title and the hover card.
+ */
+export function outsideWords(outside: { client: string; seen: number; waiting: number }, long = false): string {
+	const ago = since(outside.seen);
+	const here = ago === "just now";
+	const waiting = outside.waiting > 0 ? `${outside.waiting} waiting` : "";
+	if (long) return `Works in ${outside.client}, outside Decks. ${here ? "Calling now." : `Its last call was ${ago} ago.`}${outside.waiting > 0 ? ` ${outside.waiting} message${outside.waiting === 1 ? " waits" : "s wait"} for its next call.` : ""}`;
+	return [here ? "here" : `away · ${ago}`, waiting].filter(Boolean).join(" · ");
+}
+
 export function rowWords(status: AgentStatus, state: AgentState, at: number | undefined): string {
 	if (status === "done" || status === "idle") {
 		if (at === undefined) return "new";

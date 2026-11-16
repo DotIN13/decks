@@ -14,7 +14,11 @@ type Screenshot = { file: string; width: number; height: number; box: Box; how?:
 type Canvas = { name: string; title: string; open: string[]; cards: number; shared?: { owner: string; role: "edit" | "view"; studio?: string }; studio?: string };
 type Card = { path: string; title: string; lastWrittenBy?: string };
 type Placement = { card: string; canvas: string; box: Box; clipped?: boolean };
-type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
+type DeckFile = { path: string; size: number; at: number; dir?: true };
+type FileText = { path: string; size: number; at: number; text: string; from: number; lines: number; more?: true };
+type TextEdit = { find: string; replace: string; all?: boolean };
+type FileMatch = { path: string; line: number; text: string };
+type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string; outside?: { client: string; seen: number; waiting: number } };
 type Message = { from: string; task: string; cards: string[]; at: number; reply?: boolean };
 type Camera = { x: number; y: number; zoom: number };
 type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
@@ -59,6 +63,20 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks frame create` · `decks.frame.create(path: string, item?: PenItem): { file: string; ref?: string; id: string }`. A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in your canvas's own frames/. Placed on that canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck's own frames/ placed on a canvas is copied into it.
 - `decks file url` · `decks.file.url(file: string): string`. A file on disk, as the address a card embeds.
 
+<!-- file -->
+**Files, for a caller with no disk: with a shell, use your own tools on the deck folder instead**
+
+- `decks file list` · `decks.file.list(path?: string, options?: { deep?: boolean; limit?: number }): DeckFile[]`. The files and folders in a folder of the deck ("" is the deck itself), folders marked `dir`; `deep` lists everything under it. Hidden folders, dependencies and build output are left out.
+- `decks file find` · `decks.file.find(pattern: string, options?: { path?: string; limit?: number }): DeckFile[]`. Files whose path matches a pattern, under `path` or the whole deck: `*` within a name, `**` across folders, as in "*.md" or "assets/*.png". A pattern with no slash matches a file's name anywhere.
+- `decks file read` · `decks.file.read(path: string, options?: { from?: number; lines?: number }): FileText`. A text file's words, with `at` to name as `rev` in a later write; `from` and `lines` read part of a long one. Text only, up to 1 MB: a picture or a film is shown by its address (file.url).
+- `decks file write` · `decks.file.write(path: string, text: string, options?: { rev?: number }): DeckFile`. Write a whole text file in the deck, making its folders: a card's index.html, its stylesheet, its data. With `rev` (the `at` a read answered) the write is refused if the file has changed since. An open card redraws by itself. Never lib/, a hidden folder, or anything outside the deck.
+- `decks file edit` · `decks.file.edit(path: string, edits: TextEdit[], options?: { rev?: number }): DeckFile`. Replace exact words in a text file: each edit's `find` must occur once (or every time, with `all`), and all the edits land or none. `rev` as for file.write.
+- `decks file grep` · `decks.file.grep(pattern: string, options?: { path?: string; glob?: string; limit?: number; ignoreCase?: boolean }): FileMatch[]`. Lines that match a regular expression, in the text files under `path` or the whole deck; `glob` keeps only files that match it, `ignoreCase` matches either case.
+- `decks file move` · `decks.file.move(path: string, to: string): DeckFile`. Move or rename a file or folder inside the deck. Refused when something is already at `to`. A card that is on a canvas is moved with decks canvas calls, not this.
+- `decks file delete` · `decks.file.delete(path: string): { deleted: string; trash: string }`. Delete a file or folder by moving it to the deck's trash (.decks/trash/files), from where it can be moved back by hand.
+
+<!-- /file -->
+
 **Agent: you, or another agent**
 
 - `decks agent me` · `decks.agent.me(): Agent`. You: name, avatar, colour, workspace, tags and home canvas.
@@ -66,6 +84,7 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks here` · `decks.here(): Canvas`. The canvas a call means when it names none: your home canvas for an agent, the card's canvas for a card's button, the canvas on screen for the person. Asked, never set.
 - `decks agent claim` · `decks.agent.claim(cards: string | string[]): string[]`. Say these cards carry your work, without showing them: you become their writer.
 - `decks agent inbox` · `decks.agent.inbox(): Message[]`. Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.
+- `decks agent news` · `decks.agent.news(): { messages: Message[]; changes: string[] }`. What waits for you: `messages` handed to you or written to you by the person, and `changes`, what others did on your canvases since you last asked. For an agent that works outside Decks this is how mail arrives, and reading it takes it from the inbox; an agent Decks runs gets both with its next message and needs no call.
 - `decks agent list` · `decks.agent.list(options?: { workspace?: string }): Agent[]`. Every agent, or the ones on one project (`workspace`), with what each is doing and how much waits for it.
 - `decks agent get` · `decks.agent.get(name: string): Agent`. Another agent, by name or id: kind, workspace, tags, state, home canvas.
 - `decks agent send` · `decks.agent.send(name: string, message: { task: string; cards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }`. Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.

@@ -14,7 +14,12 @@ export type AgentState = "idle" | "thinking" | "streaming" | "tool" | "waiting";
  * antigravity's Python one. What differs between them is `capabilities`, not a method that
  * throws.
  */
-export type AgentKind = "pi" | "claude" | "opencode" | "opencode2" | "antigravity";
+/**
+ * The runtimes, and `outside`: the kind of an agent that works outside Decks, a Claude Code, Codex or
+ * Cursor session that joined by MCP. It has no runtime here, so it is not among `AGENT_KINDS`, the
+ * runtimes a new agent is made on.
+ */
+export type AgentKind = "pi" | "claude" | "opencode" | "opencode2" | "antigravity" | "outside";
 
 /**
  * The same four, as a value.
@@ -23,7 +28,7 @@ export type AgentKind = "pi" | "claude" | "opencode" | "opencode2" | "antigravit
  * backend class, the browser draws a row per kind in the new-agent menu. Written once here
  * so a fifth runtime is one edit rather than three that drift.
  */
-export const AGENT_KINDS: readonly AgentKind[] = ["claude", "pi", "opencode", "opencode2", "antigravity"];
+export const AGENT_KINDS: readonly Exclude<AgentKind, "outside">[] = ["claude", "pi", "opencode", "opencode2", "antigravity"];
 
 /**
  * One runtime, as a browser can understand it.
@@ -182,6 +187,12 @@ export interface AgentChat {
 	 * will take a moment longer to answer.
 	 */
 	dormant?: true;
+	/**
+	 * An agent that works outside Decks (`kind` "outside"): the app it runs in, as it named itself
+	 * ("Claude Code"), when it last called, and how many messages wait in its inbox. Decks runs no turn
+	 * for it, so a message to it waits there until its next call.
+	 */
+	outside?: { client: string; seen: number; waiting: number };
 }
 
 export interface Identity {

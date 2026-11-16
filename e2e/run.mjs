@@ -467,7 +467,7 @@ async function startServer(i, data) {
 		 * With the `.bin` folders on PATH, as `npm run` would have put them, so whatever the server
 		 * spawns by name is found the same way it is under `npm run e2e:serve`.
 		 */
-		env: { PATH: [join(root, "apps", "server", "node_modules", ".bin"), join(root, "node_modules", ".bin"), process.env.PATH].join(delimiter), DECKS_DATA_DIR: data, DECKS_E2E_MARKER: "decks-e2e", DECKS_PORT: String(apiPort), DECKS_WEB_PORT: String(webPort), DECKS_E2E_API: api, DECKS_E2E_WEB: web },
+		env: { PATH: [join(root, "apps", "server", "node_modules", ".bin"), join(root, "node_modules", ".bin"), process.env.PATH].join(delimiter), /* never this user's address file (`apps/server/src/address.ts`) */ DECKS_ADDRESS: "0", DECKS_DATA_DIR: data, DECKS_E2E_MARKER: "decks-e2e", DECKS_PORT: String(apiPort), DECKS_WEB_PORT: String(webPort), DECKS_E2E_API: api, DECKS_E2E_WEB: web },
 	});
 	await until(`server on ${api}`, async () => (await deckPath(api)) !== undefined, { timeout: 60000, child, every: 100 });
 	/*

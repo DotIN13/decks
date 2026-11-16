@@ -15,13 +15,15 @@ test("the table has every call of the redesign, each named once", () => {
 		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.item", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.delete", "apps.logs", "apps.check",
 		"web.status", "web.pairing", "web.repair", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
 		"ports", "now", "pair.code", "studio.connect", "studio.status", "studio.disconnect",
+		// For a caller with no disk, and for an agent that works outside Decks.
+		"file.list", "file.find", "file.read", "file.write", "file.edit", "file.grep", "file.move", "file.delete", "agent.news",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 77);
+	assert.equal(VERBS.length, 86);
 	assert.equal(VERB_BY_NAME.size, VERBS.length, "a name finds only the table's calls");
 });
 
 test("every call says what it touches and whether it changes it, in the redesign's groups", () => {
-	const groups = new Set(["canvas", "card", "agent", "view", "apps", "web", "misc"]);
+	const groups = new Set(["canvas", "card", "file", "agent", "view", "apps", "web", "misc"]);
 	for (const verb of VERBS) {
 		assert.ok(["deck", "screen", "agents", "outside"].includes(verb.touches), verb.name);
 		assert.ok(["change", "read"].includes(verb.effect), verb.name);

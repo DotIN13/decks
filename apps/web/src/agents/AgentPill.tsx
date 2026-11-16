@@ -430,7 +430,7 @@ export function AgentMenu(props: {
 									hover card also wear, so the three surfaces name a runtime identically —
 									`.kind` in `styles/chrome.css` argues for the word over a badge on the face.
 								*/}
-								<span class="kind" data-dormant={chat.dormant ? "true" : undefined}>{chat.kind}</span>
+								<span class="kind" data-dormant={chat.dormant ? "true" : undefined}>{chat.outside?.client ?? chat.kind}</span>
 								{/*
 									`data-yield` says these words give ground for the × rather than a square
 									standing empty beside them until it arrives: the last column of a row is one

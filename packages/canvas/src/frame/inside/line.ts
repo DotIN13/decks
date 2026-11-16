@@ -50,6 +50,8 @@ export function openLine(options: LineOptions): LineClient {
 	let nextId = 0;
 
 	const connect = () => {
+		// The wait that led here is over: `ensure` reads `timer` to know whether a try is already due.
+		timer = undefined;
 		if (stopped) return;
 		const ws = new WebSocket(url);
 		socket = ws;
@@ -83,7 +85,8 @@ export function openLine(options: LineOptions): LineClient {
 			if (stopped) return;
 			// 4401: the token does not open the line; said again with the token as it is now, a little later.
 			timer = setTimeout(connect, wait);
-			wait = Math.min(wait * 2, 10_000);
+			// Not far, as the page's own line (`apps/web/src/state/socket.ts`): the common cause is a harness a few seconds from being back.
+			wait = Math.min(wait * 2, 2000);
 		};
 		ws.onerror = () => ws.close();
 	};

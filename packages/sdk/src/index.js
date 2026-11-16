@@ -71,11 +71,20 @@ export const VERBS = [
 	["canvas.copyShared",["options?"]],
 	["frame.create",["path","item?"]],
 	["file.url",["file"]],
+	["file.list",["path?","options?"]],
+	["file.find",["pattern","options?"]],
+	["file.read",["path","options?"]],
+	["file.write",["path","text","options?"]],
+	["file.edit",["path","edits","options?"]],
+	["file.grep",["pattern","options?"]],
+	["file.move",["path","to"]],
+	["file.delete",["path"]],
 	["agent.me",[]],
 	["agent.update",["patch"]],
 	["here",[]],
 	["agent.claim",["cards..."]],
 	["agent.inbox",[]],
+	["agent.news",[]],
 	["agent.list",["options?"]],
 	["agent.get",["name"]],
 	["agent.send",["name","message"]],
@@ -153,6 +162,33 @@ async function savedToken(base) {
 	}
 }
 
+/**
+ * Where this user's Decks is, in Node with nothing said: `DECKS_PORT` on this machine, else what the
+ * server wrote in `~/.decks/server.json` when it started (`src/server.js` has the whole of it), else
+ * this machine's default port. Read without an import, so a bundler leaves Node's modules alone.
+ */
+function fromAddressFile() {
+	if (typeof process === "undefined" || !process.versions?.node || typeof process.getBuiltinModule !== "function") return undefined;
+	if (process.env.DECKS_PORT) return `http://127.0.0.1:${process.env.DECKS_PORT}`;
+	try {
+		const { readFileSync } = process.getBuiltinModule("node:fs");
+		const { homedir } = process.getBuiltinModule("node:os");
+		const { join } = process.getBuiltinModule("node:path");
+		const saved = JSON.parse(readFileSync(join(process.env.DECKS_HOME || join(homedir(), ".decks"), "server.json"), "utf8"));
+		if (typeof saved?.url === "string") return saved.url;
+	} catch {}
+	return "http://127.0.0.1:4329";
+}
+
+/** Whether a fetch failed because nothing was listening: the request was never taken, so it is safe to send again. */
+function refusedConnection(error) {
+	for (let cause = error; cause; cause = cause.cause) {
+		if (cause.code === "ECONNREFUSED") return true;
+		if (Array.isArray(cause.errors) && cause.errors.some((one) => one?.code === "ECONNREFUSED")) return true;
+	}
+	return false;
+}
+
 /** Notes go to stderr in Node, where an agent's script is reading; a page has nowhere to say them. */
 function defaultNotes(lines) {
 	if (typeof process !== "undefined" && process.stderr && typeof process.stderr.write === "function") {
@@ -164,7 +200,8 @@ function defaultNotes(lines) {
  * A connection to Decks.
  *
  * @param {object} [options]
- * @param {string} [options.url]  Decks' address, as in http://127.0.0.1:4329. Default: `DECKS_URL`, or the page's own.
+ * @param {string} [options.url]  Decks' address, as in http://127.0.0.1:4329. Default: `DECKS_URL`, or the page's own, or in Node what `~/.decks/server.json` says.
+ * @param {number} [options.wait]  In Node, how many seconds a call keeps trying while nothing listens at the address (a server that is restarting). Default: `DECKS_WAIT`, else 30; 0 fails at once.
  * @param {string | (() => string | undefined)} [options.token]  Who is calling: a token from Decks. Default: `DECKS_TOKEN`, else the one `decks login` kept for this address in `~/.decks/token`, else none (a page whose `fetch` adds its own).
  * @param {string | (() => string | undefined)} [options.stage]  For the person: the canvas they are acting on (`X-Decks-Stage`). A parameter, not who is calling.
  * @param {string | (() => string | undefined)} [options.agent]  For the person: the agent they are talking to (`X-Decks-Agent`). A parameter, not who is calling.
@@ -174,7 +211,7 @@ function defaultNotes(lines) {
  */
 export function connect(options = {}) {
 	const page = fromPage();
-	const base = String(options.url ?? env("DECKS_URL") ?? page.url ?? "").replace(/\/+$/, "");
+	const base = String(options.url ?? env("DECKS_URL") ?? page.url ?? fromAddressFile() ?? "").replace(/\/+$/, "");
 	// What the person is acting on, when the person is calling: parameters, read per call.
 	const agent = options.agent;
 	const stage = options.stage;
@@ -187,10 +224,27 @@ export function connect(options = {}) {
 		found ??= savedToken(base);
 		return found;
 	};
-	const doFetch = options.fetch ?? globalThis.fetch;
+	const rawFetch = options.fetch ?? globalThis.fetch;
+	/*
+	 * A server that is restarting refuses connections for a few seconds. In Node a call waits it out:
+	 * the same request again every half second while nothing listens, for `wait` seconds. Only a
+	 * refused connection is tried again, never a request the server may have taken.
+	 */
+	const waitMs = (typeof process !== "undefined" && process.versions?.node ? Number(options.wait ?? env("DECKS_WAIT") ?? 30) || 0 : 0) * 1000;
+	const doFetch = async (url, init) => {
+		const until = Date.now() + waitMs;
+		for (;;) {
+			try {
+				return await rawFetch(url, init);
+			} catch (error) {
+				if (!refusedConnection(error) || Date.now() >= until || init?.signal?.aborted) throw error;
+				await new Promise((done) => setTimeout(done, 500));
+			}
+		}
+	};
 	const onNotes = options.notes ?? defaultNotes;
 	if (!base) throw new DecksError("No Decks to talk to: set DECKS_URL (Decks sets it in each agent's shell), or pass { url }.");
-	if (typeof doFetch !== "function") throw new DecksError("This runtime has no fetch; pass one as { fetch }.");
+	if (typeof rawFetch !== "function") throw new DecksError("This runtime has no fetch; pass one as { fetch }.");
 
 	/** The headers every request carries: the caller's own, and its token. */
 	async function authHeaders() {

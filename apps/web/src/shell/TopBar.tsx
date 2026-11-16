@@ -96,7 +96,7 @@ export function TopBar(props: {
 						</Show>
 						<Show when={name()}>{(label) => <span class="v3-agent-name">{label()}</span>}</Show>
 						<Show when={active() && !props.phone}>
-							<span class="v3-agent-kind">{active()!.kind}</span>
+							<span class="v3-agent-kind">{active()!.outside?.client ?? active()!.kind}</span>
 						</Show>
 						<Icon of={ChevronDown} size={13} class="v3-chev" />
 					</button>

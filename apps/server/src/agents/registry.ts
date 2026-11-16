@@ -13,6 +13,7 @@ import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore, type AgentRecord } from "./store.ts";
+import { resumeNote, WorkingLog } from "./working.ts";
 import { fromSharedCanvas } from "../migrations/2026-09-22-shared-canvases-to-agents.ts";
 
 /**
@@ -66,6 +67,33 @@ export class Registry {
 		},
 	) {
 		this.store = new AgentStore(deck);
+		this.working = new WorkingLog(workingFile(deck));
+	}
+
+	/** Whose turn is running, written down for the next start (`agents/working.ts`). */
+	private working: WorkingLog;
+
+	/**
+	 * Start again the turns the last stop cut, once the rows are back: each agent is told what
+	 * happened and goes on, one every `gapMs` so a deck of many does not start them all in one second.
+	 * `DECKS_RESUME=0` leaves them idle, as before. Answers how many it will start.
+	 */
+	resumeInterrupted(gapMs = 1500): number {
+		if (process.env.DECKS_RESUME === "0") return 0;
+		const now = Date.now();
+		const due = this.working.toResume(now).filter(({ id }) => this.get(id));
+		due.forEach(({ id, since }, index) => {
+			const timer = setTimeout(() => {
+				const agent = this.get(id);
+				if (!agent || agent.running) return;
+				// Marked before the turn starts, so a stop during the start itself still counts as resumed.
+				this.working.set(id, true, Date.now());
+				void agent.prompt(resumeNote(since, now)).catch((error) => console.error(`[decks] could not start ${agent.chat().name} again: ${(error as Error).message}`));
+			}, 2000 + index * gapMs);
+			timer.unref();
+		});
+		if (due.length) console.log(`[decks] the last stop cut ${due.length} turn${due.length === 1 ? "" : "s"}: starting ${due.length === 1 ? "it" : "them"} again`);
+		return due.length;
 	}
 
 	/**
@@ -89,7 +117,7 @@ export class Registry {
 	 * than needing a second shape for the same fact. `undefined` for an agent in none, which is
 	 * the absence the panel draws one section for.
 	 */
-	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number; stage: string | undefined; avatar?: string }> {
+	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number; stage: string | undefined; avatar?: string; outside?: { client: string; seen: number; waiting: number } }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
@@ -114,8 +142,37 @@ export class Registry {
 				stage: agent.stageName(),
 				// The picture it drew, `/api/avatar/<id>?rev=…`, for another front end's agent rows (Studio).
 				...(chat.avatar ? { avatar: chat.avatar } : {}),
+				// An agent that works outside Decks: its app, when it last called, what waits for it.
+				...(chat.outside ? { outside: chat.outside } : {}),
 			};
 		});
+	}
+
+	/**
+	 * An agent that works outside Decks joins, or comes back: a Claude Code, Codex or Cursor session,
+	 * through MCP (`agent.attach`, the person's call). `key` is the session's own name for itself (its
+	 * app and the folder it works in), so the same session finds the same agent again, with its name,
+	 * its cards and the mail that waited. Answers the agent, whether it was made now, and a token that
+	 * calls as it. It starts no runtime and takes nobody's screen.
+	 */
+	attach(spec: { key: string; client?: string; name?: string; workspace?: string }): { agent: DeckAgent; made: boolean; token: string | undefined } {
+		const key = spec.key.trim().slice(0, 200);
+		if (!key) throw new Error('An outside agent joins with a key of its own, the same each time it comes back: { key: "claude-code:/Users/you/project" }.');
+		const client = spec.client?.replace(/\s+/g, " ").trim().slice(0, 60) || "an MCP client";
+		let agent = this.agents.find((one) => one.outsideKey === key);
+		const made = !agent;
+		if (!agent) {
+			const focused = this.focusedId;
+			const asked = spec.name?.replace(/\s+/g, " ").trim().slice(0, 60);
+			const name = asked && !this.nameTaken(asked) ? asked : numberedName(asked || client, (one) => this.nameTaken(one));
+			agent = this.create({ kind: "outside", name, outside: { key, client }, ...(spec.workspace ? { workspace: spec.workspace } : {}) });
+			// A session joining in a terminal does not change which conversation is up.
+			if (focused) this.focusedId = focused;
+			this.publish();
+			agent.keep();
+		}
+		agent.touch(client);
+		return { agent, made, token: this.host.bridge?.issue(agent.id) };
 	}
 
 	/**
@@ -160,6 +217,8 @@ export class Registry {
 			 * its workspace is the one whose latest canvas the new agent opens on (`latestCanvas`).
 			 */
 			near?: string;
+			/** For an agent that works outside Decks (`attach`): the key it joins by and the app it runs in. */
+			outside?: { key: string; client: string };
 			/** Set only by `restore`: a chat from a previous run, with nothing running behind it. */
 			restored?: {
 				id: string;
@@ -206,6 +265,7 @@ export class Registry {
 				recordRevision: (path) => this.host.recordRevision(path),
 				wrote: (path, who) => this.host.wrote?.(path, who),
 				act: (agentId, act) => this.host.act?.(agentId, act),
+				working: (agentId, working) => this.working.set(agentId, working),
 				boardPathOf: (file) => this.host.boardPathOf(file),
 			},
 			{
@@ -244,7 +304,7 @@ export class Registry {
 		 * continue. `prompt()` already opens with `await this.start()` and `start()` is
 		 * memoised, so the first thing said to a dormant agent starts it.
 		 */
-		if (!options.restored) void agent.start();
+		if (!options.restored && agent.kind !== "outside") void agent.start();
 		this.publish();
 		return agent;
 	}
@@ -294,6 +354,7 @@ export class Registry {
 					...(record.account ? { account: record.account } : {}),
 					...(record.tags ? { tags: record.tags } : {}),
 					...(record.userTags ? { userTags: record.userTags } : {}),
+					...(record.outside ? { outside: record.outside } : {}),
 					...(record.workspace ? { workspace: record.workspace } : {}),
 					...(record.stage ? { stage: record.stage } : {}),
 				},
@@ -305,9 +366,11 @@ export class Registry {
 		 * `create` sets `focusedId ??=`, and the list is restored oldest-first so the colour
 		 * fallback lands in the original order — which together would focus the *oldest* chat.
 		 */
-		this.focusedId = this.agents.at(-1)?.id;
+		// And one Decks runs, when there is one: an outside agent's conversation is in its own app.
+		this.focusedId = this.agents.findLast((agent) => agent.kind !== "outside")?.id;
 		this.publish();
-		return this.agents.length;
+		// Counted without the outside agents: a deck with only those still needs an agent of its own.
+		return this.agents.filter((agent) => agent.kind !== "outside").length;
 	}
 
 	/** A record from the shared-canvas days, made the chat's own (`migrations/2026-09-22-shared-canvases-to-agents.ts`). */
@@ -393,6 +456,7 @@ export class Registry {
 
 		this.agents.splice(index, 1);
 		agent.dispose();
+		this.working.set(id, false);
 		this.snapshots.forget(id);
 		// After `dispose`, which flushes the record — deleting first would leave that write
 		// to put it straight back, and the row would return on the next restart.
@@ -639,9 +703,12 @@ export class Registry {
 		this.focusedId = undefined;
 		this.deck = deck;
 		this.store.setDeck(deck);
+		this.working = new WorkingLog(workingFile(deck));
 	}
 
 	dispose(): void {
+		// First: a runtime that reports idle as it dies must not take its agent out of the log.
+		this.working.close();
 		for (const agent of this.agents) agent.dispose();
 		this.agents.length = 0;
 	}
@@ -682,3 +749,8 @@ function brief(task: string, boards: string[], deck: Deck, person?: boolean): st
 	return parts.join("\n");
 }
 
+
+/** Where a deck keeps the log of running turns. */
+function workingFile(deck: Deck): string {
+	return join(deck.path, ".decks", "working.json");
+}

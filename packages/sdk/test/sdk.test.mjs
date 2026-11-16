@@ -220,7 +220,7 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 			{ jsonrpc: "2.0", id: 2, method: "tools/list" },
 			{ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "decks_canvas_batch", arguments: { ops: [{ op: "delete", id: "n2" }] } } },
 		];
-		const child = execFile(process.execPath, [MCP], { env: { ...process.env, DECKS_URL: fake.url, DECKS_TOKEN: "dk_h_wren" } });
+		const child = execFile(process.execPath, [MCP], { env: { ...process.env, DECKS_URL: fake.url, DECKS_TOKEN: "dk_h_wren", DECKS_TOOLS: "all" } });
 		let output = "";
 		child.stdout.on("data", (chunk) => (output += chunk));
 		for (const line of lines) child.stdin.write(`${JSON.stringify(line)}\n`);
@@ -228,6 +228,8 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		child.kill();
 		const [init, list, call] = output.trim().split("\n").map((line) => JSON.parse(line));
 		assert.equal(init.result.protocolVersion, "2025-06-18");
+		assert.match(init.result.instructions, /You are connected to Decks/, "the brief comes with the connection");
+		assert.deepEqual(Object.keys(init.result.capabilities).sort(), ["prompts", "resources", "tools"]);
 		assert.equal(list.result.tools.length, TABLE.length, "every call");
 		assert.ok(list.result.tools.some((tool) => tool.name === "decks_canvas_insert"));
 		assert.ok(!list.result.tools.some((tool) => /^decks_(pen|board)_|^decks_new_board$/.test(tool.name)), "no old name");
@@ -236,6 +238,41 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		assert.equal(call.result.isError, false);
 		assert.deepEqual(JSON.parse(call.result.content[0].text), [{ op: "delete", id: "n2" }]);
 		assert.deepEqual(fake.seen.at(-1), { verb: "canvas.batch", args: [[{ op: "delete", id: "n2" }]], token: "Bearer dk_h_wren", agent: undefined, app: undefined, person: undefined });
+	} finally {
+		await fake.close();
+	}
+});
+
+test("the MCP server's short list reaches every call, and offers the deck to read and the skills as prompts", async () => {
+	const fake = await fakeDecks();
+	try {
+		const lines = [
+			{ jsonrpc: "2.0", id: 1, method: "tools/list" },
+			{ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "decks_call", arguments: { name: "view.focus", args: { target: "canvases/plan/cards/a/index.html" } } } },
+			{ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "decks_help", arguments: { name: "view.reload" } } },
+			{ jsonrpc: "2.0", id: 4, method: "prompts/list" },
+			{ jsonrpc: "2.0", id: 5, method: "resources/templates/list" },
+			{ jsonrpc: "2.0", id: 6, method: "no/such" },
+		];
+		const child = execFile(process.execPath, [MCP], { env: { ...process.env, DECKS_URL: fake.url, DECKS_TOKEN: "dk_h_wren", DECKS_TOOLS: "" } });
+		let output = "";
+		child.stdout.on("data", (chunk) => (output += chunk));
+		for (const line of lines) child.stdin.write(`${JSON.stringify(line)}\n`);
+		while (output.trim().split("\n").length < lines.length) await new Promise((resolve) => setTimeout(resolve, 20));
+		child.kill();
+		const [list, called, helped, prompts, templates, unknown] = output.trim().split("\n").map((line) => JSON.parse(line));
+		const names = list.result.tools.map((tool) => tool.name);
+		assert.ok(names.length < TABLE.length / 2, `a short list: ${names.length} of ${TABLE.length}`);
+		for (const name of ["decks_canvas_read", "decks_canvas_insert", "decks_card_create", "decks_file_write", "decks_agent_news", "decks_help", "decks_call"]) assert.ok(names.includes(name), name);
+		assert.ok(!names.includes("decks_apps_logs") && !names.includes("decks_view_reload"), "a rare call is not listed");
+		assert.equal(called.result.isError, false);
+		assert.equal(fake.seen.at(-1).verb, "view.focus", "a call is reached by name, its arguments by theirs");
+		assert.deepEqual(fake.seen.at(-1).args, ["canvases/plan/cards/a/index.html"]);
+		assert.match(helped.result.content[0].text, /view\.reload\(/);
+		assert.match(helped.result.content[0].text, /decks_call/);
+		assert.ok(prompts.result.prompts.some((prompt) => prompt.name === "card-authoring"));
+		assert.equal(templates.result.resourceTemplates.length, 3);
+		assert.equal(unknown.error.code, -32601);
 	} finally {
 		await fake.close();
 	}

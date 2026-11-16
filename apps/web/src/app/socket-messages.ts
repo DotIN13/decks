@@ -268,13 +268,14 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("chats", (chats) =>
 						chats.map((chat) => {
 							if (chat.id !== message.id) return chat;
-							const { lastLine: _line, lastAt: _at, mode: _mode, dormant: _dormant, ...rest } = chat;
+							const { lastLine: _line, lastAt: _at, mode: _mode, dormant: _dormant, outside: _outside, ...rest } = chat;
 							return {
 								...rest,
 								...(message.lastLine === undefined ? {} : { lastLine: message.lastLine }),
 								...(message.lastAt === undefined ? {} : { lastAt: message.lastAt }),
 								...(message.mode ? { mode: message.mode } : {}),
 								...(message.dormant ? { dormant: true as const } : {}),
+								...(message.outside ? { outside: message.outside } : {}),
 							};
 						}),
 					);

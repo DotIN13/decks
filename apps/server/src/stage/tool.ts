@@ -20,6 +20,7 @@ import { webVerbs } from "../verbs/web.ts";
 import { miscVerbs } from "../verbs/misc.ts";
 import { canvasVerbs } from "../verbs/canvas.ts";
 import { boardVerbs } from "../verbs/board.ts";
+import { fileVerbs } from "../verbs/files.ts";
 import { agentVerbs } from "../verbs/agent.ts";
 import { viewVerbs } from "../verbs/view.ts";
 import { renamedVerb } from "../verbs/renamed.ts";
@@ -124,7 +125,7 @@ export interface StageAgentHooks {
 	setTags(tags: unknown): string[];
 	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
 	setWorkspace(workspace: unknown): string | null;
-	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; stage?: string; avatar?: string }>;
+	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; stage?: string; avatar?: string; outside?: { client: string; seen: number; waiting: number } }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Queue work for an agent that already exists, and return without waiting. */
@@ -141,6 +142,8 @@ export interface StageAgentHooks {
 	 * bytes are the same revision.
 	 */
 	recordRevision(path: string): string | undefined;
+	/** What waits for the caller: its messages (taken, for an agent that works outside Decks) and its canvases' news. Optional: a card's button has neither. */
+	news?(): { messages: QueuedWork[]; changes: string[] };
 	/**
 	 * The agent worked on this board: it becomes its writer, and the board joins what the turn
 	 * reports. Called by `decks.card.create`, `decks.canvas.fit` and `decks.agent.claim`. Optional so a host
@@ -279,6 +282,7 @@ export function createStageTool(deps: {
 		...miscVerbs(ctx),
 		...canvasVerbs(ctx),
 		...boardVerbs(ctx),
+		...fileVerbs(ctx),
 		...agentVerbs(ctx),
 		...viewVerbs(ctx),
 		...appsVerbs(ctx),

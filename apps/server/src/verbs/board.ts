@@ -8,11 +8,11 @@ import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
 /**
- * Boards and the deck's other files: board files listed, made, named and found on canvases; frames
- * and file addresses. A board file is the deck's, on any number of canvases or none: making one does
+ * Boards and the deck's other files: board files listed, made, named and found on canvases, and frames
+ * (file addresses and the file calls are `verbs/files.ts`). A board file is the deck's, on any number of canvases or none: making one does
  * not place it, which is the canvas's job (`canvas.insert`).
  */
-export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame" | "file"> {
+export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 	const { service, agent, notes, needPens } = ctx;
 
 	/** Who wrote a board, as a name: an agent's, or "person" for the person's own edit. */
@@ -107,9 +107,6 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame" | "fi
 				const asked = typeof path === "string" ? path.trim().replace(/^\.?\/+/, "") : path;
 				return needPens().createFile(home && typeof asked === "string" && /^frames\//.test(asked) ? `${canvasFolder(home)}/${asked}` : path, item as never);
 			},
-		},
-		file: {
-			url: async (file: string) => service.resolve(file),
 		},
 	};
 }

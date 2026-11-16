@@ -22,7 +22,9 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 		state: other.state,
 		queued: other.queued ?? 0,
 		...(other.avatar ? { avatar: other.avatar } : {}),
+		...(other.outside ? { outside: other.outside } : {}),
 	});
+	const asMessage = (item: ReturnType<typeof agent.queue>[number]) => ({ from: item.fromName, task: item.task, cards: item.boards, at: item.at, ...(item.reply ? { reply: true } : {}) });
 	const find = (name: unknown) => {
 		const asked = typeof name === "string" ? name.trim() : "";
 		if (!asked) throw new Error("Name an agent, by name or id: decks agent list lists them.");
@@ -74,9 +76,10 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 				for (const one of paths) agent.worked?.(one);
 				return paths;
 			},
-			inbox: async () => {
-				const handed = agent.queue().map((item) => ({ from: item.fromName, task: item.task, cards: item.boards, at: item.at, ...(item.reply ? { reply: true } : {}) }));
-				return handed;
+			inbox: async () => agent.queue().map(asMessage),
+			news: async () => {
+				const got = agent.news?.() ?? { messages: agent.queue(), changes: [] };
+				return { messages: got.messages.map(asMessage), changes: got.changes };
 			},
 			list: async (options?: { workspace?: string }) => {
 				const workspace = options?.workspace === undefined || options.workspace === null ? undefined : askedWorkspace(options.workspace);

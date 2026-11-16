@@ -195,6 +195,7 @@ export function verbsJson() {
 const GROUP_TITLES = {
 	canvas: "Canvas: every call takes { canvas }; left out, it is decks.here()",
 	card: "Cards and the deck: files in the deck folder",
+	file: "Files, for a caller with no disk: with a shell, use your own tools on the deck folder instead",
 	agent: "Agent: you, or another agent",
 	view: "View: what the person is looking at, moved only on purpose (no file changes)",
 	apps: "Apps: folders in apps/ that Decks serves, builds or runs",
@@ -221,10 +222,12 @@ export function commandsMarkdown() {
 	for (const verb of VERBS) groups.set(verb.group, [...(groups.get(verb.group) ?? []), verb]);
 	for (const [group, verbs] of groups) {
 		if (group === "web") lines.push("<!-- web -->");
+		if (group === "file") lines.push("<!-- file -->");
 		lines.push(`**${GROUP_TITLES[group] ?? group}**`, "");
 		for (const verb of verbs) lines.push(`- \`decks ${commandOf(verb).join(" ")}\` · \`decks.${signature(verb)}: ${verb.result ? tsOf(verb.result) : "void"}\`. ${verb.summary}`);
 		lines.push("");
 		if (group === "web") lines.push("<!-- /web -->", "");
+		if (group === "file") lines.push("<!-- /file -->", "");
 	}
 	return `${lines.join("\n").trimEnd()}\n`;
 }

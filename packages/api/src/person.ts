@@ -49,6 +49,15 @@ export const PERSON_VERBS: readonly Verb[] = [
 			{ name: "patch", schema: obj({ name: opt(str()), tags: opt(arr(str())), workspace: opt(union(str(), nul)), model: opt(obj({ provider: str(), model: str(), thinking: opt(Thinking) })), thinking: opt(Thinking), mode: opt(AgentMode), canvas: opt(str()) }) },
 		],
 	},
+	{
+		name: "agent.attach",
+		group: "agent",
+		...agents,
+		summary:
+			"Join, or come back, as an agent that works outside Decks: a Claude Code, Codex or Cursor session. `key` is the session's own name for itself (its app and its folder), the same each time, so it finds its name, its cards and its waiting mail again. Answers the agent and a token that calls as it. Decks starts no turn for it: what is sent to it waits for its next call (agent.news).",
+		params: [{ name: "spec", schema: obj({ key: str(), client: opt(str("The app it runs in, as in Claude Code.")), name: opt(str()), workspace: opt(str()), canvas: opt(str()) }) }],
+		result: obj({ id: str(), name: str(), token: str(), made: bool(), canvas: opt(str()) }),
+	},
 	{ name: "agent.report", group: "agent", ...agentsRead, summary: "The agent's usage report, said back as agent.report.", params: [{ name: "id", schema: str() }] },
 	{ name: "agent.answer", group: "agent", ...agents, summary: "Answer a question an agent's runtime put up (agent.prompt).", params: [{ name: "answer", schema: any() }] },
 

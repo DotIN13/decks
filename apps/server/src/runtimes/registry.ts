@@ -1,6 +1,7 @@
 import { AGENT_KINDS, type AgentKind, type ModelOption, type RuntimeInfo } from "@decks/protocol";
 import { antigravity } from "./antigravity/index.ts";
 import type { AgentRuntime } from "./contract.ts";
+import { outside } from "./outside/index.ts";
 import { claude } from "./claude/index.ts";
 import { opencode } from "./opencode/index.ts";
 import { opencode2 } from "./opencode2/index.ts";
@@ -24,6 +25,8 @@ export const RUNTIMES: Record<AgentKind, AgentRuntime> = {
 	opencode,
 	opencode2,
 	antigravity,
+	// Not a runtime Decks starts (`AGENT_KINDS` leaves it out): an agent that joined from its own app.
+	outside,
 };
 
 /** The runtime behind an agent. Total, because the record is. */

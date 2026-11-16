@@ -54,7 +54,7 @@ function quietMs(): number {
  * message before every step and does not stop until it has answered it. Antigravity's print mode
  * reads one prompt line per turn, so a message sent mid-turn waits for the turn to end.
  */
-const STEERS: Record<AgentKind, boolean> = { pi: true, opencode2: true, claude: true, opencode: true, antigravity: false };
+const STEERS: Record<AgentKind, boolean> = { pi: true, opencode2: true, claude: true, opencode: true, antigravity: false, outside: false };
 
 const QUEUE_LIMIT = 8;
 
@@ -311,6 +311,8 @@ export class DeckAgent {
 			 * fixture has no canvas to draw on.
 			 */
 			act?(agentId: string, act: Act): void;
+			/** This agent's turn started or ended, for the log a restart reads (`agents/working.ts`). Optional like `act`. */
+			working?(agentId: string, working: boolean): void;
 			/**
 			 * The briefing a handed-over task is run with — the same one `delegate` uses.
 			 *
@@ -364,6 +366,8 @@ export class DeckAgent {
 			accountsChanged?(): void;
 			commandsChanged?(): void;
 			bridge?: StageBridge;
+			/** For an agent that works outside Decks (`kind` "outside"): the key it joins by and the app it runs in. */
+			outside?: { key: string; client: string };
 			/**
 			 * Everything a chat needs to be a row again without its runtime running
 			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
@@ -399,6 +403,8 @@ export class DeckAgent {
 
 				tags?: string[];
 				userTags?: string[];
+				/** An outside agent's own: its key, its app, when it last called and its waiting mail. */
+				outside?: NonNullable<AgentRecord["outside"]>;
 				workspace?: string;
 				/** The folder its stage drawing is in (`stage/pens.ts`). */
 				stage?: string;
@@ -406,6 +412,11 @@ export class DeckAgent {
 		},
 	) {
 		this.id = options.restored?.id ?? randomUUID();
+		const joined = options.restored?.outside ?? options.outside;
+		if (joined) {
+			this.outside = { key: joined.key, client: joined.client, seen: options.restored?.outside?.seen ?? Date.now() };
+			this.work.push(...(options.restored?.outside?.inbox ?? []));
+		}
 		this.firstCanvas = options.firstCanvas;
 		this.store = options.store;
 		this.restored = options.restored !== undefined;
@@ -489,6 +500,7 @@ export class DeckAgent {
 			this.id,
 			(message) => {
 				if (message.type === "agent.state") {
+					if ((this.state === "idle") !== (message.state === "idle")) this.host.working?.(this.id, message.state !== "idle");
 					this.state = message.state;
 					// The queue's whole clock. Going idle starts the countdown; anything else
 					// stops it, which is how "quiet for ten seconds" stays true rather than
@@ -673,6 +685,7 @@ export class DeckAgent {
 				return this.host.create(this.id, spec);
 			},
 			queue: (agentId?: string) => this.host.queue(agentId ?? this.id),
+			news: () => this.takeNews(),
 			recordRevision: (path: string) => this.host.recordRevision(path),
 			worked: (path: string) => this.workedOn(path),
 			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
@@ -1005,6 +1018,11 @@ export class DeckAgent {
 	 */
 	private save(): void {
 		if (!this.persisted()) return;
+		// An outside agent's record is small and is all there is of it: written now (`keep`).
+		if (this.outside) {
+			this.flush();
+			return;
+		}
 		if (this.saving) return;
 		this.saving = setTimeout(() => {
 			this.saving = undefined;
@@ -1076,7 +1094,8 @@ export class DeckAgent {
 	 * yet" from "not read yet".
 	 */
 	private persisted(): boolean {
-		return this.restored || this.translator.userMessages().length > 0;
+		// An outside agent is its record: there is no runtime session to find it by again.
+		return this.restored || this.outside !== undefined || this.translator.userMessages().length > 0;
 	}
 
 	/** Write the record now. */
@@ -1129,7 +1148,64 @@ export class DeckAgent {
 			// newest one. Kept on the record so the list never has to read a transcript.
 			...(last ? { lastLine: last.text } : {}),
 			lastAt: last?.at ?? this.createdAt,
+			...(this.outside ? { outside: { ...this.outside, inbox: this.work.map((item) => ({ ...item })) } } : {}),
 		};
+	}
+
+	// --- an agent that works outside Decks --------------------------------------------------
+
+	/**
+	 * Set for an agent that joined from its own app (`Registry.attach`): the key it joins by, the app,
+	 * and when it last called. Decks runs no turn for it: what is sent to it waits in `work`, its
+	 * inbox, until it asks (`takeMail`).
+	 */
+	private outside: { key: string; client: string; seen: number } | undefined;
+
+	/**
+	 * Write an outside agent's record now, not a second from now: its key and its waiting mail are
+	 * kept nowhere else, and the stop that matters gives no warning.
+	 */
+	keep(): void {
+		if (!this.outside) return;
+		if (this.saving) clearTimeout(this.saving);
+		this.saving = undefined;
+		this.flush();
+	}
+
+	/** The key an outside agent joins by, or undefined for an agent Decks runs. */
+	get outsideKey(): string | undefined {
+		return this.outside?.key;
+	}
+
+	/** An outside agent called: it is here now. The row is said again at most every ten seconds. */
+	touch(client?: string): void {
+		if (!this.outside) return;
+		const before = this.outside.seen;
+		this.outside.seen = Date.now();
+		if (client) this.outside.client = client;
+		if (this.outside.seen - before > 10_000) {
+			this.sayRow();
+			this.save();
+		}
+	}
+
+	/**
+	 * What waits for this agent, taken: the messages in its inbox and what others changed on its
+	 * canvases since it last asked. For an outside agent this is how mail arrives, so the messages
+	 * leave the inbox; an agent Decks runs is only shown its queue, which still drains by itself.
+	 */
+	takeNews(): { messages: QueuedWork[]; changes: string[] } {
+		const messages = this.outside ? this.work.splice(0) : [...this.work];
+		if (this.outside && messages.length > 0) {
+			this.sayRow();
+			this.keep();
+		}
+		return { messages, changes: this.canvasNotes() };
+	}
+
+	/** What an outside agent did, as a line in its conversation here: Decks has no transcript of its own to show. */
+	noteAct(line: string): void {
+		if (this.outside) this.translator.notice("info", line);
 	}
 
 	/**
@@ -1339,6 +1415,18 @@ export class DeckAgent {
 		// Before anything is appended: a restored chat's stored rows belong under the new
 		// message, not after it.
 		this.transcript();
+		/*
+		 * An outside agent has no runtime to prompt: the words are shown here, wait in its inbox, and
+		 * reach it with its next call. A slash command means nothing to it.
+		 */
+		if (this.outside) {
+			this.translator.user(text, parts);
+			this.work.push({ from: PERSON, fromName: "The person", task: text, boards: [], at: Date.now(), person: true });
+			this.translator.notice("info", `${this.identity.name} works in ${this.outside.client}, outside Decks: it reads this with its next call.`);
+			this.sayRow();
+			this.keep();
+			return;
+		}
 		await this.start();
 		if (!this.backend) {
 			this.translator.notice("error", `Not started: ${this.failure ?? "unknown reason"}`);
@@ -1459,6 +1547,11 @@ export class DeckAgent {
 		}
 		this.work.push(item);
 		this.translator.notice("info", `${item.fromName} queued work for you: ${firstLine(item.task)}`);
+		// An outside agent's inbox is part of its record, and its row counts what waits.
+		if (this.outside) {
+			this.sayRow();
+			this.keep();
+		}
 		// Nothing is started here. A dormant chat stays dormant until its item actually runs,
 		// and `prompt()` already opens with `await this.start()` — waking a runtime at queue
 		// time would mean a restored chat with something waiting behind six other items holds
@@ -1476,6 +1569,10 @@ export class DeckAgent {
 	 * no way in mid-turn, so the work is queued, as `agent.queue` would, and the answer says so.
 	 */
 	deliver(item: QueuedWork): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
+		if (this.outside) {
+			const position = this.enqueue(item);
+			return { delivered: false, turn: "queued", position, note: `${this.identity.name} works in ${this.outside.client}, outside Decks, so Decks cannot start a turn for it: the message waits in its inbox and reaches it with its next call.` };
+		}
 		const text = this.host.brief(item.task, item.boards, item.person);
 		// The person's message is theirs, as if typed in the chat; an agent's says who it is from.
 		const sent = item.person ? text : `${item.fromName} sent you this, to act on now:\n\n${text}`;
@@ -1558,6 +1655,8 @@ export class DeckAgent {
 	}
 
 	private armDrain(): void {
+		// An outside agent takes its own mail (`takeNews`): there is no turn here to run it in.
+		if (this.outside) return;
 		// Work handed over waits behind what you queued yourself.
 		if (this.mine.length > 0 && !this.mineHeld) return;
 		if (this.drainTimer || this.work.length === 0 || this.state !== "idle") return;
@@ -2043,13 +2142,14 @@ export class DeckAgent {
 	 * one. `mode` is here rather than beside the model because nothing else announces it —
 	 * a runtime reports what it asks before acting when it starts, and that is a row change.
 	 */
-	private rowFacts(): Pick<AgentChat, "lastLine" | "lastAt" | "mode" | "dormant"> {
+	private rowFacts(): Pick<AgentChat, "lastLine" | "lastAt" | "mode" | "dormant" | "outside"> {
 		const last = this.translator.lastLine() ?? this.storedLast;
 		return {
 			...(last ? { lastLine: last.text.slice(0, PREVIEW_CHARS), lastAt: last.at } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
 			// Restored and untouched: readable, but nothing is running until it is prompted.
-			...(this.restored && !this.starting ? { dormant: true as const } : {}),
+			...(this.restored && !this.starting && !this.outside ? { dormant: true as const } : {}),
+			...(this.outside ? { outside: { client: this.outside.client, seen: this.outside.seen, waiting: this.work.length } } : {}),
 		};
 	}
 
