@@ -1,10 +1,5 @@
 {
-	"unheard": {
-		"file.created": {
-			"owner": "Folio",
-			"why": "Declared for a file made at a client's named request; nothing emits it yet."
-		}
-	},
+	"unheard": {},
 	"notDrivenHere": {
 		"file.compiled": {
 			"owner": "Quire",

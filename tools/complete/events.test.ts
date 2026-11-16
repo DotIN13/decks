@@ -24,6 +24,7 @@ const STEPS: Step[] = [
 	{ event: "agent.requested", run: (w) => w.server.call("agent.create", { name: "Made", kind: "claude" }) },
 	{ event: "agent.mailed", run: (w) => w.server.call("agent.send", { agent: "Made", task: "hi" }, w.agent) },
 	{ event: "agent.acted", run: (w) => w.server.call("item.insert", { item: { type: "note", content: "by an agent" }, canvas: CANVAS }, w.agent) },
+	{ event: "file.created", run: (w) => w.server.call("file.write", { path: "docs/new.md", text: "new" }, w.agent) },
 	{ event: "file.changed", run: async (w) => (await w.host.call("file.open", { path: "docs/probe.md", client: "complete" }), w.server.call("file.write", { path: "docs/probe.md", text: "changed" }, w.agent)) },
 	{ event: "view.changed", run: (w) => w.host.call("view.update", { canvas: CANVAS, selection: [] }) },
 	{ event: "view.requested", run: (w) => w.host.call("view.focus", { target: w.item, canvas: CANVAS }) },
