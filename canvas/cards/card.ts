@@ -28,7 +28,7 @@
  * view and the time in the frame, the canvas's own calls by the harness, an agent's by the app's
  * page, which asks you before anything is sent to one, and nothing that reaches past the canvas.
  */
-import { deckFiles } from "@decks/protocol";
+import { deckFiles, type AnyCall, type Answer, type Args, type byNoun } from "@decks/protocol";
 import { readingOfCard } from "./card-reading.ts";
 import { freshAddress, passless } from "../host/host.ts";
 
@@ -58,7 +58,7 @@ export interface CardContext {
 	store: Pick<Storage, "getItem" | "setItem" | "removeItem">;
 	/** Hear a change of the theme or the size. */
 	on(what: "theme" | "size", listener: () => void): void;
-	/** The SDK, as this card (`CardDecks`): `await card.decks.canvas.insert(item, { beside: card.path })`. */
+	/** The SDK, as this card (`CardDecks`): `await card.decks.item.insert({ item, beside: card.path })`. */
 	decks: CardDecks;
 	/** The card's deck path, as the canvas names it. */
 	path: string;
@@ -241,13 +241,19 @@ function cardContext(root: ShadowRoot, body: HTMLElement, source: CardSource, re
 }
 
 /**
- * The SDK as a card has it: every call by its group and name, `card.decks.canvas.read()`, answering a
- * promise of its value. A call the canvas does not let a card make rejects with why.
+ * The SDK as a card has it: the protocol's calls, each given one object, `card.decks.item.insert({ item,
+ * beside })`. Only this shape is typed; an old card's names and arguments still run, turned into the new
+ * call by the canvas (`protocol/compat`). A call a card may not make (`callsFor("card")`) rejects.
  */
-type CardDecks = { [group: string]: { [call: string]: (...args: unknown[]) => Promise<unknown> } } & {
+type CardDecks = { [N in keyof Nouns]: NounCalls<Nouns[N]> } & {
 	here(): Promise<unknown>;
 	now(): Promise<unknown>;
 };
+type Nouns = typeof byNoun;
+type VerbOf<C> = C extends { name: `${string}.${infer V}` } ? V : never;
+/** A call as a card makes it: one object of its arguments, answering its value. */
+type CardCall<C> = {} extends Args<C> ? (args?: Args<C>) => Promise<Answer<C>> : (args: Args<C>) => Promise<Answer<C>>;
+type NounCalls<M> = { [K in keyof M as M[K] extends AnyCall ? VerbOf<M[K]> : never]: CardCall<M[K]> };
 
 /** `card.decks`, its calls made by `call` with the dotted name: `decks.canvas.insert(…)` is `call("canvas.insert", […])`. */
 function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) | undefined): CardDecks {
