@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { layout, PICTURE_LADDER, Refused } from "../../protocol/index.ts";
+import { deckFiles, layout, PICTURE_LADDER, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type DeckPath, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { ASTC_TYPE, compress, encoder, LEVELS } from "./astc.ts";
 import type { PictureTools } from "./tools.ts";
@@ -90,15 +90,9 @@ export function cardPath(raw: string): DeckPath {
 	return toDeckPath(index);
 }
 
-/** The width a card asks for in its meta tag, else 1000. */
+/** The width a page asks for in its meta tag (a card's, or a page's from before cards), else 1000. */
 export function metaWidth(source: string): number {
-	const content = /<meta\s+name=["']card["']\s+content='(\{[^']*)'/i.exec(source)?.[1];
-	try {
-		const w = (JSON.parse(content ?? "{}") as { w?: unknown }).w;
-		return typeof w === "number" && w > 0 ? w : 1000;
-	} catch {
-		return 1000;
-	}
+	return deckFiles.cardMeta(source)?.w ?? 1000;
 }
 
 /** The rung for a width the canvas asks: a rung of its ladder exactly, else the next one up, never past the top. */

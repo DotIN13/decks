@@ -187,6 +187,13 @@ test("rule 11: a card's picture is taken once per version and rung", async () =>
 	await s.close();
 });
 
+test("rule 11: a page is drawn at the width its meta tag asks, whatever the tag is named, else 1000", async () => {
+	const { metaWidth } = await import("./picture.ts");
+	assert.equal(metaWidth(`<meta name="card" content='{"w":480}' /><p>x</p>`), 480);
+	assert.equal(metaWidth(`<meta name="page" content='{"w":1160,"h":700}'>`), 1160);
+	assert.equal(metaWidth("<p>no tag</p>"), 1000);
+});
+
 test("rule 11: a page from before cards, any other .html in the deck, is pictured too", async () => {
 	const fake = fakeBrowser({ h: 1, words: 1 });
 	const s = await start(fake.browser);
