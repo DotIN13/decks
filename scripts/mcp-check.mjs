@@ -186,7 +186,7 @@ try {
 } finally {
 	client?.stop();
 	server.kill("SIGKILL");
-	for (const dir of [data, home, dirname(project)]) rmSync(dir, { recursive: true, force: true });
+	for (const dir of [data, home, dirname(project)]) rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
 }
 const failed = results.filter((ok) => !ok).length;
 console.log(`${results.length - failed} of ${results.length} passed`);

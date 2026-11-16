@@ -1,5 +1,5 @@
 import type { PenDocument } from "@decks/pen";
-import type { ServerMessage } from "@decks/protocol";
+import type { DeckState, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { boardsOn, putOn, takeOff, type OnStage } from "../stage/canvas-ops.ts";
@@ -194,8 +194,32 @@ export class Seat {
 		return out;
 	}
 
+	/**
+	 * The deck as this seat sees it: every card, the ones on its canvas where the canvas has them and
+	 * at the size the canvas draws them.
+	 *
+	 * The canvas goes with the positions, and it is what the deck's fallback layout is measured
+	 * against: a card with no place of its own is put beside **the cards on this canvas**, not below
+	 * every card this seat was ever given a place for, which on a deck of 900 was a column a million
+	 * pixels tall. A card on a canvas file always has its place there, so nothing is written by
+	 * building this view; only a seat with no canvas file keeps the places it worked out, so a card
+	 * lands once and does not drift each time another is dragged.
+	 */
+	deckState(): DeckState {
+		const seeded: Array<{ path: string; x: number; y: number }> = [];
+		const state = this.of.deck.state(this.positions(), (path, at) => seeded.push({ path, ...at }), this.inPlay);
+		if (!this.canvasName()) for (const { path, x, y } of seeded) this.setPosition(path, x, y);
+		// The size the canvas draws each card at is its item's in the canvas file; a card the seat does not hold keeps its file's size.
+		const sizes = this.boardSizes();
+		const boards = state.boards.map((board) => {
+			const size = sizes[board.path];
+			return size && (size.w !== board.w || size.h !== board.h) ? { ...board, w: size.w, h: size.h } : board;
+		});
+		return { ...state, boards };
+	}
+
 	/** How big the stage draws its boards: its file's sizes. */
-	boardSizes(): Record<string, { w: number; h: number }> {
+	private boardSizes(): Record<string, { w: number; h: number }> {
 		const out: Record<string, { w: number; h: number }> = {};
 		for (const one of this.onCanvas()) out[one.path] = { w: one.w, h: one.h };
 		return out;

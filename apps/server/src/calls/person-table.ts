@@ -365,7 +365,13 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 
 		"harness.configure": async ([settings]) => {
 			const asked = (settings ?? {}) as { timezone?: string | null; sttModel?: string | null; requireCode?: boolean };
-			const problems = [asked.timezone !== undefined ? app.setTimezone(asked.timezone) : undefined, asked.sttModel !== undefined ? app.setSttModel(asked.sttModel) : undefined].filter((one): one is { error: string } => !!one);
+			// Each choice the store takes is told to every page; one it refuses is said back.
+			const set = (outcome: { error: string } | object): { error: string } | undefined => {
+				if ("error" in outcome) return outcome as { error: string };
+				app.send(app.settings.message());
+				return undefined;
+			};
+			const problems = [asked.timezone !== undefined ? set(app.settings.setTimezone(asked.timezone)) : undefined, asked.sttModel !== undefined ? set(app.settings.setSttModel(asked.sttModel)) : undefined].filter((one): one is { error: string } => !!one);
 			if (typeof asked.requireCode === "boolean") {
 				if (app.codes.forced && !asked.requireCode) problems.push({ error: "This harness was started with DECKS_REQUIRE_PAIR_CODE, so a code is always asked for." });
 				else app.codes.setRequired(asked.requireCode);

@@ -136,7 +136,7 @@ try {
 } finally {
 	await browser?.close().catch(() => {});
 	server.kill("SIGKILL");
-	rmSync(data, { recursive: true, force: true });
+	rmSync(data, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
 }
 const failed = results.filter((ok) => !ok).length;
 console.log(`${results.length - failed} of ${results.length} passed`);

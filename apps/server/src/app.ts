@@ -1,8 +1,7 @@
-import { sttReady } from "./stt.ts";
 import { titleCanvas } from "./stage/stage-admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
 import { closeOldShapes } from "./deck/old-shapes.ts";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
 import type { Page, ClientMessage, DeckState, RuntimeInfo, ServerMessage } from "@decks/protocol";
@@ -29,7 +28,7 @@ import { AccountList } from "./runtimes/claude/account-list.ts";
 import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
-import { watchDeck } from "./deck/watcher.ts";
+import { followDeck } from "./cards/follow.ts";
 import { Cameras } from "./deck/cameras.ts";
 import { Hub, type View } from "./connections/tab-socket.ts";
 import type { DeckAgent } from "./agents/session.ts";
@@ -43,27 +42,19 @@ import { gitSync } from "./docs/git.ts";
 import { GoogleDocs } from "./google/docs.ts";
 import { NativeShots } from "./stage/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
-import { documentItemPath } from "./docs/item-path.ts";
+import { documentsOnCanvas } from "./docs/on-canvas.ts";
+import { canvasListMessage } from "./stage/canvas-list.ts";
 import { Writers } from "./docs/writers.ts";
 import { canvasShowsApp, canvasShowsDocument } from "./calls/app-caller.ts";
 import { deckImportPaths } from "./cards/cards.ts";
 
 /**
- * How often the deck re-reads its boards from disk regardless of what the watcher said.
+ * The harness, put together: every part made and handed what it needs of the others, the deck
+ * opened and followed, and the pages told what changed.
  *
- * Slow enough that it is free (a walk and a `stat` per board), fast enough that a missed
- * event is a beat rather than a session.
- */
-
-const RESYNC_MS = 4000;
-
-/**
- * The open deck, the watcher on it, and the browsers looking at it.
- *
- * Deliberately thin: it holds no agent, no camera and no selection. Agents arrive
- * in M2 and get their own registry; the camera belongs to the browser that is
- * looking; the selection belongs to the frame. What lives here is what is true
- * for everyone — which board files exist and where they sit.
+ * It holds no logic of its own that a part could own. What an agent is lives in `agents/`, a canvas
+ * in `stage/`, a call in `calls/`, the ways in under `connections/`; here they are wired, started
+ * and stopped.
  */
 export class App {
 	deck: Deck;
@@ -148,8 +139,6 @@ export class App {
 	/** The browser whose frame is being handled right now, if any — see `handle`. */
 	viewing: View | undefined;
 	private unwatch: (() => void) | undefined;
-	/** The safety net under the watcher — see `watch()`. */
-	private resyncTimer: NodeJS.Timeout | undefined;
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
 	/** What an agent asked the pages to do to a canvas, waiting on their answers (`stage/page-calls.ts`). */
@@ -472,7 +461,7 @@ export class App {
 
 	attach(hub: Hub): void {
 		this.hub = hub;
-		this.watch();
+		this.follow();
 		/*
 		 * The deck's own chat list first, then one agent only if it had none.
 		 *
@@ -492,96 +481,19 @@ export class App {
 		this.claudeAccounts.sweepAgents(this.agents.all().map((agent) => agent.id));
 	}
 
-	private watch(): void {
+	/** Follow the open deck's files (`cards/follow.ts`), and start reading the accounts' limits. */
+	private follow(): void {
 		this.unwatch?.();
-		this.unwatch = watchDeck(this.deck.path, (change) => {
-			if (change.kind === "rescan") {
-				// A rename went past, or the watcher was replaced. Either way what we
-				// were told is no longer trustworthy, so ask the disk.
-				this.resyncBoards();
-				return;
-			}
-			if (change.kind === "deck") {
-				/*
-				 * A hand edit, always: **the app never writes `deck.json`** any more, so there is no echo of
-				 * its own to tell apart from somebody's. A place belongs to a stage and a size belongs to the
-				 * board's file, so the only things left in here — the name, the roots, and an older build's
-				 * arrangement — are the user's to change.
-				 */
-				this.deck.reload();
-				this.boards.restamp();
-				this.send({ type: "deck.changed", deck: this.stageState() });
-				return;
-			}
-			if (change.kind === "board") {
-				const board = this.deck.refresh(change.path);
-				// Whoever wrote it — the agent, an editor, a shell redirect — this is the
-				// moment the new version exists, so this is where it is recorded.
-				if (board) {
-					try {
-						this.boards.recordRevision(change.path);
-						// Whoever was holding this board with a write or edit tool is done, and the diff says what changed.
-						this.acts.landed(change.path, this.stage.read(change.path));
-					} catch {
-						/* the file went away between the event and the read */
-					}
-				}
-				// A board that is gone must leave every agent's context with it, or the
-				// dead path silently empties the rail and the canvas (DeckAgent.forget).
-				if (!board) {
-					this.agents.boardRemoved(change.path);
-					this.boards.forgetBoard(change.path);
-				}
-				this.send(
-					board
-						? { type: "card.changed", path: change.path, rev: board.rev, card: this.placed(board) }
-						: { type: "card.changed", path: change.path, rev: 0, removed: true },
-				);
-				return;
-			}
-			// An asset under the deck moved. A board may be showing it, and the frame
-			// has no way to know, so every board reloads — cheap, and rare.
-			this.send({ type: "deck.changed", deck: this.stageState() });
+		this.unwatch = followDeck({
+			deck: () => this.deck,
+			boards: this.boards,
+			send: (message) => this.send(message),
+			state: () => this.stageState(),
+			placed: (card) => this.placed(card),
+			landed: (path) => this.acts.landed(path, this.stage.read(path)),
+			gone: (path) => this.agents.boardRemoved(path),
 		});
-
-		/*
-		 * And a slow reading of the disk under all of it.
-		 *
-		 * The watcher is a promise the operating system does not quite make: events are
-		 * dropped under load, a recursive arm can end up pointed at a replaced inode, and
-		 * a deck on a network filesystem may produce nothing at all. None of that is
-		 * recoverable from the inside, and the failure is silent — the canvas simply stops
-		 * agreeing with the files.
-		 *
-		 * So every few seconds the deck stats its boards and reports what actually moved.
-		 * It costs a directory walk and one `stat` per board, it reads nothing that has
-		 * not changed, and it says nothing when nothing has. `unref` so it never holds a
-		 * process open, which matters for the tests and for a headless run.
-		 */
-		clearInterval(this.resyncTimer);
-		this.resyncTimer = setInterval(() => this.resyncBoards(), RESYNC_MS);
-		this.resyncTimer.unref?.();
 		this.accountList.startLimits();
-	}
-
-	/**
-	 * Re-read the boards directory and tell everyone what moved.
-	 *
-	 * The same two messages the watcher's own branch sends, from the same place, so a
-	 * board that arrives this way is indistinguishable from one the watcher caught.
-	 */
-	private resyncBoards(): void {
-		const { changed, removed } = this.deck.resync();
-		for (const board of changed) {
-			this.boards.recordRevision(board.path);
-			this.send({ type: "card.changed", path: board.path, rev: board.rev, card: this.placed(board) });
-		}
-		for (const path of removed) {
-			// A dead path left in a context silently empties the rail and the canvas.
-			this.agents.boardRemoved(path);
-			this.boards.forgetBoard(path);
-			this.send({ type: "card.changed", path, rev: 0, removed: true });
-		}
 	}
 
 	/**
@@ -650,7 +562,7 @@ export class App {
 		// Which stages exist: the manager's list, and the name the pill shows beside the agent.
 		reply(this.stagesMessage());
 		reply({ type: "web.changed", status: this.web.status(), code: this.web.code() });
-		reply(this.settingsMessage());
+		reply(this.settings.message());
 		reply(this.pairingMessage());
 	}
 
@@ -659,26 +571,6 @@ export class App {
 		// The code itself never goes to a browser: it is made and shown only by decks pair code.
 		const studio = studioLink(this.deck.path);
 		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio } : {}) };
-	}
-
-	settingsMessage(): ServerMessage {
-		return { type: "harness.settings", settings: this.settings.get(), machineZone: this.settings.machineZone(), sttKey: sttReady() };
-	}
-
-	/** Choose the server recogniser's model; every browser hears it. */
-	setSttModel(model: string | null): { error: string } | undefined {
-		const outcome = this.settings.setSttModel(model);
-		if ("error" in outcome) return outcome;
-		this.send(this.settingsMessage());
-		return undefined;
-	}
-
-	/** Choose the deck's timezone. The clock moves at once, and every browser hears it. */
-	setTimezone(zone: string | null): { error: string } | undefined {
-		const outcome = this.settings.setTimezone(zone);
-		if ("error" in outcome) return outcome;
-		this.send(this.settingsMessage());
-		return undefined;
 	}
 
 	/**
@@ -711,58 +603,23 @@ export class App {
 		 */
 		this.claudeAccounts.sweepAgents(this.agents.all().map((agent) => agent.id));
 		});
-		this.watch();
+		this.follow();
 		this.send({ type: "deck.changed", deck: this.stageState() });
 		for (const warning of this.deck.warnings) this.send({ type: "harness.notice", level: "warn", text: warning });
 	}
 
 	/**
-	 * The deck as the focused stage sees it, with the places it had to work out written down on it.
+	 * The deck as the conversation on screen sees it (`Seat.deckState`), or as one agent does.
 	 *
-	 * **Every outbound board list goes through this**, including the ones `boards/service.ts` sends,
-	 * because `Deck.state()` on its own is the auto-layout and not the arrangement the conversation is
-	 * looking at. It is one function rather than a rule repeated at six call sites: the failure mode of
-	 * the rule is a board jumping to the origin on somebody else's write, which is easy to miss and
-	 * hard to attribute.
-	 *
-	 * The seeding half matters as much as the reading half. `Deck.arrange` places a board the stage has
-	 * not placed beside the frontier *as it is at that moment*, so leaving the result unrecorded means
-	 * a board drifts every time a different one is dragged down. Writing the computed place onto the
-	 * stage is what makes a board land once — `setPosition` is the debounced write the rest of the
-	 * stage state already uses, so this is not a write per send.
-	 *
-	 * **It never creates an agent.** `Registry.focused()` mints one on demand for a deck nobody has
-	 * spoken to, which is right for a prompt and wrong here: this is called from broadcast paths, and a
-	 * `card.changed` must not start a runtime as a side effect of being sent. No stage means the
-	 * deck's own auto-layout, which is what a deck with nobody looking at it has anyway.
+	 * **Every outbound card list goes through this**, because `Deck.state()` on its own is the
+	 * auto-layout and not the arrangement the conversation is looking at. **It never creates an
+	 * agent**: `Registry.focused()` makes one on demand, which is right for a prompt and wrong here,
+	 * since this is called from broadcast paths and a `card.changed` must not start a runtime as a side
+	 * effect of being sent. No agent means the deck's own layout, which is what a deck with nobody
+	 * looking at it has anyway.
 	 */
 	stageState(asked?: DeckAgent): DeckState {
-		const agent = asked ?? this.agents.looking();
-		if (!agent) return this.deck.state();
-		const seeded: Array<{ path: string; x: number; y: number }> = [];
-		/*
-		 * The canvas goes with the positions, and it is what the auto-layout is measured against: a
-		 * board with no place of its own is put beside **the boards on this canvas**, not below every
-		 * board this stage has ever been given a place for. The second is what the deck-wide layout
-		 * did, and on a deck of 900 boards it is a column a million pixels tall with three boards
-		 * visible anywhere in it.
-		 */
-		const state = this.deck.state(agent.seat.positions(), (path, at) => seeded.push({ path, ...at }), agent.seat.inPlay);
-		/*
-		 * A board on a canvas file always has its place there, so nothing is seeded and building a view
-		 * never writes the file. Only a session with no canvas file keeps the places it worked out.
-		 */
-		if (!agent.seat.canvasName()) for (const { path, x, y } of seeded) agent.seat.setPosition(path, x, y);
-		/*
-		 * And the size the stage draws each board at, which is its item's in the stage file: the one
-		 * record of it (`DeckAgent.setSize`). A board the stage does not hold keeps its file's size.
-		 */
-		const sizes = agent.seat.boardSizes();
-		const boards = state.boards.map((board) => {
-			const size = sizes[board.path];
-			return size && (size.w !== board.w || size.h !== board.h) ? { ...board, w: size.w, h: size.h } : board;
-		});
-		return { ...state, boards };
+		return (asked ?? this.agents.looking())?.seat.deckState() ?? this.deck.state();
 	}
 
 	/** What a board frame acts on: the stage of the conversation this browser is in. */
@@ -814,40 +671,9 @@ export class App {
 		for (const listener of this.listeners) listener(message);
 	}
 
-	/**
-	 * The files the document items on a canvas name (`decks.document`), each as the deck names it and as
-	 * the document service keys it: the only files a canvas frame may open (`connections/routes/v1.ts`, `connections/line.ts`).
-	 */
+	/** The files a canvas's document items name, as the document service keys them (`docs/on-canvas.ts`). */
 	documentsOn(canvas: string): Map<string, string> {
-		const out = new Map<string, string>();
-		let doc: { children?: unknown[] } | undefined;
-		try {
-			doc = this.pens.get(canvas).doc as { children?: unknown[] };
-		} catch {
-			return out;
-		}
-		const walk = (nodes: unknown[] | undefined) => {
-			for (const node of nodes ?? []) {
-				const item = node as { type?: string; metadata?: { type?: string; path?: unknown }; children?: unknown[] };
-				if (item.type === "browser" && item.metadata?.type === "decks.document" && typeof item.metadata.path === "string" && item.metadata.path) {
-					// The path as written on the item, and the file it means as the deck names it (an older item may name it from the canvas's folder): either opens the same file.
-					const given = item.metadata.path;
-					const { path } = documentItemPath(this.deck.path, canvas, given);
-					let key = path;
-					try {
-						key = resolveDoc(this.deck.roots, path).key;
-					} catch {
-						/* a file that does not resolve opens nothing */
-					}
-					out.set(given, key);
-					out.set(path, key);
-					out.set(key, key);
-				}
-				walk(item.children);
-			}
-		};
-		walk(doc?.children);
-		return out;
+		return documentsOnCanvas(this.pens, this.deck, canvas);
 	}
 
 	listen(listener: (message: ServerMessage) => void): () => void {
@@ -905,41 +731,9 @@ export class App {
 		this.publishStages();
 	}
 
-	/**
-	 * Every stage in the deck, and who is on it: the manager's whole list (`protocol/StageRow`).
-	 *
-	 * Built from two records that already exist — the folders under `canvases/`, and each session's
-	 * own stage field — because a stage nobody has open is still a stage, and an agent with a stage
-	 * that has never been drawn on still has one. A server with no stage files answers with nothing,
-	 * and the manager draws nothing rather than an empty room.
-	 */
+	/** Every canvas and who is on it, for the pages' list (`stage/canvas-list.ts`). */
 	stagesMessage(): ServerMessage {
-		const pens = this.pens;
-		const everyone = this.agents?.all() ?? [];
-		const stages = pens.names().map((name) => {
-			const { boards, rev, words } = pens.summary(name);
-			let changedAt: number | undefined;
-			try {
-				changedAt = Math.round(statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : pens.folderOf(name)).mtimeMs);
-			} catch {
-				/* gone between the listing and the look */
-			}
-			const shared = pens.sharing(name);
-			return {
-				name,
-				title: pens.titleOf(name),
-				...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role } } : !pens.yoursAlone(name) ? { othersEdit: true as const } : {}),
-				...(changedAt ? { changedAt } : {}),
-				boards,
-				rev,
-				words,
-				...(pens.formerly(name).length ? { formerly: pens.formerly(name) } : {}),
-				agents: everyone
-					.filter((agent) => agent.seat.stageName() === name)
-					.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),
-			};
-		});
-		return { type: "canvas.list", stages };
+		return canvasListMessage(this.pens, this.agents?.all() ?? []);
 	}
 
 	publishStages(): void {
@@ -957,8 +751,6 @@ export class App {
 		closeOldShapes(this.deck.path);
 		this.unwatch?.();
 		this.unwatch = undefined;
-		clearInterval(this.resyncTimer);
-		this.resyncTimer = undefined;
 		this.accountList.dispose();
 		this.web.dispose();
 		this.thumbs.dispose();

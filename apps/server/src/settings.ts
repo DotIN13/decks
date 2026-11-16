@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { STT_MODELS, type DeckSettings } from "@decks/protocol";
+import { STT_MODELS, type DeckSettings, type ServerMessage } from "@decks/protocol";
 import { isZone, processZone } from "./lib/clock.ts";
+import { sttReady } from "./stt.ts";
 
 /**
  * What the person has set for the whole deck, kept by the server: today, their timezone.
@@ -47,6 +48,11 @@ export class SettingsStore {
 	/** The zone in force: the deck's, else the machine's. */
 	zone(): string {
 		return this.settings.timezone ?? MACHINE_ZONE;
+	}
+
+	/** The settings as every page is sent them: on connect, and whenever one changes. */
+	message(): ServerMessage {
+		return { type: "harness.settings", settings: this.get(), machineZone: this.machineZone(), sttKey: sttReady() };
 	}
 
 	/** Choose a zone, or `null` to go back to the machine's. Returns a sentence when it is not one. */
