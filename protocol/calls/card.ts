@@ -26,7 +26,7 @@ export const get = defineCall({
 export const create = defineCall({
 	name: "card.create",
 	summary: "Write a blank card in a canvas's cards/: a folder named from the title. Placing it is item.insert.",
-	who: NOT_CARD,
+	who: ANYONE,
 	args: { title: str("The finding, as a sentence."), w: opt(num()), h: opt(num()), ...onCanvas },
 	answer: Card,
 	effect: "change",

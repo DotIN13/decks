@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CALL_BY_NAME } from "../calls/index.ts";
+import { CALL_BY_NAME, callsFor } from "../calls/index.ts";
 import { answerBack, cardCall, DROPPED, isOld, keyed, OLD_CALLS, turn, withEdit } from "./old-calls.ts";
 
 // An old call becomes its new one; a card's call is old or new by its arguments' shape, and a card
@@ -73,5 +73,35 @@ test("a card may queue, read its agent and inbox, and send the person's screen t
 	assert.equal(ok(cardCall("agent.inbox", [], "mine")).name, "agent.inbox");
 	assert.equal(ok(cardCall("view.goto", ["other"], "mine")).name, "view.goto");
 	assert.ok("refusal" in cardCall("agent.create", ["x"], "mine"));
+});
+
+/** Every call a card could make before the rewrite: packages/api/src/verbs.ts at rewrite-stop-3, its card column. */
+const CARD_CALLS_BEFORE = [
+	"canvas.read", "canvas.space", "canvas.insert", "canvas.update", "canvas.replace", "canvas.delete", "canvas.move", "canvas.copy",
+	"canvas.clip", "canvas.paste", "canvas.variables", "canvas.batch", "canvas.step", "canvas.fit", "canvas.save", "canvas.screenshot",
+	"canvas.export", "canvas.rename", "card.create", "card.get", "card.canvases", "card.url", "frame.create", "file.url", "agent.me",
+	"here", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create", "view.goto", "view.focus",
+	"view.camera", "view.move", "view.viewport", "view.cursor", "view.reload", "now",
+];
+
+test("a card may make exactly the calls it could before, by their new names, but agent.create", () => {
+	const now = new Map(OLD_CALLS.map(([old, , name]) => [old, name]));
+	const before = new Set(CARD_CALLS_BEFORE.map((old) => now.get(old) ?? old));
+	before.add("item.get"); // canvas.read with of, one item and what is in it
+	const card = callsFor("card");
+	assert.deepEqual([...before].filter((name) => !card.has(name)), ["agent.create"]);
+	assert.deepEqual([...card].filter((name) => !before.has(name)), []);
+});
+
+test("the shape the card called in decides, not its arguments, and an old card gets its old answer", () => {
+	const move = cardCall("view.move", [{ x: 1, y: 2, zoom: 1 }], "mine", "old") as { name: string; back: (v: unknown) => Record<string, unknown> };
+	const view = { canvas: "mine", camera: { x: 1, y: 2, zoom: 1 }, moved: true };
+	assert.deepEqual(move.back(view), { ...view, x: 1, y: 2, zoom: 1 });
+	const focus = cardCall("view.focus", ["n1"], "mine", "old") as { back: (v: unknown) => Record<string, unknown> };
+	assert.equal(focus.back({ canvas: "mine" }).target, "n1");
+	const reload = cardCall("view.reload", [{}], "mine", "old") as { back: (v: unknown) => unknown };
+	assert.deepEqual(reload.back(1), { reloaded: 1 });
+	const fresh = cardCall("view.reload", {}, "mine", "new") as { back: (v: unknown) => unknown };
+	assert.equal(fresh.back(1), 1);
 });
 

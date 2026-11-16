@@ -19,7 +19,7 @@ export const list = defineCall({
 export const get = defineCall({
 	name: "canvas.get",
 	summary: "One canvas: its title, file, revision, variables and whether a step can be undone.",
-	who: ANYONE,
+	who: NOT_CARD,
 	args: { ...onCanvas },
 	answer: Canvas,
 	effect: "read",
@@ -28,7 +28,7 @@ export const get = defineCall({
 export const drawing = defineCall({
 	name: "canvas.drawing",
 	summary: "The canvas's pen document as its file holds it, with the revision it is at and the address its relative paths are read against. For the canvas frame, which edits pen's own nodes; everyone else reads item.list.",
-	who: ["person", "app", "card"],
+	who: ["person", "app"],
 	args: { ...onCanvas },
 	answer: obj({ doc: rec(any()), rev: int("The revision the document is at: item.changed's base for the next change."), base: str("The address the document's relative paths (pictures, card folders) are read against.") }),
 	effect: "read",
@@ -55,7 +55,7 @@ export const create = defineCall({
 export const update = defineCall({
 	name: "canvas.update",
 	summary: "Change what the person calls a canvas. Its folder never changes.",
-	who: PEOPLE,
+	who: ["person", "agent", "card"],
 	args: { title: str(), ...onCanvas },
 	answer: Canvas,
 	effect: "change",
@@ -92,7 +92,7 @@ export const undo = defineCall({
 export const screenshot = defineCall({
 	name: "canvas.screenshot",
 	summary: "A picture of the canvas or part of it (of: ids, a card's path, or a box), drawing and cards together.",
-	who: NOT_CARD,
+	who: ANYONE,
 	args: {
 		of: opt(union(str(), arr(str()), BoxChange)),
 		scale: opt(num()),
@@ -109,7 +109,7 @@ export const screenshot = defineCall({
 export const exportPage = defineCall({
 	name: "canvas.export",
 	summary: "Items as one self-contained web page in the deck, inline styles or Tailwind classes.",
-	who: NOT_CARD,
+	who: ANYONE,
 	args: { of: union(str(), arr(str())), format: opt(lit("html", "tailwind")), to: opt(str()), ...onItems },
 	answer: File,
 	effect: "change",

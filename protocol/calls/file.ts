@@ -30,7 +30,7 @@ export const find = defineCall({
 export const read = defineCall({
 	name: "file.read",
 	summary: "A text file's words, with its revision for a later write; from and lines read part of it, sha a past version. The deck only: never a folder outside it, an app's source included.",
-	who: ANYONE,
+	who: NOT_CARD,
 	args: { path: Path, from: opt(int()), lines: opt(int()), sha: opt(str()) },
 	answer: FileText,
 	effect: "read",
@@ -95,8 +95,8 @@ export const url = defineCall({
 
 const Client = str("The page's own id, so its typing is not echoed back.");
 
-export const open = defineCall({ name: "file.open", summary: "Join a page to a document: its words, revision and the edits waiting for review. The deck only: never a folder outside it, an app's source included.", who: ANYONE, args: { path: Path, client: Client }, answer: DocState, effect: "read" });
-export const close = defineCall({ name: "file.close", summary: "The page leaves the document. The deck only: never a folder outside it, an app's source included.", who: ANYONE, args: { path: Path, client: Client }, answer: DocState, effect: "read" });
+export const open = defineCall({ name: "file.open", summary: "Join a page to a document: its words, revision and the edits waiting for review. The deck only: never a folder outside it, an app's source included.", who: NOT_CARD, args: { path: Path, client: Client }, answer: DocState, effect: "read" });
+export const close = defineCall({ name: "file.close", summary: "The page leaves the document. The deck only: never a folder outside it, an app's source included.", who: NOT_CARD, args: { path: Path, client: Client }, answer: DocState, effect: "read" });
 
 export const splice = defineCall({
 	name: "file.splice",
@@ -116,7 +116,7 @@ export const review = defineCall({
 	effect: "change",
 });
 
-export const versions = defineCall({ name: "file.versions", summary: "A document's kept versions, newest first. The deck only: never a folder outside it, an app's source included.", who: ANYONE, args: { path: Path }, answer: arr(Version), effect: "read" });
+export const versions = defineCall({ name: "file.versions", summary: "A document's kept versions, newest first. The deck only: never a folder outside it, an app's source included.", who: NOT_CARD, args: { path: Path }, answer: arr(Version), effect: "read" });
 export const restore = defineCall({ name: "file.restore", summary: "Put a document back as it was at a version; the restore is itself a version. The deck only: never a folder outside it, an app's source included.", who: NOT_CARD, args: { path: Path, sha: str() }, answer: File, effect: "change" });
 
 // A document's LaTeX and its git repository.

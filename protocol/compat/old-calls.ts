@@ -16,19 +16,19 @@ const isObject = (value: unknown): value is Args => typeof value === "object" &&
 // A card's call, old or new.
 
 /**
- * A card's call as the new call it means, by its arguments' shape: a list is an old call; one object
- * the new call when its schema takes it, else the old one (an old canvas.delete acts on an item).
- * Only calls a card may make pass, and with here (the card's canvas), only on it.
+ * A card's call as the new call it means. used, the shape the card called in (the frame knows it),
+ * decides; without it, a list is old and one object new when its schema takes it. Only calls a card
+ * may make pass, and with here (the card's canvas), only on it; an old canvas.delete acts on an item.
  */
-export function cardCall(name: string, raw: unknown, here?: string): { name: string; args: Args; back: (value: unknown) => unknown } | { refusal: Refusal } {
+export function cardCall(name: string, raw: unknown, here?: string, used?: "old" | "new"): { name: string; args: Args; back: (value: unknown) => unknown } | { refusal: Refusal } {
 	const call = CALL_BY_NAME.get(name);
-	const fresh = call && isObject(raw) && check(call.input, raw).length === 0;
-	const turned: Turned = fresh ? { name, args: raw as Args, old: [name, "agents", name, []] } : turn(name, raw);
+	const fresh = used ? used === "new" && !!call : !!call && isObject(raw) && check(call.input, raw).length === 0;
+	const turned: Turned = fresh ? { name, args: isObject(raw) ? raw : {}, old: [name, "agents", name, []] } : turn(name, raw);
 	if ("refusal" in turned) return turned;
 	if (!mayCall(CALL_BY_NAME.get(turned.name), "card")) return { refusal: { code: "refused", message: `A card may not call ${turned.name}.` } };
 	const canvas = turned.args.canvas;
 	if (here !== undefined && canvas !== undefined && canvas !== here && !CANVAS_IS_THE_THING.has(turned.name)) return { refusal: { code: "refused", message: `A card acts on its own canvas, ${here}, not ${String(canvas)}.` } };
-	return { name: turned.name, args: turned.args, back: (value) => (fresh ? value : answerBack(name, value)) };
+	return { name: turned.name, args: turned.args, back: (value) => (fresh ? value : answerBack(name, value, turned.args)) };
 }
 
 /** Calls whose canvas is where they go, not an option: a card may name another canvas there. */
@@ -121,13 +121,16 @@ export function withEdit(turned: { name: string; args: Args }, edit: unknown): {
 // The answer back, in the shape the old call gave it.
 
 /** A new answer as the old call expected it, where its shape changed. */
-export function answerBack(old: string, value: unknown): unknown {
+export function answerBack(old: string, value: unknown, args: Args = {}): unknown {
 	if (old === "canvas.read" && Array.isArray(value)) return { items: value };
 	if (old === "canvas.read" && isObject(value)) return { items: [value] };
 	if (old === "canvas.space" && isObject(value) && typeof value.x === "number") return { x1: value.x, y1: value.y };
 	if (old === "canvas.step" && isObject(value)) return { undo: Boolean(value.undo), redo: Boolean(value.redo) };
 	// view.reload answered { reloaded }; view.camera the Camera itself; view.viewport the screen's { width, height }.
 	if (old === "view.reload" && typeof value === "number") return { reloaded: value };
+	// view.move answered the Camera and view.focus { canvas, target }: the View with those fields too.
+	if (old === "view.move" && isObject(value) && isObject(value.camera)) return { ...value, ...value.camera };
+	if (old === "view.focus" && isObject(value)) return { ...value, target: args.target };
 	if (old === "view.camera" && isObject(value) && "camera" in value) return value.camera;
 	if (old === "view.viewport" && isObject(value)) {
 		const screen = value.screen as { w?: number; h?: number } | undefined;

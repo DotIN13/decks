@@ -22,7 +22,11 @@ The rest of `protocol/`, nothing outside it.
    `canvas.update` acts on an item and never on a canvas.
 3. A card makes only the calls a card may (`who` includes `card`), and with its canvas given, only on
    it, whichever shape it uses.
-4. The retired words live here as old names only; nothing outside a `compat` folder uses them.
+4. Where an old and a new call take the same arguments, a card's answer carries both shapes' fields
+   (view.move adds x, y, zoom; view.focus adds target); where the two answers cannot be one
+   (view.reload), a card gets the old answer ({ reloaded: n }), so the card docs stay true. The shape
+   the card called in decides which it is, not its arguments.
+5. The retired words live here as old names only; nothing outside a `compat` folder uses them.
 
 ## Check
 
