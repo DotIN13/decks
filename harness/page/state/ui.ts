@@ -6,7 +6,7 @@ import { call } from "./line.ts";
 /**
  * What the browser is showing that the server has no opinion about.
  *
- * Layer 2: it imports `socket` (to ask for a usage report), and nothing imports it back. Everything here is *browser* state
+ * Layer 2: it imports `line` (to ask for a usage report), and nothing imports it back. Everything here is *browser* state
  * — which panel is open, which modal is up, what the composer was handed — as distinct from
  * `deck`, which is the server's view of the world. A reload is allowed to lose all of it.
  *

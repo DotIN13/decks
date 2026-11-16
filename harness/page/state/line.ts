@@ -21,6 +21,18 @@ const line = {
 	up: (_up: boolean) => {},
 };
 
+// Opening the line
+/** Open the line: a client, then the event stream, reopened when it drops. `onUp` runs each time it comes up. */
+export async function start(onUp: (up: boolean) => void): Promise<Client> {
+	const { url, token, compat } = await findServer();
+	line.client = clientFor(url, token);
+	if (compat && token) openOldLine(url, token);
+	line.up = onUp;
+	line.stopped = false;
+	listen();
+	return line.client;
+}
+
 /** The server and token the page calls with: /page.json, else ?token= in the address, kept for this tab. */
 export async function findServer(): Promise<{ url: string; token: string | undefined; compat?: boolean }> {
 	const fromAddress = new URLSearchParams(location.search).get("token");
@@ -35,17 +47,6 @@ export async function findServer(): Promise<{ url: string; token: string | undef
 		// No /page.json: the token from the address, below.
 	}
 	return { url: location.origin, token: sessionStorage.getItem("decks-token") ?? undefined };
-}
-
-/** Open the line: a client, then the event stream, reopened when it drops. `onUp` runs each time it comes up. */
-export async function start(onUp: (up: boolean) => void): Promise<Client> {
-	const { url, token, compat } = await findServer();
-	line.client = clientFor(url, token);
-	if (compat && token) openOldLine(url, token);
-	line.up = onUp;
-	line.stopped = false;
-	listen();
-	return line.client;
 }
 
 function listen(): void {
@@ -69,18 +70,6 @@ function listen(): void {
 	});
 }
 
-/** A call on this page's socket, for what is tied to this screen (view.move registers it). Never throws. */
-export async function callOnLine<T = unknown>(name: string, args: unknown = {}): Promise<Answer<T>> {
-	if (!line.socket) return call<T>(name, args);
-	try {
-		const answered = await line.socket.call(name, args);
-		return { ok: true, value: answered.value as T, notes: answered.notes };
-	} catch (error) {
-		const refusal = error instanceof DecksError ? error : undefined;
-		return { ok: false, error: (error as Error).message, code: refusal?.code ?? "unavailable", notes: refusal?.notes ?? [] };
-	}
-}
-
 function arrive(event: Heard): void {
 	line.arrived.push(event);
 	if (line.painting) return;
@@ -97,6 +86,7 @@ function arrive(event: Heard): void {
 	window.setTimeout(wave, 50);
 }
 
+// Hearing events by name
 /** Hear one event by name, or "*" for every one. Answers the stop. */
 export function on(name: string, hear: Hear): () => void {
 	const set = line.hearers.get(name) ?? new Set<Hear>();
@@ -114,6 +104,7 @@ export function watched(names: Iterable<string>): string[] | undefined {
 	return list.includes("*") ? undefined : list.sort();
 }
 
+// Calling
 const need = (): Client => {
 	if (!line.client) throw new Error("The line is not open yet: state/line.ts start() runs from the shell's mount.");
 	return line.client;
@@ -133,6 +124,19 @@ export async function call<T = unknown>(name: string, args: unknown = {}): Promi
 	}
 }
 
+/** A call on this page's socket, for what is tied to this screen (view.move registers it). Never throws. */
+export async function callOnLine<T = unknown>(name: string, args: unknown = {}): Promise<Answer<T>> {
+	if (!line.socket) return call<T>(name, args);
+	try {
+		const answered = await line.socket.call(name, args);
+		return { ok: true, value: answered.value as T, notes: answered.notes };
+	} catch (error) {
+		const refusal = error instanceof DecksError ? error : undefined;
+		return { ok: false, error: (error as Error).message, code: refusal?.code ?? "unavailable", notes: refusal?.notes ?? [] };
+	}
+}
+
+// Whether the line is open, and closing it
 /** Whether the line has been opened (not whether it is up). */
 export const started = (): boolean => line.client !== undefined;
 
@@ -147,6 +151,7 @@ export function stop(): void {
 	line.client = undefined;
 }
 
+// Failed calls, said as notices
 /** Where a failed call's words go: the shell gives it the notices. */
 const failures = { say: (_text: string) => {} };
 export function setFailureSink(say: (text: string) => void): void {

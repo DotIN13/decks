@@ -26,18 +26,6 @@ export async function act<T = unknown>(name: string, args: Record<string, unknow
 	return undefined;
 }
 
-type PenOp = { op: string; node?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; id?: string; [key: string]: unknown };
-
-/** pen.dev's own op form ({ op, node, box }) as an item op: its corner as at, its far corner as the node's size. */
-export function itemOp(op: PenOp): Record<string, unknown> {
-	if (op.op !== "insert" || !op.node) return op;
-	const { node, box, op: _op, ...rest } = op;
-	const at = box && box.x1 !== undefined && box.y1 !== undefined ? { at: { x: box.x1, y: box.y1 } } : {};
-	const w = box?.x1 !== undefined && box.x2 !== undefined ? { width: box.x2 - box.x1 } : {};
-	const h = box?.y1 !== undefined && box.y2 !== undefined ? { height: box.y2 - box.y1 } : {};
-	return { op: "insert", item: { ...node, ...w, ...h }, ...at, ...rest };
-}
-
 /** The editor in the frame, when one is up: the person's edits go through it so they undo there. */
 const frame = { editor: undefined as { agentId: () => string | undefined; edit(ops: unknown[]): void } | undefined };
 
@@ -51,4 +39,16 @@ export async function editDrawing(agentId: string, ops: unknown[]): Promise<void
 	const canvas = stageOf(agentId)?.name;
 	const done = await act("item.batch", { ops: (ops as PenOp[]).map(itemOp), ...(canvas ? { canvas } : {}) });
 	if (done === undefined) rewatch(canvas);
+}
+
+type PenOp = { op: string; node?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; id?: string; [key: string]: unknown };
+
+/** pen.dev's own op form ({ op, node, box }) as an item op: its corner as at, its far corner as the node's size. */
+export function itemOp(op: PenOp): Record<string, unknown> {
+	if (op.op !== "insert" || !op.node) return op;
+	const { node, box, op: _op, ...rest } = op;
+	const at = box && box.x1 !== undefined && box.y1 !== undefined ? { at: { x: box.x1, y: box.y1 } } : {};
+	const w = box?.x1 !== undefined && box.x2 !== undefined ? { width: box.x2 - box.x1 } : {};
+	const h = box?.y1 !== undefined && box.y2 !== undefined ? { height: box.y2 - box.y1 } : {};
+	return { op: "insert", item: { ...node, ...w, ...h }, ...at, ...rest };
 }

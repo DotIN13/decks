@@ -3,6 +3,7 @@ import { adoptComments, commentsKey, loadComments, saveComments, type CardCommen
 
 /**
  * Comments on boards: whether the one being written has words in it, and the ones waiting for the next message.
+ * Below them, what the canvas frame hands over (comments, pills, sketches), cleaned before it is used.
  *
  * Waiting comments are kept per agent and canvas, because a comment is said *to* somebody about
  * something: it was made on that agent's canvas and goes with the next thing sent to that agent

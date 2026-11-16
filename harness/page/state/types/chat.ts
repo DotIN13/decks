@@ -1,7 +1,5 @@
 import type { AgentChat, AgentKind, AgentMode, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
-/** An agent as the chat list draws it: its runtime, its identity, and what it can do. */
-
-
+/** What an agent's runtime offers a chat: the kinds, what each can run and do, and the thinking scale. */
 
 /**
  * The same four, as a value.

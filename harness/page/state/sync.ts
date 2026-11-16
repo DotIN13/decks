@@ -34,119 +34,7 @@ type Canvas = Parameters<typeof stageRowOf>[0];
 /** The latest answers the rows are made from; not drawn, so not reactive. */
 const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[], soon: undefined as ReturnType<typeof setTimeout> | undefined, focused: undefined as string | undefined };
 
-/** Rows told by today's socket messages (state/compat): an old agent list was the whole list, so it is drawn alone. */
-export function tellChats(chats: AgentChat[], hooks: SyncHooks): void {
-	held.told = chats;
-	drawAgents(hooks);
-}
-
-/** Change one row as today's socket said: the told copy too, so the next drawing keeps it. */
-export function amendChat(id: string, patch: Partial<AgentChat>): void {
-	held.told = held.told.map((one) => (one.id === id ? { ...one, ...patch } : one));
-	setState("chats", (chats) => chats.map((one) => (one.id === id ? { ...one, ...patch } : one)));
-}
-
-/** A ring when a face turns green or starts waiting: keyed on the change, so a reload rings nothing. */
-export function heardState(id: string, next: AgentState, hooks: SyncHooks): void {
-	const mine = scratch.of(id);
-	const was = mine.lastState;
-	mine.lastState = next;
-	if (finished(was, next)) hooks.raise("done", { title: `${nameOf(id)} finished`, tag: `done:${id}`, agent: id });
-	else if (startedAsking(was, next)) hooks.raise("ask", { title: `${nameOf(id)} is waiting for you`, tag: `ask:${id}`, agent: id });
-}
-
-/** Rebuild the agent rows from what is held, writing only what changed. */
-function drawAgents(hooks: SyncHooks): void {
-	const served = held.agents.map((agent) => chatOf(agent, held.extras[agent.id], cardsOn(held.cards, agent.canvas)));
-	const chats = held.told.length > 0 ? held.told : served;
-	setState("chats", reconcile(chats, { key: "id", merge: true }));
-	for (const chat of chats) {
-		ensureAgent(chat.id);
-		setState("identities", chat.id, reconcile(chat.identity));
-		setState("contexts", chat.id, chat.cards);
-		setState("agents", chat.id, "inPlay", chat.inPlay);
-		setState("agents", chat.id, "model", chat.model);
-		setState("agents", chat.id, "usage", chat.usage);
-		setState("agents", chat.id, "spending", chat.account);
-		heardState(chat.id, chat.state, hooks);
-	}
-	setStages(held.canvases.map((canvas) => stageRowOf(canvas, held.agents)));
-	if (!state.focused && chats[0]) setState("focused", firstFocus(chats.map((chat) => chat.id), held.focused));
-	if (!state.focused) releasePages();
-}
-
-/** What only the harness knows of one agent: its lines, usage, queue and questions. Quiet when no harness answers. */
-async function readExtra(id: string): Promise<void> {
-	const answer = await call<AgentExtra>("runtime.get", { agent: id });
-	if (!answer.ok) return;
-	held.extras[id] = answer.value;
-	if (answer.value.queued) setQueued(id, answer.value.queued);
-	const dialog = answer.value.dialogs?.[0] as { id: string } | undefined;
-	ensureAgent(id);
-	if (dialog) setState("agents", id, "dialog", dialog as never);
-}
-
-async function readAgents(hooks: SyncHooks): Promise<void> {
-	const answer = await call<Agent[]>("agent.list", {});
-	if (!answer.ok) return void notice("warn", answer.error);
-	held.agents = answer.value;
-	drawAgents(hooks);
-	await Promise.all(held.agents.map((agent) => readExtra(agent.id)));
-	drawAgents(hooks);
-}
-
-async function readCanvases(hooks: SyncHooks): Promise<void> {
-	const answer = await call<Canvas[]>("canvas.list", {});
-	if (answer.ok) held.canvases = answer.value;
-	drawAgents(hooks);
-}
-
-async function readCards(hooks: SyncHooks): Promise<void> {
-	const answer = await call<Card[]>("card.list", {});
-	if (!answer.ok) return;
-	held.cards = answer.value;
-	setState("pages", reconcile(held.cards.map(pageOf), { key: "path", merge: true }));
-	drawAgents(hooks);
-	hooks.landed();
-}
-
-async function readDeck(): Promise<void> {
-	const answer = await call<{ timezone?: string; warnings: string[] }>("deck.get", {});
-	if (!answer.ok) return;
-	if (answer.value.timezone) setTimeZone(answer.value.timezone);
-	setState("settings", "timezone" as never, answer.value.timezone as never);
-	for (const warning of answer.value.warnings) notice("warn", warning);
-}
-
-/** The agent the harness last had on screen, for a page that opens. */
-async function readFocus(): Promise<void> {
-	const answer = await call<{ focused?: string }>("runtime.get", {});
-	if (answer.ok && answer.value.focused) held.focused = answer.value.focused;
-}
-
-async function readRuntimes(): Promise<void> {
-	const answer = await call<Parameters<typeof runtimeOf>[0][]>("runtime.list", {});
-	if (answer.ok) setState("runtimes", answer.value.map(runtimeOf));
-}
-
-async function readAccounts(): Promise<void> {
-	const answer = await call<Array<{ id: string; label: string; active: boolean; spending?: string }>>("account.list", {});
-	if (!answer.ok) return;
-	const { accounts, active } = accountsOf(answer.value);
-	setState({ accounts: accounts as ClaudeAccount[], activeAccount: active });
-}
-
-async function readTab(): Promise<void> {
-	const answer = await call<{ paired: boolean; connected: boolean }>("tab.status", {});
-	if (answer.ok) setState("web", (was) => ({ status: answer.value as never, ...(was?.code ? { code: was.code } : {}) }));
-}
-
-/** Read the cards again soon: a run of edits is one read. */
-function cardsSoon(hooks: SyncHooks): void {
-	clearTimeout(held.soon);
-	held.soon = setTimeout(() => void readCards(hooks), 150);
-}
-
+// Reading everything, and hearing what changed
 /** Everything, read again: what the line coming up means. */
 export async function readAll(hooks: SyncHooks): Promise<void> {
 	await Promise.all([readDeck(), readRuntimes(), readAccounts(), readTab(), readFocus(), readCanvases(hooks)]);
@@ -200,4 +88,120 @@ function forget(id: string): void {
 	setState("agents", id, undefined);
 	setState("identities", id, undefined as never);
 	setState("contexts", id, undefined as never);
+}
+
+// The reads, one call each
+async function readDeck(): Promise<void> {
+	const answer = await call<{ timezone?: string; warnings: string[] }>("deck.get", {});
+	if (!answer.ok) return;
+	if (answer.value.timezone) setTimeZone(answer.value.timezone);
+	setState("settings", "timezone" as never, answer.value.timezone as never);
+	for (const warning of answer.value.warnings) notice("warn", warning);
+}
+
+/** The agent the harness last had on screen, for a page that opens. */
+async function readFocus(): Promise<void> {
+	const answer = await call<{ focused?: string }>("runtime.get", {});
+	if (answer.ok && answer.value.focused) held.focused = answer.value.focused;
+}
+
+async function readRuntimes(): Promise<void> {
+	const answer = await call<Parameters<typeof runtimeOf>[0][]>("runtime.list", {});
+	if (answer.ok) setState("runtimes", answer.value.map(runtimeOf));
+}
+
+async function readAccounts(): Promise<void> {
+	const answer = await call<Array<{ id: string; label: string; active: boolean; spending?: string }>>("account.list", {});
+	if (!answer.ok) return;
+	const { accounts, active } = accountsOf(answer.value);
+	setState({ accounts: accounts as ClaudeAccount[], activeAccount: active });
+}
+
+async function readTab(): Promise<void> {
+	const answer = await call<{ paired: boolean; connected: boolean }>("tab.status", {});
+	if (answer.ok) setState("web", (was) => ({ status: answer.value as never, ...(was?.code ? { code: was.code } : {}) }));
+}
+
+async function readCanvases(hooks: SyncHooks): Promise<void> {
+	const answer = await call<Canvas[]>("canvas.list", {});
+	if (answer.ok) held.canvases = answer.value;
+	drawAgents(hooks);
+}
+
+async function readCards(hooks: SyncHooks): Promise<void> {
+	const answer = await call<Card[]>("card.list", {});
+	if (!answer.ok) return;
+	held.cards = answer.value;
+	setState("pages", reconcile(held.cards.map(pageOf), { key: "path", merge: true }));
+	drawAgents(hooks);
+	hooks.landed();
+}
+
+/** Read the cards again soon: a run of edits is one read. */
+function cardsSoon(hooks: SyncHooks): void {
+	clearTimeout(held.soon);
+	held.soon = setTimeout(() => void readCards(hooks), 150);
+}
+
+async function readAgents(hooks: SyncHooks): Promise<void> {
+	const answer = await call<Agent[]>("agent.list", {});
+	if (!answer.ok) return void notice("warn", answer.error);
+	held.agents = answer.value;
+	drawAgents(hooks);
+	await Promise.all(held.agents.map((agent) => readExtra(agent.id)));
+	drawAgents(hooks);
+}
+
+/** What only the harness knows of one agent: its lines, usage, queue and questions. Quiet when no harness answers. */
+async function readExtra(id: string): Promise<void> {
+	const answer = await call<AgentExtra>("runtime.get", { agent: id });
+	if (!answer.ok) return;
+	held.extras[id] = answer.value;
+	if (answer.value.queued) setQueued(id, answer.value.queued);
+	const dialog = answer.value.dialogs?.[0] as { id: string } | undefined;
+	ensureAgent(id);
+	if (dialog) setState("agents", id, "dialog", dialog as never);
+}
+
+// Drawing the agent rows
+/** Rebuild the agent rows from what is held, writing only what changed. */
+function drawAgents(hooks: SyncHooks): void {
+	const served = held.agents.map((agent) => chatOf(agent, held.extras[agent.id], cardsOn(held.cards, agent.canvas)));
+	const chats = held.told.length > 0 ? held.told : served;
+	setState("chats", reconcile(chats, { key: "id", merge: true }));
+	for (const chat of chats) {
+		ensureAgent(chat.id);
+		setState("identities", chat.id, reconcile(chat.identity));
+		setState("contexts", chat.id, chat.cards);
+		setState("agents", chat.id, "inPlay", chat.inPlay);
+		setState("agents", chat.id, "model", chat.model);
+		setState("agents", chat.id, "usage", chat.usage);
+		setState("agents", chat.id, "spending", chat.account);
+		heardState(chat.id, chat.state, hooks);
+	}
+	setStages(held.canvases.map((canvas) => stageRowOf(canvas, held.agents)));
+	if (!state.focused && chats[0]) setState("focused", firstFocus(chats.map((chat) => chat.id), held.focused));
+	if (!state.focused) releasePages();
+}
+
+/** A ring when a face turns green or starts waiting: keyed on the change, so a reload rings nothing. */
+export function heardState(id: string, next: AgentState, hooks: SyncHooks): void {
+	const mine = scratch.of(id);
+	const was = mine.lastState;
+	mine.lastState = next;
+	if (finished(was, next)) hooks.raise("done", { title: `${nameOf(id)} finished`, tag: `done:${id}`, agent: id });
+	else if (startedAsking(was, next)) hooks.raise("ask", { title: `${nameOf(id)} is waiting for you`, tag: `ask:${id}`, agent: id });
+}
+
+// What today's socket messages tell (state/compat)
+/** Rows told by today's socket messages (state/compat): an old agent list was the whole list, so it is drawn alone. */
+export function tellChats(chats: AgentChat[], hooks: SyncHooks): void {
+	held.told = chats;
+	drawAgents(hooks);
+}
+
+/** Change one row as today's socket said: the told copy too, so the next drawing keeps it. */
+export function amendChat(id: string, patch: Partial<AgentChat>): void {
+	held.told = held.told.map((one) => (one.id === id ? { ...one, ...patch } : one));
+	setState("chats", (chats) => chats.map((one) => (one.id === id ? { ...one, ...patch } : one)));
 }
