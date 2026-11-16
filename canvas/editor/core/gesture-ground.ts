@@ -7,7 +7,7 @@ import type { EditorState, Offset } from "./model.ts";
 export const SETTLE_MS = 2000;
 /** How long a let-go radius is held for the drawing to have it. */
 export const RADIUS_HOLD_MS = 3000;
-/** How long a let-go board size is held for the board to be at it. */
+/** How long a let-go page size is held for the page to be at it. */
 export const PAGE_HOLD_MS = 4000;
 /** Two presses on one handle within this long, with no drag: the handle's double-click. */
 export const HANDLE_TAP_MS = 400;
