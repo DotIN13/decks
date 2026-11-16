@@ -3,8 +3,6 @@
 	"canvas/chrome/Callout.tsx: line shallower than its block": 2,
 	"canvas/documents/page.ts: line shallower than its block": 6,
 	"canvas/editor/editor.tsx: line shallower than its block": 4,
-	"canvas/host/inside/frame.tsx: line shallower than its block": 13,
-	"canvas/host/inside/options.ts: line shallower than its block": 9,
 	"canvas/input/canvas-input.ts: line shallower than its block": 4,
 	"canvas/input/pointer.ts: line shallower than its block": 7,
 	"canvas/items/item-slot.tsx: line shallower than its block": 2

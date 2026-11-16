@@ -68,26 +68,42 @@ export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView
 async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: FrameChromeView | undefined): Promise<() => void> {
 	const ctx = await openFrame(root, start, end, chrome);
 	return createRoot((disposeRoot) => {
-	installHost(ctx);
-	const cursors = presenceLayer(ctx);
-	let reread = () => {};
-	const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors));
-	const { handle } = editor;
-	ctx.setMade(editor);
-	ctx.changed();
-	setProbes(ctx, handle);
+		installHost(ctx);
+		const cursors = presenceLayer(ctx);
+		let reread = () => {};
+		const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors));
+		const { handle } = editor;
+		ctx.setMade(editor);
+		ctx.changed();
+		setProbes(ctx, handle);
 
-	reread = wireFrame(ctx).reread;
+		reread = wireFrame(ctx).reread;
 
 
-	if (chrome) {
-		// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
-		// Made inside the render's root, so its effects and its parts' onMount run (a float's grip, the pen's state).
-		const view = () => chromeView(ctx, handle, chrome);
+		if (chrome) {
+			// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
+			// Made inside the render's root, so its effects and its parts' onMount run (a float's grip, the pen's state).
+			const view = () => chromeView(ctx, handle, chrome);
+			const unrender = render(() => (
+				<>
+					{editor.surface()}
+					{view()}
+				</>
+			), root);
+			return () => {
+				unrender();
+				editor.dispose();
+				disposeRoot();
+			};
+		}
+
+		/*
+		 * No chrome of its own (Studio, until it brings one): the editor's own bars, or none. Nothing of the
+		 * tools crosses the frame line: an app's chrome lives in the frame beside the canvas.
+		 */
 		const unrender = render(() => (
 			<>
-				{editor.surface()}
-				{view()}
+				{start.look.toolbar ? editor.root() : editor.surface()}
 			</>
 		), root);
 		return () => {
@@ -95,22 +111,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			editor.dispose();
 			disposeRoot();
 		};
-	}
-
-	/*
-	 * No chrome of its own (Studio, until it brings one): the editor's own bars, or none. Nothing of the
-	 * tools crosses the frame line: an app's chrome lives in the frame beside the canvas.
-	 */
-	const unrender = render(() => (
-		<>
-			{start.look.toolbar ? editor.root() : editor.surface()}
-		</>
-	), root);
-	return () => {
-		unrender();
-		editor.dispose();
-		disposeRoot();
-	};
 	});
 }
 

@@ -295,34 +295,34 @@ const PICTURE_LOOK = 6;
 function sayOptions(ctx: FrameContext): Partial<Parameters<typeof createEditor>[0]> {
 	const { start, end, chrome } = ctx;
 	return {
-	onSelection: (ids) => {
-		end.emit("composer", { selection: { ids: [...ids] } });
-		ctx.presence?.selection(ids);
-	},
-	onSelect: (path) => {
-		end.emit("composer", { selection: { ids: [], ...(path ? { page: path } : {}) } });
-		// A card selected is its item on the drawing, for the others on the canvas. Said once the editor is made: the first selection comes while it is being made.
-		queueMicrotask(() => {
-			try {
-				const item = path ? ((ctx.handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path) : undefined;
-				ctx.presence?.selection(item?.id ? [item.id] : []);
-			} catch {
-				/* the editor is not made yet: nothing is selected for anyone to see */
-			}
-		});
-	},
-	onViewport: (viewport) => end.emit("viewport", viewport),
-	onRefer: (pills) => end.emit("composer", { pills }),
-	onComment: (target) => {
-		// The page draws the box when it can (`pageComments`): a Send now pressed there is yours, where one pressed in this frame could be a card's script.
-		if (chrome && !start.look.pageComments) return void ctx.setComment(target);
-		const at = rectOf(target.anchor());
-		end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}), ...(target.open ? { open: true } : {}) });
-	},
-	onExport: (ids, format) => end.emit("export", { ids, ...(format ? { format } : {}) }),
-	onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
-	// The agent on screen, the one the page's composer talks to, which the ink's Make a drawing, Make a card and Send go to.
-	inkAgent: () => { const id = ctx.agent(); return (id ? ctx.agents()[id]?.name : undefined) ?? ctx.busy().writer?.name; },
+		onSelection: (ids) => {
+			end.emit("composer", { selection: { ids: [...ids] } });
+			ctx.presence?.selection(ids);
+		},
+		onSelect: (path) => {
+			end.emit("composer", { selection: { ids: [], ...(path ? { page: path } : {}) } });
+			// A card selected is its item on the drawing, for the others on the canvas. Said once the editor is made: the first selection comes while it is being made.
+			queueMicrotask(() => {
+				try {
+					const item = path ? ((ctx.handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path) : undefined;
+					ctx.presence?.selection(item?.id ? [item.id] : []);
+				} catch {
+					/* the editor is not made yet: nothing is selected for anyone to see */
+				}
+			});
+		},
+		onViewport: (viewport) => end.emit("viewport", viewport),
+		onRefer: (pills) => end.emit("composer", { pills }),
+		onComment: (target) => {
+			// The page draws the box when it can (`pageComments`): a Send now pressed there is yours, where one pressed in this frame could be a card's script.
+			if (chrome && !start.look.pageComments) return void ctx.setComment(target);
+			const at = rectOf(target.anchor());
+			end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}), ...(target.open ? { open: true } : {}) });
+		},
+		onExport: (ids, format) => end.emit("export", { ids, ...(format ? { format } : {}) }),
+		onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
+		// The agent on screen, the one the page's composer talks to, which the ink's Make a drawing, Make a card and Send go to.
+		inkAgent: () => { const id = ctx.agent(); return (id ? ctx.agents()[id]?.name : undefined) ?? ctx.busy().writer?.name; },
 	};
 }
 
