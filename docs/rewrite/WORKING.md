@@ -154,3 +154,6 @@ recipe Loom wrote in `docs/rewrite/loom/` (ask Loom for the commands), and commi
 by name at once. In the main checkout, hold the baseline turn while you do it
 (`mkdir /tmp/decks-rewrite-baseline.lock` … `rmdir`), so two agents never have that file open together.
 The gates pass after every commit: "do not edit the baselines" was wrong for a split and is withdrawn.
+
+Never amend or rebase a commit that is already on `rewrite`: others have based work on it within seconds.
+Fix forward with a new commit.
