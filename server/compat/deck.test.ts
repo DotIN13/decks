@@ -36,6 +36,25 @@ test("an upload lands in the canvas's files/, never over another, and where find
 	await server.close();
 });
 
+test("a canvas pass uploads only into its own canvas's files: never assets/, never another canvas (Reader, 4)", async () => {
+	const deck = { "canvases/plan/canvas.pen": JSON.stringify({ version: "2.14", children: [] }), "canvases/other/canvas.pen": JSON.stringify({ version: "2.14", children: [] }) };
+	const server = await testServer({ features: features(), deck });
+	const doors = await server.listen(0);
+	try {
+		const asked = await fetch(`${doors.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${doors.token}`, "content-type": "application/json" }, body: JSON.stringify({ canvas: "plan" }) });
+		const { pass } = (await asked.json()) as { pass: string };
+		const up = (query: string) => fetch(`${doors.url}/api/upload?${query}`, { method: "POST", headers: { authorization: `Bearer ${pass}` }, body: new Uint8Array([1]) });
+		const none = await up(`name=importmap.json`);
+		assert.equal(none.status, 200);
+		assert.equal(((await none.json()) as { path: string }).path, "canvases/plan/files/importmap.json", "no canvas named: its own files, not assets/");
+		assert.equal((await up(`name=x.png&canvas=other`)).status, 403);
+		const climbed = await up(`name=${encodeURIComponent("../../assets/importmap.json")}&canvas=plan`);
+		assert.equal(((await climbed.json()) as { path: string }).path, "canvases/plan/files/importmap-2.json", "a name's folders are dropped");
+	} finally {
+		await doors.close();
+		await server.close();
+	}
+});
 
 test("pages carry a card's news as today's Page did", async () => {
 	const { pagesOf } = await import("./drawing.ts");

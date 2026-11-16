@@ -6,11 +6,25 @@ import type { Tokens } from "../kernel/index.ts";
 
 export const PASS_MS = 3_600_000;
 
-/** What the frame itself calls, beyond the card set: its presence, its answers to view calls, the cards it lists, its drawing. */
-export const FRAME_OWN: readonly string[] = ["view.update", "view.answer", "card.list", "canvas.drawing"];
+/**
+ * What the frame calls on its pass beyond the card set (pass-calls.test.ts fails on any other): its drawing,
+ * presence, view answers, the cards it lists and marks seen, and a placed document's calls, which compat's
+ * document line makes as the pass. guard.ts holds each path to the canvas, the shared roots or a placed document.
+ */
+export const FRAME_OWN: readonly string[] = [
+	"canvas.drawing", "view.update", "view.answer", "card.list", "card.seen",
+	"file.open", "file.close", "file.splice", "file.review", "file.versions", "file.read", "file.restore", "file.compile", "file.repo", "file.pull", "file.push",
+	"google.get", "google.style", "google.comment", "google.comments", "google.status",
+];
 
-/** Every call a pass may make: the card set and the frame's own (its Scope's calls). */
-export const PASS_CALLS: readonly string[] = [...new Set([...callsFor("card"), ...FRAME_OWN])].sort();
+/**
+ * Card calls the frame hands to the page instead, which asks the person first on their own token: a pass
+ * never makes them, so a card's script cannot skip the question by calling the socket itself (Reader, 5).
+ */
+const PAGE_ONLY = (name: string) => name.startsWith("agent.") || name === "view.goto";
+
+/** Every call a pass may make: the card set but the page's own, and the frame's own (its Scope's calls). */
+export const PASS_CALLS: readonly string[] = [...new Set([...[...callsFor("card")].filter((name) => !PAGE_ONLY(name)), ...FRAME_OWN])].sort();
 
 /** Whether a caller id is a canvas pass's: <asker id>~frame-<n>. */
 export const isPass = (id: string): boolean => /(^|~)frame-/.test(id);

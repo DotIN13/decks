@@ -4,12 +4,14 @@
 import { deckFiles, layout } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { isPass, type Passes } from "./passes.ts";
+import { inCanvas, inSharedRoot } from "./paths.ts";
 
 const PASS_ROOT = "/api/t/";
 
 const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value) });
 
-const allowed = (canvas: string, rest: string) => rest.startsWith(`${layout.canvasFolder(canvas)}/`) || ["assets/", "lib/", "docs/", "apps/"].some((root) => rest.startsWith(root));
+/** A pass's file: plain (no climb, nothing hidden), in its canvas's folder or a shared root (paths.ts). */
+const allowed = (canvas: string, rest: string) => inCanvas(canvas, rest) || inSharedRoot(rest);
 
 /** Where a pass's kind of file is read: a file through cards' /files/, a picture through /pictures/. */
 const FORWARD: Record<string, string> = { card: "/files/", thumb: "/pictures/" };
@@ -55,7 +57,7 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 			const [path, query = ""] = (req.url ?? "").split("?");
 			const [pass = "", kind = "", ...parts] = path!.slice(PASS_ROOT.length).split("/");
 			// A canvas's lib/, assets/, docs/ and apps/ are the deck's, as today (servedAs); a card's folder at a revision is the folder.
-			const rest = decodeURIComponent(parts.join("/")).replace(/@\d+(?=\/)/g, "").replace(/^(?:shared\/)?canvases\/(?:[^/]+\/)+?(lib|assets|docs|apps)\//, "$1/");
+			const rest = decoded(parts.join("/")).replace(/@\d+(?=\/)/g, "").replace(/^(?:shared\/)?canvases\/(?:[^/]+\/)+?(lib|assets|docs|apps)\//, "$1/");
 			const canvas = passes.canvasOf(pass);
 			const base = url();
 			const forward = FORWARD[kind];
@@ -70,4 +72,13 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 			res.writeHead(answer.status, headers).end(Buffer.from(await answer.arrayBuffer()));
 		},
 	};
+}
+
+/** A path from the address, decoded; a malformed escape decodes to nothing, which no rule allows. */
+function decoded(path: string): string {
+	try {
+		return decodeURIComponent(path);
+	} catch {
+		return "";
+	}
 }

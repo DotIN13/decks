@@ -1,5 +1,6 @@
 // Today's POST /api/upload?name=&canvas= and GET /api/where?path=: a dropped file kept in the
 // canvas's files/ (or assets/), never over another, and whether a path is a file of the deck.
+// A scoped caller (a canvas pass, a card, an app) uploads only into its own canvas's files/ (Reader, 4).
 import { layout } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
 
@@ -9,14 +10,27 @@ export const uploadRoute: Route = {
 	method: "POST",
 	prefix: "/api/upload",
 	async answer(ctx, _path, query, body) {
-		const canvas = query.get("canvas") || undefined;
-		if (canvas && !(await ctx.call("canvas.get", { canvas }).then(() => true, () => false))) return json(404, { error: `There is no canvas ${canvas} to put the file in.` });
+		const asked = query.get("canvas") || undefined;
+		const scoped = scopedCaller(ctx);
+		if (scoped && !ctx.caller.canvas) return json(403, { error: "A pass, card or app uploads only into its own canvas's files, and this one names no canvas." });
+		if (scoped && asked !== undefined && asked !== ctx.caller.canvas) return json(403, { error: `This pass is ${ctx.caller.canvas}'s: it uploads into ${ctx.caller.canvas}'s files only.` });
+		const canvas = scoped ? ctx.caller.canvas : asked;
+		// A pass's canvas was checked when the pass was issued; a whole caller's is asked for here.
+		if (canvas && !scoped && !(await ctx.call("canvas.get", { canvas }).then(() => true, () => false))) return json(404, { error: `There is no canvas ${canvas} to put the file in.` });
 		const folder = canvas ? `${layout.canvasFolder(canvas)}/files` : "assets";
 		const name = await freeName(ctx, folder, safeName(query.get("name") ?? ""));
 		await ctx.deck.write(toDeckPath(`${folder}/${name}`), body, ctx.caller);
 		return json(200, { path: `${folder}/${name}`, name, bytes: body.byteLength, ...(canvas ? { ref: `files/${name}` } : {}) });
 	},
 };
+
+/**
+ * Whether the caller is held to one canvas: a canvas pass (<asker>~frame-<n>, as compat's line binds it), a
+ * card or an app. Until the kernel hands a route its caller's Scope, the kind and the id say it.
+ */
+function scopedCaller(ctx: Context): boolean {
+	return /(^|~)frame-/.test(ctx.caller.id) || ctx.caller.kind === "card" || ctx.caller.kind === "app";
+}
 
 /** A file name made safe: its last part, plain characters only. */
 export function safeName(asked: string): string {

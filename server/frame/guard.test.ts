@@ -102,3 +102,31 @@ test("on every door: HTTP, the socket and MCP refuse the pass on b, as does a ca
 		await s.close();
 	}
 });
+
+test("Reader's attack: an encoded climb, an agent call, and another canvas's path inside an item are refused", async () => {
+	const s = await server();
+	const doors = await s.listen(0);
+	try {
+		const asked = await fetch(`${doors.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${doors.token}`, "content-type": "application/json" }, body: JSON.stringify({ canvas: "a" }) });
+		const { pass } = (await asked.json()) as { pass: string };
+		// (2) assets/ followed by an encoded climb into canvas b: refused before any prefix is compared.
+		const climb = await fetch(`${doors.url}/api/t/${pass}/card/assets/..%2fcanvases%2fb%2fcards%2fsecret%2findex.html`, { headers: { origin: "null" } });
+		assert.equal(climb.status, 404, "an encoded climb");
+		assert.equal((await fetch(`${doors.url}/api/t/${pass}/card/canvases/a/cards/note/index.html`, { headers: { origin: "null" } })).status, 200, "its own card");
+		// (5) agent.send and agent.queue are the page's, which asks the person: not the pass's.
+		const http = async (name: string, args: unknown) => (await fetch(`${doors.url}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${pass}`, "content-type": "application/json" }, body: JSON.stringify(args) })).json() as Promise<{ ok: boolean }>;
+		assert.equal((await http("agent.send", { agent: "x", task: "t" })).ok, false, "agent.send");
+		assert.equal((await http("agent.queue", { agent: "x", task: "t" })).ok, false, "agent.queue");
+		assert.equal((await http("view.goto", { canvas: "a" })).ok, false, "view.goto");
+		// (6) a path inside an item: another canvas's card, a document elsewhere in the deck, a climb.
+		const insert = (item: unknown) => http("item.insert", { canvas: "a", item, at: { x: 0, y: 0 } });
+		assert.equal((await insert({ type: "card", card: "canvases/b/cards/secret/index.html" })).ok, false, "another canvas's card");
+		assert.equal((await insert({ type: "document", path: "notes/private.md" })).ok, false, "a document outside the canvas");
+		assert.equal((await insert({ type: "document", path: "canvases/a/../b/canvas.json" })).ok, false, "a climb");
+		assert.equal((await http("item.batch", { canvas: "a", ops: [{ op: "insert", item: { type: "card", card: "canvases/b/cards/secret/index.html" } }] })).ok, false, "in a batch");
+		assert.equal((await insert({ type: "card", card: "canvases/a/cards/note/index.html" })).ok, true, "its own card");
+	} finally {
+		await doors.close();
+		await s.close();
+	}
+});
