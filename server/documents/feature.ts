@@ -33,4 +33,3 @@ export function documents(options: DocumentsOptions = {}): Feature {
 	});
 }
 
-export default documents();

@@ -37,4 +37,3 @@ export function cards(options: CardsOptions = {}): Feature {
 	});
 }
 
-export default cards();
