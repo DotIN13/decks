@@ -15,6 +15,8 @@ owns them.
   entry today's `.decks/` keeps, with its owner and what becomes of it.
 - `scopes.test.ts`: every token issued in server/ for less than a whole caller has a Scope with until;
   `scopes-whole.json` names the files that issue whole callers, how many sites, and why.
+- `pass-attack.test.ts`: Reader's attack on a canvas pass, kept: every way it found into another canvas
+  is refused and leaks nothing; the pass still reads its own canvas.
 - `start.ts`: the server started as main starts it, socket lines, and what the harness answers.
 
 ## May import

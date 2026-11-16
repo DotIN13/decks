@@ -15,11 +15,13 @@ type Envelope = { ok: boolean; value?: any; error?: { code: string; message: str
 export type Line = { call(name: string, args: unknown): Promise<Envelope>; heard: string[]; close(): void };
 export type Started = { server: TestServer; url: string; token: string; root: string; options: Record<string, unknown>; stop(): Promise<void> };
 
-/** The server as main starts it, on a copy of a fixture deck in tools/fixtures/ ("deck" or "old-deck"). */
-export async function start(fixture = "deck"): Promise<Started> {
+/** The server as main starts it, on a copy of a fixture deck in tools/fixtures/ ("deck" or "old-deck");
+ *  before it starts, prepare may add to the copy (another canvas, a secret file). */
+export async function start(fixture = "deck", prepare?: (root: string) => Promise<void>): Promise<Started> {
 	const folder = await mkdtemp(join(tmpdir(), "complete-"));
 	const root = join(folder, "decks");
 	await cp(new URL(`../fixtures/${fixture}`, import.meta.url).pathname, root, { recursive: true });
+	await prepare?.(root);
 	const deck = new FolderDeck(root);
 	const options = startOptions(root) as Record<string, unknown>;
 	const server = await testServer({ features: features(options), deck, version: folderVersion(root), old: new FolderStore(join(root, ".decks")) });
