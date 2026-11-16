@@ -15,7 +15,7 @@ import type { Changes, LiveEvent } from "@decks/sync-protocol";
  * while one of the page's is on its way is shown under it: Studio applies the page's after, so a
  * field both set keeps the page's value, here as there.
  */
-export interface FollowerHost {
+interface FollowerHost {
 	/** The drawing as the page has it now. */
 	doc(): PenDocument;
 	/** A newer drawing, and the revisions' edits that made it (empty when it came whole). */

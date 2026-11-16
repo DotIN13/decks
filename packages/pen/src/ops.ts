@@ -37,7 +37,7 @@ export interface OpResult {
 	note?: string;
 }
 
-export interface ApplyOptions {
+interface ApplyOptions {
 	theme: ThemeState;
 	measure?: MeasureText;
 }

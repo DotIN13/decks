@@ -19,7 +19,7 @@ export function applySplices(text: string, splices: readonly Splice[]): string {
 }
 
 /** Old text no shorter than this may be looked for when the history to move a splice was not kept. */
-export const SEARCH_MIN = 8;
+const SEARCH_MIN = 8;
 
 /** The occurrence of `needle` nearest to `near`, or -1. */
 function nearest(text: string, needle: string, near: number): number {

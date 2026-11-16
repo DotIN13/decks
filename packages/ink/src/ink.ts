@@ -40,7 +40,7 @@ function toPts(points: number[]): Pt[] {
 const f = (n: number) => String(round1(n));
 
 /** How wide the pen is at a pressure: the chosen size at a mouse's 0.5, thinner and wider around it. */
-export function widthAt(size: number, pressure: number): number {
+function widthAt(size: number, pressure: number): number {
 	return size * (0.4 + 1.2 * Math.min(1, Math.max(0, pressure)));
 }
 
@@ -138,7 +138,7 @@ function outline(pts: Pt[], size: number): string {
  * each new piece goes at its front. Points that are not the ones last given grown by more (a new
  * array, fewer points, the last one changed, another tool or size) are shaped from the start.
  */
-export interface InkShaper {
+interface InkShaper {
 	shape(stroke: InkStroke): { d: string; filled: boolean };
 }
 
@@ -321,7 +321,7 @@ export function hitStroke(stroke: InkStroke, x: number, y: number, radius: numbe
 }
 
 /** Even-odd, so a loop that crosses itself still selects what it goes round. */
-export function insidePolygon(x: number, y: number, polygon: number[]): boolean {
+function insidePolygon(x: number, y: number, polygon: number[]): boolean {
 	let inside = false;
 	const count = polygon.length / 2;
 	for (let i = 0, j = count - 1; i < count; j = i++) {
@@ -351,7 +351,7 @@ export function lassoPick(strokes: InkStroke[], polygon: number[]): string[] {
 		.map((stroke) => stroke.id);
 }
 
-export interface InkBox {
+interface InkBox {
 	x: number;
 	y: number;
 	w: number;
@@ -391,7 +391,7 @@ export function moveStroke(stroke: InkStroke, dx: number, dy: number): InkStroke
  * appears in, so a step costs an array of references, and "erase three, move two, undo, undo,
  * redo" needs no case analysis at all: every step is "the list is now this".
  */
-export interface InkHistory {
+interface InkHistory {
 	past: InkStroke[][];
 	present: InkStroke[];
 	future: InkStroke[][];

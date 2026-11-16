@@ -68,7 +68,7 @@ export class Hub {
 
 	/**
 	 * The `/ws` upgrade, from the router in `index.ts`. `open` says the address carried a token that checked
-	 * out (the older way, for one release); without one the socket waits for `hello` with the token, its first message.
+	 * out (the older way, which the browser checks still use); without one the socket waits for `hello` with the token, its first message.
 	 */
 	handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer, open = true): void {
 		this.server.handleUpgrade(request, socket, head, (ws) => this.accept(ws, request, open));

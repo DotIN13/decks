@@ -11,7 +11,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * agents' Google Docs tools. The sign-in is started by the page with its own origin, since
 	 * behind a proxy this server cannot tell what address the browser used to reach it.
 	 */
-	// Kept one release as aliases of account.google, account.googleCode and account.googleSignOut.
+	// Aliases of account.google, account.googleCode and account.googleSignOut, which the file picker and a Google Doc's page call.
 	const run = async (req: Request, res: Response, verb: string, args: unknown[]) => {
 		const { status, answer } = await runVerb(app, req.principal, req.headers, verb, args, req.socket.remoteAddress);
 		res.setHeader("Cache-Control", "no-store");

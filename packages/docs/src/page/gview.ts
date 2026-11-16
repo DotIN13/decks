@@ -21,7 +21,7 @@ import type { Mark } from "./marks.ts";
  * style of the text before it as Docs gives it.
  */
 
-export interface GoogleViewHost {
+interface GoogleViewHost {
 	marks(): readonly Mark[];
 	/** Requests for the selection's styles, for the server to send once the typing before them is in. */
 	style(requests: DocsRequest[]): void;

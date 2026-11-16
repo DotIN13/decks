@@ -19,4 +19,4 @@ export function springCurve(ms: number, response = SPRING_RESPONSE): (t: number)
  * second later. Closing is the swipe up, a little quicker. (0.42s and 560ms read as slow; 0.32s
  * and 420ms as too fast.)
  */
-export const SPRING_RESPONSE = 0.38;
+const SPRING_RESPONSE = 0.38;

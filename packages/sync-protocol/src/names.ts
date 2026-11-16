@@ -15,7 +15,7 @@ export const MIRRORED_PARTS = ["assets", "docs"] as const;
 /** The canvas's pictures, the one hidden part a bundle has. */
 export const PICTURES = ".pictures";
 /** Every top-level part a synced file of a canvas can be in. */
-export const BUNDLE_PARTS: readonly string[] = [...OWN_PARTS, ...MIRRORED_PARTS, PICTURES];
+const BUNDLE_PARTS: readonly string[] = [...OWN_PARTS, ...MIRRORED_PARTS, PICTURES];
 
 /**
  * A canvas's folder name as the service keeps it: letters and digits of any script (a deck names a canvas

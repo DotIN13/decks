@@ -80,7 +80,7 @@ export function findMarks(change: DocChange, text: string): Mark[] {
 	return marks;
 }
 
-export type Segment = { text: string } | { text: string; mark: Mark };
+type Segment = { text: string } | { text: string; mark: Mark };
 
 /** The text cut into runs for drawing: plain words, inserted runs, and the ghosts between them. */
 export function segments(text: string, marks: readonly Mark[]): Segment[] {

@@ -116,9 +116,8 @@ export function createHttpApp(app: App): Express {
 	registerGoogle(api, deps);
 	registerApps(api, deps);
 	// Decks as an MCP server at a web address (`routes/mcp.ts`): `/api/mcp`, and `/mcp` for short.
-	registerMcp(api, deps);
 	const mcpShort = express.Router();
-	registerMcp(mcpShort, deps);
+	registerMcp([api, mcpShort], deps);
 	server.use(mcpShort);
 
 	server.use("/api", api);

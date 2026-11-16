@@ -2,7 +2,7 @@ import type { Router, Request, Response } from "express";
 import { asyncRoute, type RouteDeps } from "./shared.ts";
 import { runVerb } from "../verbs/router.ts";
 
-/** `/api/harness…`, kept one release as aliases of the person's verbs for Decks Studio's Settings page. */
+/** `/api/harness…`, aliases of the person's verbs, kept while Decks Studio's Settings page calls them. */
 export function register(api: Router, { app }: RouteDeps): void {
 	const run = async (req: Request, res: Response, verb: string, args: unknown[], shape: (value: unknown) => unknown = (value) => value, failed = 400) => {
 		const { status, answer } = await runVerb(app, req.principal, req.headers, verb, args, req.socket.remoteAddress, req.tokenId ? { tokenId: req.tokenId } : undefined);

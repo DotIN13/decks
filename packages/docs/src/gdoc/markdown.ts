@@ -33,7 +33,7 @@ function styleOf(style: DocsTextStyle | undefined): Style {
 
 const LEVELS: Record<string, number> = { TITLE: 1, SUBTITLE: 2, HEADING_1: 1, HEADING_2: 2, HEADING_3: 3, HEADING_4: 4, HEADING_5: 5, HEADING_6: 6 };
 
-export function levelOf(namedStyleType: string | undefined): number {
+function levelOf(namedStyleType: string | undefined): number {
 	return LEVELS[namedStyleType ?? ""] ?? 0;
 }
 

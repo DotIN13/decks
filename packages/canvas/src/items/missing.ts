@@ -10,7 +10,7 @@ import { createSignal } from "solid-js";
 const [missing, setMissing] = createSignal<ReadonlySet<string>>(new Set<string>());
 export { missing };
 
-export const MISSING_HEADER = "X-Decks-Missing";
+const MISSING_HEADER = "X-Decks-Missing";
 
 /** Whether an answer says the host has no copy and no source (not that it failed, which is asked again). */
 export function saysMissing(response: { status: number; headers?: { get(name: string): string | null } }): boolean {

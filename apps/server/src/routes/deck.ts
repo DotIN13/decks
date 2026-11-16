@@ -20,7 +20,7 @@ export function register(api: Router, { app, relay }: RouteDeps): void {
 		res.json({ ok: true });
 	});
 
-	// Kept one release as an alias of deck.get.
+	// An alias of deck.get, which the browser checks read the deck's folder from.
 	api.get("/deck", async (req, res) => {
 		const { status, answer } = await runVerb(app, req.principal, req.headers, "deck.get", [], req.socket.remoteAddress);
 		if (!answer.ok) res.status(status).json({ error: answer.error });

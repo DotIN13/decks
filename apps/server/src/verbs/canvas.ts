@@ -11,7 +11,7 @@ import type { ShotFormat, ShotOf } from "../stage/shots.ts";
 import { fitOn } from "./fit.ts";
 import { documentItemPath } from "../docs/item-path.ts";
 import { shootOn } from "./shoot.ts";
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 import { freeSpot, type Side } from "./space.ts";
 import { exportPage } from "./export.ts";

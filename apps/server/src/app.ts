@@ -1009,7 +1009,7 @@ export class App {
 			if (message.removed) this.thumbs.forget(message.path);
 			else if (message.card) this.thumbs.changed(message.card);
 		}
-		// A tab's socket reads a canvas's changes per agent (`stage.pen.delta`) for one release; `canvas.changed` is the line's and the stream's.
+		// A tab's socket reads a canvas's changes per agent (`stage.pen.delta`) for the Decks iOS app; `canvas.changed` is the line's and the stream's.
 		if (message.type !== "canvas.changed") this.hub?.each((view) => this.forView(message, view));
 		for (const listener of this.listeners) listener(message);
 	}

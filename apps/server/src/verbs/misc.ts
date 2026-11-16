@@ -2,7 +2,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { saveStudioLink } from "../studio/index.ts";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /** Forwarded ports, the clock, and the link to Decks Studio. */

@@ -23,7 +23,7 @@ import { createSignal } from "solid-js";
  *   conversation would be a bad trade, and nothing about the inspector is lost by it being
  *   away for a moment.
  */
-export type EdgeOwner = "history" | "inspector" | "none";
+type EdgeOwner = "history" | "inspector" | "none";
 
 /** Whether the conversation is wanted at all, whatever is currently on the edge. */
 const [wanted, setWanted] = createSignal(false);

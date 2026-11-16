@@ -1,5 +1,5 @@
 import type { WebTarget } from "../stage/service.ts";
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /** The person's own Chrome, shared through the Decks extension. */

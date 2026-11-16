@@ -23,7 +23,7 @@ import type { AgentState } from "@decks/protocol";
  * 4. **Waiting is not working**, but it is still worth a sign: the agent asked *you*
  *    something. The mark stands still and the words name whose move it is.
  */
-export type SignPlace = "none" | "dock" | "column";
+type SignPlace = "none" | "dock" | "column";
 
 export function signPlacement(state: AgentState, options: { historyOpen: boolean; arriving: boolean }): SignPlace {
 	if (state === "idle") return "none";

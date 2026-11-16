@@ -116,7 +116,7 @@ httpServer.on("upgrade", (request, socket, head) => {
 	if (path === "/ws") {
 		/*
 		 * The socket runs the person's commands, so it is opened only with the person's token or a
-		 * paired site's: in `hello`, its first message, or (the older way, for one release) in its
+		 * paired site's: in `hello`, its first message, or (the older way, which the browser checks still use) in its
 		 * address (`decks_token`). A socket that says neither is closed (`ws.ts`).
 		 */
 		hub.handleUpgrade(request, socket, head, socketPrincipal(app, request) !== undefined);

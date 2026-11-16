@@ -107,13 +107,13 @@ export function Turn(props: {
 }
 
 /** A sent message read back into the words and pills it was written as, and what each pill is about. */
-export interface MineReading {
+interface MineReading {
 	draft: Draft;
 	pills: PillHost;
 }
 
 /** Reads a sent message into its pills: from its stored `parts` when it has them, else from its text. */
-export type MineReader = (text: string, parts?: MessagePart[]) => MineReading | undefined;
+type MineReader = (text: string, parts?: MessagePart[]) => MineReading | undefined;
 
 let mineReader: MineReader | undefined;
 /**

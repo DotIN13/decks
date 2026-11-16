@@ -99,7 +99,7 @@ export interface DocsDocument {
 	namedStyles?: { styles?: Array<{ namedStyleType?: string; textStyle?: DocsTextStyle; paragraphStyle?: DocsParagraphStyle }> };
 }
 
-export type DocsRange = { startIndex: number; endIndex: number };
+type DocsRange = { startIndex: number; endIndex: number };
 
 /** One `batchUpdate` request, of the kinds a document page sends. */
 export type DocsRequest =
@@ -117,7 +117,7 @@ export type DocsRequest =
 	| { deleteTableColumn: { tableCellLocation: DocsCellLocation } };
 
 /** A cell, as the table requests name one: the table by its start index, then row and column. */
-export interface DocsCellLocation {
+interface DocsCellLocation {
 	tableStartLocation: { index: number };
 	rowIndex: number;
 	columnIndex: number;
@@ -216,7 +216,7 @@ export interface Table {
 }
 
 /** A block shown but not edited: a section break, a table of contents. */
-export interface Atom {
+interface Atom {
 	kind: "atom";
 	md: string;
 	start?: number;

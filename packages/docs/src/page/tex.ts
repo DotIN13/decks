@@ -9,7 +9,7 @@
  * the file has its own bibliography).
  */
 
-export type LabelKind = "section" | "equation" | "figure" | "table" | "theorem" | "item" | "other";
+type LabelKind = "section" | "equation" | "figure" | "table" | "theorem" | "item" | "other";
 
 export interface TexMeta {
 	title?: string;
@@ -46,7 +46,7 @@ export const THEOREMS: Record<string, string> = {
 export const TEXT_ENVS = new Set(["abstract", "quote", "quotation", "center", "flushleft", "flushright", "proof", "verse", ...Object.keys(THEOREMS)]);
 
 /** The index of the brace closing the one at `open`, or -1. */
-export function closeBraceAt(text: string, open: number): number {
+function closeBraceAt(text: string, open: number): number {
 	let depth = 0;
 	for (let i = open; i < text.length; i++) {
 		const c = text[i];
@@ -61,7 +61,7 @@ export function closeBraceAt(text: string, open: number): number {
 }
 
 /** The text with every comment blanked out, same length, so offsets still hold. */
-export function blankComments(text: string): string {
+function blankComments(text: string): string {
 	return text.replace(/(^|[^\\])(%[^\n]*)/g, (_m, lead: string, comment: string) => lead + " ".repeat(comment.length));
 }
 
@@ -164,7 +164,7 @@ export function texMeta(source: string): TexMeta {
 	return meta;
 }
 
-export interface TabularCell {
+interface TabularCell {
 	text: string;
 	span: number;
 	align: string;

@@ -39,7 +39,7 @@ export type Inline =
  * line. Capped at three, because the fourth level of nesting in a 360px column is not
  * information.
  */
-export interface ListItem {
+interface ListItem {
 	spans: Inline[];
 	depth: number;
 }

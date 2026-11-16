@@ -9,11 +9,11 @@ import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, l
  */
 
 /** How wide a dropped picture lands on the stage, at most, in stage pixels. */
-export const PICTURE_W = 640;
+const PICTURE_W = 640;
 /** How wide a dropped text file's card is, in stage pixels. */
-export const DROP_CARD_W = 480;
+const DROP_CARD_W = 480;
 /** The gap between items dropped together. */
-export const DROP_GAP = 32;
+const DROP_GAP = 32;
 /** A sound has no picture, so it lands as a strip wide enough for a name and a time. */
 const SOUND_W = 420;
 const SOUND_H = 72;

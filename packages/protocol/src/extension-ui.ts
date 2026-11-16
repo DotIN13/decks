@@ -1,10 +1,10 @@
 /** A runtime's dialog surface, serialised — Pi's widget API, and Claude's questions. */
-export interface WidgetSpan {
+interface WidgetSpan {
 	text: string;
 	role?: string;
 	bold?: boolean;
 }
-export type WidgetLine = WidgetSpan[];
+type WidgetLine = WidgetSpan[];
 
 export type ExtensionUiPrompt =
 	| { id: string; method: "select"; title: string; options: string[] }

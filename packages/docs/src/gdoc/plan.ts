@@ -24,7 +24,7 @@ export function plan(doc: DocsDocument, markdown: string): DocsRequest[] {
 	return planBlocks(blocksOfDoc(doc), parseMarkdown(markdown), bodyEnd(doc));
 }
 
-export function bodyEnd(doc: DocsDocument): number {
+function bodyEnd(doc: DocsDocument): number {
 	const content = doc.body?.content ?? [];
 	return content[content.length - 1]?.endIndex ?? 1;
 }

@@ -156,7 +156,7 @@ interface ClaudeHome {
 }
 
 /** The two keychain calls a sign-in that replaces another needs. */
-export interface Keychain {
+interface Keychain {
 	read(service: string): string | undefined;
 	write(service: string, value: string): void;
 }

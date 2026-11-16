@@ -24,7 +24,7 @@ import { readTabular, texMeta, TEXT_ENVS, THEOREMS, withMacros, type TexMeta } f
  * whatever others wrote since, so undo never takes back an agent's words.
  */
 
-export interface LiveHost {
+interface LiveHost {
 	/** Set the maths in an element (KaTeX's auto-render, in Decks). */
 	math?(into: HTMLElement): Promise<void> | void;
 	/** A URL a picture's address can be drawn from: relative addresses are the file's neighbours. */

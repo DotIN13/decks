@@ -42,7 +42,7 @@ import {
  * float's home without anyone storing new numbers.
  */
 
-export interface FloatOptions {
+interface FloatOptions {
 	/** Storage key within `decks.floats`. */
 	key: string;
 	/** Where a drag may start. */

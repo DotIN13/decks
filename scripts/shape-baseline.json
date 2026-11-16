@@ -1,11 +1,11 @@
 {
 	"counts": {
 		"files over 1,000 lines": 13,
-		"functions over 150 lines": 70,
+		"functions over 150 lines": 69,
 		"classes over 30 methods": 13,
 		"server folder pairs that import each other": 15,
-		"imports across packages by relative path": 16,
-		"\"one release\" notes": 18,
+		"imports across packages by relative path": 6,
+		"\"one release\" notes": 0,
 		"server imports that point up a layer": 29
 	},
 	"upward": [

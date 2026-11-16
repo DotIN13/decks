@@ -385,7 +385,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					if (message.doc && message.error) notice("warn", message.error);
 					return;
 
-				// The tab socket's per-agent copies of a change, for one release: the line says canvas.changed.
+				// The tab socket's per-agent copies of a change, which the Decks iOS app reads: the line says canvas.changed.
 				case "stage.pen":
 				case "stage.pen.delta":
 				case "stage.pen.refused":

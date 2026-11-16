@@ -15,9 +15,9 @@ import { applySplice, transformSplices, type DocChange, type DocClientMessage, t
  * Framework-free: the page draws from `text` and `changes` whenever `onUpdate` fires.
  */
 
-export const BATCH_MS = 50;
+const BATCH_MS = 50;
 
-export interface DocSyncOptions {
+interface DocSyncOptions {
 	path: string;
 	send: (message: DocClientMessage) => void;
 	/**

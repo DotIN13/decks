@@ -9,7 +9,7 @@ import { sessionStale } from "../lib/session.ts";
  * holds, in the same envelope. Calls go up as `line.call` and come back as `call.answered` under
  * their id; everything else that arrives is an event (`names.ts`), handed to the listeners in one
  * batch per paint. The page says hello with its token and asks to be greeted and to hear everything,
- * as the tab's socket (`/ws`) greeted it; that socket stays one release for pages that still open it.
+ * as the tab's socket (`/ws`) greeted it; that socket stays for the Decks iOS app and the browser checks.
  *
  * Layer 0 of the state split, beside `selection` and `deck`: this module imports nothing from the
  * others, and most of them import it. `start()` opens it from the app's mount rather than on import,

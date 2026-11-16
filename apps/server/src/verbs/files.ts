@@ -1,6 +1,6 @@
 import { isCardPath } from "@decks/hub/layout";
 import { deleteFile, editFile, findFiles, grepFiles, listFiles, moveFile, readFile, writeFile, type TextEdit } from "../files/deck-files.ts";
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /**

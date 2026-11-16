@@ -10,7 +10,7 @@ export type ToolItem = Extract<ChatItem, { kind: "tool" }>;
  * the first user message of that turn, or the first item of all when nothing has
  * been asked yet. The turn is what a click on the bubble rewinds the sheet to.
  */
-export type FloatRow =
+type FloatRow =
 	| { kind: "user"; id: string; turnId: string; text: string }
 	| { kind: "assistant"; id: string; turnId: string; text: string; streaming: boolean; thinking?: string }
 	| { kind: "tools"; id: string; turnId: string; calls: ToolItem[]; running: boolean; failed: boolean }

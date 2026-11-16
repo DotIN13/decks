@@ -6,11 +6,11 @@ import { runVerb } from "../verbs/router.ts";
 import { renameCanvas, unpairStudioHere } from "../verbs/person-table.ts";
 
 /**
- * The tab socket's old requests, for one release: each is an alias of a person's verb (`@decks/api`,
+ * The tab socket's old requests, kept while anything sends them: each is an alias of a person's verb (`@decks/api`,
  * `PERSON_VERBS`) or of the table's, run exactly as a call is, and answered as the socket answered
  * it: a failure as a notice, the things the old frame said back said back. A page of this release
- * calls the verbs on the line instead; the Decks iOS app and a page of the release before still
- * send these.
+ * calls the verbs on the line instead; the Decks iOS app and the browser checks' harness
+ * (`e2e/harness.mjs`) still send these.
  */
 
 type Alias = { verb: string; args: unknown[]; on?: { stage?: string; agent?: string; edit?: string }; /** Says its own refusals (the pen edits): no notice from here. */ quiet?: true; after?: (answer: { ok: boolean; value?: unknown; error?: string }, tell: (message: ServerMessage) => void, app: App) => void } | { direct: (app: App, tell: (message: ServerMessage) => void, view?: View) => void };

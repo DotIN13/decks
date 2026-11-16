@@ -62,7 +62,7 @@ export const EVENT_NAMES: Record<ServerMessage["type"], true> = {
 	"presence.changed": true,
 	"account.list": true,
 	"web.changed": true,
-	// The tab socket's per-agent copies of a canvas's change, kept for one release (`server/src/ws.ts`): the line and the stream say `canvas.changed`.
+	// The tab socket's per-agent copies of a canvas's change, kept for the Decks iOS app (`server/src/ws.ts`): the line and the stream say `canvas.changed`.
 	"stage.pen": true,
 	"stage.pen.delta": true,
 	"stage.pen.refused": true,
@@ -85,8 +85,8 @@ export const LINE_NAMES: Record<Exclude<LineClientMessage["type"], `doc.${string
 };
 
 /**
- * The events' old names, said on the tab socket (`/ws`) for one release to a page that did not say
- * `v: 2` in its hello: the Decks iOS app and an older web page. Nothing new is said under an old name.
+ * The events' old names, said on the tab socket (`/ws`) to a client that did not say
+ * `v: 2` in its hello: the Decks iOS app and the browser checks' harness. Nothing new is said under an old name.
  */
 export const OLD_EVENT_NAMES: Partial<Record<ServerMessage["type"], string>> = {
 	"harness.hello": "backend",

@@ -25,8 +25,8 @@ export interface DeckFile {
 }
 
 /** The most a read answers, and the largest file a search opens or a write takes. */
-export const MAX_READ = 1024 * 1024;
-export const MAX_WRITE = 5 * 1024 * 1024;
+const MAX_READ = 1024 * 1024;
+const MAX_WRITE = 5 * 1024 * 1024;
 /** How many entries or matches one call answers unless it asks for fewer. */
 export const LIMIT = 200;
 /** Folders a walk never enters: dependencies and build output are not the deck's content. */
@@ -114,7 +114,7 @@ export function listFiles(root: string, path: unknown, options: { deep?: boolean
 }
 
 /** A glob as a pattern: `*` within a name, `**` across folders, `?` one character. */
-export function globToRegex(glob: string): RegExp {
+function globToRegex(glob: string): RegExp {
 	let out = "";
 	for (let index = 0; index < glob.length; index++) {
 		const char = glob[index]!;

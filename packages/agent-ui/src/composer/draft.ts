@@ -29,7 +29,7 @@ export type MentionKind = "comment" | "card" | "item" | "file";
 
 const KINDS: readonly string[] = ["comment", "card", "item", "file"];
 /** Whether a string names a kind of pill: what a draft read back from the DOM or the clipboard is checked by. */
-export function isMentionKind(kind: unknown): kind is MentionKind {
+function isMentionKind(kind: unknown): kind is MentionKind {
 	return typeof kind === "string" && KINDS.includes(kind);
 }
 

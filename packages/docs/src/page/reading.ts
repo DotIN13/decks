@@ -22,7 +22,7 @@ import { texToHtml } from "./render.ts";
  * out like any other.
  */
 
-export interface ReadingHost {
+interface ReadingHost {
 	/** Draw markdown into an element, as the host draws markdown everywhere else. */
 	markdown?(into: HTMLElement, source: string): Promise<void> | void;
 	/** Set the maths in an element (KaTeX's auto-render, in Decks). */

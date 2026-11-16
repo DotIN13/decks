@@ -31,13 +31,13 @@ import { CANVASES, OWN_PARTS, SHARED_CANVASES } from "@decks/sync-protocol";
 import { CARD_SANDBOX } from "@decks/card-host/sandbox";
 export { CANVASES, OWN_PARTS, SHARED_CANVASES };
 /** The deck's folders a canvas may point at by their deck path. */
-export const DECK_PARTS = ["assets", "docs", "apps"] as const;
+const DECK_PARTS = ["assets", "docs", "apps"] as const;
 /**
  * The card runtime (`@decks/card-host`'s `lib/`: card.css, theme.css, card.js and the live pages),
  * served at the deck's `lib/` and inside every canvas's folder, so a card's `../../lib/card.css`
  * and an old board's `../lib/board.css` both find it.
  */
-export const LIB = "lib";
+const LIB = "lib";
 
 /**
  * A file of `lib/` by the name a page asked for: `board.css` and `board.js`, which pages written
@@ -58,13 +58,13 @@ export const SHARED_SANDBOX = CARD_SANDBOX;
 /** What a canvas may point at, said once for every refusal. */
 const MAY = "a canvas points at its own boards/, frames/ and files/, and the deck's assets/, docs/ and apps/";
 
-export type Resolution = { path: string } | { refused: string };
+type Resolution = { path: string } | { refused: string };
 
 /** The parts of a forward-slashed path, a backslash read as a slash. */
 const partsOf = (path: string): string[] => path.split("\\").join("/").split("/");
 
 /** The first hidden part of a path (`.decks`, `.git`, `.env`), or undefined. `.` and `..` are not hidden, they are steps. */
-export function hiddenPart(path: string): string | undefined {
+function hiddenPart(path: string): string | undefined {
 	return partsOf(path).find((part) => part.length > 1 && part.startsWith(".") && part !== "..");
 }
 
@@ -116,7 +116,7 @@ export function canvasOfPath(path: string): { name: string; folder: string; rest
 }
 
 /** How many folders deep a canvas's folder is: 2 for `canvases/x`, 4 for a shared one. */
-export const canvasDepth = (name: string): number => canvasFolder(name).split("/").length;
+const canvasDepth = (name: string): number => canvasFolder(name).split("/").length;
 
 /** A path's parts with `.` and `..` worked out, or undefined when `..` climbs past its start. */
 function normalise(parts: string[]): string[] | undefined {

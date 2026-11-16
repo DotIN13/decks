@@ -57,7 +57,7 @@ export type Effect = "change" | "read";
 export type Touches = "deck" | "screen" | "agents" | "outside";
 export type Group = "canvas" | "card" | "file" | "agent" | "view" | "apps" | "web" | "misc";
 
-export interface Param {
+interface Param {
 	name: string;
 	schema: Schema;
 	optional?: boolean;
@@ -88,7 +88,7 @@ export interface Verb {
 	card?: CardRoute;
 }
 
-export type CardRoute = "frame" | "canvas" | "page";
+type CardRoute = "frame" | "canvas" | "page";
 
 const p = (name: string, schema: Schema, more: Partial<Param> = {}): Param => ({ name, schema, ...more });
 const o = (name: string, schema: Schema, more: Partial<Param> = {}): Param => ({ name, schema, optional: true, ...more });

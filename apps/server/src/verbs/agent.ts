@@ -1,4 +1,4 @@
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import { escapeXml } from "./context.ts";
 import type { VerbContext } from "./context.ts";
 import { moveHome } from "./move-home.ts";

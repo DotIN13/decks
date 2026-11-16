@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { cloneRepo, initRepo, isRepo, nameFromUrl, repoState, type RepoState } from "../apps/repo.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
 import type { AppKind } from "../apps/service.ts";
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /** The item that shows an app on a canvas, as `canvas.insert` takes it (`verbs/canvas.ts`). */

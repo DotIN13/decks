@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import type { Request, Response, Router } from "express";
-import { createMcp, type McpSession } from "../../../../packages/sdk/mcp/core.mjs";
+import { createMcp, type McpSession } from "@decks/sdk/mcp";
+import VERBS from "@decks/sdk/verbs.json" with { type: "json" };
 import type { App } from "../app.ts";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
 import { runVerb } from "../verbs/router.ts";
@@ -23,7 +23,6 @@ import { runVerb } from "../verbs/router.ts";
  * opens another.
  */
 
-const VERBS = JSON.parse(readFileSync(new URL("../../../../packages/sdk/src/verbs.json", import.meta.url), "utf8")) as unknown[];
 const IDLE_MS = 24 * 3_600_000;
 
 interface Session {
@@ -35,7 +34,8 @@ interface Session {
 	used: number;
 }
 
-export function registerMcp(api: Router, deps: { app: App }): void {
+/** One MCP door, answered at `/mcp` on each router given: the sessions are the door's, whichever address a request came by. */
+export function registerMcp(routers: Router[], deps: { app: App }): void {
 	const { app } = deps;
 	const sessions = new Map<string, Session>();
 	const sweep = setInterval(() => {
@@ -119,11 +119,11 @@ export function registerMcp(api: Router, deps: { app: App }): void {
 		res.json(Array.isArray(body) ? answers : answers[0]);
 	};
 
-	for (const path of ["/mcp"]) {
-		api.post(path, (req, res, next) => void post(req, res).catch(next));
+	for (const router of routers) {
+		router.post("/mcp", (req, res, next) => void post(req, res).catch(next));
 		// No stream from the server: the protocol's way of saying so.
-		api.get(path, (_req, res) => void res.status(405).set("Allow", "POST, DELETE").end());
-		api.delete(path, (req, res) => {
+		router.get("/mcp", (_req, res) => void res.status(405).set("Allow", "POST, DELETE").end());
+		router.delete("/mcp", (req, res) => {
 			const id = req.header("mcp-session-id");
 			const session = id ? sessions.get(id) : undefined;
 			if (id && session && session.tokenId === req.tokenId) sessions.delete(id);

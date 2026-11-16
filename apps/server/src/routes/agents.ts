@@ -3,8 +3,8 @@ import { asyncRoute, type RouteDeps } from "./shared.ts";
 import { runVerb } from "../verbs/router.ts";
 
 /**
- * `/api/agents/:id/…`, kept one release as aliases of the person's verbs (`@decks/api`, `PERSON_VERBS`)
- * for Decks Studio and a page of the release before. Each runs the verb as `POST /api/v1/<verb>` would,
+ * `/api/agents/:id/…`, aliases of the person's verbs (`@decks/api`, `PERSON_VERBS`), kept while
+ * Decks Studio's page reads a conversation through them. Each runs the verb as `POST /api/v1/<verb>` would,
  * for the request's token, and answers the shape the route always answered.
  */
 export function register(api: Router, { app }: RouteDeps): void {

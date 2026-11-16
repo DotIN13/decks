@@ -1,6 +1,6 @@
 import { walk } from "@decks/pen";
 import { boardOf } from "../stage/pens.ts";
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 import { canvasOfPath, moveHome } from "./move-home.ts";
 

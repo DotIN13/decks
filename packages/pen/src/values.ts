@@ -202,7 +202,7 @@ export function fillsOf(fills: Fills | undefined): Fill[] {
 	return list.map((fill) => (fill && typeof fill === "object" && (fill as { type?: string }).type === "solid" ? ({ ...(fill as object), type: "color" } as Fill) : fill));
 }
 
-export interface StrokeSpec {
+interface StrokeSpec {
 	fills: Fill[];
 	/** Per side, top right bottom left. Uniform strokes have four equal numbers. */
 	widths: [number, number, number, number];

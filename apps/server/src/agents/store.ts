@@ -149,7 +149,7 @@ export interface AgentRecord {
 }
 
 /** A message waiting for an outside agent: `QueuedWork` (`stage/tool.ts`) as it is written down. */
-export interface OutsideMail {
+interface OutsideMail {
 	from: string;
 	fromName: string;
 	task: string;

@@ -16,7 +16,7 @@ export function nodeHandler(handle: (req: Request) => Promise<Response | undefin
 }
 
 /** node:http's request as a fetch `Request`; its body is read only when the handler reads it. */
-export function toRequest(req: IncomingMessage, origin = "http://localhost"): Request {
+function toRequest(req: IncomingMessage, origin = "http://localhost"): Request {
 	const headers = new Headers();
 	for (const [k, v] of Object.entries(req.headers)) {
 		if (Array.isArray(v)) for (const one of v) headers.append(k, one);

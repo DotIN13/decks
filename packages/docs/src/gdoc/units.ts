@@ -85,7 +85,7 @@ export function segmentEnds(doc: DocsDocument): Set<number> {
  * pieces of it is compared on its own: a diff of the whole could match a cell's index to another
  * cell's and delete across a table, which Docs refuses.
  */
-export function unitDiff(from: string, to: string): Array<{ at: number; before: string; text: string }> {
+function unitDiff(from: string, to: string): Array<{ at: number; before: string; text: string }> {
 	const pieces = (t: string) => t.split(/[\uE000-\uE004]/);
 	const skeleton = (t: string) => t.replace(/[^\uE000-\uE004]/g, "");
 	if (skeleton(from) !== skeleton(to)) return spliceDiff(from, to);

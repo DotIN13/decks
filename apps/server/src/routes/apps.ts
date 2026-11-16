@@ -34,7 +34,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * a board's page has no token (`auth/guard.ts` lets this read in), and a heartbeat is no more than the
 	 * request from its frame that would wake the app anyway.
 	 */
-	// Kept one release as aliases of apps.seen and apps.restart.
+	// Aliases of apps.seen and apps.restart, which an app's frame calls (`card-host/lib/live-app.js`): it has no token to call a verb with.
 	const run = async (req: Request, res: Response, verb: string, args: unknown[], shape: (value: unknown) => unknown = (value) => value) => {
 		const { status, answer } = await runVerb(app, req.principal, req.headers, verb, args, req.socket.remoteAddress);
 		if (!answer.ok) res.status(status).json({ error: answer.error });

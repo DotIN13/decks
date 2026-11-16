@@ -44,7 +44,7 @@ export interface DocPageOptions {
 	api?: string;
 }
 
-export interface DocPage {
+interface DocPage {
 	sync: DocSync;
 	destroy(): void;
 }

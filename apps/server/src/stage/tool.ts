@@ -6,7 +6,7 @@ import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActBox, ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile } from "@decks/runtime";
-import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
+import type { Verbs as Stage } from "@decks/sdk";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { serverText } from "./text.ts";

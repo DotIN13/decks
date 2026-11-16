@@ -21,7 +21,7 @@ import { FILE, isFile, isLiveFile, LIVE_FILE } from "./file-kinds.ts";
  * that size too; the gap between blocks is one size of them, as between paragraphs within a block, so
  * the card and its editor space the blocks alike.
  */
-export const CARD_FONT = 16;
+const CARD_FONT = 16;
 export const CARD_GAP = 16;
 export const CARD_PAD = 20;
 export const CARD_RADIUS = 12;
@@ -111,7 +111,7 @@ export function fileCard(path: string, fresh: () => string, facts: { preview?: s
  */
 export { LIVE_FILE, isLiveFile };
 /** How wide an SVG lands on the canvas. */
-export const LIVE_SVG_W = 480;
+const LIVE_SVG_W = 480;
 
 export function liveFileItem(path: string, fresh: () => string, facts: { still?: string; w?: number; h?: number; url: (deckPath: string) => string }): PenNode {
 	const name = path.split("/").pop() || path;
@@ -125,7 +125,7 @@ const PLACEHOLDER = /^<!--decks:item (\S+)-->$/;
 const placeholder = (id: string) => `<!--decks:item ${id}-->`;
 
 /** A child's markdown: its words, a picture as Obsidian writes one, anything else as a placeholder. */
-export function childMarkdown(node: PenNode): string {
+function childMarkdown(node: PenNode): string {
 	if (node.type === "text" && typeof node.content === "string") return node.content;
 	// A file, or a film or a sound, is embedded as Obsidian embeds one.
 	if (isFile(node) && typeof node.metadata?.path === "string") return `![[${node.metadata.path}]]`;
@@ -146,7 +146,7 @@ export function cardMarkdown(children: readonly PenNode[]): string {
 		.join("\n\n");
 }
 
-export interface ChildrenOptions {
+interface ChildrenOptions {
 	/** A fresh id that no item on the stage has. */
 	fresh(): string;
 	/** A picture's own size, when it is known. */

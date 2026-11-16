@@ -1137,7 +1137,7 @@ export class StagePens {
 	/**
 	 * What changed since the version last sent: one `canvas.changed` for every client on the canvas's
 	 * line or stream, then the same as `stage.pen.delta` frames for these agents (what a tab's socket
-	 * still reads, for one release); or the whole drawing when nothing was sent before or the file does
+	 * still reads: the Decks iOS app's); or the whole drawing when nothing was sent before or the file does
 	 * not read. The edits are the log's whenever it holds every revision since the one sent (`editsSince`);
 	 * else (a frame of the canvas changed with no revision, a revision from before this server) the two
 	 * drawings, imports and all, are compared, so the edits are always right.

@@ -202,7 +202,7 @@ function quadRange(a: number, b: number, c: number): number[] {
  * horizontal: for a rotated ellipse those angles are not the quadrant angles, which is why they
  * are solved rather than assumed.
  */
-export function arcBounds(x1: number, y1: number, rxIn: number, ryIn: number, degrees: number, large: boolean, sweep: boolean, x2: number, y2: number): Rect {
+function arcBounds(x1: number, y1: number, rxIn: number, ryIn: number, degrees: number, large: boolean, sweep: boolean, x2: number, y2: number): Rect {
 	const box = (xs: number[], ys: number[]): Rect => {
 		const minX = Math.min(...xs);
 		const minY = Math.min(...ys);

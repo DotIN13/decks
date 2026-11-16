@@ -133,7 +133,7 @@ function button(className: string, html: string, label?: string): HTMLButtonElem
 }
 
 /** The card a press on a pill opens; a second press on the same pill puts it away. */
-export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHost): void {
+function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHost): void {
 	const again = open?.pill === pill;
 	closePillCard();
 	if (again) return;
