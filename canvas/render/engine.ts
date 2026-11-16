@@ -23,7 +23,7 @@ import { type Words } from "./measure.ts";
 import { type Shift } from "../items/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
 import { type Detected, type StageModule } from "./backends/detect.ts";
-import { ENGINE, knownGpuClass, PICTURES } from "./device.ts";
+import { knownGpuClass, PICTURES } from "./device.ts";
 
 export { pixelsFirst } from "./engine-life.ts";
 import * as engineLife from "./engine-life.ts";
@@ -31,23 +31,14 @@ import * as engineFrame from "./engine-frame.ts";
 import * as engineDoc from "./engine-doc.ts";
 import * as engineHits from "./engine-hits.ts";
 import * as enginePictures from "./engine-pictures.ts";
-/** What a card's picture is held under in both engines: `card:<path>` (`CardPlace` in the Rust engine). */
-export const pictureKey = (path: string) => `card:${path}`;
 
-export const EMPTY = '{"version":"2.14","children":[]}';
 /** Card pictures copied to the GPU in one frame (`putPaced`). */
 const PICTURES_PER_FRAME = 1;
 
 export type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array };
-/** WebKit (Safari, and every browser on iOS and iPadOS), as `render/device.ts` tells it. */
-export function webKit(): boolean {
-	return ENGINE === "webkit";
-}
 /** A card as the engine sends it with its top-level item: its place in that item's tree (`i`) rather than its paint order. */
 export type RootCard = Omit<CardGeometry, "order"> & { i: number };
 export type RootLaid = { base: number; items: Array<[string, number]>; cards: RootCard[] };
-/** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */
-export const SHEET_MARGIN = 0.25;
 
 /**
  * The stage's drawing for `CanvasView.tsx`, with the same calls the CanvasKit sheet it replaced had
@@ -336,16 +327,16 @@ export class StageEngine {
 	fail(error: unknown): void {
 		return engineLife.fail(this, error);
 	}
-	async start(over: HTMLCanvasElement): Promise<void> {
+	start(over: HTMLCanvasElement): Promise<void> {
 		return engineLife.start(this, over);
 	}
-	async open(over: HTMLCanvasElement): Promise<void> {
+	open(over: HTMLCanvasElement): Promise<void> {
 		return engineLife.open(this, over);
 	}
 	lose(): void {
 		return engineLife.lose(this);
 	}
-	async restart(): Promise<void> {
+	restart(): Promise<void> {
 		return engineLife.restart(this);
 	}
 	tilePixels(on: boolean): void {
@@ -425,7 +416,7 @@ export class StageEngine {
 		return engineFrame.settle(this, landing);
 	}
 	whole(doc: PenDocument | undefined): void {
-		return engineFrame.whole(this, doc);
+		return engineDoc.whole(this, doc);
 	}
 	windowInSheet(): boolean {
 		return engineFrame.windowInSheet(this);
@@ -523,7 +514,7 @@ export class StageEngine {
 
 	// What is under a point, and what the view hides or mutes (engine-hits.ts).
 	withOutlines(moving: ReadonlyMap<string, PenPreview>): Array<[string, PenPreview]> {
-		return engineHits.withOutlines(this, moving);
+		return engineDoc.withOutlines(this, moving);
 	}
 	ink(strokes: readonly LiveInk[], _warm?: boolean): void {
 		return engineHits.ink(this, strokes, _warm);
@@ -630,7 +621,7 @@ export class StageEngine {
 	layOutPicturesSoon(): void {
 		return enginePictures.layOutPicturesSoon(this);
 	}
-	async picture(blob: Blob, wide?: number): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
+	picture(blob: Blob, wide?: number): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
 		return enginePictures.picture(this, blob, wide);
 	}
 	fetchIcon(key: string): void {
@@ -652,9 +643,9 @@ export class StageEngine {
 		return enginePictures.postFonts(this, fonts);
 	}
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
-		return enginePictures.preview(this, moving);
+		return engineDoc.preview(this, moving);
 	}
 	showPreview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
-		return enginePictures.showPreview(this, moving);
+		return engineDoc.showPreview(this, moving);
 	}
 }

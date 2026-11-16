@@ -3,9 +3,8 @@
  * and lines touched, cards and links, and what the view hides or mutes.
  */
 import type { StageEngine as Engine } from "./engine.ts";
-import { docIndex } from "../drawing/doc-index.ts";
-import { isShape, pathBounds, type PenNode, type Placed, shapeKind, shapeOutline, shapeRadius } from "@decks/pen";
-import type { CardGeometry, LiveInk, PenPreview } from "./types.ts";
+import { isShape, pathBounds, type Placed } from "@decks/pen";
+import type { CardGeometry, LiveInk } from "./types.ts";
 import { probes } from "../debug.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
 
@@ -218,49 +217,7 @@ export function pageIdOf(e: Engine, path: string): string | undefined {
 	return undefined;
 }
 
-export function sendView(e: Engine): void {
-	e.viewState.scrolls = Object.fromEntries(e.scrolls);
-	const key = JSON.stringify(e.viewState);
-	if (key === e.viewKey) return;
-	e.viewKey = key;
-	e.page?.setView(key);
-	e.post({ type: "view", view: key });
-	e.draw();
-}
-
 // What the view hides, mutes or shows as holes, and who wrote the drawing.
-/**
- * A library shape being resized or rounded shows its outline as the saved drawing will have it
- * (`fitShapes`): sized to the shape, and built at that size by its kind (`build`) so a curve stays
- * a circle, rather than left at its old size. Its radius is the shape's own, not a frame corner.
- */
-export function withOutlines(e: Engine, moving: ReadonlyMap<string, PenPreview>): Array<[string, PenPreview]> {
-	const list = [...moving];
-	if (!e.doc) return list;
-	for (const [at, [id, change]] of list.entries()) {
-		if (change.w === undefined && change.h === undefined && change.radius === undefined) continue;
-		const node = docIndex(e.doc).get(id)?.node;
-		const outline = node && isShape(node) ? shapeOutline(node) : undefined;
-		if (!node || !outline) continue;
-		const w = change.w ?? node.width;
-		const h = change.h ?? node.height;
-		if (typeof w !== "number" || typeof h !== "number") continue;
-		const set: Record<string, unknown> = { x: 0, y: 0, width: w, height: h };
-		const build = shapeKind(node.metadata?.kind)?.build;
-		if (build) {
-			const metadata = change.radius === undefined ? node.metadata : ({ ...node.metadata, radius: change.radius ?? undefined } as PenNode["metadata"]);
-			set.geometry = build(w, h, shapeRadius({ ...node, width: w, height: h, metadata }) ?? 0);
-			set.viewBox = [0, 0, w, h];
-		}
-		if (change.radius !== undefined) {
-			const { radius: _, ...rest } = change;
-			list[at] = [id, rest];
-		}
-		list.push([outline.id, { dx: 0, dy: 0, set }]);
-	}
-	return list;
-}
-
 /** Strokes to draw over everything until they are in the drawing, at the next frame however often they change. */
 export function ink(e: Engine, strokes: readonly LiveInk[], _warm?: boolean): void {
 	probes.sheet.ink = strokes.length;
@@ -292,4 +249,14 @@ export function setWriter(e: Engine, writer: { name?: string; color: string } | 
 	if (writer) e.viewState.writer = writer.name ? { name: writer.name, color: writer.color } : { color: writer.color };
 	else delete e.viewState.writer;
 	e.sendView();
+}
+
+export function sendView(e: Engine): void {
+	e.viewState.scrolls = Object.fromEntries(e.scrolls);
+	const key = JSON.stringify(e.viewState);
+	if (key === e.viewKey) return;
+	e.viewKey = key;
+	e.page?.setView(key);
+	e.post({ type: "view", view: key });
+	e.draw();
 }

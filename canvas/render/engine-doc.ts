@@ -2,14 +2,17 @@
  * The canvas engine's drawing: the document both engines hold, its layout as the page is told it,
  * and the cards placed on it, carried and landed.
  */
-import { pictureKey, type RootCard, type RootLaid, SHEET_MARGIN, type StageEngine as Engine } from "./engine.ts";
-import { diff, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
-import type { CardGeometry, DocEdits, SceneCard } from "./types.ts";
+import type { RootCard, RootLaid, StageEngine as Engine } from "./engine.ts";
+import { pictureKey } from "./engine-pictures.ts";
+import { SHEET_MARGIN } from "./engine-frame.ts";
+import { diff, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState, shapeRadius, isShape, shapeKind, shapeOutline } from "@decks/pen";
+import type { CardGeometry, DocEdits, SceneCard, PenPreview } from "./types.ts";
 import type { Shift } from "../items/glide.ts";
-import { drawnNodes } from "../drawing/doc-index.ts";
+import { drawnNodes, docIndex } from "../drawing/doc-index.ts";
 import { boundsOf } from "../drawing/bounds.ts";
 import { fontFiles } from "../look/font-files.ts";
 import { BoxIndex } from "./spatial.ts";
+import { EMPTY } from "./engine-life.ts";
 
 /** What the page engine laid out again since it was last asked (`Page::layout_changes`). */
 export type LayoutChanges = {
@@ -84,6 +87,15 @@ export function setDoc(e: Engine, doc: PenDocument | undefined, base: string, ed
 		e.landing = undefined;
 		if (e.lifted.size && !e.cardsOnly) e.post({ type: "drop", ids: [...e.lifted] });
 	}
+}
+
+export function whole(e: Engine, doc: PenDocument | undefined): void {
+	const text = doc ? JSON.stringify(doc) : EMPTY;
+	e.page?.setDocument(text);
+	// The fonts its words name are asked for first, so a worker still to paint its first view hears
+	// they are coming before it has the drawing, and waits for them rather than paint it twice.
+	e.needFonts();
+	e.post({ type: "doc", doc: text, dark: e.scheme === "dark" });
 }
 
 /** Whether a top-level item of the drawing frames itself: its own outline or shadow (`paint`'s `has_frame`). */
@@ -451,8 +463,81 @@ export function lift(e: Engine, answer: string): void {
 }
 
 /**
+ * Items a gesture is moving or reshaping: lifted out of the worker's tiles and drawn here each
+ * frame, moved and with the fields shown, until the gesture ends (`undefined`) and the saved
+ * drawing has been painted into the tiles again.
+ */
+export function preview(e: Engine, moving: ReadonlyMap<string, PenPreview> | undefined): void {
+	// A gesture's own preview ends a glide still in hand: what it shows is where things are now.
+	e.endGlide();
+	e.showPreview(moving);
+}
+
+export function showPreview(e: Engine, moving: ReadonlyMap<string, PenPreview> | undefined): void {
+	if (!e.page) return;
+	// Only moved: nothing the stage reads of the layout changes but the arrows bent, so it is told at the end.
+	// A fade in (`opacity` alone) changes no layout either.
+	e.moveOnly = !!moving?.size && [...moving.values()].every((one) => one.w === undefined && one.h === undefined && one.radius === undefined && (!one.set || Object.keys(one.set).every((key) => key === "opacity")));
+	if (moving?.size) {
+		const fresh = [...moving.keys()].filter((id) => !e.lifted.has(id));
+		if (fresh.length) {
+			for (const id of fresh) e.lifted.add(id);
+			e.page.lift(JSON.stringify(fresh));
+			e.post({ type: "lift", ids: fresh });
+		}
+		const first = moving.values().next().value;
+		e.offset = { dx: first?.dx ?? 0, dy: first?.dy ?? 0 };
+		// The arrows joined to what moves bend with it, routed by the page's engine: lifted out of the tiles too.
+		e.shown = JSON.stringify(e.withOutlines(moving));
+		e.cardsOnly = false;
+		e.settling = false;
+		e.lift(e.page.setPreview(e.shown));
+	} else {
+		e.shown = undefined;
+		e.cardsOnly = false;
+		e.page.setPreview("null");
+		e.offset = { dx: 0, dy: 0 };
+		if (e.lifted.size) e.post({ type: "drop", ids: [...e.lifted] });
+	}
+	e.laidOut(e.moveOnly);
+	e.draw();
+}
+
+/**
+ * A library shape being resized or rounded shows its outline as the saved drawing will have it
+ * (`fitShapes`): sized to the shape, and built at that size by its kind (`build`) so a curve stays
+ * a circle, rather than left at its old size. Its radius is the shape's own, not a frame corner.
+ */
+export function withOutlines(e: Engine, moving: ReadonlyMap<string, PenPreview>): Array<[string, PenPreview]> {
+	const list = [...moving];
+	if (!e.doc) return list;
+	for (const [at, [id, change]] of list.entries()) {
+		if (change.w === undefined && change.h === undefined && change.radius === undefined) continue;
+		const node = docIndex(e.doc).get(id)?.node;
+		const outline = node && isShape(node) ? shapeOutline(node) : undefined;
+		if (!node || !outline) continue;
+		const w = change.w ?? node.width;
+		const h = change.h ?? node.height;
+		if (typeof w !== "number" || typeof h !== "number") continue;
+		const set: Record<string, unknown> = { x: 0, y: 0, width: w, height: h };
+		const build = shapeKind(node.metadata?.kind)?.build;
+		if (build) {
+			const metadata = change.radius === undefined ? node.metadata : ({ ...node.metadata, radius: change.radius ?? undefined } as PenNode["metadata"]);
+			set.geometry = build(w, h, shapeRadius({ ...node, width: w, height: h, metadata }) ?? 0);
+			set.viewBox = [0, 0, w, h];
+		}
+		if (change.radius !== undefined) {
+			const { radius: _, ...rest } = change;
+			list[at] = [id, rest];
+		}
+		list.push([outline.id, { dx: 0, dy: 0, set }]);
+	}
+	return list;
+}
+
+/**
  * A picture of what a drag carries, for the ghost a drag over a card shows (`CanvasView.tsx`): the lifted
- * items drawn alone for one frame and copied off the canvas in the same task, then the stage drawn
+ * items drawn alone for one frame and copied off the canvas in the same task, then the canvas drawn
  * whole again. `rect` is where they lay on screen before the drag; they are now the drag's offset on.
  */
 export function cutFromCarried(e: Engine, rect: { left: number; top: number; width: number; height: number }): HTMLCanvasElement | undefined {

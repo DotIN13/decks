@@ -2,8 +2,8 @@
  * Pictures and fonts for both engines: card pictures fetched at the size they are drawn and held to
  * a budget, image fills, icons, and the font files the drawing's words need.
  */
-import { type Font, pictureKey, type StageEngine as Engine } from "./engine.ts";
-import type { PenPreview, SceneCard } from "./types.ts";
+import type { Font, StageEngine as Engine } from "./engine.ts";
+import type { SceneCard } from "./types.ts";
 import { upgrades } from "./picture-ladder.ts";
 import { knobs } from "../debug.ts";
 import { pictureAddress } from "../host/host.ts";
@@ -11,6 +11,9 @@ import { markMissing, saysMissing } from "../items/missing.ts";
 import { iconUrl, parseIcon } from "../look/icons.ts";
 import { type FontFile, fontFiles, type FontNeed, isFallbackFamily, stageFontNeeds } from "../look/font-files.ts";
 import { baseTheme } from "@decks/pen";
+
+/** What a card's picture is held under in both engines: `card:<path>` (`CardPlace` in the Rust engine). */
+export const pictureKey = (path: string) => `card:${path}`;
 
 /** A card whose picture can be fetched: it names one by address, and is not a live page still loading. */
 export const fetchable = (card: SceneCard) => !!card.picture && !(card.live && !card.ready) && /^(https?:|\/)/.test(card.picture);
@@ -183,7 +186,6 @@ export function wantPictures(e: Engine, urls: readonly string[]): void {
 	}
 }
 
-
 // Fetching a picture and handing it to both engines.
 /** What a picture was asked for with, kept while it is fetched and asked again. */
 type Asked = NonNullable<ReturnType<Engine["picturesAsked"]["get"]>>;
@@ -355,49 +357,7 @@ export async function picture(e: Engine, blob: Blob, wide?: number): Promise<{ b
 	return { bitmap: smaller, width, height };
 }
 
-
 // A gesture's preview.
-/**
- * Items a gesture is moving or reshaping: lifted out of the worker's tiles and drawn here each
- * frame, moved and with the fields shown, until the gesture ends (`undefined`) and the saved
- * drawing has been painted into the tiles again.
- */
-export function preview(e: Engine, moving: ReadonlyMap<string, PenPreview> | undefined): void {
-	// A gesture's own preview ends a glide still in hand: what it shows is where things are now.
-	e.endGlide();
-	e.showPreview(moving);
-}
-
-export function showPreview(e: Engine, moving: ReadonlyMap<string, PenPreview> | undefined): void {
-	if (!e.page) return;
-	// Only moved: nothing the stage reads of the layout changes but the arrows bent, so it is told at the end.
-	// A fade in (`opacity` alone) changes no layout either.
-	e.moveOnly = !!moving?.size && [...moving.values()].every((one) => one.w === undefined && one.h === undefined && one.radius === undefined && (!one.set || Object.keys(one.set).every((key) => key === "opacity")));
-	if (moving?.size) {
-		const fresh = [...moving.keys()].filter((id) => !e.lifted.has(id));
-		if (fresh.length) {
-			for (const id of fresh) e.lifted.add(id);
-			e.page.lift(JSON.stringify(fresh));
-			e.post({ type: "lift", ids: fresh });
-		}
-		const first = moving.values().next().value;
-		e.offset = { dx: first?.dx ?? 0, dy: first?.dy ?? 0 };
-		// The arrows joined to what moves bend with it, routed by the page's engine: lifted out of the tiles too.
-		e.shown = JSON.stringify(e.withOutlines(moving));
-		e.cardsOnly = false;
-		e.settling = false;
-		e.lift(e.page.setPreview(e.shown));
-	} else {
-		e.shown = undefined;
-		e.cardsOnly = false;
-		e.page.setPreview("null");
-		e.offset = { dx: 0, dy: 0 };
-		if (e.lifted.size) e.post({ type: "drop", ids: [...e.lifted] });
-	}
-	e.laidOut(e.moveOnly);
-	e.draw();
-}
-
 // Icons and fonts.
 export function fetchIcon(e: Engine, key: string): void {
 	if (e.iconsAsked.has(key)) return;

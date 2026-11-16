@@ -2,16 +2,23 @@
  * The canvas engine's life: attaching its canvases, opening the Rust page engine and its render
  * worker, the worker's messages, and losing, restarting and disposing of them.
  */
-import { EMPTY, type StageEngine as Engine, webKit } from "./engine.ts";
+import type { StageEngine as Engine } from "./engine.ts";
 import { knobs, probes } from "../debug.ts";
 import { detect, type StageModule } from "./backends/detect.ts";
 import { noticeFor } from "./backends/notice.ts";
 import renderWorkerUrl from "./render.worker.ts?worker&url";
 import type { FromWorker, ToWorker } from "./types.ts";
 import type { PageEngine } from "@decks/engine";
-import { PICTURES, readGpuClass } from "./device.ts";
+import { ENGINE, PICTURES, readGpuClass } from "./device.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { setStageWords } from "./measure.ts";
+
+/** The empty drawing: what both engines hold before the server's comes. */
+export const EMPTY = '{"version":"2.14","children":[]}';
+/** WebKit (Safari, and every browser on iOS and iPadOS), as `render/device.ts` tells it. */
+export function webKit(): boolean {
+	return ENGINE === "webkit";
+}
 
 // Opening: the canvases, the Rust page engine and its worker, and how tiles cross.
 /**

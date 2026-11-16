@@ -2,13 +2,17 @@
  * The canvas engine's frames: the camera and its glide, the tiles the worker paints for it, and
  * drawing a frame of both engines' canvases.
  */
-import { EMPTY, SHEET_MARGIN, type StageEngine as Engine, webKit } from "./engine.ts";
+import type { StageEngine as Engine } from "./engine.ts";
+import { webKit } from "./engine-life.ts";
 import { knobs, probes } from "../debug.ts";
 import { glideShifts, glideStep, type Shift, shiftsFrom } from "../items/glide.ts";
-import { type Frame, isArrow, type PenDocument } from "@decks/pen";
+import { type Frame, isArrow } from "@decks/pen";
 import type { PenPreview, TileFromWorker } from "./types.ts";
 import { cardReader } from "./reader.ts";
 import type { Camera } from "@decks/protocol-old";
+
+/** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */
+export const SHEET_MARGIN = 0.25;
 
 /** A level whose tiles stop coming before they cover the window is shown anyway this long after the last. */
 export const SHOW_ANYWAY_MS = 2000;
@@ -35,6 +39,7 @@ export const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...knobs.
 
 /** A tile's place on the stage, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
 export const tileScale = new DataView(new ArrayBuffer(4));
+export const TILE_SIDE = 512;
 
 // The camera: where it looks, whether it moves, and what the worker is told.
 /** In the call that moves the board pages, and drawn there, so the two land in one frame. */
@@ -66,8 +71,6 @@ export function setCamera(e: Engine, camera: Camera): void {
 	// The click shapes' reach round a line is a screen width: written again once the zoom has drifted far from the one they were made at.
 	if (e.placed.size && e.bandZoom > 0 && (camera.zoom > e.bandZoom * 1.25 || camera.zoom < e.bandZoom * 0.8)) e.writeHits();
 }
-
-export const TILE_SIDE = 512;
 
 export function setMoving(e: Engine, moving: boolean): void {
 	if (moving === e.moving) return;
@@ -138,15 +141,6 @@ export function holdStill(e: Engine, on: boolean): void {
 	if (on === e.still) return;
 	e.still = on;
 	if (!on) e.draw();
-}
-
-export function whole(e: Engine, doc: PenDocument | undefined): void {
-	const text = doc ? JSON.stringify(doc) : EMPTY;
-	e.page?.setDocument(text);
-	// The fonts its words name are asked for first, so a worker still to paint its first view hears
-	// they are coming before it has the drawing, and waits for them rather than paint it twice.
-	e.needFonts();
-	e.post({ type: "doc", doc: text, dark: e.scheme === "dark" });
 }
 
 /** Whether the window, at the camera now, is still inside the sheet. */
