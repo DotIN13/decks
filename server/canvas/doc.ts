@@ -62,7 +62,7 @@ export class PenCanvas implements CanvasDoc {
 	}
 
 	// Changing it: all or none, one revision per change
-	apply(ops: ItemOp[], by: Caller, edit?: string): { items: Item[]; rev: number } {
+	apply(ops: ItemOp[], by: Caller, edit?: string, scoped = false): { items: Item[]; rev: number } {
 		if (!Array.isArray(ops) || !ops.length) throw new Refused("invalid", "Give at least one op.", "item.batch");
 		let work = this.doc;
 		const written: ItemOp[] = [];
@@ -73,7 +73,7 @@ export class PenCanvas implements CanvasDoc {
 				work = done.doc;
 				written.push(done.op);
 				if (done.id) ids.push(done.id);
-				if (done.id && (op.op !== "update" || op.set) && op.op !== "delete" && op.op !== "move") this.keepsInside(work, done.id);
+				if (scoped && done.id && (op.op !== "update" || op.set) && op.op !== "delete" && op.op !== "move") this.keepsInside(work, done.id);
 			} catch (error) {
 				throw failed(error, i, op);
 			}
@@ -97,7 +97,7 @@ export class PenCanvas implements CanvasDoc {
 		this.saved(text, change, [...new Set(ids)], by, { pen, ...(edit ? { made: [edit] } : {}) });
 	}
 
-	/** Refuse an item that names a path outside this canvas (README rule 9). */
+	/** Refuse, for a scoped caller, an item that names a path outside this canvas (README rule 9). */
 	private keepsInside(doc: PenDocument, id: string): void {
 		const node = [...walk(doc.children)].find((one) => one.id === id);
 		const stray = node ? strayPath([node], this.name, this.kinds) : undefined;

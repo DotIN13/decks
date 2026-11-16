@@ -2,8 +2,8 @@ import { walk, type PenNode } from "@decks/pen";
 import { layout } from "../../protocol/index.ts";
 import type { Kinds } from "./kinds.ts";
 
-// Every path an item names stays in its canvas: its own folder, or the deck's assets/, docs/ and
-// apps/ (README rule 9). Read decoded and normalised before any test, for every caller.
+// For a scoped caller (a pass), every path an item names stays in its canvas: its own folder, or the
+// deck's assets/, docs/ and apps/ (README rule 9). Read decoded and normalised before any test.
 
 /** The first path in these nodes that leaves the canvas, and why; undefined when all stay. */
 export function strayPath(nodes: PenNode[], canvas: string, kinds: Kinds): { path: string; why: string } | undefined {

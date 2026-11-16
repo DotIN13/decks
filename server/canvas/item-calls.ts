@@ -30,10 +30,10 @@ export function itemCalls(store: CanvasStore, clips: Clips) {
 		copy: async (ctx, { id, as, at: corner, parent, ...on }) => written(await one(store, at(ctx, on), { op: "copy", id, ...defined({ as, at: corner, parent }) }, ctx)),
 		batch: async (ctx, { ops, for: _for, edit, ...on }) => {
 			const doc = at(ctx, on);
-			return written(doc.apply(await store.kindsOf().prepare(ops, prepping(doc, ctx)), ctx.caller, edit).items);
+			return written(doc.apply(await store.kindsOf().prepare(ops, prepping(doc, ctx)), ctx.caller, edit, ctx.scope !== undefined).items);
 		},
 		clip: (ctx, a) => clips.clip(ctx.canvasName(a.canvas), a.ids, a.id),
-		paste: async (ctx, a) => written(await clips.paste(a.clip.id, ctx.canvasName(a.canvas), a.at, ctx.caller, a.edit)),
+		paste: async (ctx, a) => written(await clips.paste(a.clip.id, ctx.canvasName(a.canvas), a.at, ctx.caller, a.edit, ctx.scope !== undefined)),
 		space: (ctx, a) => roomFor(at(ctx, a), a),
 		variables: (ctx, { set, themes, ...on }) => {
 			const name = ctx.canvasName(on.canvas);
@@ -49,7 +49,7 @@ function drawingOf(store: CanvasStore, ctx: Context, on: On): PenCanvas {
 }
 
 const one = async (store: CanvasStore, doc: PenCanvas, op: ItemOp, ctx: Context): Promise<Item> => {
-	const items = doc.apply(await store.kindsOf().prepare([op], prepping(doc, ctx)), ctx.caller).items;
+	const items = doc.apply(await store.kindsOf().prepare([op], prepping(doc, ctx)), ctx.caller, undefined, ctx.scope !== undefined).items;
 	if (!items[0]) throw new Refused("not_found", "The item is not on the canvas after the change.", "item.list");
 	return items[0];
 };

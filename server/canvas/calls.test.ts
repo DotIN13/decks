@@ -146,24 +146,35 @@ test("a watcher catching up gets every item.changed after its revision, as told 
 	await s.close();
 });
 
-test("an item naming a path outside its canvas is refused, for every caller, however it is written", async () => {
-	const s = await start({ ...DECK, "canvases/other/cards/x/index.html": "<p>x</p>" });
-	const refused = async (args: Record<string, unknown>, name = "item.insert") => {
-		const answer = await s.call(name, args, ann);
-		return !answer.ok && answer.error.code === "refused" && /points only at its own folder/.test(answer.error.message);
+test("for a scoped caller, an item naming a path outside its canvas is refused, however it is written", async () => {
+	const canvas = canvasFeature();
+	const s = await testServer({ features: [canvas, stickerFeature()], deck: { ...DECK, "canvases/other/cards/x/index.html": "<p>x</p>" } });
+	const doc = (canvas.canvases!(s.kernel) as CanvasStore).doc("plan");
+	const scoped = (ops: unknown[]) => {
+		try {
+			doc.apply(ops as never, ann, undefined, true);
+			return false;
+		} catch (error) {
+			return (error as { code?: string }).code === "refused" && /points only at its own folder/.test((error as Error).message);
+		}
 	};
-	assert.ok(await refused({ item: { type: "sticker", path: "canvases/other/cards/x/index.html" }, at: { x: 0, y: 900 } }), "another canvas's card");
-	assert.ok(await refused({ item: { type: "sticker", path: "assets/..%2fcanvases%2fother%2fcards%2fx%2findex.html" }, at: { x: 0, y: 900 } }), "a climb, encoded");
-	assert.ok(await refused({ item: { type: "rectangle", fill: { type: "image", url: "../other/files/a.png" } }, at: { x: 0, y: 900 } }), "a picture outside");
-	assert.ok(await refused({ ops: [{ op: "insert", item: { type: "note", id: "ok" } }, { op: "replace", id: "a", item: { type: "browser", url: "../../canvases/other/cards/x/index.html" } }] }, "item.batch"), "a replace in a batch");
-	assert.ok(await refused({ id: "a", set: { metadata: { path: "canvases/other/cards/x/index.html" } } }, "item.update"), "an update that sets one");
-	assert.equal((await s.value<Item[]>("item.list", {}, ann)).length, 2, "nothing changed");
-	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "files/a.png" } }, at: { x: 0, y: 900 } }, ann)).ok, true, "its own files");
-	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "assets/logo.png" } }, at: { x: 400, y: 900 } }, ann)).ok, true, "the deck's assets");
-	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "https://example.com/a.png" } }, at: { x: 800, y: 900 } }, ann)).ok, true, "a web address");
-	assert.equal((await s.call("item.insert", { item: { type: "browser", url: "/app/notes/" }, at: { x: 1200, y: 900 } }, ann)).ok, true, "an app's page");
-	assert.ok(await refused({ item: { type: "browser", url: "/files/canvases/other/cards/x/index.html" }, at: { x: 0, y: 1300 } }), "another route");
-	assert.ok(await refused({ item: { type: "browser", url: "/app/../files/canvases/other/x" }, at: { x: 0, y: 1300 } }), "an app path that climbs");
+	assert.ok(scoped([{ op: "insert", item: { type: "sticker", path: "canvases/other/cards/x/index.html" }, at: { x: 0, y: 900 } }]), "another canvas's card");
+	assert.ok(scoped([{ op: "insert", item: { type: "sticker", path: "assets/..%2fcanvases%2fother%2fcards%2fx%2findex.html" }, at: { x: 0, y: 900 } }]), "a climb, encoded");
+	assert.ok(scoped([{ op: "insert", item: { type: "rectangle", fill: { type: "image", url: "../other/files/a.png" } }, at: { x: 0, y: 900 } }]), "a picture outside");
+	assert.ok(scoped([{ op: "insert", item: { type: "note", id: "ok" } }, { op: "replace", id: "a", item: { type: "browser", url: "../../canvases/other/cards/x/index.html" } }]), "a replace in a batch");
+	assert.ok(scoped([{ op: "update", id: "a", set: { metadata: { path: "canvases/other/cards/x/index.html" } } }]), "an update that sets one");
+	assert.ok(scoped([{ op: "insert", item: { type: "browser", url: "/files/canvases/other/cards/x/index.html" }, at: { x: 0, y: 1300 } }]), "another route");
+	assert.equal(doc.read().length, 2, "nothing changed");
+	for (const url of ["files/a.png", "assets/logo.png", "https://example.com/a.png", "/app/notes/"]) {
+		assert.equal(scoped([{ op: "insert", item: { type: "rectangle", fill: { type: "image", url } }, at: { x: 0, y: 1300 } }]), false, url);
+	}
+	await s.close();
+});
+
+test("a whole caller places what today's Decks let it: another canvas's card, a document anywhere in the deck", async () => {
+	const s = await start({ ...DECK, "canvases/other/cards/x/index.html": "<p>x</p>", "papers/paper.md": "# Paper" });
+	assert.equal((await s.call("item.insert", { item: { type: "sticker", path: "canvases/other/cards/x/index.html" }, at: { x: 0, y: 900 } }, ann)).ok, true);
+	assert.equal((await s.call("item.insert", { item: { type: "browser", url: "../../papers/paper.md", metadata: { type: "decks.document", path: "papers/paper.md" } }, at: { x: 600, y: 900 } }, ann)).ok, true);
 	await s.close();
 });
 
