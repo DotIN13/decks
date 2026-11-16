@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Installs the rewrite's two git hooks in this checkout: node tools/gates/install-hooks.mjs
-// commit-msg checks the title and body (rule 7); pre-commit checks your paths against your lane.
+// commit-msg checks the title and body (rule 7); pre-commit refuses a commit in the main checkout under
+// a full run's hold (hold.mjs), then checks your paths against your lane.
 import { execFileSync } from "node:child_process";
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,7 +9,7 @@ import { join } from "node:path";
 const dir = execFileSync("git", ["rev-parse", "--git-path", "hooks"], { encoding: "utf8" }).trim();
 const hooks = {
 	"commit-msg": 'exec node "$(git rev-parse --show-toplevel)/tools/gates/commits.mjs" --hook "$1"',
-	"pre-commit": 'exec node "$(git rev-parse --show-toplevel)/tools/gates/lanes.mjs" --staged',
+	"pre-commit": 'node "$(git rev-parse --show-toplevel)/tools/gates/hold.mjs" || exit 1\nexec node "$(git rev-parse --show-toplevel)/tools/gates/lanes.mjs" --staged',
 };
 for (const [name, line] of Object.entries(hooks)) {
 	const path = join(dir, name);

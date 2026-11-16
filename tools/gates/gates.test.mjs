@@ -126,6 +126,17 @@ test("typeOnly tells a clause of types from one that brings a value", async () =
 	assert.equal(typeOnly("import", "X, { type A }"), false);
 	assert.equal(typeOnly("export", "*"), false);
 });
+test("the hold refuses a commit in the main checkout unless REWRITE_AGENT owns the lock", async () => {
+	const { refusal } = await import("./hold.mjs");
+	const lock = mkdtempSync(join(tmpdir(), "gates-hold-"));
+	made.push(lock);
+	assert.match(refusal({ lock, agent: "Mason", main: true }) ?? "", /a full run is going on the main checkout since \d\d:\d\d.*names no one/);
+	writeFileSync(join(lock, "owner"), "Mason\n");
+	assert.equal(refusal({ lock, agent: "Mason", main: true }), undefined);
+	assert.match(refusal({ lock, agent: "Warden", main: true }) ?? "", /Mason holds it/);
+	assert.equal(refusal({ lock, agent: "Warden", main: false }), undefined, "another checkout commits freely");
+	assert.equal(refusal({ lock: join(lock, "none"), agent: "Warden", main: true }), undefined, "no lock, no hold");
+});
 test("calls names a call declared twice", () =>
 	plantedFails("calls", { "protocol/calls/a.ts": 'defineCall({ name: "item.move" })\n', "protocol/calls/b.ts": 'defineCall({ name: "item.move" })\n' },
 		{ "protocol/calls/a.ts": 'defineCall({ name: "item.move" })\n' }, "item.move again"));
