@@ -39,10 +39,10 @@ Paths (`page/package.json`, and the root `package.json` for `@decks/pen`):
 
 Imports:
 
-- `page/src/routes/canvas/engine-actions.ts` and `state.ts`: `@decks/hub/follower` becomes
+- decks-studio's page/src/routes/canvas/engine-actions.ts and state.ts: `@decks/hub/follower` becomes
   `@decks/canvas/follower` (also exported from `@decks/canvas/host`). Same class, same `FollowerHost`; its
   types now come from `@decks/protocol` (`Changes`, `LiveEvent`).
-- `@decks/protocol` (`chat-panel.tsx`, `harness.ts`, `alerts.tsx`, `transcripts.ts`): `AgentKind`,
+- `@decks/protocol` (decks-studio's chat-panel.tsx, harness.ts, alerts.tsx and transcripts.ts): `AgentKind`,
   `AgentState`, `AgentMode`, `ModelOption`, `SlashCommand`, `ThinkingLevel`, `THINKING_LEVELS` and
   `ChatItem` are all in the new `@decks/protocol` under those names.
 - `@decks/agent-ui/composer`, `/chat`, `/alerts` (4, 2 and 2 imports): the composer and chat moved into
