@@ -6,7 +6,8 @@
 	"exports": {
 		".": "./index.ts",
 		"./calls/*": "./calls/*.ts",
-		"./fonts": "./fonts.ts"
+		"./fonts": "./fonts.ts",
+		"./compat": "./compat/old-calls.ts"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",

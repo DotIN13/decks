@@ -14,7 +14,8 @@ messages a server and Studio exchange. Package `@decks/protocol`. Only Lexicon e
 - `glossary.ts`: the nouns, the shared verbs, and `retired`, the words the names gate refuses.
 - `layout.ts`: the deck folder's layout and path rules. `deck-files.ts`: a card's meta tag and the deck's
   import map, read one way. `fonts.ts` (`@decks/protocol/fonts`, not in the index): which font files a
-  text needs, from the generated `font-coverage.ts`. `pen-ops.ts`: a pen op as an item op and back. `sync.ts`: what a server and Studio exchange.
+  text needs, from the generated `font-coverage.ts`. `pen-ops.ts`: a pen op as an item op and back.
+- `compat/`: the calls before the rewrite and how each becomes its new one (`@decks/protocol/compat`). `sync.ts`: what a server and Studio exchange.
 - `version.ts`: the protocol's version.
 
 ## May import
