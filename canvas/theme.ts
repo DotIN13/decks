@@ -1,7 +1,5 @@
 import { createSignal } from "solid-js";
 
-export type Scheme = "light" | "dark";
-
 /**
  * The canvas's colour scheme: the one signal everything on the canvas reads its light or dark from.
  *
@@ -11,3 +9,5 @@ export type Scheme = "light" | "dark";
  */
 const [scheme, setCanvasScheme] = createSignal<Scheme>("light");
 export { scheme, setCanvasScheme };
+
+export type Scheme = "light" | "dark";

@@ -1,9 +1,6 @@
 import { isMarkdown, isMarkdownText, textStyleOf, walk, type PenDocument, type PenNode, type TextStyle, type ThemeState } from "@decks/pen";
 import { parseMarkdown, wordsOf } from "../cards/markdown.ts";
 import { FACE_ALIAS } from "../cards/card-syntax.ts";
-
-/** The serif a card's `{.serif}` words are set in. */
-export const SERIF_FAMILY = FACE_ALIAS.serif!;
 import { FONT_COVERAGE } from "./font-coverage.ts";
 
 /**
@@ -17,6 +14,9 @@ import { FONT_COVERAGE } from "./font-coverage.ts";
  * does not have falls through to Inter.
  */
 
+
+/** The serif a card's `{.serif}` words are set in. */
+export const SERIF_FAMILY = FACE_ALIAS.serif!;
 /** The face a card's `code` is set in. */
 const MONO_FAMILY = "JetBrains Mono";
 export const FONT_CDN = "https://cdn.jsdelivr.net/fontsource/fonts";
@@ -33,91 +33,6 @@ const EMOJI = /\p{Extended_Pictographic}/u;
 /** The families whose letters come in one large file per language, fetched in two weights only. */
 const CJK = new Set(["noto-sans-sc", "noto-sans-jp", "noto-sans-kr", "noto-sans-tc"]);
 
-/**
- * Every fallback file, in the order they are tried (`font-coverage.ts`, generated): Inter's other
- * languages, Noto Sans, one Noto family per script, then maths, symbols, Chinese, Japanese and Korean,
- * music and emoji. A file is fetched only when a text has a character only it draws.
- */
-interface Fallback {
-	id: string;
-	family: string;
-	weights: readonly number[];
-	italic: boolean;
-	subset: string;
-	/** The name it is registered under, which is what a chain lists. */
-	name: string;
-	/** Code point ranges, as start and end pairs, sorted. */
-	ranges: Int32Array;
-}
-let fallbacks: Fallback[] | undefined;
-function fallbackList(): Fallback[] {
-	if (fallbacks) return fallbacks;
-	fallbacks = [];
-	for (const [id, family, weights, italic, subsets] of FONT_COVERAGE) {
-		for (const [subset, text] of subsets) {
-			const pairs: number[] = [];
-			for (const part of text.split(",")) {
-				const [a, b] = part.split("-");
-				const start = parseInt(a!, 16);
-				pairs.push(start, b === undefined ? start : parseInt(b, 16));
-			}
-			fallbacks.push({ id, family, weights, italic, subset, name: fileName(family, subset, subsets.length), ranges: Int32Array.from(pairs) });
-		}
-	}
-	return fallbacks;
-}
-
-/**
- * The name a file is registered under. A face's extended-Latin letters are a file of their own under a
- * name of their own (`EXT`), tried after the face: registered under the face's own name, the extended
- * file was sometimes picked for plain words, and it has no digits or punctuation, so "10 s" came out in
- * a symbol font and a full stop as a missing-glyph box. Every other language file is named the same way.
- */
-function fileName(family: string, subset: string, files: number): string {
-	if (subset === "latin") return family;
-	if (subset === "latin-ext") return `${family}${EXT}`;
-	return files === 1 ? family : `${family} ${subset}`;
-}
-
-const covers = (ranges: Int32Array, cp: number): boolean => {
-	let lo = 0;
-	let hi = ranges.length / 2 - 1;
-	while (lo <= hi) {
-		const mid = (lo + hi) >> 1;
-		if (cp < ranges[mid * 2]!) hi = mid - 1;
-		else if (cp > ranges[mid * 2 + 1]!) lo = mid + 1;
-		else return true;
-	}
-	return false;
-};
-
-/** The first fallback file that draws a character, if any does; kept, since a text repeats its letters. */
-const fileOf = new Map<number, Fallback | null>();
-function fallbackFor(cp: number): Fallback | undefined {
-	const known = fileOf.get(cp);
-	if (known !== undefined) return known ?? undefined;
-	const list = fallbackList();
-	// Pictures drawn in colour come from the emoji font, as they always have, not from a symbol font's outline.
-	const emoji = cp >= 0x1f000 && EMOJI.test(String.fromCodePoint(cp));
-	const found = (emoji ? list.find((f) => f.id === "noto-color-emoji" && covers(f.ranges, cp)) : undefined) ?? list.find((f) => covers(f.ranges, cp)) ?? null;
-	fileOf.set(cp, found);
-	return found ?? undefined;
-}
-
-/**
- * The families a paragraph in `family` asks for, in order: the family, its extended Latin, Inter's
- * Latin, then every fallback file. Only the files that have been fetched are anything to the font engines; the rest of the
- * names are skipped.
- */
-/** Whether a registered family is one of the per-script fallbacks, tried after the family and Inter. */
-export function isFallbackFamily(name: string): boolean {
-	return fallbackList().some((f) => f.name === name);
-}
-
-function fontChain(family: string): string[] {
-	return [...new Set([family, `${family}${EXT}`, FALLBACK_FAMILY, `${FALLBACK_FAMILY}${EXT}`, ...fallbackList().map((f) => f.name)])];
-}
-
 export interface FontNeed {
 	family: string;
 	weight: number;
@@ -132,10 +47,6 @@ export interface FontFile {
 	url: string;
 	fallback?: string;
 }
-
-export const fontsourceId = (family: string) => family.trim().toLowerCase().replace(/\s+/g, "-");
-export const roundWeight = (weight: number) => Math.min(900, Math.max(100, Math.round(weight / 100) * 100));
-const nearest = (weights: readonly number[], weight: number) => weights.reduce((best, w) => (Math.abs(w - weight) < Math.abs(best - weight) ? w : best), weights[0] ?? 400);
 
 /** The files these texts need: the family asked for and Inter in Latin, and a fallback for every other character. */
 export function fontFiles(needs: readonly FontNeed[]): FontFile[] {
@@ -217,4 +128,97 @@ export function textNeeds(content: string, style: TextStyle, markdown: boolean):
 	if (/\.serif\b/.test(content)) faces.add(SERIF_FAMILY);
 	for (const family of faces) needs.push({ family, weight: 400, italic: false, text: content }, { family, weight: 700, italic: false, text: content }, { family, weight: 400, italic: true, text: content });
 	return needs;
+}
+
+// Names and weights, as Fontsource has them.
+
+export const fontsourceId = (family: string) => family.trim().toLowerCase().replace(/\s+/g, "-");
+export const roundWeight = (weight: number) => Math.min(900, Math.max(100, Math.round(weight / 100) * 100));
+const nearest = (weights: readonly number[], weight: number) => weights.reduce((best, w) => (Math.abs(w - weight) < Math.abs(best - weight) ? w : best), weights[0] ?? 400);
+
+// The fallback files, and which one draws a character.
+
+/**
+ * Every fallback file, in the order they are tried (`font-coverage.ts`, generated): Inter's other
+ * languages, Noto Sans, one Noto family per script, then maths, symbols, Chinese, Japanese and Korean,
+ * music and emoji. A file is fetched only when a text has a character only it draws.
+ */
+interface Fallback {
+	id: string;
+	family: string;
+	weights: readonly number[];
+	italic: boolean;
+	subset: string;
+	/** The name it is registered under, which is what a chain lists. */
+	name: string;
+	/** Code point ranges, as start and end pairs, sorted. */
+	ranges: Int32Array;
+}
+let fallbacks: Fallback[] | undefined;
+function fallbackList(): Fallback[] {
+	if (fallbacks) return fallbacks;
+	fallbacks = [];
+	for (const [id, family, weights, italic, subsets] of FONT_COVERAGE) {
+		for (const [subset, text] of subsets) {
+			const pairs: number[] = [];
+			for (const part of text.split(",")) {
+				const [a, b] = part.split("-");
+				const start = parseInt(a!, 16);
+				pairs.push(start, b === undefined ? start : parseInt(b, 16));
+			}
+			fallbacks.push({ id, family, weights, italic, subset, name: fileName(family, subset, subsets.length), ranges: Int32Array.from(pairs) });
+		}
+	}
+	return fallbacks;
+}
+
+/**
+ * The name a file is registered under. A face's extended-Latin letters are a file of their own under a
+ * name of their own (`EXT`), tried after the face: registered under the face's own name, the extended
+ * file was sometimes picked for plain words, and it has no digits or punctuation, so "10 s" came out in
+ * a symbol font and a full stop as a missing-glyph box. Every other language file is named the same way.
+ */
+function fileName(family: string, subset: string, files: number): string {
+	if (subset === "latin") return family;
+	if (subset === "latin-ext") return `${family}${EXT}`;
+	return files === 1 ? family : `${family} ${subset}`;
+}
+
+const covers = (ranges: Int32Array, cp: number): boolean => {
+	let lo = 0;
+	let hi = ranges.length / 2 - 1;
+	while (lo <= hi) {
+		const mid = (lo + hi) >> 1;
+		if (cp < ranges[mid * 2]!) hi = mid - 1;
+		else if (cp > ranges[mid * 2 + 1]!) lo = mid + 1;
+		else return true;
+	}
+	return false;
+};
+
+/** The first fallback file that draws a character, if any does; kept, since a text repeats its letters. */
+const fileOf = new Map<number, Fallback | null>();
+function fallbackFor(cp: number): Fallback | undefined {
+	const known = fileOf.get(cp);
+	if (known !== undefined) return known ?? undefined;
+	const list = fallbackList();
+	// Pictures drawn in colour come from the emoji font, as they always have, not from a symbol font's outline.
+	const emoji = cp >= 0x1f000 && EMOJI.test(String.fromCodePoint(cp));
+	const found = (emoji ? list.find((f) => f.id === "noto-color-emoji" && covers(f.ranges, cp)) : undefined) ?? list.find((f) => covers(f.ranges, cp)) ?? null;
+	fileOf.set(cp, found);
+	return found ?? undefined;
+}
+
+/** Whether a registered family is one of the per-script fallbacks, tried after the family and Inter. */
+export function isFallbackFamily(name: string): boolean {
+	return fallbackList().some((f) => f.name === name);
+}
+
+/**
+ * The families a paragraph in `family` asks for, in order: the family, its extended Latin, Inter's
+ * Latin, then every fallback file. Only the files that have been fetched are anything to the font engines; the rest of the
+ * names are skipped.
+ */
+function fontChain(family: string): string[] {
+	return [...new Set([family, `${family}${EXT}`, FALLBACK_FAMILY, `${FALLBACK_FAMILY}${EXT}`, ...fallbackList().map((f) => f.name)])];
 }

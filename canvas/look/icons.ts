@@ -60,48 +60,6 @@ function cdnIconUrl(library: string, name: string, weight: number): string | und
 	return undefined;
 }
 
-/**
- * An SVG element as the parser below reads it: its name, its attributes and its children.
- *
- * Read with a few regular expressions rather than `DOMParser`, because the drawing is laid out and
- * painted in a worker (`render.worker.ts`) and a worker has no DOM. An icon file is a handful of
- * shapes with plain attributes, which is all this has to understand.
- */
-interface SvgElement {
-	name: string;
-	attrs: Map<string, string>;
-	children: SvgElement[];
-}
-
-const decode = (value: string) => value.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-
-function parseSvg(text: string): SvgElement | undefined {
-	const body = text.replace(/<!--[\s\S]*?-->/g, "").replace(/<\?[\s\S]*?\?>/g, "").replace(/<!DOCTYPE[\s\S]*?>/gi, "");
-	const root: SvgElement = { name: "#root", attrs: new Map(), children: [] };
-	const stack = [root];
-	const tag = /<(\/?)([A-Za-z][\w:.-]*)((?:\s+[\w:.-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/g;
-	const attr = /([\w:.-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
-	for (let found = tag.exec(body); found; found = tag.exec(body)) {
-		const [, closing, name, rest, selfClosing] = found;
-		if (closing) {
-			if (stack.length > 1) stack.pop();
-			continue;
-		}
-		const attrs = new Map<string, string>();
-		for (let a = attr.exec(rest ?? ""); a; a = attr.exec(rest ?? "")) attrs.set(a[1]!, decode(a[2] ?? a[3] ?? a[4] ?? ""));
-		attr.lastIndex = 0;
-		// An inline style says the same things as attributes, and wins over them.
-		for (const decl of (attrs.get("style") ?? "").split(";")) {
-			const [key, value] = decl.split(":").map((part) => part.trim());
-			if (key && value) attrs.set(key, value);
-		}
-		const element: SvgElement = { name: name!.toLowerCase(), attrs, children: [] };
-		stack[stack.length - 1]!.children.push(element);
-		if (!selfClosing) stack.push(element);
-	}
-	return root.children.find((child) => child.name === "svg");
-}
-
 /** Turn an SVG's drawable elements into path parts, with the fill and stroke each inherits. */
 export function parseIcon(svgText: string, weight: number): IconShape | undefined {
 	const root = parseSvg(svgText);
@@ -170,3 +128,44 @@ function toPath(el: SvgElement): string | undefined {
 	}
 }
 
+/**
+ * An SVG element as the parser below reads it: its name, its attributes and its children.
+ *
+ * Read with a few regular expressions rather than `DOMParser`, because the drawing is laid out and
+ * painted in a worker (`render.worker.ts`) and a worker has no DOM. An icon file is a handful of
+ * shapes with plain attributes, which is all this has to understand.
+ */
+interface SvgElement {
+	name: string;
+	attrs: Map<string, string>;
+	children: SvgElement[];
+}
+
+const decode = (value: string) => value.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+function parseSvg(text: string): SvgElement | undefined {
+	const body = text.replace(/<!--[\s\S]*?-->/g, "").replace(/<\?[\s\S]*?\?>/g, "").replace(/<!DOCTYPE[\s\S]*?>/gi, "");
+	const root: SvgElement = { name: "#root", attrs: new Map(), children: [] };
+	const stack = [root];
+	const tag = /<(\/?)([A-Za-z][\w:.-]*)((?:\s+[\w:.-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/g;
+	const attr = /([\w:.-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+	for (let found = tag.exec(body); found; found = tag.exec(body)) {
+		const [, closing, name, rest, selfClosing] = found;
+		if (closing) {
+			if (stack.length > 1) stack.pop();
+			continue;
+		}
+		const attrs = new Map<string, string>();
+		for (let a = attr.exec(rest ?? ""); a; a = attr.exec(rest ?? "")) attrs.set(a[1]!, decode(a[2] ?? a[3] ?? a[4] ?? ""));
+		attr.lastIndex = 0;
+		// An inline style says the same things as attributes, and wins over them.
+		for (const decl of (attrs.get("style") ?? "").split(";")) {
+			const [key, value] = decl.split(":").map((part) => part.trim());
+			if (key && value) attrs.set(key, value);
+		}
+		const element: SvgElement = { name: name!.toLowerCase(), attrs, children: [] };
+		stack[stack.length - 1]!.children.push(element);
+		if (!selfClosing) stack.push(element);
+	}
+	return root.children.find((child) => child.name === "svg");
+}

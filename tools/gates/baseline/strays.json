@@ -32,8 +32,6 @@
 	"canvas/host/inside/options.ts: names a path no file has": 1,
 	"canvas/host/messages.ts: names a path no file has": 1,
 	"canvas/host/outside/framed-editor.tsx: names a path no file has": 2,
-	"canvas/look/font-files.ts: doc above a blank line": 1,
-	"canvas/look/font-files.ts: doc above another doc": 1,
 	"canvas/look/math.ts: names a path no file has": 2,
 	"canvas/scripts/build-css.mjs: names a path no file has": 1,
 	"canvas/types.ts: doc above another doc": 1,
