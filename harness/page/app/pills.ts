@@ -29,7 +29,7 @@ interface PillInputs {
  */
 export function createPills({ stagePen, editorHandle, setPenSelected, playAndFrame }: PillInputs) {
 	/**
-	 * A row of the Canvas tab: a board plays and is framed as from any list; a drawn item is selected
+	 * A row of the Canvas tab: a card plays and is framed as from any list; a drawn item is selected
 	 * and brought to the middle of the canvas, framed whole when it would not fit at this zoom.
 	 */
 	const pickItem = (item: CanvasItem) => {
@@ -50,18 +50,18 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 		const cy = item.box.y + item.box.h / 2;
 		moveCamera({ zoom, x: cx - (region.x + region.width / 2 - view.width / 2) / zoom, y: cy - (region.y + region.height / 2 - view.height / 2) / zoom }, { animate: true });
 	};
-	/** A board's or card's title by its path, for the name on a pill's card. */
+	/** A card's title by its path, for the name on a pill's card. */
 	const titleOf = (path: string) => state.pages.find((one) => one.path === path)?.title;
 	/** A drawn item's name by its id, as the layers list calls it: its own name, or a few of its words. */
 	const itemName = (id: string) => canvasItems(stagePen()?.doc).items.find((one) => one.id === id)?.label;
 	/**
-	 * Show what a pill is about (its card's name): a file opens in a new tab; a board, a card or a drawn
+	 * Show what a pill is about (its card's name): a file opens in a new tab; a card or a drawn
 	 * item, or what a comment is on, is found on the canvas and framed as the side panel's rows do.
 	 */
 	const showPill = (node: DraftMention, comment?: WaitingComment) => {
 		// Read with this tab's token, as every file is (`lib/authed.tsx`).
 		if (node.kind === "file") return void openAuthed(fileAddress(node.id)).catch((error: unknown) => notice("warn", `${node.id} could not be opened: ${(error as Error).message}`));
-		const target = comment ? (comment.items?.[0] ?? comment.path ?? "") : node.id;
+		const target = comment ? (comment.items?.[0] ?? comment.path) : node.id;
 		const name = stageOf(state.focused)?.name;
 		const item = canvasItems(stagePen()?.doc).items.find(
 			(one) => one.id === target || (!!one.board && (one.board === target || target.endsWith(`/${one.board}`) || (!!name && `canvases/${name}/${one.board}` === target))),
