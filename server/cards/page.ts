@@ -70,7 +70,7 @@ export function cardPage(input: { path: string; source: string; pass: string; de
 <html lang="en"><head><meta charset="utf-8" /><title>${escape(titleOf(input.path, input.source))}</title>
 <link rel="stylesheet" href="${up}lib/card.css${input.pass}" />
 <script type="importmap">${map}</script></head>
-<body class="card" style="width:${w}px"><div class="card-body" id="decks-card" style="min-height:100vh">${html}</div>
+<body style="width:${w}px"><div class="card-body" id="decks-card" style="min-height:100vh">${html}</div>
 <script type="module">${PAGE_SCRIPT.replace("__PATH__", JSON.stringify(input.path)).replace("__URLS__", JSON.stringify(urls)).replace("__W__", String(w))}</script>
 <script src="${up}lib/card.js${input.pass}"></script></body></html>
 `;
