@@ -1,0 +1,6 @@
+{
+	"server/people/agent-calls.ts": { "sites": 3, "why": "An agent's own token (agent.create, agent.attach, agent.host): a whole caller, ended by agent.delete." },
+	"server/kernel/server.ts": { "sites": 1, "why": "The lock file's token for the person on this machine: a whole caller, replaced at each start." },
+	"server/kernel/testing.ts": { "sites": 2, "why": "Tests' own tokens, in memory, gone with the test server." },
+	"server/frame/feature.ts": { "sites": 1, "why": "Forwards the scope its caller gives: server/frame/passes.ts passes one with until." }
+}

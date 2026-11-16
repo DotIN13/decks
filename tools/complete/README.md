@@ -13,6 +13,8 @@ owns them.
   what proves it).
 - `old-deck.test.ts`: opens Warden's old-deck fixture as main does; `old-entries.json` names every
   entry today's `.decks/` keeps, with its owner and what becomes of it.
+- `scopes.test.ts`: every token issued in server/ for less than a whole caller has a Scope with until;
+  `scopes-whole.json` names the files that issue whole callers, how many sites, and why.
 - `start.ts`: the server started as main starts it, socket lines, and what the harness answers.
 
 ## May import
@@ -32,6 +34,9 @@ Anything: `@decks/protocol`, `@decks/server` and its kernel's testing entry, `@d
 
 6. Every entry in the old-deck fixture's `.decks/` is in `old-entries.json`, and what is adopted is
    reachable after the start: paired tokens resolve, card versions read, agents are listed.
+
+7. Every callers.issue or tokens.issue in server/ passes a Scope with until, unless its file is in
+   `scopes-whole.json` with that many sites and why; one more or one fewer fails.
 
 ## Check
 
