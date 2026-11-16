@@ -5,6 +5,7 @@ import { ExtensionUiBridge } from "../runtimes/shared/extension-ui.ts";
 import { sessionTokenFiles } from "../runtimes/shared/session-tokens.ts";
 import { Translator, type ChatEvent } from "../runtimes/shared/translator.ts";
 import type { AgentMode, AgentState, AgentUsage, ChatItem, MessagePart, ThinkingLevel } from "../runtimes/types/index.ts";
+import { writeTeller } from "./acts.ts";
 import { identityReminder, type Agent, type Spec } from "./identity.ts";
 import { Queues, type Mail } from "./queue.ts";
 import { markFiles, touchedFiles } from "./timeline.ts";
@@ -60,6 +61,7 @@ export class Session {
 		if (spec.token) this.saved.token = spec.token;
 		this.translator = new Translator(spec.id, (event) => this.hear(event), deps.deckPath, () => this.save(), (items) => deps.transcripts.archive(spec.id, items));
 		this.translator.load(this.saved.items);
+		this.translator.onTool = writeTeller(() => this.client, deps.deckPath);
 		this.bridge = new ExtensionUiBridge({
 			prompt: (question) => this.tellChat("chat.asked", [spec.id], { question }),
 			closePrompt: (id) => this.tellChat("chat.answered", [spec.id, id], {}),
