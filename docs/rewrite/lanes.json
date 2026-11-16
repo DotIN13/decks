@@ -125,5 +125,9 @@
 	],
 	"*": [
 		"tools/gates/baseline/"
+	],
+	"Quire": [
+		"server/documents/latex/",
+		"server/documents/git/"
 	]
 }
