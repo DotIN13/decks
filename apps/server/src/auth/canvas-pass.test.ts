@@ -257,9 +257,9 @@ test("its stream carries its own canvas's drawing and nothing else", async () =>
 		controller.abort();
 		await reading;
 		const text = heard.join("");
-		assert.match(text, new RegExp(`"stage":"${one}"`), "its own canvas, with no agent on it");
+		assert.match(text, new RegExp(`"canvas":"${one}"`), "its own canvas, with no agent on it");
 		assert.match(text, /"id":"mine"/);
-		assert.equal(text.includes(`"stage":"${two}"`), false, "nothing of the other canvas");
+		assert.equal(text.includes(`"canvas":"${two}"`), false, "nothing of the other canvas");
 	} finally {
 		cleanup();
 	}

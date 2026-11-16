@@ -11,8 +11,9 @@ import { AgentStore } from "../agents/store.ts";
 import { Deck } from "../deck/loader.ts";
 import { realPathOf } from "../deck/roots.ts";
 import type { CanvasService } from "../canvas/service.ts";
-import type { Hub, View } from "./tab-socket.ts";
-import { greet, handleTabRequest } from "./greeting.ts";
+import { runVerb } from "../calls/run.ts";
+import type { View } from "../calls/person-table.ts";
+import { greet } from "./greeting.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {
@@ -65,24 +66,19 @@ function open() {
 
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	app.agents.restore();
-	// A hub with two browsers on it, each keeping what it was sent.
+	// Two pages on the line, each keeping what it was told: a broadcast as its own screen sees it (`forView`), as the line says it.
 	const laptop: View = {};
 	const phone: View = {};
 	const inbox = new Map<View, ServerMessage[]>([
 		[laptop, []],
 		[phone, []],
 	]);
-	const hub = {
-		connections: 2,
-		each: (render: (view: View) => ServerMessage) => {
-			for (const [view, got] of inbox) got.push(render(view));
-		},
-		broadcast: (message: ServerMessage) => {
-			for (const got of inbox.values()) got.push(message);
-		},
-	};
-	app.pages.hub = hub as unknown as Hub;
+	app.pages.listen((message) => {
+		for (const [view, got] of inbox) got.push(app.pages.forView(message, view));
+	});
 	const replyTo = (view: View) => (message: ServerMessage) => inbox.get(view)!.push(message);
+	/** One of the person's calls from a page, which names the conversation on its screen. */
+	const call = (view: View, verb: string, args: unknown[]) => runVerb(app, { kind: "person" }, view.focused ? { "x-decks-agent": view.focused } : {}, verb, args, undefined, { tell: replyTo(view), view });
 	const last = <T extends ServerMessage["type"]>(view: View, type: T) =>
 		inbox.get(view)!.filter((message): message is Extract<ServerMessage, { type: T }> => message.type === type).at(-1);
 	const plan = (message: Extract<ServerMessage, { type: "deck.changed" }> | undefined) => {
@@ -96,19 +92,20 @@ function open() {
 		laptop,
 		phone,
 		replyTo,
+		call,
 		last,
 		plan,
 		cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })),
 	};
 }
 
-test("opening a chat on one device leaves the other device where it was", () => {
-	const { app, one, two, laptop, phone, replyTo, last, cleanup } = open();
+test("opening a chat on one device leaves the other device where it was", async () => {
+	const { app, one, two, laptop, phone, replyTo, call, last, cleanup } = open();
 	try {
 		greet(app, replyTo(laptop), laptop);
 		greet(app, replyTo(phone), phone);
-		handleTabRequest(app, { type: "agent.focus", id: one }, replyTo(laptop), laptop);
-		handleTabRequest(app, { type: "agent.focus", id: two }, replyTo(phone), phone);
+		await call(laptop, "agent.focus", [one]);
+		await call(phone, "agent.focus", [two]);
 
 		assert.equal(last(phone, "agent.list")?.focused, two, "the phone is on the chat it opened");
 		assert.equal(last(laptop, "agent.list")?.focused, one, "and the laptop was not moved to it");
@@ -122,23 +119,19 @@ test("opening a chat on one device leaves the other device where it was", () => 
 	}
 });
 
-test("each device's board list carries its own conversation's arrangement", () => {
-	const { app, one, two, laptop, phone, replyTo, last, plan, cleanup } = open();
+test("each device's board list carries its own conversation's arrangement", async () => {
+	const { app, one, two, laptop, phone, call, last, plan, cleanup } = open();
 	try {
-		handleTabRequest(app, { type: "agent.focus", id: one }, replyTo(laptop), laptop);
+		await call(laptop, "agent.focus", [one]);
 		assert.deepEqual(plan(last(laptop, "deck.changed")), [10, 20]);
-		handleTabRequest(app, { type: "agent.focus", id: two }, replyTo(phone), phone);
+		await call(phone, "agent.focus", [two]);
 		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 
 		// Something changed the deck: each device hears it as its own stage sees it.
 		app.send({ type: "deck.changed", deck: app.stageState() });
 		assert.deepEqual(plan(last(laptop, "deck.changed")), [10, 20]);
 		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
-
-		// And a board moved on the laptop lands on the laptop's conversation, not the phone's.
-		handleTabRequest(app, { type: "card.move", path: "canvases/t/cards/plan/index.html", x: 64, y: 64 }, replyTo(laptop), laptop);
-		assert.deepEqual(app.agents.get(one)?.seat.positions()["canvases/t/cards/plan/index.html"], { x: 64, y: 64 });
-		assert.deepEqual(app.agents.get(two)?.seat.positions()["canvases/t/cards/plan/index.html"], { x: 900, y: 400 });
+		// A card moved on one device names the canvas on its screen: `canvas/card-size-on-canvas.test.ts` holds that it lands there.
 	} finally {
 		cleanup();
 	}

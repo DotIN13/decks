@@ -4,7 +4,7 @@ import renderWorkerUrl from "./render.worker.ts?worker&url";
  * The stage's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
  *
  * The page engine owns a copy of the drawing, kept on the server's revision by its edits
- * (`stage.pen.delta`), and answers what the stage asks of the drawing: where each item is, what is
+ * (`canvas.changed`), and answers what the stage asks of the drawing: where each item is, what is
  * under a point, what a marquee holds, a card's links. Each frame it draws two canvases in the same
  * call that moves the board pages (`frame`): under them, the boards' pictures; over them, the
  * worker's tiles, then what a gesture is moving and the stroke under the pen, drawn fresh.

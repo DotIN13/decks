@@ -12,16 +12,28 @@ import { putOn } from "../canvas/canvas-ops.ts";
 import { penEditBy } from "../canvas/pens.ts";
 import { deleteCanvas, titleCanvas } from "../canvas/admin.ts";
 import { unpairStudio } from "../studio/index.ts";
-import type { View } from "../connections/tab-socket.ts";
 import { personAgent } from "./person.ts";
+
+/**
+ * What one connected page is looking at.
+ *
+ * Only the conversation, because that is the one thing the server answers differently per
+ * screen: which agent's canvas is up decides the arrangement a card list carries and the
+ * `focused` an `agent.list` names. Everything else about where a person is lives in that
+ * browser's own hash (`web/src/app/route.ts`).
+ */
+export interface View {
+	/** The agent this page's canvas is on. `undefined` until it has said. */
+	focused?: string;
+}
 
 /**
  * Who is calling a person's verb, and what it may say back.
  *
- * `tell` says a message to the caller alone (the line it came on, or the tab's socket), where a
+ * `tell` says a message to the caller alone (the line it came on), where a
  * broadcast goes to everyone: the history a chat.open asked for, a notice about this call. A call
  * by HTTP has nobody to tell, and its messages become the answer's notes. `view` is the caller's
- * screen, which agent it is on, kept per line or socket (`forView` in `app.ts`); a page that has
+ * screen, which agent it is on, kept per line (`forView` in `connections/broadcast.ts`); a page that has
  * none (a terminal) changes the harness's own focus alone.
  */
 export interface PersonCall {
@@ -454,7 +466,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 	};
 }
 
-/** `canvas.rename` and `studio.disconnect` are the table's; the person's old `stage.rename` and `studio.unpair` run through them (`connections/tab-requests.ts`). */
+/** A canvas renamed by the person: `canvas.rename` is the table's, for an agent, and this is what the canvas manager's rename runs. */
 export function renameCanvas(app: App, name: string, to: string): void {
 	const pens = app.stage.pens;
 	if (!pens) throw new Error("This server keeps no canvases.");

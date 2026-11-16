@@ -1,6 +1,4 @@
-import type { IncomingMessage } from "node:http";
 import type { NextFunction, Request, Response } from "express";
-import { actsAsPerson, type Principal } from "./principal.ts";
 import type { Refusal, TokenStore, Verified } from "./tokens.ts";
 import { decodedPath, HARNESS_ID, isAppPass, isCanvasPass, passCovers, splitPathPass, type Passes } from "./passes.ts";
 
@@ -297,15 +295,4 @@ export function guard(gate: Gate) {
 		}
 		res.status(401).type("text").send(refusal("none"));
 	};
-}
-
-/**
- * The gate for a socket at `/ws`, which runs the person's commands: only the person's token or a
- * site's, from `decks_token` in its address or a bearer header. Answers the principal, or nothing.
- */
-export function socketPrincipal(gate: Pick<Gate, "tokens">, request: IncomingMessage): Principal | undefined {
-	const token = queryTokenOf(request.url) ?? bearerOf(request.headers);
-	const seen = verifyOn(gate, token, request.headers);
-	if (!seen.ok) return undefined;
-	return actsAsPerson(seen.principal) ? seen.principal : undefined;
 }

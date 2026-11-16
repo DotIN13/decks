@@ -6,8 +6,8 @@ import type { ServerMessage, StageCall } from "@decks/protocol";
  * has it), and the wait for their answers.
  *
  * The harness cannot move a camera or read a screen: a page does, and says what happened. So a call
- * goes out to every page as `view.called` under an id, and whoever answers settles it: a tab on the
- * old socket, a page or a canvas frame on the line, a frame over HTTP. A page that never answers
+ * goes out to every page as `view.called` under an id, and whoever answers settles it: a page or
+ * a canvas frame on the line, a frame over HTTP. A page that never answers
  * times out into a result rather than leaving the agent's call hanging on a tab that was closed.
  */
 
@@ -20,7 +20,7 @@ interface Waiting {
 /** What the page calls need of the harness: how to tell every page, and how many could answer. */
 export interface PageCallsHost {
 	send(message: ServerMessage): void;
-	/** The pages and frames connected now, on the old socket and on the line. */
+	/** The pages and frames connected now, on the line. */
 	screens(): number;
 }
 
@@ -55,7 +55,7 @@ export class PageCalls {
 	 */
 	askAll(call: Omit<StageCall, "id">, timeoutMs = 1500): Promise<unknown[]> {
 		const id = randomUUID();
-		// Every front end may answer: pages and canvas frames on the line as well as the old socket's. A line that
+		// Every front end may answer: pages and canvas frames on the line. A line that
 		// answers nothing (a script's, or a page leaving the call to its frame) only makes the wait run to its end.
 		const expected = this.of.screens();
 		if (expected === 0) return Promise.resolve([]);

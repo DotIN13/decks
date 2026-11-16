@@ -11,7 +11,7 @@ import type { FrameHooks, Of } from "../socket-messages.ts";
  * What changed in the deck: the deck itself, one of its cards, a document made for a drop, a canvas's
  * drawing, and the list of canvases.
  */
-export function heardDeck(message: Of<"deck"> | Of<"card"> | Of<"doc"> | Of<"canvas"> | Of<"stage">, hooks: FrameHooks): void {
+export function heardDeck(message: Of<"deck"> | Of<"card"> | Of<"doc"> | Of<"canvas">, hooks: FrameHooks): void {
 	switch (message.type) {
 		case "deck.changed":
 			setState("deck", message.deck);
@@ -73,12 +73,6 @@ export function heardDeck(message: Of<"deck"> | Of<"card"> | Of<"doc"> | Of<"can
 		// What stages there are, and who is on them: the manager's whole list.
 		case "canvas.list":
 			receiveStages(message);
-			return;
-
-		// The tab socket's per-agent copies of a change, which the Decks iOS app reads: the line says canvas.changed.
-		case "stage.pen":
-		case "stage.pen.delta":
-		case "stage.pen.refused":
 			return;
 		default:
 			return;

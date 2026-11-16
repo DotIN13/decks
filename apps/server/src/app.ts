@@ -30,7 +30,6 @@ import { Deck } from "./deck/loader.ts";
 import { followDeck } from "./cards/follow.ts";
 import { Cameras } from "./deck/cameras.ts";
 import { Broadcast } from "./connections/broadcast.ts";
-import type { Hub } from "./connections/tab-socket.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { CanvasPens, type PenEntry } from "./canvas/pens.ts";
 import { Forwards } from "./ports.ts";
@@ -470,8 +469,7 @@ export class App {
 		return runtimeLib();
 	}
 
-	attach(hub: Hub): void {
-		this.pages.hub = hub;
+	attach(): void {
 		this.follow();
 		/*
 		 * The deck's own chat list first, then one agent only if it had none.
@@ -597,19 +595,14 @@ export class App {
 	}
 
 	/**
-	 * A stage drawing changed: every session on that stage takes its boards from it, and every
-	 * browser is sent it once per agent whose stage it is.
+	 * A canvas's drawing changed: every agent on that canvas takes its cards from it, and whoever
+	 * hears the canvas is told once (`canvas.changed`).
 	 */
 	private publishPen(name: string, entry: PenEntry): void {
 		const on = (this.agents?.all() ?? []).filter((agent) => agent.seat.stageName() === name);
 		for (const agent of on) agent.seat.penChanged();
-		/*
-		 * What changed, not the whole drawing: a browser that missed a revision asks for it whole. With
-		 * no agent on the canvas it is still said once, to no agent (`agentId` ""), for a canvas frame
-		 * showing it (`/api/v1/events`), which follows the canvas rather than an agent.
-		 */
-		const ids = on.length ? on.map((agent) => agent.id) : [""];
-		for (const message of this.pens.log.changes(ids, name)) this.send(message);
+		// What changed, not the whole drawing: a client that missed a revision asks for it whole.
+		this.send(this.pens.log.changes(name));
 		// The manager lists what each stage holds, and this is the moment that changed.
 		this.publishStages();
 	}
@@ -621,12 +614,6 @@ export class App {
 
 	publishStages(): void {
 		this.send(this.stagesMessage());
-	}
-
-	/** The drawing for one agent's stage, for a browser opening its chat; nothing if it has never drawn. */
-	penMessage(agentId: string): ServerMessage | undefined {
-		const name = this.agents.get(agentId)?.seat.stageName();
-		return name ? this.pens.log.frame(agentId, name) : undefined;
 	}
 
 	dispose(): void {

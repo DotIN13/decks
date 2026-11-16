@@ -574,7 +574,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				return { variables: (doc.variables ?? {}) as Record<string, unknown>, values: shortVariables(doc), ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
 			},
 			batch: async (ops: readonly unknown[], options?: On) => change(targetOf(options), ops as readonly CanvasOpIn[]) as never,
-			/** Undo and redo of the person's own edits (`CanvasPens.step`), as the socket's `stage.pen.step` does them. */
+			/** Undo and redo of the person's own edits (`CanvasPens.step`), as `canvas.step` does them. */
 			step: async (direction: "undo" | "redo", options?: { canvas?: string }) => {
 				const name = canvasOf(options?.canvas);
 				const pens = needPens();

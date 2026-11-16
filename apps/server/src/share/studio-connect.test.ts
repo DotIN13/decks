@@ -9,7 +9,7 @@ import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../connections/http.ts";
 import { revokeStudioTokens, STUDIO_TOKEN_MS, studioToken } from "../studio/index.ts";
-import { handleTabRequest } from "../connections/greeting.ts";
+import { unpairStudioHere } from "../calls/person-table.ts";
 
 const KEY = "dsk_abcdefghijklmnopqrstuvwxyz012345";
 const STUDIO = { origin: "https://studio.test", "sec-fetch-site": "cross-site", "content-type": "application/json" };
@@ -300,15 +300,13 @@ test("unpairing Studio in Settings deletes its key and takes back every token gi
 		const ada = studioToken(app.tokens, { user: { id: "u1", name: "Ada" }, origin: "https://studio.test" });
 		const bob = studioToken(app.tokens, { user: { id: "u2", name: "Bob" }, origin: "https://studio.test" });
 		const other = app.tokens.issue({ kind: "site", label: "Another Decks", origin: "https://other.test" }).token;
-		const shown: unknown[] = [];
 		const before = app.pairingMessage() as { studio?: { url: string } };
 		assert.equal(before.studio?.url, "https://studio.test", "Settings shows the link");
-		handleTabRequest(app, { type: "studio.unpair" }, (frame) => shown.push(frame));
+		unpairStudioHere(app);
 		assert.ok(!linked(), "the key is gone");
 		for (const token of [first.body.token as string, ada.token, bob.token]) assert.equal(app.tokens.verify(token).ok, false);
 		assert.ok(app.tokens.verify(other).ok, "another Decks keeps its pairing");
 		assert.equal((app.pairingMessage() as { studio?: unknown }).studio, undefined);
-		assert.equal(shown.length, 0, "nothing went wrong");
 		// A key replaced by another takes back only what the old one gave, not the new connect's own pairing.
 		const again = await post("/pair", { studio: "https://studio.test", key: KEY, label: "Decks Studio" });
 		const carol = studioToken(app.tokens, { user: { id: "u3", name: "Carol" }, origin: "https://studio.test" });

@@ -3,7 +3,7 @@ import type { Duplex } from "node:stream";
 import type { LineClientMessage, Presence, PresenceBy, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { App } from "../app.ts";
-import type { View } from "./tab-socket.ts";
+import type { View } from "../calls/person-table.ts";
 import { verifyOn } from "../auth/guard.ts";
 import { isCanvasPass } from "../auth/passes.ts";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
@@ -145,7 +145,7 @@ export class Line {
 			}, RECHECK_MS);
 			state.recheck.unref?.();
 			send(socket, { type: "line.hello", who: principal.kind as "person" | "site" | "agent" | "canvas", ...(principal.kind === "canvas" ? { canvas: principal.canvas, role: principal.role } : {}) });
-			// A page: greeted as the tab's socket greeted it, with a screen of its own that `forView` renders for.
+			// A page: greeted with the whole deck, with a screen of its own that `forView` renders for.
 			if (message.greet === true && actsAsPerson(principal)) {
 				state.view = {};
 				greet(this.app, (said) => send(socket, said), state.view);
@@ -298,8 +298,6 @@ export class Line {
 	private hear(message: ServerMessage): void {
 		// What was said to one stream alone (a document's answers to a frame on the stream); a line's answers come straight to it.
 		if ((message as { frameTo?: unknown }).frameTo !== undefined) return;
-		// Per-agent copies of a canvas's change, for a tab's socket; the line hears `canvas.changed`.
-		if (message.type === "stage.pen" || message.type === "stage.pen.delta" || message.type === "stage.pen.refused") return;
 		let text: string | undefined;
 		for (const [socket, state] of this.sockets) {
 			if (!state.principal) continue;

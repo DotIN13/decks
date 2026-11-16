@@ -1,4 +1,3 @@
-import { socketPrincipal, verifyOn } from "./auth/guard.ts";
 import { actsAsPerson } from "./auth/principal.ts";
 import { extraHosts, hostAllowed } from "./auth/hosts.ts";
 import { writeCliToken, type CliToken } from "./auth/cli-token.ts";
@@ -10,11 +9,9 @@ import { App } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { createHttpApp } from "./connections/http.ts";
 import { installDir } from "@decks/runtime";
-import { Hub } from "./connections/tab-socket.ts";
 import { Line } from "./connections/line.ts";
 import { revokeStudioTokens, startStudio, studioToken as studioGives } from "./studio/index.ts";
 import { DryRun } from "./migrations/index.ts";
-import { greet, handleTabRequest } from "./connections/greeting.ts";
 
 const config = loadConfig();
 
@@ -38,18 +35,8 @@ try {
 }
 
 const httpServer = createServer(createHttpApp(app));
-const hub = new Hub(
-	httpServer,
-	(message, reply, view) => handleTabRequest(app, message, reply, view),
-	(reply, view) => greet(app, reply, view),
-	// A hello's token opens the socket as an address's did: the person's or a paired site's.
-	(token, headers) => {
-		const seen = verifyOn(app, token, headers);
-		return seen.ok && actsAsPerson(seen.principal);
-	},
-);
-app.attach(hub);
-// The line: one socket for the canvas frame (and any token holder), its calls, its canvas's changes and its own messages (`connections/line.ts`).
+app.attach();
+// The line: one socket for the page, the canvas frame and any token holder: its calls, its canvases' changes and its own messages (`connections/line.ts`).
 const line = new Line(app);
 app.pages.lines = () => line.connections;
 
@@ -93,9 +80,9 @@ line.onPresence = (message) => {
 app.pens.log.wrote = (name, change) => studio.edited(name, change);
 
 /*
- * One upgrade listener, two websockets.
+ * One upgrade listener, several websockets.
  *
- * `/ws` is the browser; `/api/web/relay` is the Decks extension in the user's own Chrome,
+ * `/api/v1/socket` is the line; `/api/web/relay` is the Decks extension in the user's own Chrome,
  * dialling in with its pairing code (`browser/bridge.ts`); `/node/…` and `/rnode/…` are a
  * forwarded port's own websockets (`ports.ts`). Anything else is not a websocket this
  * server has, and is dropped rather than left hanging.
@@ -114,15 +101,7 @@ httpServer.on("upgrade", (request, socket, head) => {
 		line.handleUpgrade(request, socket, head);
 		return;
 	}
-	if (path === "/ws") {
-		/*
-		 * The socket runs the person's commands, so it is opened only with the person's token or a
-		 * paired site's: in `hello`, its first message, or (the older way, which the browser checks still use) in its
-		 * address (`decks_token`). A socket that says neither is closed (`connections/tab-socket.ts`).
-		 */
-		hub.handleUpgrade(request, socket, head, socketPrincipal(app, request) !== undefined);
-	}
-	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
+	if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
 	else if (
 		appUpgrade(
 			request,
@@ -172,7 +151,6 @@ const shutdown = () => {
 	app.cliTokenId = undefined;
 	void studio.stop();
 	app.dispose();
-	hub.close();
 	line.close();
 	httpServer.close(() => process.exit(0));
 	// A socket that will not close must not hold the process open forever.

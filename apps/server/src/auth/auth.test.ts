@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { bearerOf, fromAnotherSite, harnessReads, isDoor, isPublic, queryTokenOf, socketPrincipal, verifyOn } from "./guard.ts";
+import { bearerOf, fromAnotherSite, harnessReads, isDoor, isPublic, queryTokenOf, verifyOn } from "./guard.ts";
 import { fromPrivateNetwork, isPrivateAddress, isTopNavigation, PairCodes, pairWithoutCode, withSession } from "./issue.ts";
 import { Passes } from "./passes.ts";
 import { TOKEN_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
@@ -221,19 +221,6 @@ test("a person's, an agent's or an app's token from another site's page is refus
 	assert.deepEqual(verifyOn(gate, agent, cross), { ok: false, reason: "kind" });
 	assert.ok(verifyOn(gate, site, cross).ok);
 	assert.ok(verifyOn(gate, person, { "sec-fetch-site": "same-origin" }).ok);
-});
-
-test("the socket takes the person's token or a site's, from its address or a header, and nothing else", () => {
-	const { tokens } = store();
-	const gate = { tokens };
-	const person = tokens.issue({ kind: "person" }).token;
-	const agent = tokens.issue({ kind: "agent", id: "a1" }).token;
-	const request = (url: string, headers: Record<string, string> = {}) => ({ url, headers }) as unknown as import("node:http").IncomingMessage;
-	assert.deepEqual(socketPrincipal(gate, request(`/ws?decks_token=${person}`)), { kind: "person" });
-	assert.deepEqual(socketPrincipal(gate, request("/ws", { authorization: `Bearer ${person}` })), { kind: "person" });
-	assert.equal(socketPrincipal(gate, request("/ws")), undefined, "no token, from this machine or not");
-	assert.equal(socketPrincipal(gate, request(`/ws?decks_token=${agent}`)), undefined, "an agent has the verbs, not the person's socket");
-	assert.equal(socketPrincipal(gate, request("/ws?decks_key=anything")), undefined, "the old person key is nothing");
 });
 
 test("a pass is good only while the token it was made with is", () => {

@@ -2,7 +2,7 @@ import type { PenDocument, PenNode } from "./types.ts";
 
 /**
  * What changed between two versions of a drawing, as small edits: what the server sends instead of
- * the whole file (`stage.pen.delta`), and what the stage's engines and the app's own copy apply.
+ * the whole file (`canvas.changed`), and what the stage's engines and the app's own copy apply.
  *
  * Worked out from the two documents, not from the ops that made the change, because a drawing also
  * changes by arrows rerouting after an edit, by undo putting back an older text, and by a person or

@@ -96,7 +96,6 @@ test("the line takes its token in hello, answers calls once each, and says a can
 		assert.deepEqual(changed.made, ["typed two"]);
 		assert.equal(changed.author?.kind, "person");
 		assert.equal(me.heard.filter((m) => m.type === "canvas.changed").length, 1, "said once, not once per agent");
-		assert.equal(me.heard.filter((m) => m.type === "stage.pen.delta").length, 0, "the per-agent copies are the tab's socket's");
 
 		// An unknown verb is answered, not dropped.
 		me.send({ type: "line.call", id: "k2", verb: "no.such", args: [] });

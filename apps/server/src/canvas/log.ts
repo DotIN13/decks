@@ -31,6 +31,18 @@ export interface ChangeRecord {
 	made?: string[];
 }
 
+/** A canvas's drawing whole, as a reader over HTTP is given it (`CanvasLog.frame`). */
+export interface CanvasFrame {
+	stage: string;
+	rev: number;
+	doc: PenDocument;
+	base: string;
+	/** The file on disk does not parse, and `doc` is the last good version. */
+	error?: string;
+	made?: string[];
+	by?: string;
+}
+
 /** How many writes of each canvas are kept for the agents' notes (`changesSince`). */
 const CHANGE_LOG = 400;
 /** How many of a stage's recent names a drawing sent whole carries. */
@@ -200,16 +212,16 @@ export class CanvasLog {
 	}
 
 	/**
-	 * A drawing sent whole to one browser (asked again, opened, a picture of the stage) says it has the
-	 * recent names and those still to be sent, and takes none: taken, they were never sent to the
-	 * other browsers, whose edits then stayed on top of the drawing for six seconds.
+	 * A canvas's drawing whole, with its imports, for a reader over HTTP (the picture page, a bundle):
+	 * it says the browsers' recent names and those still to be said, and takes none, since taken they
+	 * would never be said to the clients on the line, whose edits then stayed on top of the drawing.
 	 */
-	frame(agentId: string, name: string, made = [...(this.madeLately.get(name) ?? []), ...(this.made.get(name) ?? [])]): ServerMessage {
+	frame(name: string): CanvasFrame {
 		const entry = this.of.get(name);
 		const doc = this.of.files.withImported(name, entry.doc);
-		this.sent.set(name, { rev: entry.rev, doc });
+		const made = [...(this.madeLately.get(name) ?? []), ...(this.made.get(name) ?? [])];
 		const by = this.writers.get(name);
-		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(this.of.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}), ...(by ? { by } : {}) };
+		return { stage: name, rev: entry.rev, doc, base: `${fileUrl(this.of.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}), ...(by ? { by } : {}) };
 	}
 
 	/** The browsers' edits written since the drawing was last sent, taken: the next frame or delta says it has them. */
@@ -220,7 +232,7 @@ export class CanvasLog {
 		return made;
 	}
 
-	/** The version of each stage last sent to browsers, whole or as edits: what the next edits are from. */
+	/** The version of each canvas last said to its clients, whole or as edits: what the next edits are from. */
 	private readonly sent = new Map<string, { rev: number; doc: PenDocument }>();
 
 	/** Who made the write that gave a canvas its current revision, from the log; nothing when the log does not say. */
@@ -238,20 +250,20 @@ export class CanvasLog {
 	}
 
 	/**
-	 * What changed since the version last sent: one `canvas.changed` for every client on the canvas's
-	 * line or stream, then the same as `stage.pen.delta` frames for these agents (what a tab's socket
-	 * still reads: the Decks iOS app's); or the whole drawing when nothing was sent before or the file does
-	 * not read. The edits are the log's whenever it holds every revision since the one sent (`editsSince`);
+	 * What changed since the version last said, as the one `canvas.changed` every client on the canvas's
+	 * line or stream hears; or the whole drawing when nothing was said before or the file does not
+	 * read. The edits are the log's whenever it holds every revision since the one said (`editsSince`);
 	 * else (a frame of the canvas changed with no revision, a revision from before this server) the two
 	 * drawings, imports and all, are compared, so the edits are always right.
 	 */
-	changes(agentIds: readonly string[], name: string): ServerMessage[] {
+	changes(name: string): ServerMessage {
 		const entry = this.of.get(name);
 		const before = this.sent.get(name);
 		const made = this.takeMade(name);
 		if (!before || entry.error) {
 			const whole = this.changedWhole(name, entry, made.length ? made : (this.madeLately.get(name) ?? []));
-			return [whole, ...agentIds.map((id) => this.frame(id, name, this.madeLately.get(name) ?? made))];
+			this.sent.set(name, { rev: entry.rev, doc: (whole as { doc: PenDocument }).doc });
+			return whole;
 		}
 		const doc = this.of.files.withImported(name, entry.doc);
 		const edits = (entry.rev > before.rev ? this.editsSince(name, before.rev, entry.rev)?.edits : undefined) ?? diff(before.doc, doc);
@@ -259,8 +271,7 @@ export class CanvasLog {
 		const base = `${fileUrl(this.of.folderOf(name))}/`;
 		const by = this.writers.get(name);
 		const author = this.authorOf(name, entry.rev);
-		const changed: ServerMessage = { type: "canvas.changed", canvas: name, rev: entry.rev, from: before.rev, edits, base, ...(made.length ? { made } : {}), ...(by ? { by } : {}), ...(author ? { author } : {}) };
-		return [changed, ...agentIds.map((agentId): ServerMessage => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base, ...(made.length ? { made } : {}), ...(by ? { by } : {}) }))];
+		return { type: "canvas.changed", canvas: name, rev: entry.rev, from: before.rev, edits, base, ...(made.length ? { made } : {}), ...(by ? { by } : {}), ...(author ? { author } : {}) };
 	}
 
 	/**

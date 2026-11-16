@@ -198,7 +198,7 @@ test("a stage's imports are read from inside the deck, used for its boxes and it
 		);
 		const view = pens.read(name);
 		assert.deepEqual(view.children[0]!.box, { x1: 10, y1: 20, x2: 130, y2: 60 }, "the imported card's own size");
-		const frame = pens.log.frame("agent", name) as unknown as { doc: Record<string, unknown> };
+		const frame = pens.log.frame(name) as unknown as { doc: Record<string, unknown> };
 		assert.deepEqual(Object.keys((frame.doc["decks.imported"] ?? {}) as object), ["deck", "far"], "a file outside the deck is read too");
 		const saved = readFileSync(join(dir, "canvases", name, "canvas.pen"), "utf8");
 		assert.equal(saved.includes("decks.imported"), false);
@@ -394,7 +394,7 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "a", content: "one" }, box: { x1: 0, y1: 0 } }]);
 		const first = pens.get(name).rev;
 		// The drawing was sent whole once; what follows is the log's edits, revision by revision.
-		pens.log.changes([""], name);
+		pens.log.changes(name);
 		pens.edit(name, [{ op: "update", id: "a", set: { content: "two" } }]);
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "b", content: "b" }, box: { x1: 400, y1: 0 } }]);
 		const now = pens.get(name).rev;
@@ -408,11 +408,10 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 		assert.deepEqual(span.edits.map((e) => e.op), ["set", "insert"]);
 		assert.equal(pens.log.editsSince(name, -1), undefined, "a revision from before the log has no edits to offer");
 		// Published from the log: the delta from the revision last sent carries exactly those edits, in order.
-		// Said first as canvas.changed, once for every client on the line, then as the tab's per-agent delta: the same edits.
-		const published = pens.log.changes([""], name) as Array<{ type: string; from: number; rev: number; edits: Array<{ op: string }>; author?: { kind: string } }>;
-		assert.deepEqual(published.map((m) => m.type), ["canvas.changed", "stage.pen.delta"]);
-		assert.equal(published[0]!.author?.kind, "person");
-		const delta = published[1];
+		// Said once, as canvas.changed, for every client on the line.
+		const delta = pens.log.changes(name) as unknown as { type: string; from: number; rev: number; edits: Array<{ op: string }>; author?: { kind: string } };
+		assert.equal(delta.type, "canvas.changed");
+		assert.equal(delta.author?.kind, "person");
 		assert.deepEqual([delta!.from, delta!.rev], [first, now]);
 		assert.deepEqual(delta!.edits.map((e) => e.op), ["set", "insert"]);
 		assert.deepEqual(wrote.map((w) => [w.rev, w.by, w.ops]), [[first, "person", ["insert"]], [first + 1, "person", ["set"]], [first + 2, "person", ["insert"]]]);
@@ -422,7 +421,7 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 		const hand = pens.get(name);
 		assert.equal(hand.rev, now + 1);
 		assert.equal(pens.log.editsSince(name, now), undefined);
-		const [fallback] = pens.log.changes([""], name) as Array<{ from: number; rev: number; edits: Array<{ op: string; id?: string }> }>;
+		const fallback = pens.log.changes(name) as unknown as { from: number; rev: number; edits: Array<{ op: string; id?: string }> };
 		assert.equal((fallback as { type?: string }).type, "canvas.changed");
 		assert.deepEqual([fallback!.from, fallback!.rev], [now, now + 1]);
 		assert.ok(fallback!.edits.some((e) => e.op === "remove" && e.id === "b"), "the drawings compared say b went");

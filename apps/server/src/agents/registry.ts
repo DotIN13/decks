@@ -418,11 +418,9 @@ export class Registry {
 	}
 
 	/**
-	 * Take one browser's focus for the length of one of its frames.
-	 *
-	 * Silent, because nothing moved for anyone: each browser keeps its own conversation
-	 * (`connections/tab-socket.ts`'s `View`), and this only makes "the focused agent" mean *that browser's* while
-	 * its frame is handled. An id that is gone is ignored, and the last focus stands.
+	 * Move the focus without saying so: nothing is published, since each page keeps its own
+	 * conversation (`calls/person-table.ts`'s `View`). An id that is gone is ignored, and the
+	 * last focus stands.
 	 */
 	look(id: string | undefined): void {
 		if (this.get(id)) this.focusedId = id;

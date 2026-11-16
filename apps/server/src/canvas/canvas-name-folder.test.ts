@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { handleTabRequest } from "../connections/greeting.ts";
+import { renameCanvas } from "../calls/person-table.ts";
 
 /*
  * Canvases are the deck's: a new one is not named after the agent on it, and the first name chosen
@@ -21,10 +21,10 @@ test("a new agent's canvas is not named after it, and the first name chosen name
 		const one = app.agents.create({ name: "Wren", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		const first = one.seat.stageName(true)!;
 		assert.equal(first, "untitled-canvas");
-		handleTabRequest(app, { type: "stage.rename", name: first, to: "Launch plan" }, () => {});
+		renameCanvas(app, first, "Launch plan");
 		assert.equal(one.seat.stageName(), "launch-plan", "the folder takes the first name");
 		assert.ok(existsSync(join(deck, "canvases", "launch-plan", "canvas.json")));
-		handleTabRequest(app, { type: "stage.rename", name: "launch-plan", to: "Launch plan, week two" }, () => {});
+		renameCanvas(app, "launch-plan", "Launch plan, week two");
 		assert.equal(one.seat.stageName(), "launch-plan", "and keeps it after that");
 		assert.equal(app.pens.titleOf("launch-plan"), "Launch plan, week two");
 	} finally {

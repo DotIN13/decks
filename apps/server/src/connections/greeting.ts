@@ -1,12 +1,6 @@
-import type { ClientMessage, ServerMessage } from "@decks/protocol";
+import type { ServerMessage } from "@decks/protocol";
+import type { View } from "../calls/person-table.ts";
 import type { RouteDeps } from "./routes/shared.ts";
-import { legacy } from "./tab-requests.ts";
-import type { View } from "./tab-socket.ts";
-
-/**
- * What a page is told when it connects, on the line or on the old tab socket, and how the old
- * socket's requests are answered as the tab that sent them.
- */
 
 /**
  * The greeting: the whole truth on connect, so a reconnect is a refresh. Who is answering, the deck
@@ -52,28 +46,4 @@ export function greet(app: RouteDeps["app"], reply: (message: ServerMessage) => 
 	reply({ type: "web.changed", status: app.web.status(), code: app.web.code() });
 	reply(app.settings.message());
 	reply(app.pairingMessage());
-}
-
-/**
- * One of the old tab socket's requests, answered by the table in `tab-requests.ts`.
- */
-export function handleTabRequest(app: RouteDeps["app"], message: ClientMessage, reply: (message: ServerMessage) => void, view?: View): void {
-	if (!view) {
-		void legacy(app, message, reply);
-		return;
-	}
-	/*
-	 * Each browser has its own conversation, so a frame is handled as the browser that sent it.
-	 *
-	 * The registry keeps one "focused agent", which every frame about "the stage you are on" reads:
-	 * a board moved, a board placed, a prompt with no id. Setting it to this browser's before the
-	 * frame and reading it back after is what lets a phone and a laptop sit on two different
-	 * conversations — without it, opening a chat on one moved the other to it too.
-	 */
-	app.agents.look(view.focused);
-	app.pages.viewing = view;
-	void legacy(app, message, reply, view).finally(() => {
-		app.pages.viewing = undefined;
-		view.focused = app.agents.looking()?.id;
-	});
 }

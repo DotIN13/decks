@@ -29,8 +29,8 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 
 	/**
 	 * Every change as it happens, for a client that is not a browser on the socket: the frames Decks
-	 * broadcasts (`card.changed`, `stage.pen.delta`, `agent.state`, …), one Server-Sent Event each.
-	 * `?types=card.changed,stage.pen.delta` keeps only those. A comment every 25 seconds keeps
+	 * broadcasts (`card.changed`, `canvas.changed`, `agent.state`, …), one Server-Sent Event each.
+	 * `?types=card.changed,canvas.changed` keeps only those. A comment every 25 seconds keeps
 	 * proxies from closing a quiet stream.
 	 */
 	router.get("/events", (req: Request, res: Response) => {

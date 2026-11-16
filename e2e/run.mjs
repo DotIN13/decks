@@ -437,7 +437,7 @@ async function deckPath(api) {
 
 /*
  * One worker's Vite, for the whole run. `npm run dev:web` with the worker's ports: it proxies
- * `/api` and `/ws` to `DECKS_PORT`, which is where each of the worker's servers comes up in turn.
+ * `/api`, the line included, to `DECKS_PORT`, which is where each of the worker's servers comes up in turn.
  * Kept across checks because what it costs is the first page's transforms, and a Vite that
  * survives does those once.
  */

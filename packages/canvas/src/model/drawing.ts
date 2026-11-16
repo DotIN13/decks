@@ -23,7 +23,7 @@ export interface Drawing {
 	/**
 	 * A newer drawing from elsewhere: shown, not reported, and the person's undo starts again from it.
 	 * `edits`, when the host has them, are what made it from the drawing held (`DocEdits`). With a host,
-	 * `made` names the person's edits it is the first to have (`stage.pen.delta`'s `made`), which stop
+	 * `made` names the person's edits it is the first to have (`canvas.changed`'s `made`), which stop
 	 * being shown on top of it; the others are shown on top still. `scope` names the drawing (the canvas):
 	 * a drawing of another scope drops every edit on its way.
 	 */

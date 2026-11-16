@@ -62,10 +62,6 @@ export const EVENT_NAMES: Record<ServerMessage["type"], true> = {
 	"presence.changed": true,
 	"account.list": true,
 	"web.changed": true,
-	// The tab socket's per-agent copies of a canvas's change, kept for the Decks iOS app (`server/src/connections/tab-socket.ts`): the line and the stream say `canvas.changed`.
-	"stage.pen": true,
-	"stage.pen.delta": true,
-	"stage.pen.refused": true,
 };
 
 /** Every event the harness says, by name. */
@@ -82,34 +78,6 @@ export const LINE_NAMES: Record<Exclude<LineClientMessage["type"], `doc.${string
 	"card.seen": true,
 	"card.extent": true,
 	"presence.set": true,
-};
-
-/**
- * The events' old names, said on the tab socket (`/ws`) to a client that did not say
- * `v: 2` in its hello: the Decks iOS app and the browser checks' harness. Nothing new is said under an old name.
- */
-export const OLD_EVENT_NAMES: Partial<Record<ServerMessage["type"], string>> = {
-	"harness.hello": "backend",
-	"harness.runtimes": "runtimes",
-	"harness.notice": "notice",
-	"harness.error": "error",
-	"harness.settings": "settings",
-	"harness.paired": "pairing",
-	"deck.changed": "deck.state",
-	"canvas.list": "stages",
-	"app.changed": "app.state",
-	"agent.list": "agents",
-	"agent.context": "context.changed",
-	"agent.prompt": "extension.ui.prompt",
-	"agent.promptClosed": "extension.ui.prompt.closed",
-	"chat.preview": "timeline.preview",
-	"chat.draft": "composer.draft",
-	"doc.created": "document.created",
-	"view.called": "stage.call",
-	"call.answered": "answer",
-	"line.hello": "hello",
-	"account.list": "claude.accounts",
-	"web.changed": "web.status",
 };
 
 /** The names that stand outside the shape on purpose: three bare words every agent types. */

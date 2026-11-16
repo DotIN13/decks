@@ -88,8 +88,8 @@ export function cardRefusedFor(app: Pick<CallsHost, "deck" | "stage">, principal
 export const DOC_CALLS: ReadonlySet<string> = new Set(["doc.open", "doc.close", "doc.patch", "doc.review", "doc.versions", "doc.version", "doc.compile", "doc.restore", "doc.git", "doc.gstyle", "doc.gcomment"]);
 
 /**
- * Whether a broadcast is about one canvas: its drawing (`stage.pen`, `stage.pen.delta`, refusals), its
- * cards (`card.changed` for one on it), and what is said to it alone.
+ * Whether a broadcast is about one canvas: its drawing (`canvas.changed`), its cards (`card.changed`
+ * for one on it), its apps and documents, an agent's view of it, and what is said to it alone.
  */
 export function onCanvas(app: Pick<CallsHost, "stage" | "agents" | "documentsOn">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
 	/*
@@ -113,7 +113,7 @@ export function onCanvas(app: Pick<CallsHost, "stage" | "agents" | "documentsOn"
 		if (named !== undefined) return named === canvas;
 		return !!call.agentId && app.agents.get(call.agentId)?.seat.stageName() === canvas;
 	}
-	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
+	if (message.type === "canvas.changed") return message.canvas === canvas;
 	// An agent at work on a card: the frame showing the canvas it is on draws the agent's cursor there.
 	if (message.type === "agent.act") return typeof message.path === "string" && boardOnCanvas(app, message.path, canvas);
 	// An app's state, for a canvas holding an item of that app.

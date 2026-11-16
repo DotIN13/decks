@@ -114,15 +114,14 @@ export default defineConfig({
 		proxy: {
 			/*
 			 * `ws: true` on `/api` as well: `/api/web/relay` is the Decks extension's websocket
-			 * (`server/web/bridge.ts`), and a dev server that only proxied the app's own `/ws`
-			 * refused the extension with nothing in any log to say why.
+			 * (`server/web/bridge.ts`) and `/api/v1/socket` is the line, the page's own connection: a dev
+			 * server that proxied only requests refused both with nothing in any log to say why.
 			 */
 			/*
 			 * `xfwd` says who the browser is: the server asks no pairing code of a private network
 			 * (`server/src/auth/issue.ts`), and through a proxy every request is from loopback.
 			 */
 			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
-			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true, xfwd: true },
 			// Another server passed through this one, for a page with no service worker (`share/relay.ts`): `/c/…`, not `/canvas-frame.html`.
 			"^/c/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, xfwd: true },
 			// Forwarded ports (`server/ports.ts`), which the server answers for, websockets and all.

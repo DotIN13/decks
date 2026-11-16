@@ -74,7 +74,7 @@ export interface PenEntry {
 /**
  * The person's own name for the edit being made, when the browser gave one (`x-decks-edit` on a verb's
  * request, `edit` on the socket's): set around the call that makes it, read when the drawing is written,
- * and sent back with the revision that has it (`made` on `stage.pen.delta` and `stage.pen`). The browser
+ * and sent back with the revision that has it (`made` on `canvas.changed`). The browser
  * shows its edit at once and keeps it on top of what the server sends until that revision comes
  * (`canvas/src/model/drawing.ts`), so it never draws the drawing as it was before for the round trip.
  */

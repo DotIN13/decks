@@ -1,14 +1,13 @@
 import type { DeckState, ServerMessage } from "@decks/protocol";
-import type { Hub, View } from "./tab-socket.ts";
+import type { View } from "../calls/person-table.ts";
 
 /**
  * What is said to the pages: every change the harness makes, to everyone who is listening.
  *
- * Three kinds of listener hear a broadcast. Tabs on the old socket (`tab-socket.ts`), each of
- * which sees it as the conversation on its own screen would (`forView`). The line and the event
- * stream (`line.ts`, `routes/v1.ts`), which hear every message as it is and choose what to pass
- * on. And how many of each are connected is counted here, for whoever asks whether a page is
- * there to answer.
+ * The line and the event stream (`line.ts`, `routes/v1.ts`) hear every message as it is and choose
+ * what to pass on; a page on the line is told it as the conversation on its own screen would see it
+ * (`forView`). How many are connected is counted here, for whoever asks whether a page is there to
+ * answer.
  */
 
 /** What the broadcast needs of the harness: who is on screen, and the deck as an agent sees it. */
@@ -22,10 +21,6 @@ export interface BroadcastHost<Agent extends { id: string }> {
 }
 
 export class Broadcast<Agent extends { id: string }> {
-	/** The old tab socket's connections, once the server is listening. */
-	hub: Hub | undefined;
-	/** The tab whose request is being answered now: what is said meanwhile is already as it sees it. */
-	viewing: View | undefined;
 	/** Canvas frames following their canvas's stream now (`routes/v1.ts`): each can answer an agent's view of its canvas. */
 	canvasFrames = 0;
 	/** How many lines are open (`line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
@@ -37,10 +32,10 @@ export class Broadcast<Agent extends { id: string }> {
 
 	/** Pages and frames connected now, by any way in. */
 	get screens(): number {
-		return (this.hub?.connections ?? 0) + this.lines();
+		return this.lines();
 	}
 
-	/** Whether anything is there to draw a canvas: a tab, a page on the line, or a frame on its stream. */
+	/** Whether anything is there to draw a canvas: a page on the line, or a frame on its stream. */
 	get connected(): boolean {
 		return this.screens > 0 || this.canvasFrames > 0;
 	}
@@ -48,8 +43,6 @@ export class Broadcast<Agent extends { id: string }> {
 	/** Say something to everyone. */
 	send(message: ServerMessage): void {
 		this.of.saying?.(message);
-		// A tab's socket reads a canvas's changes per agent (`stage.pen.delta`) for the Decks iOS app; `canvas.changed` is the line's and the stream's.
-		if (message.type !== "canvas.changed") this.hub?.each((view) => this.forView(message, view));
 		for (const listener of this.listeners) listener(message);
 	}
 
@@ -74,7 +67,6 @@ export class Broadcast<Agent extends { id: string }> {
 	 */
 	forView(message: ServerMessage, view: View): ServerMessage {
 		const shared = this.of.looking();
-		if (view === this.viewing) return message;
 		const own = this.of.agent(view.focused);
 		if (!own) {
 			view.focused = shared?.id;

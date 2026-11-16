@@ -43,8 +43,8 @@ errors and two silent listeners**. That is the whole migration.
 
 ### 2.1 Two listeners on the harness's event stream say the old names
 
-The harness renamed 21 events in the "one vocabulary" change. The tab socket (`/ws`) still says the
-old names to a client whose hello lacks `v: 2`, but **the event stream (`GET /api/v1/events`), which
+The harness renamed 21 events in the "one vocabulary" change, and the tab socket (`/ws`) that said
+the old names is gone (2026-11-16). **The event stream (`GET /api/v1/events`), which
 is what the SDK's `events()` reads, says only the new names**, and its `?types=` filter matches by
 name. So two of Studio's listeners hear nothing at the tip:
 
@@ -216,8 +216,8 @@ canvas in both schemes, once, is the other.
   repository is what keeps them resolving, and it can only guard what Studio imports through them.
 - **Do not read `__decksKnobs` or `__decksProbes`.** They are the browser checks' and the measuring
   scripts'. Studio's own probe is `window.__studio`, and that is right.
-- **Do not keep the old event names as a fallback.** The stream never said them; the tab socket's
-  aliases go with the Decks iOS app's update, and a client that listens for both names forever is how
+- **Do not keep the old event names as a fallback.** The stream never said them, the tab socket
+  that did is gone, and a client that listens for both names forever is how
   the second vocabulary comes back.
 
 ## 6. Sequence

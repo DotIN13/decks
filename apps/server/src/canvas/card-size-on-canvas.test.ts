@@ -5,7 +5,10 @@ import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { handleTabRequest } from "../connections/greeting.ts";
+import { runVerb } from "../calls/run.ts";
+
+/** One of the person's calls, as a page makes it for the canvas on its screen. */
+const person = (app: App, canvas: string, verb: string, args: unknown[]) => runVerb(app, { kind: "person" }, { "x-decks-stage": canvas }, verb, [...args, { canvas }]);
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {
@@ -43,7 +46,7 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		const shown = () => app.stage.boards(one.id).find((board) => board.path === mine)!;
 		assert.deepEqual([shown().w, shown().h], [900, 400], "it joins at its file's size");
 
-		handleTabRequest(app, { type: "card.extent", path: mine, rev: shown().rev, w: 900, h: 690 }, () => {});
+		app.boards.noteExtent(mine, { rev: shown().rev, w: 900, h: 690 });
 		assert.equal(shown().h, 400, "a reading sizes nothing");
 
 		one.seat.setSize(PATH, { h: 520 });
@@ -116,14 +119,14 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 		// The person drags the copy that is on the canvas they are looking at.
 		const shown = app.pens.cards.copyOf(first, PATH);
 
-		handleTabRequest(app, { type: "card.move", path: shown, x: 4000, y: 3000, stage: first }, () => {});
-		handleTabRequest(app, { type: "card.resize", path: shown, h: 777, stage: first }, () => {});
+		await person(app, first, "card.move", [shown, { x: 4000, y: 3000 }]);
+		await person(app, first, "card.resize", [shown, { h: 777 }]);
 		await settle();
 		assert.deepEqual([on(first)?.x, on(first)?.y, on(first)?.h], [4000, 3000, 777], "the named canvas takes the move and the size");
 		assert.deepEqual([on(second)?.x, on(second)?.y, on(second)?.h], [before.x, before.y, before.h], "the focused agent's canvas is untouched");
 		assert.equal(app.deck.board(shown)?.h, 777, "the drag writes the board's own file, as a fit does");
 
-		handleTabRequest(app, { type: "card.hide", path: shown, stage: first }, () => {});
+		await person(app, first, "card.hide", [shown]);
 		await settle();
 		assert.equal(on(first), undefined, "a hide takes it off the named canvas");
 		assert.ok(on(second), "and leaves it on the other");
@@ -147,7 +150,7 @@ test("a person's drag to a shorter board sends only the new height, so the canva
 			if (message.type === "card.changed" && message.path === shown && message.card) heights.push(message.card.h);
 			send(message);
 		};
-		handleTabRequest(app, { type: "card.resize", path: shown, h: 450, stage: one.seat.stageName()! }, () => {});
+		await person(app, one.seat.stageName()!, "card.resize", [shown, { h: 450 }]);
 		await settle();
 		assert.ok(heights.length > 0, "the change is sent");
 		assert.deepEqual([...new Set(heights)], [450], "every card.changed carries the new height, none the old 600");

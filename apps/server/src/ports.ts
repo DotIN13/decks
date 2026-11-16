@@ -22,7 +22,7 @@ import type { Duplex } from "node:stream";
  * manage the list, and why nothing is forwarded until one asks. Decks' own port is refused.
  *
  * **Same origin as the app.** A forwarded page is served from Decks' origin, so it can read what
- * the app keeps in the browser and open `/ws`, as any board already can.
+ * the app keeps in the browser, as any page of Decks's own address can.
  */
 
 export interface Forward {

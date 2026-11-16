@@ -73,7 +73,7 @@ served from it (docs/DESIGN.md, "Trust"), and "same origin" has to be true of th
 browser ──https──▶ private-network proxy ──http──▶ 127.0.0.1:4329
                                                     │
                                                     ├── /api/*        the API
-                                                    ├── /api/v1/socket  the line: the page's and the canvas frame's socket (`/ws` stays one release for older pages)
+                                                    ├── /api/v1/socket  the line: the page's and the canvas frame's socket
                                                     └── /*            apps/web/dist
 ```
 

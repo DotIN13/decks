@@ -300,7 +300,6 @@ export class Seat {
 		for (const path of [...this.playing].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		this.of.arranged?.();
 		this.publishContext();
-		this.of.emit(pens.log.frame(this.of.id, name));
 	}
 
 	/**
@@ -317,8 +316,6 @@ export class Seat {
 		this.of.save();
 		this.of.arranged?.();
 		this.publishContext();
-		const pens = this.of.stage.pens;
-		if (pens) this.of.emit(pens.log.frame(this.of.id, to));
 	}
 
 	/**

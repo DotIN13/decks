@@ -10,7 +10,6 @@ import { imageKind } from "../../canvas/shots.ts";
 import { keptWidth, pictureType } from "../../pictures/ladder.ts";
 import type { AppPage } from "../../pictures/service.ts";
 import type { Page as DeckPage } from "@decks/protocol";
-import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "../../share/bundle.ts";
 import { actsAsPerson } from "../../auth/principal.ts";
 import { asyncRoute, wildcard, sendFile, harnessId, type RouteDeps } from "./shared.ts";
@@ -192,7 +191,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				res.status(404).type("text").send("No such canvas.");
 				return;
 			}
-			const frame = pens.log.frame("", name) as Extract<ServerMessage, { type: "stage.pen" }>;
+			const frame = pens.log.frame(name);
 			const until = Date.now() + 60_000;
 			const { bytes } = await buildBundle({
 				deckPath: app.deck.path,
@@ -225,7 +224,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			res.status(404).end();
 			return;
 		}
-		const frame = pens.log.frame("", name) as { doc: unknown; base: string; rev: number; by?: string };
+		const frame = pens.log.frame(name);
 		res.setHeader("Cache-Control", "no-store");
 		/*
 		 * Each card and board on it with its record (title, revision, card or not, who wrote it and when,

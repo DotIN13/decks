@@ -37,8 +37,6 @@ export interface Backend {
 export type Heard =
 	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/src/canvas/pens.ts`). */
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
-	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
-	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
 	| { type: "app.changed"; name: string; title?: string; status: string }
@@ -148,7 +146,7 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 /**
  * Keeps one drawing from the line: a revision already held is passed over; edits from the revision
  * held are applied; anything else, a gap, and the drawing is read whole again. `canvas.changed` is
- * what the harness says now; `stage.pen` and `stage.pen.delta` are the same from an older one.
+ * what the harness says now;
  */
 export function drawingFollower(handlers: {
 	whole(doc: PenDocument, base: string, made?: readonly string[]): void;
@@ -178,17 +176,6 @@ export function drawingFollower(handlers: {
 					}
 					rev = message.rev;
 				}
-			} else if (message.type === "stage.pen") {
-				if (message.rev === rev) return;
-				rev = message.rev;
-				handlers.whole(message.doc, message.base, message.made);
-			} else if (message.type === "stage.pen.delta") {
-				if (message.rev <= rev) return;
-				if (message.from !== rev || !handlers.edits(message.edits, message.base, message.made)) {
-					handlers.reread();
-					return;
-				}
-				rev = message.rev;
 			} else if (message.type === "reconnected") handlers.reread();
 		},
 	};

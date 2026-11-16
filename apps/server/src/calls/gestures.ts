@@ -65,7 +65,7 @@ export function gestures(ctx: VerbContext): Gestures {
 		},
 
 		/**
-		 * Pen operations on the stage's own drawing, applied together or not at all (`stage.pen.edit`).
+		 * Pen operations on the stage's own drawing, applied together or not at all (`canvas.edit`).
 		 * The person's own edits can be taken back with the stage's undo; each item's new box comes back.
 		 */
 		edit: async (ops: readonly unknown[]) => {

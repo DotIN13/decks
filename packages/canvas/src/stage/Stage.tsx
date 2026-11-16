@@ -89,12 +89,12 @@ export type StageProps = {
 	 */
 	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter; /** The person's own edit or step, drawn by their hand already: nothing to glide. */ own?: true };
 	/**
-	 * The person's edits to the drawing, as pen operations (`stage.pen.edit` on the wire, `decks.canvas.batch` for an agent). Absent
+	 * The person's edits to the drawing, as pen operations (`canvas.edit` on the wire, `decks.canvas.batch` for an agent). Absent
 	 * means the drawing is read-only here. Edits are made in edit mode only, so browsing the canvas
 	 * never picks a note up by accident.
 	 */
 	onPenEdit?: (ops: unknown[]) => void;
-	/** Take back the person's last edit to the drawing, or put it back (`stage.pen.step`). */
+	/** Take back the person's last edit to the drawing, or put it back (`canvas.step`). */
 	onPenStep?: (direction: "undo" | "redo") => void;
 	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/StageInk.tsx`). */
 	drawing?: boolean;

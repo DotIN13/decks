@@ -10,8 +10,8 @@ import type { Verb } from "./verbs.ts";
  * harness (which agent is up, the accounts, the pairing) rather than on a canvas. They are not
  * in the SDK agents read, so `decks --help` does not list them; `GET /api/v1` does, to the person.
  *
- * The 52 requests the tab's socket took are these, under the same shape as every other call. The
- * socket still takes the old requests from the Decks iOS app and the browser checks, as aliases of these (`server/src/connections/tab-requests.ts`).
+ * The requests the page's old socket took are these, under the same shape as every other call:
+ * the page, the Decks iOS app and the browser checks all make them on the line.
  */
 
 const agents = { touches: "agents", effect: "change", who: "person" } as const;
