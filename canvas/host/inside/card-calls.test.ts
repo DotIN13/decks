@@ -97,3 +97,10 @@ test("view.reload answers a card the old { reloaded }, not the new number", asyn
 	const { call } = frame();
 	assert.deepEqual(await call("view.reload", { card: CARD }), { reloaded: 1 });
 });
+
+test("an old name called with one object is read as old by the name it used, not its arguments", async () => {
+	const { call, sent } = frame();
+	await call("canvas.insert", { type: "note", content: "hi" });
+	assert.equal(sent[0]?.name, "item.insert");
+	assert.deepEqual(sent[0]?.args.item, { type: "note", content: "hi" });
+});
