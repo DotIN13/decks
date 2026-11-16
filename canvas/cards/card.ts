@@ -1,5 +1,6 @@
 // A card mounted in a closed shadow root of the canvas's page: its HTML cleaned when a
 // friend's, its parts drawn, its scripts handed the card, and what it may reach.
+import { deckFiles } from "@decks/protocol";
 import { readingOfCard } from "./card-reading.ts";
 import { freshAddress, passless } from "../host/host.ts";
 
@@ -723,26 +724,23 @@ export function giveDeckImports(given: Record<string, string>, base: string): vo
 }
 
 /**
- * The deck's own libraries, beside the boards' (`assets/importmap.json`, `{ "imports": { "name": "address" } }`):
- * added to the page's import map once, before the first card's script that could name one. An address
- * is taken from the file's own folder when it is relative. A name the page already maps keeps its
- * first address, as import maps do, so a deck cannot swap the boards' d3.
+ * The deck's own libraries, beside the boards' (`assets/importmap.json`): added to the page's import map
+ * once, before the first card's script that could name one. The file is read as every program reads it
+ * (the protocol's `deckFiles.importMap`): an https address as it is, any other a deck path under
+ * assets/, found from the canvas's folder, two up from the card's. A name the page already maps keeps
+ * its first address, as import maps do, so a deck cannot swap the boards' d3.
  */
 function deckImports(cardUrl: string): Promise<void> {
 	// Handed by the host for the whole canvas (`giveDeckImports`): nothing to look for.
 	if (deckImportsGiven) return Promise.resolve();
-	const at = new URL("../../assets/importmap.json", cardUrl).href;
+	const folder = new URL("../../", cardUrl).href;
+	const at = new URL(deckFiles.IMPORT_MAP, folder).href;
 	return once(`importmap:${at}`, async () => {
 		try {
 			const response = await fetch(at, { cache: "no-cache" });
 			if (!response.ok) return;
-			const given = (await response.json()) as { imports?: Record<string, unknown> };
-			const imports: Record<string, string> = {};
-			for (const [name, address] of Object.entries(given.imports ?? {})) {
-				if (typeof address !== "string" || !name) continue;
-				const url = new URL(address, at);
-				if (url.protocol === "https:" || url.origin === location.origin) imports[name] = url.href;
-			}
+			const given = deckFiles.importMap(await response.text());
+			const imports = Object.fromEntries(Object.entries(given).map(([name, address]) => [name, address.startsWith("https://") ? address : new URL(address, folder).href]));
 			if (!Object.keys(imports).length) return;
 			const script = document.createElement("script");
 			script.type = "importmap";
