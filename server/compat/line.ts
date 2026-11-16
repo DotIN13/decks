@@ -3,6 +3,7 @@
 import type { Caller } from "../../protocol/index.ts";
 import type { Deck, Peer, Route, SocketDoor, Stop } from "../kernel/index.ts";
 import { answerBack, turn } from "./args.ts";
+import { docHeard } from "./docs.ts";
 import { HEARD, told } from "./events.ts";
 import { pagesOf, readDrawing, type News } from "./drawing.ts";
 
@@ -22,7 +23,7 @@ type Edit = { name: string; canvas?: string; at?: number; answered?: Promise<voi
  * edits: the frame's names for its edits not yet told back as made, each with its canvas and, once
  * answered, the revision the canvas had then (at), which has the edit. sent: this line's messages in order.
  */
-type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; edits: Edit[]; pointer?: Pointer; sent?: Promise<unknown> };
+type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; docs?: Set<string>; edits: Edit[]; pointer?: Pointer; sent?: Promise<unknown> };
 
 /** What a line's helpers share: its state, the kernel's socket parts, the deck, its sender and its client. */
 type LineParts = { state: State; door: SocketDoor; deck: () => Deck; send: (m: Said) => void; client: ReturnType<SocketDoor["client"]>; url: () => string | undefined };
@@ -76,6 +77,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 		if (message.type === "card.seen") return seen(parts, String(message.path ?? ""));
 		if (message.type === "card.extent") return extent(parts, message);
 		if (message.type === "view.answered") return answered(parts, message);
+		if (String(message.type).startsWith("doc.")) return docHeard(parts, message);
 		if (QUIET.has(String(message.type)) || message.type === "line.token") return;
 		send({ type: "harness.notice", level: "warn", text: `The line does not know ${String(message.type)}.` });
 	}
