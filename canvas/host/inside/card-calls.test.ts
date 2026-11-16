@@ -36,9 +36,9 @@ test("agent.send in the old shape (a decision button) goes to the page as the ne
 	assert.equal(sent[0]?.args.task, "Option A");
 });
 
-test("a migrated board's stage.send (agent.queue with boards) goes to the page as agent.queue", async () => {
+test("a migrated button's send, an old agent.queue, goes to the page as agent.queue", async () => {
 	const { call, sent } = frame();
-	await call("agent.queue", "Mason", { task: "Pressed", boards: [CARD] });
+	await call("agent.queue", "Mason", { task: "Pressed", cards: [CARD] });
 	assert.equal(sent[0]?.to, "page");
 	assert.equal(sent[0]?.name, "agent.queue");
 	assert.equal(sent[0]?.args.agent, "Mason");

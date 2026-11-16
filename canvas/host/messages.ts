@@ -149,8 +149,7 @@ interface FrameToPage {
 /** The calls the frame makes of the page, and what each answers. */
 export type FrameCalls = {
 	open: { data: { path: string; from: string }; value: boolean };
-	/** A card's agent call, or showing another canvas: the page's, with your token, and your OK before a message goes to an agent. */
-	/** A card's agent call or view.goto, by its protocol name and one object of arguments, as the card that asked. */
+	/** A card's agent call or view.goto, by protocol name with one object of arguments: the page's, with your token, and your OK before a message goes to an agent. */
 	agent: { data: { name: string; args: Record<string, unknown>; card: string }; value: unknown };
 	/**
 	 * Files dropped on the canvas, at a point of the frame: the page uploads them into the canvas's folder and places them, as it does a drop of its own;

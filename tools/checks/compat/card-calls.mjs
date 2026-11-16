@@ -1,12 +1,7 @@
 /**
- * A card's `card.decks` calls, in each shape the person's deck uses, do what they did.
- *
- * Old cards keep working forever (DESIGN.md's last note, rewire step 5): the frame turns an old call into
- * the new one (`@decks/protocol/compat`, `cardCall`). Here, on one canvas: a decision button in the new
- * shape and in the old one (`card.decks.agent.send`), a card made by the boards-to-cards migration whose
- * `data-eval` button runs `stage.send` (its module, as the migration wrote it), and old canvas calls
- * (insert, read, delete). Each is pressed; a message to an agent is asked of the person, allowed once and
- * refused once, and the card shows what it was answered.
+ * A card's card.decks calls, in each shape the person's deck uses, do what they did (rewire step 5): a decision
+ * button new and old (agent.send), a boards-to-cards card's data-eval button (stage.send), and old canvas calls.
+ * Each message to an agent is asked of the person, allowed once and refused once; the card shows its answer.
  */
 import { API, asPerson, canvasFrame, flyToCard, open, resetStage, say, settle } from "../harness.mjs";
 
