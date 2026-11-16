@@ -162,7 +162,7 @@ function beyond(scope: Scope | undefined, name: string, args: unknown, placed: P
 type Placed = (canvas: string, path: string) => boolean;
 
 /** Arguments that name a place: where to write (to, only its folder), or which card (card, cards: its
- *  folder or a card its canvas already places, such as an old page from the deck's boards/). */
+ *  folder or a card its canvas already places, such as an old page outside any canvas folder). */
 const PLACES = { to: false, card: true, cards: true } as const;
 
 /** Why an argument naming a place lies outside what a scoped canvas reaches, read through deckPathFrom. */

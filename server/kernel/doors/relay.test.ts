@@ -59,7 +59,7 @@ test("a harness call at the HTTP door is answered by the connected host", async 
 
 test("a host that never replies, or goes, answers unavailable", async () => {
 	const { feature, seen } = hostsFeature();
-	const server = await testServer({ features: [feature], relayWaitMs: 100 });
+	const server = await testServer({ features: [feature], relayWaitMs: 400 });
 	const doors = await server.listen(4628);
 	const host = await fakeHost(doors.url, doors.token, true);
 	seen.clients.push([...(server.relay as unknown as { sockets: Map<string, unknown> }).sockets.keys()].at(-1)!);

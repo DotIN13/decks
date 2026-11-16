@@ -127,18 +127,18 @@ test("a pass's to, card and cards must lie inside its canvas's folder, for any c
 });
 
 test("a pass's card may be one its canvas already places, as the canvas feature says; its to may not", async () => {
-	const canvasy = defineFeature({ name: "canvasy", calls: [], start: (kernel) => kernel.places((canvas, path) => canvas === "a" && path === "boards/old.html") });
+	const canvasy = defineFeature({ name: "canvasy", calls: [], start: (kernel) => kernel.places((canvas, path) => canvas === "a" && path === "pages/old.html") });
 	const server = await testServer({ features: [canvasy, probeFeature()] });
 	const pass = server.callers.resolve(server.callers.issue({ ...callers.person, id: "person~frame-6" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 }))!;
 	const code = async (args: Record<string, unknown>) => {
 		const answer = await server.call("port.list", args, pass);
 		return answer.ok ? "ok" : answer.error.code;
 	};
-	assert.equal(server.kernel.placed("a", "boards/old.html"), true);
-	assert.equal(await code({ card: "boards/old.html" }), "invalid", "a placed old page passes the scope");
-	assert.equal(await code({ cards: ["canvases/a/cards/x", "boards/old.html"] }), "invalid");
-	assert.equal(await code({ card: "boards/other.html" }), "refused");
-	assert.equal(await code({ to: "boards/old.html" }), "refused", "a write still stays in its folder");
+	assert.equal(server.kernel.placed("a", "pages/old.html"), true);
+	assert.equal(await code({ card: "pages/old.html" }), "invalid", "a placed old page passes the scope");
+	assert.equal(await code({ cards: ["canvases/a/cards/x", "pages/old.html"] }), "invalid");
+	assert.equal(await code({ card: "pages/other.html" }), "refused");
+	assert.equal(await code({ to: "pages/old.html" }), "refused", "a write still stays in its folder");
 	await server.close();
 });
 
