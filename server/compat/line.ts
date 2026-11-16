@@ -14,20 +14,21 @@ export const POINTER_MS = 50;
 
 type Said = Record<string, unknown>;
 
-/**
- * edits: the frame's names for its edits not yet told back as made, each with its canvas and, once
- * answered, the revision the canvas had then (at), which has the edit. sent: this line's messages in order.
- */
 type Pointer = { last: number; timer?: ReturnType<typeof setTimeout>; value: unknown; canvas: string };
 
 type Edit = { name: string; canvas?: string; at?: number; answered?: Promise<void> };
 
+/**
+ * edits: the frame's names for its edits not yet told back as made, each with its canvas and, once
+ * answered, the revision the canvas had then (at), which has the edit. sent: this line's messages in order.
+ */
 type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; edits: Edit[]; pointer?: Pointer; sent?: Promise<unknown> };
-
-type Watching = { state: State; door: SocketDoor; deck: () => Deck; send: (m: Said) => void; client: { id: string } };
 
 /** What a line's helpers share: its state, the kernel's socket parts, the deck, its sender and its client. */
 type LineParts = { state: State; door: SocketDoor; deck: () => Deck; send: (m: Said) => void; client: ReturnType<SocketDoor["client"]>; url: () => string | undefined };
+
+/** The canvas a caller is bound to: a frame's pass names one; the person's token none. */
+export const boundTo = (caller: Caller): string | undefined => (/(^|~)frame-/.test(caller.id) ? caller.canvas : undefined);
 
 // The line: a socket that says hello, then calls in the old names.
 
@@ -117,13 +118,10 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 	}
 }
 
-/** The canvas a caller is bound to: a frame's pass names one; the person's token none. */
-export const boundTo = (caller: Caller): string | undefined => (/(^|~)frame-/.test(caller.id) ? caller.canvas : undefined);
-
 // A watched canvas: its changes told as today's events, the line's own edits named as made.
 
 /** Hear one canvas from now on, and send it whole when the line holds another revision. */
-async function watchOn(w: Watching, canvas: string, since: unknown, whole: unknown): Promise<void> {
+async function watchOn(w: LineParts, canvas: string, since: unknown, whole: unknown): Promise<void> {
 	const caller = w.state.caller!;
 	const bound = boundTo(caller);
 	if (!canvas) return;

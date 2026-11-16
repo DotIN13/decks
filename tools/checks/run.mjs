@@ -24,9 +24,11 @@ const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
 /** What one run shares: the page built once. */
 const RUN = { dist: undefined, kinds: "pi" };
 
-/** Checks that measure time run alone (e2e/run.mjs marks them alone: true; ink-long-stroke times the frame too). */
-/** What tools/checks/checks.json says of a check (timed, agent, named, bench, path), by name. */
-export const traitsOf = (file) => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks[file.replace(/\.mjs$/, "")] ?? {};
+/** Every check tools/checks/checks.json describes, by name: what it is (timed, agent, named, bench, dev) and its path. */
+const checks = () => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks;
+
+/** What checks.json says of one check, by its name or file name. */
+export const traitsOf = (file) => checks()[file.replace(/\.mjs$/, "")] ?? {};
 
 /** A check that measures time runs alone, on the dev server it was written for (DESIGN.md section 11). */
 export const timed = (file) => traitsOf(file).timed === true;
@@ -82,6 +84,7 @@ function firstFailure(log, code) {
 	return (bad ?? lines.at(-1) ?? `exit ${code}`).replace(/^\[check\]\s*/, "").slice(0, 300);
 }
 
+/** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
 export async function runPrograms(work, { i = 0, onlyServer = false, log = [], dist = RUN.dist } = {}) {
 	const ports = portsFor(i);
 	// The slot is ours, but the last caller's programs may still be closing its ports: wait for them.
@@ -106,20 +109,9 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [], d
 	}
 }
 
-/** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
-/** Where a check is: its path in checks.json after the switch-over, else today's e2e/checks. */
+/** Where a check is: its path in checks.json. */
 export function checkPath(file) {
 	return join(ROOT, traitsOf(file).path ?? `e2e/checks/${file}`);
-}
-
-/** The page built once for a run, into a scratch folder: vite build of harness/page. */
-export function buildPage() {
-	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
-	// Development mode, unminified: the code today's checks were written against (vite's dev server).
-	// Minified, a timed check (ink-long-stroke) measured two ways too close to tell apart, 7 runs in 10.
-	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--mode", "development", "--minify", "false", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
-	if (built.status !== 0) throw new Error(`the page did not build: ${built.stderr.slice(-400)}`);
-	return dist;
 }
 
 // Whether a program is up: the server listening, the harness's agent, the page.
@@ -208,11 +200,21 @@ async function stopAndWait(child) {
 
 // The command line: a slot per check, the page built once, a line per check.
 
+/** The page built once for a run, into a scratch folder: vite build of harness/page. */
+export function buildPage() {
+	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
+	// Development mode, unminified: the code today's checks were written against (vite's dev server).
+	// Minified, a timed check (ink-long-stroke) measured two ways too close to tell apart, 7 runs in 10.
+	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--mode", "development", "--minify", "false", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+	if (built.status !== 0) throw new Error(`the page did not build: ${built.stderr.slice(-400)}`);
+	return dist;
+}
+
 async function main(argv) {
 	const onlyServer = argv.includes("--only-server");
 	const asked = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--kinds").map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
 	// None named: every check with a place in checks.json that is not an agent's, a long one or a bench, as CI runs them.
-	const named = asked.length ? asked : Object.entries(JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks).filter(([, t]) => t.path && !t.agent && !t.named && !t.bench).map(([name]) => `${name}.mjs`);
+	const named = asked.length ? asked : Object.entries(checks()).filter(([, t]) => t.path && !t.agent && !t.named && !t.bench).map(([name]) => `${name}.mjs`);
 	// A check that starts an agent's turn runs only with --agent: it needs a model and may cost tokens.
 	const withAgent = argv.includes("--agent");
 	// --kinds claude starts the harness with a signed-in Claude instead of Pi on the fake model, for a check marked model.
