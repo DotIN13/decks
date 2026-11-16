@@ -2,7 +2,7 @@ import { inkBounds } from "./index.ts";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkSelection, inkTool, penSeen, setInkSelection } from "./ink.ts";
 import { dropLive, handOver, liveState } from "./live-ink.ts";
-import { cancel, fingerDown, listenTaps, onDown, onMove, onUp, palm, STAGE_INK, startScale, takePalm, type InkCtx, type InkProps } from "./ink-gestures.ts";
+import { cancel, fingerDown, listenTaps, onDown, onMove, onUp, palm, STAGE_INK, startScale, takePalm, zoom, type Corner, type InkCtx, type InkProps } from "./ink-gestures.ts";
 
 /**
  * Drawing on the stage: a sheet of glass over the whole canvas while the draw tool is on.
@@ -23,7 +23,7 @@ import { cancel, fingerDown, listenTaps, onDown, onMove, onUp, palm, STAGE_INK, 
  * (`PALM_AFTER_MS`) does nothing at all, neither drawing nor moving the canvas. iPadOS turns away a
  * resting palm by itself.
  */
-export function StageInk(props: InkProps) {
+export function CanvasInk(props: InkProps) {
 	const [resizing, setResizing] = createSignal<{ anchor: { x: number; y: number }; by: number } | undefined>();
 	const held = createMemo(() => {
 		const picked = inkSelection();
@@ -68,10 +68,9 @@ export function StageInk(props: InkProps) {
 		setInkSelection(undefined);
 		dropLive(c);
 	});
-	const zoom = () => props.camera.zoom || 1;
 	const transform = () => {
 		const { x, y } = props.camera;
-		return `translate(${props.view.width / 2} ${props.view.height / 2}) scale(${zoom()}) translate(${-x} ${-y})`;
+		return `translate(${props.view.width / 2} ${props.view.height / 2}) scale(${zoom(c)}) translate(${-x} ${-y})`;
 	};
 	const up = (event: PointerEvent) => onUp(c, event);
 	return (
@@ -94,13 +93,16 @@ export function StageInk(props: InkProps) {
 			<g transform={transform()}>
 				<g ref={(el) => (c.inkLayer = el)} class="ink-live-layer" pointer-events="none" />
 				<path ref={(el) => (c.loop = el)} class="ink-loop" d="" />
-				<Show when={selection()}>{(box) => <HeldBox box={box()} zoom={zoom()} onCorner={(event, corner) => startScale(c, event, corner)} />}</Show>
+				<Show when={selection()}>{(box) => <HeldBox box={box()} zoom={zoom(c)} onCorner={(event, corner) => startScale(c, event, corner)} />}</Show>
 			</g>
 		</svg>
 	);
 }
 
-type Corner = "nw" | "ne" | "sw" | "se";
+
+
+/** Its old name, until its one importer (`view/CanvasView.tsx`) takes the new one. */
+export { CanvasInk as StageInk };
 
 /** The box round what the lasso holds, with the corners that resize it. */
 function HeldBox(props: { box: { x: number; y: number; w: number; h: number }; zoom: number; onCorner: (event: PointerEvent, corner: Corner) => void }) {

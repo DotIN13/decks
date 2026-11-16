@@ -10,6 +10,7 @@ import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
 import { handTool } from "../editor/pen-tools.ts";
 import { handPans } from "../editor/core/dispatch.ts";
 import { untilReleased } from "../editor/held.ts";
+import { onCanvas } from "./press-target.ts";
 import type { StageEditor } from "../editor/index.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { StageProps } from "../view/CanvasView.tsx";
@@ -446,18 +447,18 @@ function listenLost(c: InputCtx): void {
 // Keys, the wheel and the trackpad.
 /** A press pans: Space is held, or the host's hand tool is on (`editor/pen-tools.ts`). */
 function grabbing(c: InputCtx) {
-return c.spaceHeld() || handTool();
+	return c.spaceHeld() || handTool();
 }
 
 function centre(c: InputCtx) {
-return ({ x: c.view().width / 2, y: c.view().height / 2 });
+	return { x: c.view().width / 2, y: c.view().height / 2 };
 }
 
 /**
  * The camera shortcuts, and the palette's one key, in one place. Returns whether the key meant
  * anything, so the caller knows to swallow it.
  */
-function shortcut(c: InputCtx, key: string) : boolean {
+function shortcut(c: InputCtx, key: string): boolean {
 	const tool = TOOL_KEYS[key];
 	if (tool && c.props.onTool) {
 		c.props.onTool(tool);
@@ -532,27 +533,16 @@ function onWheel(c: InputCtx, event: WheelEvent) {
 }
 
 // Fingers: the pool, carrying them, catching a moving canvas, losing them, and what an item's slot asks.
-/**
- * A press on a drawn item's click shape (`render/engine.ts`, `attachHits`). Only items over a board have one, to take
- * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
- */
-function onDrawn(c: InputCtx, target: EventTarget | null) {
-return !!(target as Element | null)?.closest?.(".pen-hits");
-}
 
-/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
-function onCanvas(c: InputCtx, target: EventTarget | null) {
-return target === c.el() || onDrawn(c, target);
-}
 
 /** A finger, in the stage's own coordinates: the space the camera works in. */
-function fingerOf(c: InputCtx, event: PointerEvent) : Finger {
+function fingerOf(c: InputCtx, event: PointerEvent): Finger {
 	const at = stagePoint(event);
 	return { id: event.pointerId, x: at.x, y: at.y };
 }
 
 /** One finger's worth of a gesture. A one-finger pan is the browser's scroll, so only a pinch moves the camera here. */
-function touch(c: InputCtx, phase: "down" | "move" | "up", finger: Finger) : TouchStep {
+function touch(c: InputCtx, phase: "down" | "move" | "up", finger: Finger): TouchStep {
 	// For the checks: every step of the pool, when asked for (`knobs.touchLog`).
 	const log = knobs.touchLog;
 	if (log) log.push({ phase, id: finger.id, x: Math.round(finger.x), y: Math.round(finger.y), count: c.touches.count(), claimed: c.claimed.size, kept: c.keptTouches.size, t: Math.round(performance.now()) });
@@ -632,7 +622,7 @@ function beginTouch(c: InputCtx, event: PointerEvent) {
 	// A tap on bare canvas clears the selection, exactly as a click does. Decided on
 	// the way down rather than on the way up: a pan that starts on empty stage is not
 	// a gesture that wants to keep a component selected either.
-	if (onCanvas(c, event.target)) c.props.onSelect(undefined);
+	if (onCanvas(c.el(), event.target)) c.props.onSelect(undefined);
 	/*
 	 * The browser's own word for "nothing else is down": the primary pointer of a
 	 * touch sequence is the first finger on the glass. Anything still carried at that

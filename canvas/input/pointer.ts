@@ -9,12 +9,13 @@
  * hands this its finger pool and its pan (`PointerHost`), and tells it when the camera moves
  * (`cameraMoved`) and when it was dragged (`panned`).
  *
- * A board's frame reads what the editor says about it through `pageView(path)`, and nothing else.
+ * A page's frame reads what the editor says about it through `pageView(path)`, and nothing else.
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
-import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../editor/core/dispatch.ts";
+import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap } from "../editor/core/dispatch.ts";
 import { HOLD_MS, slopFor } from "./touch-rules.ts";
+import { onCanvas, onDrawn, pressTarget } from "./press-target.ts";
 import type { ArrowHandles } from "../editor/core/arrows.ts";
 import type { PageBox, Offset, PenTool, Pt, Rect } from "../editor/core/model.ts";
 import type { PageHandles, Outline, RadiusHandle } from "../editor/core/overlay.ts";
@@ -120,15 +121,6 @@ export type PointerHost = {
 	};
 };
 
-const TEXTY = new Set(["text", "note", "prompt", "context"]);
-
-/** Where an event landed, in `core/dispatch.ts`'s words. */
-function pressTarget(element: HTMLElement, target: EventTarget | null): PressTarget {
-	if (target === element) return "stage";
-	return (target as Element | null)?.closest?.(".pen-hits") ? "drawn" : "other";
-}
-
-
 export function createPointer(editor: Editor, host: PointerHost) {
 	const c: PointerCtx = {
 		editor,
@@ -213,6 +205,129 @@ function listen(c: PointerCtx): void {
 	});
 }
 
+// The press and the double-click that start it all.
+const TEXTY = new Set(["text", "note", "prompt", "context"]);
+/**
+ * A press on the stage (`core/dispatch.ts` decides what it starts). The drawing, in either mode:
+ * an armed tool makes its item; otherwise a press on an item picks it up, a shift-press adds it
+ * to the selection or takes it out, and a drag on empty canvas draws a marquee. A finger goes to
+ * the stage's pool, and on the drawing it taps and carries. The camera pans with Space and a
+ * drag, the middle button, a scroll or a pinch: that is the stage's (`PointerHost`, `pan`).
+ *
+ * Touch is asked of the event rather than of the screen size: a laptop with a touchscreen has
+ * both, and each pointer should mean what it means. `preventDefault` is not called for a finger —
+ * the frames' `touch-action` is what stops the browser scrolling, and swallowing the default
+ * here would take focus away from the composer mid-sentence.
+ */
+function onPointerDown(c: PointerCtx, event: PointerEvent) {
+	const element = c.host.element();
+	const kind = event.pointerType;
+	/*
+	 * A Pencil on bare canvas is a stroke, whatever tool is in hand: the pen comes on by itself and
+	 * the press starts the stroke, as on an iPad's own apps. On an item it still selects and moves
+	 * as a pointer does, and a finger is never this.
+	 */
+	if (kind === "pen" && event.button === 0 && c.host.editable() && !c.host.drawing() && c.host.tool() === "select" && onCanvas(c.host.element(), event.target) && !pickAtHere(c, worldAt(c, event)) && !pictureUnder(c, event) && c.host.pencil?.(event)) return;
+	const act = decidePress({
+		pointer: kind === "touch" || kind === "pen" ? kind : "mouse",
+		button: event.button,
+		target: pressTarget(element, event.target),
+		editable: c.host.editable(),
+		drawing: c.host.drawing(),
+		tool: c.host.tool(),
+		space: c.host.spaceHeld(),
+		fingers: c.host.fingers(),
+		onItem: () => !!pickAtHere(c, worldAt(c, event)),
+		picture: () => pictureUnder(c, event),
+	});
+	// A finger that presses something rather than the canvas is the editor's, not the browser's to scroll with.
+	if (kind === "touch" && act.do !== "touch" && act.do !== "pan") c.host.keepTouch?.(event);
+	switch (act.do) {
+		case "make":
+		case "press":
+			penPress(c, event);
+			return;
+		case "picture":
+			if (!act.carry || !dragPage(c, act.path, event, element)) selectPage(c, act.path);
+			return;
+		case "touch":
+			// The touch first: it clears the selection for a finger on bare stage, which a board's picture lies on,
+			// so selecting the board before it was undone by the same press.
+			c.host.beginTouch(event);
+			if (act.picture) {
+				selectPage(c, act.picture);
+				return;
+			}
+			if (act.then === "drawing") touchOnDrawing(c, event);
+			else if (act.then === "deselect") tapToDeselect(c, event);
+			return;
+		case "pan":
+			c.host.pan(event, { deselect: act.deselect, middle: act.middle });
+			return;
+		case "nothing":
+			return;
+	}
+}
+
+/**
+ * A double-click on empty canvas: a note there, open for typing — what the Note tool and a
+ * click there make (`InsertMenu`'s `noteAt`). A double-click on an item reaches into it instead.
+ *
+ * "Empty" is the stage's own element with no board's picture under the point: not a board, its
+ * title bar, something drawn, or anything laid over the drawing (the editor a note's words are
+ * typed in is one, and a double-click there picks a word).
+ */
+function onDblClick(c: PointerCtx, event: MouseEvent) {
+	// Pressed on something else (a handle whose edit moved it away): not a double-click on what is under the pointer now.
+	// A press on the drawing's hit shapes is captured by the stage, so its click lands on the stage: the same place.
+	// So is a press on a size handle that the first click put over a small item: the item is still under it.
+	const sizer = (c.pressedOn as Element | null)?.closest?.(".pen-handle[data-handle]");
+	const overItem = !!sizer && sizer.getAttribute("data-handle") !== "radius" && event.target === c.host.element() && !!pickAtHere(c, worldAt(c, event), { deep: true });
+	const sameSpot = c.pressedOn === event.target || (onDrawn(c.pressedOn) && event.target === c.host.element()) || overItem;
+	if (!sameSpot) return;
+	if (c.host.editable() && !c.host.drawing() && onCanvas(c.host.element(), event.target)) {
+		// The second press of a quick double-click on a tool's first item is not a request for a note.
+		if (performance.now() - c.host.madeAt() < MADE_MS) return;
+		// A double-click reaches into what is one thing (a shape, a file, a card): words open for rewriting, anything else is selected on its own.
+		const hit = pickAtHere(c, worldAt(c, event), { deep: true });
+		// A film or a sound starts: a double-click is how a board is opened too, so it is the same gesture.
+		// A film or a sound: its first press already started it, so the second is only a press.
+		if (hit && mediaOf(hit.node)) {
+			c.editor.select([hit.id]);
+			return;
+		}
+		// A file shown live: a web page taken into, an SVG opened in a tab.
+		if (hit && c.host.open.liveFile(hit.id)) return;
+		// A file's chip opens the file, in a tab of its own.
+		if (hit && c.host.open.file(hit.id)) return;
+		// A card opens for typing: at the words, or with a new line in the gap that was double-clicked.
+		if (hit && (hit.node.type !== "rectangle" || !c.host.open.cardOf(hit.id)) && c.host.open.cardAt(hit, worldAt(c, event), { x: event.clientX, y: event.clientY })) return;
+		// A shape's words open for typing, and a shape with none gets them (`openShapeWords`).
+		const shape = hit ? c.host.open.shapeOf(hit.id) : undefined;
+		if (shape && !(hit && TEXTY.has(hit.node.type))) {
+			c.host.open.shapeWords(shape);
+			return;
+		}
+		if (hit && TEXTY.has(hit.node.type)) {
+			c.host.open.text(hit);
+			return;
+		}
+		if (hit && !c.editor.items().includes(hit.id)) {
+			c.editor.select([hit.id]);
+			return;
+		}
+	}
+	// Nothing can be added where nothing can be written: a canvas opened from a file.
+	if (!c.host.editable() || c.host.drawing()) return;
+	if (event.target !== c.host.element() || pictureUnder(c, event)) return;
+	// On an item that took none of the above (one already selected, say): it is not empty canvas.
+	if (pickAtHere(c, worldAt(c, event), { deep: true })) return;
+	if (performance.now() - c.pannedAt < PANNED_MS) return;
+	// A finger's two taps already made it (`tapToDeselect`); a touch screen's own dblclick is the same gesture.
+	if (performance.now() - c.host.madeAt() < MADE_MS) return;
+	c.host.noteAt(event);
+}
+
 // What every press reads: where a point is, what is under it, and following a press to its release.
 function notePress(c: PointerCtx, event: PointerEvent) {
 	c.pressedOn = event.target;
@@ -224,31 +339,20 @@ function worldAt(c: PointerCtx, event: Client): Pt {
 }
 
 function pickAtHere(c: PointerCtx, at: Pt, options?: PickOptions) {
-return pickAt(c.host.scene, at, options);
+	return pickAt(c.host.scene, at, options);
 }
 
 /**
  * The board whose picture is under a point and that has no node of its own to take the press
  * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
  */
-function pictureUnder(c: PointerCtx, event: Client) : string | undefined {
+function pictureUnder(c: PointerCtx, event: Client): string | undefined {
 	const at = worldAt(c, event);
 	// The spatial index finds the few boards near the point; core decides among them, in paint order.
 	return pictureAt(c.host.pagesNear(at), at, c.host.rendered());
 }
 
-/**
- * A press on a drawn item's click shape (`render/engine.ts`, `attachHits`). Only items over a board have one, to take
- * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
- */
-function onDrawn(c: PointerCtx, target: EventTarget | null) {
-return !!(target as Element | null)?.closest?.(".pen-hits");
-}
 
-/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
-function onCanvas(c: PointerCtx, target: EventTarget | null) {
-return target === c.host.element() || onDrawn(c, target);
-}
 
 /**
  * Follow one press to its release: `move` on each step past the pointer's slop (`touch-rules.ts`: 3 px for a mouse, 8 for a finger), `done` at the end.
@@ -346,13 +450,14 @@ function follow(c: PointerCtx, event: PointerEvent, move: (e: PointerEvent) => v
  * told to it, in stage coordinates. `on` captures the pointer, the stage unless said otherwise.
  */
 function followEditor(c: PointerCtx, event: PointerEvent, on?: HTMLElement) {
-return follow(c, 
-			event,
-			(e) => c.editor.input({ type: "move", ...pointerInput(e, worldAt(c, e)) }),
-			(_moved, e) => c.editor.input({ type: "release", ...pointerInput(e, worldAt(c, e)) }),
-			on,
-			() => c.editor.input({ type: "cancel" }),
-		);
+	return follow(
+		c,
+		event,
+		(e) => c.editor.input({ type: "move", ...pointerInput(e, worldAt(c, e)) }),
+		(_moved, e) => c.editor.input({ type: "release", ...pointerInput(e, worldAt(c, e)) }),
+		on,
+		() => c.editor.input({ type: "cancel" }),
+	);
 }
 
 /*
@@ -371,8 +476,8 @@ function fingerIn(c: PointerCtx, event: PointerEvent) {
  * The text block of a card at a stage point: the one under it, or in the card's margin, the one
  * level with it. Not while the card is open for typing, which has its own way of moving things.
  */
-function blockUnder(c: PointerCtx, at: Pt) : string | undefined {
-return blockAt(c.host.scene, at, c.host.typing());
+function blockUnder(c: PointerCtx, at: Pt): string | undefined {
+	return blockAt(c.host.scene, at, c.host.typing());
 }
 
 // Moving and resizing what is pressed: pages, frames, corners, arrow ends and bends, blocks.
@@ -380,7 +485,7 @@ return blockAt(c.host.scene, at, c.host.typing());
  * A press on the drawing; true when it was the drawing's to handle. A tool makes its item; with
  * the select tool the editor picks up what is under the press, or draws a marquee on bare canvas.
  */
-function penPress(c: PointerCtx, event: PointerEvent) : boolean {
+function penPress(c: PointerCtx, event: PointerEvent): boolean {
 	const at = worldAt(c, event);
 	const tool = c.host.tool();
 	if (tool !== "select") {
@@ -400,7 +505,7 @@ function penPress(c: PointerCtx, event: PointerEvent) : boolean {
  * moves with whatever else is selected and snaps like everything else. Shift adds the board to the
  * selection or takes it out. A finger's drag stays the board's own, where a pinch can take it back.
  */
-function dragPage(c: PointerCtx, path: string, event: PointerEvent, on = event.currentTarget as HTMLElement) : boolean {
+function dragPage(c: PointerCtx, path: string, event: PointerEvent, on = event.currentTarget as HTMLElement): boolean {
 	if (event.button !== 0) return false;
 	event.stopPropagation();
 	event.preventDefault();
@@ -557,7 +662,7 @@ function altKey(c: PointerCtx, event: KeyboardEvent) {
 }
 
 function altGone(c: PointerCtx) {
-return c.editor.hover({ alt: false });
+	return c.editor.hover({ alt: false });
 }
 
 function onLeave(c: PointerCtx) {
@@ -781,131 +886,9 @@ function tapOnDrawing(c: PointerCtx, e: PointerEvent, hit: NonNullable<ReturnTyp
 	c.editor.select([hit.id]);
 }
 
-// The press and the double-click that start it all.
-/**
- * A press on the stage (`core/dispatch.ts` decides what it starts). The drawing, in either mode:
- * an armed tool makes its item; otherwise a press on an item picks it up, a shift-press adds it
- * to the selection or takes it out, and a drag on empty canvas draws a marquee. A finger goes to
- * the stage's pool, and on the drawing it taps and carries. The camera pans with Space and a
- * drag, the middle button, a scroll or a pinch: that is the stage's (`PointerHost`, `pan`).
- *
- * Touch is asked of the event rather than of the screen size: a laptop with a touchscreen has
- * both, and each pointer should mean what it means. `preventDefault` is not called for a finger —
- * the frames' `touch-action` is what stops the browser scrolling, and swallowing the default
- * here would take focus away from the composer mid-sentence.
- */
-function onPointerDown(c: PointerCtx, event: PointerEvent) {
-	const element = c.host.element();
-	const kind = event.pointerType;
-	/*
-	 * A Pencil on bare canvas is a stroke, whatever tool is in hand: the pen comes on by itself and
-	 * the press starts the stroke, as on an iPad's own apps. On an item it still selects and moves
-	 * as a pointer does, and a finger is never this.
-	 */
-	if (kind === "pen" && event.button === 0 && c.host.editable() && !c.host.drawing() && c.host.tool() === "select" && onCanvas(c, event.target) && !pickAtHere(c, worldAt(c, event)) && !pictureUnder(c, event) && c.host.pencil?.(event)) return;
-	const act = decidePress({
-		pointer: kind === "touch" || kind === "pen" ? kind : "mouse",
-		button: event.button,
-		target: pressTarget(element, event.target),
-		editable: c.host.editable(),
-		drawing: c.host.drawing(),
-		tool: c.host.tool(),
-		space: c.host.spaceHeld(),
-		fingers: c.host.fingers(),
-		onItem: () => !!pickAtHere(c, worldAt(c, event)),
-		picture: () => pictureUnder(c, event),
-	});
-	// A finger that presses something rather than the canvas is the editor's, not the browser's to scroll with.
-	if (kind === "touch" && act.do !== "touch" && act.do !== "pan") c.host.keepTouch?.(event);
-	switch (act.do) {
-		case "make":
-		case "press":
-			penPress(c, event);
-			return;
-		case "picture":
-			if (!act.carry || !dragPage(c, act.path, event, element)) selectPage(c, act.path);
-			return;
-		case "touch":
-			// The touch first: it clears the selection for a finger on bare stage, which a board's picture lies on,
-			// so selecting the board before it was undone by the same press.
-			c.host.beginTouch(event);
-			if (act.picture) {
-				selectPage(c, act.picture);
-				return;
-			}
-			if (act.then === "drawing") touchOnDrawing(c, event);
-			else if (act.then === "deselect") tapToDeselect(c, event);
-			return;
-		case "pan":
-			c.host.pan(event, { deselect: act.deselect, middle: act.middle });
-			return;
-		case "nothing":
-			return;
-	}
-}
-
-/**
- * A double-click on empty canvas: a note there, open for typing — what the Note tool and a
- * click there make (`InsertMenu`'s `noteAt`). A double-click on an item reaches into it instead.
- *
- * "Empty" is the stage's own element with no board's picture under the point: not a board, its
- * title bar, something drawn, or anything laid over the drawing (the editor a note's words are
- * typed in is one, and a double-click there picks a word).
- */
-function onDblClick(c: PointerCtx, event: MouseEvent) {
-	// Pressed on something else (a handle whose edit moved it away): not a double-click on what is under the pointer now.
-	// A press on the drawing's hit shapes is captured by the stage, so its click lands on the stage: the same place.
-	// So is a press on a size handle that the first click put over a small item: the item is still under it.
-	const sizer = (c.pressedOn as Element | null)?.closest?.(".pen-handle[data-handle]");
-	const overItem = !!sizer && sizer.getAttribute("data-handle") !== "radius" && event.target === c.host.element() && !!pickAtHere(c, worldAt(c, event), { deep: true });
-	const sameSpot = c.pressedOn === event.target || (onDrawn(c, c.pressedOn) && event.target === c.host.element()) || overItem;
-	if (!sameSpot) return;
-	if (c.host.editable() && !c.host.drawing() && onCanvas(c, event.target)) {
-		// The second press of a quick double-click on a tool's first item is not a request for a note.
-		if (performance.now() - c.host.madeAt() < MADE_MS) return;
-		// A double-click reaches into what is one thing (a shape, a file, a card): words open for rewriting, anything else is selected on its own.
-		const hit = pickAtHere(c, worldAt(c, event), { deep: true });
-		// A film or a sound starts: a double-click is how a board is opened too, so it is the same gesture.
-		// A film or a sound: its first press already started it, so the second is only a press.
-		if (hit && mediaOf(hit.node)) {
-			c.editor.select([hit.id]);
-			return;
-		}
-		// A file shown live: a web page taken into, an SVG opened in a tab.
-		if (hit && c.host.open.liveFile(hit.id)) return;
-		// A file's chip opens the file, in a tab of its own.
-		if (hit && c.host.open.file(hit.id)) return;
-		// A card opens for typing: at the words, or with a new line in the gap that was double-clicked.
-		if (hit && (hit.node.type !== "rectangle" || !c.host.open.cardOf(hit.id)) && c.host.open.cardAt(hit, worldAt(c, event), { x: event.clientX, y: event.clientY })) return;
-		// A shape's words open for typing, and a shape with none gets them (`openShapeWords`).
-		const shape = hit ? c.host.open.shapeOf(hit.id) : undefined;
-		if (shape && !(hit && TEXTY.has(hit.node.type))) {
-			c.host.open.shapeWords(shape);
-			return;
-		}
-		if (hit && TEXTY.has(hit.node.type)) {
-			c.host.open.text(hit);
-			return;
-		}
-		if (hit && !c.editor.items().includes(hit.id)) {
-			c.editor.select([hit.id]);
-			return;
-		}
-	}
-	// Nothing can be added where nothing can be written: a canvas opened from a file.
-	if (!c.host.editable() || c.host.drawing()) return;
-	if (event.target !== c.host.element() || pictureUnder(c, event)) return;
-	// On an item that took none of the above (one already selected, say): it is not empty canvas.
-	if (pickAtHere(c, worldAt(c, event), { deep: true })) return;
-	if (performance.now() - c.pannedAt < PANNED_MS) return;
-	// A finger's two taps already made it (`tapToDeselect`); a touch screen's own dblclick is the same gesture.
-	if (performance.now() - c.host.madeAt() < MADE_MS) return;
-	c.host.noteAt(event);
-}
-
 // What a page's frame reads of the editor and says back to it.
 /** The item on the drawing that is this page, by its path as the item names it or by its end. */
-function pageItemId(c: PointerCtx, path: string) : string | undefined {
+function pageItemId(c: PointerCtx, path: string): string | undefined {
 	if (c.host.scene.pageItem) return c.host.scene.pageItem(path);
 	let ends: string | undefined;
 	for (const one of c.host.scene.items()) {
@@ -917,8 +900,8 @@ function pageItemId(c: PointerCtx, path: string) : string | undefined {
 	return ends;
 }
 
-function pageView(c: PointerCtx, path: string) : PageView {
-return ({
+function pageView(c: PointerCtx, path: string): PageView {
+	return {
 		// Carried by the page drag in hand, or gliding to where a change put its item (`editor.glide`, by the item or an ancestor's shift).
 		shift: () => {
 			const drag = c.editor.pageDrag()?.paths.includes(path) ? c.editor.pageDrag() : undefined;
@@ -937,7 +920,7 @@ return ({
 		press: (event, on) => (c.host.editable() ? dragPage(c, path, event, on) : false),
 		dragging: (at) => c.editor.setOwnDrag(at ? { path, ...at } : undefined),
 		select: () => selectPage(c, path),
-	});
+	};
 }
 
 export type Pointer = ReturnType<typeof createPointer>;

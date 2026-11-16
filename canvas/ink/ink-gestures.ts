@@ -33,6 +33,8 @@ export type InkProps = {
 };
 
 type Box = { x: number; y: number; w: number; h: number };
+/** A corner of the box round what the lasso holds. */
+export type Corner = "nw" | "ne" | "sw" | "se";
 type Point = { x: number; y: number };
 
 export type Gesture =
@@ -82,7 +84,8 @@ export type InkCtx = LiveCtx & {
 	palms: Set<number>;
 };
 
-const zoom = (c: InkCtx) => c.props.camera.zoom || 1;
+/** The camera's zoom, 1 when it has none. */
+export const zoom = (c: InkCtx) => c.props.camera.zoom || 1;
 const pressureOf = (event: PointerEvent) => (event.pointerType === "pen" && event.pressure > 0 ? event.pressure : 0.5);
 
 /*
@@ -158,7 +161,7 @@ function begin(c: InkCtx, event: PointerEvent, point: Point): void {
  * A corner of the lasso's box, dragged: what the lasso holds grows or shrinks about the opposite
  * corner, keeping its shape, as a notes app's selection does.
  */
-export function startScale(c: InkCtx, event: PointerEvent, corner: "nw" | "ne" | "sw" | "se"): void {
+export function startScale(c: InkCtx, event: PointerEvent, corner: Corner): void {
 	const box = c.selection();
 	if (!box || c.gesture || (event.pointerType === "mouse" && event.button !== 0)) return;
 	event.stopPropagation();

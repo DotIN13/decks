@@ -7,6 +7,9 @@ import { surfaceState } from "./awake.ts";
 import { APP_BAR } from "../render/types.ts";
 import { COARSE, HOLD_MS, slopFor } from "../input/touch-rules.ts";
 
+// One placed item's slot on the canvas: where it sits, what draws it (a card, a
+// document, an app or its picture), and the edge and grip that move it.
+
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
 const EDGE_OUT_PX = COARSE ? 16 : 8;
 const EDGE_IN_PX = COARSE ? 6 : 4;
@@ -166,7 +169,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 // Its parts: where it sits, its surface, a finger on it, its edge band, telling the sheet it shows.
 /** Where the item sits and how big, as the editor resizes or shifts it. */
 function usePlace(props: ItemSlotProps) {
-		const at = createMemo(() => {
+	const at = createMemo(() => {
 		const resized = props.view.resized();
 		return { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
 	});
