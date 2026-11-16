@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Caller, Envelope } from "../../protocol/index.ts";
-import { fail } from "./router.ts";
+import { refusal, type Caller, type Envelope } from "../../protocol/index.ts";
 import type { Answerer } from "./types.ts";
 
 // Harness calls: a declared call no feature handles goes to the connected
@@ -29,17 +28,17 @@ export class Relay {
 		this.sockets.set(client, send);
 		return () => {
 			this.sockets.delete(client);
-			for (const [id, one] of this.pending) if (one.client === client) this.finish(id, fail("unavailable", "The harness that was answering went away before it replied.", []));
+			for (const [id, one] of this.pending) if (one.client === client) this.finish(id, refusal("unavailable", "The harness that was answering went away before it replied."));
 		};
 	}
 
 	forward(name: string, args: unknown, caller: Caller): Promise<Envelope<unknown>> {
 		const client = this.answerer?.(name, caller);
 		const send = client ? this.sockets.get(client) : undefined;
-		if (!client || !send) return Promise.resolve(fail("unavailable", `No harness is connected to answer ${name}: start the Decks harness.`, [], "agent.host"));
+		if (!client || !send) return Promise.resolve(refusal("unavailable", `No harness is connected to answer ${name}: start the Decks harness.`, "agent.host"));
 		const id = randomUUID();
 		return new Promise((done) => {
-			const timer = setTimeout(() => this.finish(id, fail("unavailable", `The harness did not answer ${name} in ${Math.round(this.waitMs / 1000)} s.`, [])), this.waitMs);
+			const timer = setTimeout(() => this.finish(id, refusal("unavailable", `The harness did not answer ${name} in ${Math.round(this.waitMs / 1000)} s.`)), this.waitMs);
 			this.pending.set(id, { client, done, timer });
 			send({ type: "ask", id, name, args, caller });
 		});

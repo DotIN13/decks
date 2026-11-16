@@ -1,4 +1,4 @@
-import { CALL_BY_NAME, check, Refused, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
+import { CALL_BY_NAME, check, Refused, refusal, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
 import type { Client, Context, Feature, Filter, Guard, Translator } from "./types.ts";
 
 // Find the call, check who may call it, check the arguments against its
@@ -35,31 +35,31 @@ export class Router {
 			const value = await found.entry.run(this.makeContext(found.entry.feature, caller, notes, client), (args ?? {}) as never);
 			return await this.answer(found.entry.call, value, notes, caller);
 		} catch (error) {
-			if (error instanceof Refused) return fail(error.code, error.message, notes, error.hint);
-			return fail("unavailable", `${name} failed on the server: ${(error as Error).message}`, notes);
+			if (error instanceof Refused) return refusal(error.code, error.message, error.hint, notes);
+			return refusal("unavailable", `${name} failed on the server: ${(error as Error).message}`, undefined, notes);
 		}
 	}
 
 	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
 		const turned = this.translator!(name, args);
 		if (!turned && this.declared.has(name)) return this.call(name, args, caller, client, true);
-		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
-		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
-		if (!this.declared.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
+		if (!turned) return refusal("not_found", `There is no call named ${name}.`);
+		if ("refusal" in turned) return refusal(turned.refusal.code, turned.refusal.message, turned.refusal.hint);
+		if (!this.declared.has(turned.name)) return refusal("not_found", `${name} was turned into ${turned.name}, which is not a call either.`);
 		const answer = await this.call(turned.name, turned.args, caller, client, true);
 		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
 	}
 
 	private find(name: string, caller: Caller, args: unknown, notes: string[]): { entry: Entry } | { error: Envelope<never> } | { relay: AnyCall } {
 		const call = this.declared.get(name);
-		if (!call) return { error: fail("not_found", `There is no call named ${name}.`, notes) };
-		if (!call.who.includes(caller.kind)) return { error: fail("refused", `A ${caller.kind} may not call ${name}; it is for: ${call.who.join(", ")}.`, notes) };
+		if (!call) return { error: refusal("not_found", `There is no call named ${name}.`, undefined, notes) };
+		if (!call.who.includes(caller.kind)) return { error: refusal("refused", `A ${caller.kind} may not call ${name}; it is for: ${call.who.join(", ")}.`, undefined, notes) };
 		const problems = check(call.input, args, "the arguments");
-		if (problems.length) return { error: fail("invalid", problems.join(" "), notes) };
+		if (problems.length) return { error: refusal("invalid", problems.join(" "), undefined, notes) };
 		const entry = this.entries.get(name);
 		if (entry) return { entry };
 		if (this.forward) return { relay: call };
-		return { error: fail("unavailable", `${name} is declared, but no feature on this server answers it yet.`, notes) };
+		return { error: refusal("unavailable", `${name} is declared, but no feature on this server answers it yet.`, undefined, notes) };
 	}
 
 	private async relayed(call: AnyCall, args: unknown, caller: Caller, notes: string[]): Promise<Envelope<unknown>> {
@@ -71,7 +71,7 @@ export class Router {
 	private async answer(call: AnyCall, value: unknown, notes: string[], caller: Caller): Promise<Envelope<unknown>> {
 		for (const filter of this.filters) value = await filter(call.name, value, caller);
 		const problems = this.checkAnswers ? check(call.answer, value, `the answer of ${call.name}`) : [];
-		if (problems.length) return fail("unavailable", problems.join(" "), notes);
+		if (problems.length) return refusal("unavailable", problems.join(" "), undefined, notes);
 		return { ok: true, value, notes };
 	}
 
@@ -107,12 +107,6 @@ export class Router {
 /** Today's positional form, { args: [...] } and nothing else; no declared call takes it. */
 const oldForm = (args: unknown): boolean =>
 	typeof args === "object" && args !== null && Array.isArray((args as { args?: unknown }).args) && Object.keys(args).length === 1;
-
-export const fail = (code: Refused["code"], message: string, notes: string[], hint?: string): Envelope<never> => ({
-	ok: false,
-	error: { code, message, ...(hint ? { hint } : {}) },
-	notes,
-});
 
 // Building the tables of declared and handled calls, from the features.
 /** The protocol's calls, and those a feature declares itself (Studio's); a name declared twice stops the server. */

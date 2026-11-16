@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type AnyCall, type Caller, type Envelope, type Node } from "../../../protocol/index.ts";
+import { jsonSchemaOf, PROTOCOL_VERSION, type AnyCall, type Caller, type Envelope } from "../../../protocol/index.ts";
 import { SERVER_VERSION, type Built } from "../kernel.ts";
 
 // The MCP door, POST /mcp: JSON-RPC 2.0 over HTTP. Its tools are the calls
@@ -32,31 +32,6 @@ export async function mcpAnswer(built: Built, caller: Caller, rpc: Rpc): Promise
 }
 
 const tool = (call: AnyCall) => ({ name: call.name, description: call.summary, inputSchema: jsonSchemaOf(call.input) });
-
-export function jsonSchemaOf(node: Node): Record<string, unknown> {
-	const doc = node.doc ? { description: node.doc } : {};
-	switch (node.k) {
-		case "any":
-			return { ...doc };
-		case "union":
-			return { anyOf: node.of.map(jsonSchemaOf), ...doc };
-		case "lit":
-			return { enum: [...node.values], ...doc };
-		case "arr":
-			return { type: "array", items: jsonSchemaOf(node.items), ...doc };
-		case "num":
-			return { type: node.int ? "integer" : "number", ...doc };
-		case "str":
-		case "bool":
-		case "null":
-			return { type: { str: "string", bool: "boolean", null: "null" }[node.k], ...doc };
-		case "obj": {
-			const properties = Object.fromEntries(Object.entries(node.props).map(([key, one]) => [key, jsonSchemaOf(one)]));
-			const rest = node.rest === undefined ? false : node.rest === true ? true : jsonSchemaOf(node.rest);
-			return { type: "object", properties, ...(node.required.length ? { required: [...node.required] } : {}), additionalProperties: rest, ...doc };
-		}
-	}
-}
 
 /** What an MCP client reads: the value then its notes, or the refusal, its hint, then notes; as clients/mcp writes it. */
 export function textOf(envelope: Envelope<unknown>): string {

@@ -1,9 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
-import { API, LOGIN_PATH, MCP_PATH, PROTOCOL_VERSION, SOCKET_PATH, type Caller, type Envelope } from "../../../protocol/index.ts";
+import { API, LOGIN_PATH, MCP_PATH, PROTOCOL_VERSION, refusal, SOCKET_PATH, type Caller, type Envelope } from "../../../protocol/index.ts";
 import { LOCAL_PERSON } from "../callers.ts";
 import { SERVER_VERSION, type Built } from "../kernel.ts";
-import { fail } from "../router.ts";
 import { PUBLIC, type Route } from "../types.ts";
 import { mcpAnswer } from "./mcp.ts";
 import { socketDoor, socketParts } from "./socket.ts";
@@ -31,14 +30,14 @@ const SANDBOXED = {
 
 const WHO = "Who is calling? Send a token: Authorization: Bearer <token>, from .decks/server.json or POST /api/v1/login.";
 
-const NO_TOKEN = fail("refused", WHO, [], "deck.get");
+const NO_TOKEN = refusal("refused", WHO, "deck.get");
 
 /** Serve the doors on a port; a port in use fails with a sentence, not a crash. */
 export function listen(built: Built, port: number, host = "127.0.0.1"): Promise<Served> {
 	const serve = handler(built);
 	const server = createServer((req, res) => {
 		serve(req, res).catch((error: Error) => {
-			if (!res.headersSent) json(res, 200, fail("unavailable", `The server failed: ${error.message}`, []));
+			if (!res.headersSent) json(res, 200, refusal("unavailable", `The server failed: ${error.message}`));
 			else res.destroy();
 		});
 	});
@@ -73,7 +72,7 @@ export function handler(built: Built) {
 		const token = inPath?.token ?? tokenOf(req, url);
 		const open = found?.route.public === true && method === "GET";
 		if (req.headers.origin === "null" && token) res.setHeader("access-control-allow-origin", "null");
-		if (req.headers.origin && !token && !open) return json(res, 403, fail("refused", "A page in a browser must send a token; the origin alone says nothing.", []));
+		if (req.headers.origin && !token && !open) return json(res, 403, refusal("refused", "A page in a browser must send a token; the origin alone says nothing."));
 		const caller = built.callers.resolve(token) ?? (open ? PUBLIC : undefined);
 		if (found) return caller ? serveRoute(built, found, caller, req, res) : json(res, 401, NO_TOKEN);
 		return api(built, req, res, url, token, caller);
@@ -98,14 +97,14 @@ async function api(built: Built, req: IncomingMessage, res: ServerResponse, url:
 	if (method === "GET" && (path === API || path === `${API}/`)) return json(res, 200, { ok: true, value: { protocol: PROTOCOL_VERSION, server: SERVER_VERSION }, notes: [] });
 	if (method === "POST" && path === LOGIN_PATH) {
 		const args = parsed(body);
-		if (!args) return json(res, 200, fail("invalid", "The body should be one JSON object.", []));
+		if (!args) return json(res, 200, refusal("invalid", "The body should be one JSON object."));
 		const done = login(built, token, args);
 		return json(res, done.status, done.body);
 	}
 	if (method === "POST" && path.startsWith(`${API}/`)) {
 		const args = parsed(body);
 		if (!caller) return json(res, 401, NO_TOKEN);
-		if (!args) return json(res, 200, fail("invalid", "The arguments should be one JSON object, keyed by name.", []));
+		if (!args) return json(res, 200, refusal("invalid", "The arguments should be one JSON object, keyed by name."));
 		return json(res, 200, await built.router.call(decodeURIComponent(path.slice(API.length + 1)), args, caller));
 	}
 	if (method === "POST" && path === MCP_PATH) {
@@ -114,17 +113,17 @@ async function api(built: Built, req: IncomingMessage, res: ServerResponse, url:
 		if (!answer) return void res.writeHead(202).end();
 		return json(res, 200, answer);
 	}
-	return json(res, 404, fail("not_found", `Nothing is served at ${path}.`, [], "deck.get"));
+	return json(res, 404, refusal("not_found", `Nothing is served at ${path}.`, "deck.get"));
 }
 
 function login(built: Built, token: string | undefined, args: Record<string, unknown>): { status: number; body: Envelope<unknown> } {
 	const label = typeof args.label === "string" ? args.label : undefined;
 	if (typeof args.code === "string") {
 		const got = built.callers.redeem(args.code, label);
-		return got ? { status: 200, body: { ok: true, value: { token: got.token, name: got.who.name }, notes: [] } } : { status: 401, body: fail("refused", "That code is wrong, spent or more than ten minutes old.", [], "deck.pair") };
+		return got ? { status: 200, body: { ok: true, value: { token: got.token, name: got.who.name }, notes: [] } } : { status: 401, body: refusal("refused", "That code is wrong, spent or more than ten minutes old.", "deck.pair") };
 	}
 	const caller = built.callers.resolve(token);
-	if (caller?.id !== LOCAL_PERSON.id) return { status: 401, body: fail("refused", "Log in with a pairing code, or with the token in .decks/server.json as the bearer.", [], "deck.pair") };
+	if (caller?.id !== LOCAL_PERSON.id) return { status: 401, body: refusal("refused", "Log in with a pairing code, or with the token in .decks/server.json as the bearer.", "deck.pair") };
 	const got = built.callers.login(label);
 	return { status: 200, body: { ok: true, value: { token: got.token, name: got.who.name }, notes: [] } };
 }
@@ -160,7 +159,7 @@ async function serveRoute(built: Built, found: RouteOf, caller: Caller, req: Inc
 	const ctx = built.router.context(found.feature, caller, []);
 	if (found.route.serve) return found.route.serve(ctx, req, res);
 	const url = new URL(req.url ?? "/", "http://decks.local");
-	if (!found.route.answer) return json(res, 404, fail("not_found", `Nothing is served at ${url.pathname}.`, []));
+	if (!found.route.answer) return json(res, 404, refusal("not_found", `Nothing is served at ${url.pathname}.`));
 	const answer = await found.route.answer(ctx, url.pathname, url.searchParams, new Uint8Array(await bodyOf(req)));
 	res.writeHead(answer.status ?? 200, { "content-type": answer.type, ...(answer.headers ?? {}) });
 	res.end(typeof answer.body === "string" ? answer.body : Buffer.from(answer.body));
