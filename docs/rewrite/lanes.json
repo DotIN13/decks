@@ -32,13 +32,14 @@
 		"server/frame/",
 		"server/compat/",
 		"server/upgrade/",
-		"tools/switch/",
 		"tools/checks/agent/",
-		"tools/checks/bench/"
+		"tools/checks/bench/",
+		"tools/switch/"
 	],
 	"Keel": [
 		"server/kernel/",
-		"server/main.ts"
+		"server/main.ts",
+		"tools/complete/"
 	],
 	"Easel": [
 		"server/canvas/",
