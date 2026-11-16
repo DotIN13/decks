@@ -55,23 +55,23 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
  */
 function wireClipboard(ctx: FrameContext, handle: Handle): void {
 	const { root, start, end, studio, backend, first } = ctx;
-const harness = studio ? `studio:${start.backend.api}` : ((first as { harness?: string }).harness ?? `harness:${start.backend.api}`);
-const say = sayer(root);
-const clipboard = installClipboard({
-	handle,
-	canvas: start.canvas.name,
-	harness: () => harness,
-	canWrite: ctx.canWrite,
-	...(studio ? {} : { call: (verb: string, args: unknown[]) => backend.call(verb, args) }),
-	upload: (files, at) =>
-		void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
-			end.call("upload", { files: read, at }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
-		),
-	say,
-});
-// A sheet open over the foot of the frame (a phone's properties drawer): the page's dock makes way for it.
-document.addEventListener("decks-sheet", (event) => end.emit("sheet", { open: !!(event as CustomEvent<{ open?: boolean }>).detail?.open }), { signal: life() });
-end.on("paste", (data) => clipboard.paste(data));
+	const harness = studio ? `studio:${start.backend.api}` : ((first as { harness?: string }).harness ?? `harness:${start.backend.api}`);
+	const say = sayer(root);
+	const clipboard = installClipboard({
+		handle,
+		canvas: start.canvas.name,
+		harness: () => harness,
+		canWrite: ctx.canWrite,
+		...(studio ? {} : { call: (verb: string, args: unknown[]) => backend.call(verb, args) }),
+		upload: (files, at) =>
+			void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
+				end.call("upload", { files: read, at }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
+			),
+		say,
+	});
+	// A sheet open over the foot of the frame (a phone's properties drawer): the page's dock makes way for it.
+	document.addEventListener("decks-sheet", (event) => end.emit("sheet", { open: !!(event as CustomEvent<{ open?: boolean }>).detail?.open }), { signal: life() });
+	end.on("paste", (data) => clipboard.paste(data));
 }
 
 /*
@@ -80,49 +80,49 @@ end.on("paste", (data) => clipboard.paste(data));
  */
 function followDrawing(ctx: FrameContext, handle: Handle): { follower: Follower; reread: () => void } {
 	const { backend, first, changed } = ctx;
-let reading = false;
-const follower = drawingFollower({
-	whole: (doc, base, made) => {
-		handle.setDocument(serialize(doc), base, made);
-		changed();
-	},
-	edits: (edits, base, made, author) => {
-		// A deleted item's box is gone once the edits are in: read first.
-		const agent = author?.kind === "agent" && author.id ? author : undefined;
-		const before = new Map<string, ReturnType<typeof handle.itemBox>>();
-		if (agent) for (const edit of edits) if (edit.op === "remove") before.set(edit.id, handle.itemBox(edit.id));
-		const applied = handle.applyEdits(edits, base, made) !== false;
-		changed();
-		/*
-		 * An agent's edit is shown as its hand: a mark in its colour on each thing it touched, and its
-		 * cursor going to each in turn (`marks.ts`, `presence.ts`). Read from the change itself rather
-		 * than the agent's act, so the marks land with the drawing and a run of edits is one tour.
-		 */
-		if (applied && agent) {
-			const who = ctx.agents()[agent.id!];
-			const color = who?.color ?? "#3b5cf6";
-			const touched = touchedBy(edits, (id) => before.get(id), (id) => handle.itemBox(id));
-			ctx.marks.add(agent.id!, color, touched);
-			ctx.presence?.tour(agent.id!, { kind: "agent", id: agent.id!, name: who?.name ?? agent.name ?? "An agent", color }, touched.map((one) => ({ x: one.box.x, y: one.box.y })));
-		}
-		return applied;
-	},
-	reread: () => reread(),
-});
-function reread(): void {
-	if (reading) return;
-	reading = true;
-	void backend
-		.drawing()
-		.then((now) => {
-			follower.at(now.rev);
-			handle.setDocument(serialize(now.doc), now.base);
+	let reading = false;
+	const follower = drawingFollower({
+		whole: (doc, base, made) => {
+			handle.setDocument(serialize(doc), base, made);
 			changed();
-		})
-		.catch((error: unknown) => console.warn(error))
-		.finally(() => (reading = false));
-}
-follower.at(first.rev);
+		},
+		edits: (edits, base, made, author) => {
+			// A deleted item's box is gone once the edits are in: read first.
+			const agent = author?.kind === "agent" && author.id ? author : undefined;
+			const before = new Map<string, ReturnType<typeof handle.itemBox>>();
+			if (agent) for (const edit of edits) if (edit.op === "remove") before.set(edit.id, handle.itemBox(edit.id));
+			const applied = handle.applyEdits(edits, base, made) !== false;
+			changed();
+			/*
+			 * An agent's edit is shown as its hand: a mark in its colour on each thing it touched, and its
+			 * cursor going to each in turn (`marks.ts`, `presence.ts`). Read from the change itself rather
+			 * than the agent's act, so the marks land with the drawing and a run of edits is one tour.
+			 */
+			if (applied && agent) {
+				const who = ctx.agents()[agent.id!];
+				const color = who?.color ?? "#3b5cf6";
+				const touched = touchedBy(edits, (id) => before.get(id), (id) => handle.itemBox(id));
+				ctx.marks.add(agent.id!, color, touched);
+				ctx.presence?.tour(agent.id!, { kind: "agent", id: agent.id!, name: who?.name ?? agent.name ?? "An agent", color }, touched.map((one) => ({ x: one.box.x, y: one.box.y })));
+			}
+			return applied;
+		},
+		reread: () => reread(),
+	});
+	function reread(): void {
+		if (reading) return;
+		reading = true;
+		void backend
+			.drawing()
+			.then((now) => {
+				follower.at(now.rev);
+				handle.setDocument(serialize(now.doc), now.base);
+				changed();
+			})
+			.catch((error: unknown) => console.warn(error))
+			.finally(() => (reading = false));
+	}
+	follower.at(first.rev);
 	return { follower, reread };
 }
 
@@ -256,76 +256,76 @@ function hearLine(ctx: FrameContext, handle: Handle, follower: Follower, message
 /** What the page tells the frame: a card to reload, its look, the tool, the camera, a selection, who is busy, an edit. */
 function hearPage(ctx: FrameContext, handle: Handle): void {
 	const { end, agent, setAgent, busy, setBusy } = ctx;
-end.on("reload", (data) => handle.reloadCard(data.path));
-end.on("look", (data) => {
-	if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);
-	if (data.insets) useInsets(data.insets);
-	if (data.agents) ctx.setAgents(data.agents);
-	if (data.dock !== undefined) {
-		ctx.setDock(data.dock);
-		ctx.reflect();
-	}
-	if (data.composer !== undefined) ctx.setComposerBox(data.composer);
-	if (data.dark !== undefined) {
-		document.documentElement.dataset.colorScheme = data.dark ? "dark" : "light";
-		ctx.setDark(data.dark);
-		handle.setDark(data.dark);
-	}
-	if (data.mode !== undefined) handle.setMode(data.mode);
-});
-end.on("tool", (data) => {
-	if (data.tool) handle.setTool(data.tool);
-	if (data.ink) setDrawing(data.ink.on);
-});
-end.on("camera", (data) => (data.glide ? handle.glide(data.camera, data.glide) : handle.setCamera(data.camera)));
+	end.on("reload", (data) => handle.reloadCard(data.path));
+	end.on("look", (data) => {
+		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);
+		if (data.insets) useInsets(data.insets);
+		if (data.agents) ctx.setAgents(data.agents);
+		if (data.dock !== undefined) {
+			ctx.setDock(data.dock);
+			ctx.reflect();
+		}
+		if (data.composer !== undefined) ctx.setComposerBox(data.composer);
+		if (data.dark !== undefined) {
+			document.documentElement.dataset.colorScheme = data.dark ? "dark" : "light";
+			ctx.setDark(data.dark);
+			handle.setDark(data.dark);
+		}
+		if (data.mode !== undefined) handle.setMode(data.mode);
+	});
+	end.on("tool", (data) => {
+		if (data.tool) handle.setTool(data.tool);
+		if (data.ink) setDrawing(data.ink.on);
+	});
+	end.on("camera", (data) => (data.glide ? handle.glide(data.camera, data.glide) : handle.setCamera(data.camera)));
 	end.on("select", (data) => (data.page ? selectCard(handle, data.page) : handle.select(data.ids)));
-end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
-end.answer("edit", (data) => {
-	handle.edit(data.ops);
-	return true as const;
-});
+	end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
+	end.answer("edit", (data) => {
+		handle.edit(data.ops);
+		return true as const;
+	});
 }
 
 /** The window's own events: files dropped from outside, shortcuts for the page, and presses that put menus away. */
 function wireWindow(ctx: FrameContext): void {
 	const { end } = ctx;
-/*
- * Files dropped from outside the browser: never opened in place (a dropped file's default is to
- * replace the page with it), but handed to the page, which uploads them into this canvas's folder
- * and places them where they landed, as it does a drop of its own.
- */
-const carries = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
-addEventListener("dragover", (event) => {
-	if (!carries(event)) return;
-	event.preventDefault();
-	if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-}, { signal: life() });
-addEventListener("drop", (event) => {
-	if (!carries(event)) return;
-	event.preventDefault();
-	const at = { x: event.clientX, y: event.clientY };
-	// Over a card they go into it, between its blocks where they land: only the stage here knows what is under the point.
-	const card = probes.cardAt?.(at.x, at.y) as CardSlot | undefined;
-	const files = Array.from(event.dataTransfer?.files ?? []);
-	void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
-		end.call("upload", { files: read, at, ...(card ? { card } : {}) }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
-	);
-}, { signal: life() });
+	/*
+	 * Files dropped from outside the browser: never opened in place (a dropped file's default is to
+	 * replace the page with it), but handed to the page, which uploads them into this canvas's folder
+	 * and places them where they landed, as it does a drop of its own.
+	 */
+	const carries = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+	addEventListener("dragover", (event) => {
+		if (!carries(event)) return;
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+	}, { signal: life() });
+	addEventListener("drop", (event) => {
+		if (!carries(event)) return;
+		event.preventDefault();
+		const at = { x: event.clientX, y: event.clientY };
+		// Over a card they go into it, between its blocks where they land: only the stage here knows what is under the point.
+		const card = probes.cardAt?.(at.x, at.y) as CardSlot | undefined;
+		const files = Array.from(event.dataTransfer?.files ?? []);
+		void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
+			end.call("upload", { files: read, at, ...(card ? { card } : {}) }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
+		);
+	}, { signal: life() });
 
-/*
- * A shortcut the canvas did not take goes to the page, so the app's own keys work wherever the focus
- * is: only one with a modifier, since a bare letter typed here is the canvas's or a card's.
- */
-addEventListener("keydown", (event) => {
-	if (event.defaultPrevented || !(event.metaKey || event.ctrlKey || event.altKey)) return;
-	end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
-}, { signal: life() });
+	/*
+	 * A shortcut the canvas did not take goes to the page, so the app's own keys work wherever the focus
+	 * is: only one with a modifier, since a bare letter typed here is the canvas's or a card's.
+	 */
+	addEventListener("keydown", (event) => {
+		if (event.defaultPrevented || !(event.metaKey || event.ctrlKey || event.altKey)) return;
+		end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
+	}, { signal: life() });
 
-/*
- * A press or Escape here puts away the page's menus, which hear nothing from this document; and one
- * there puts away this frame's (`@decks/ui` dismiss).
- */
-addEventListener("pointerdown", () => end.emit("away", {}), { capture: true, signal: life() });
-addEventListener("keydown", (event) => event.key === "Escape" && end.emit("away", {}), { capture: true, signal: life() });
-end.on("away", () => dismissMenus());
+	/*
+	 * A press or Escape here puts away the page's menus, which hear nothing from this document; and one
+	 * there puts away this frame's (`@decks/ui` dismiss).
+	 */
+	addEventListener("pointerdown", () => end.emit("away", {}), { capture: true, signal: life() });
+	addEventListener("keydown", (event) => event.key === "Escape" && end.emit("away", {}), { capture: true, signal: life() });
+	end.on("away", () => dismissMenus());
 }
