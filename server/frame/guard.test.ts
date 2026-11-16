@@ -136,9 +136,9 @@ test("Reader's attack: an encoded climb, an agent call, and another canvas's pat
 		assert.equal((await http("item.update", { canvas: "a", id: "paper", set: { type: "app", app: "other" } })).ok, false, "an update turning an item into a new app");
 		const dup = await http("item.batch", { canvas: "a", ops: [{ op: "insert", item: { type: "app", app: "notes", at: { x: 600, y: 400 } } }] });
 		assert.doesNotMatch(JSON.stringify(dup), /canvas pass may not/, "a duplicate of an app already placed is not the guard's to refuse");
-		// (7) export and screenshot write wherever their 'to' says: not on a pass.
-		assert.equal((await http("canvas.export", { canvas: "a", of: "x", to: "assets/importmap.json" })).ok, false, "canvas.export");
-		assert.equal((await http("canvas.screenshot", { canvas: "a", to: "assets/x.png" })).ok, false, "canvas.screenshot");
+		// (7) export and screenshot are a card's calls again, but their 'to' stays in the pass's canvas (kernel and pictures).
+		assert.equal((await http("canvas.export", { canvas: "a", of: "x", to: "assets/importmap.json" })).ok, false, "canvas.export to assets/");
+		assert.equal((await http("canvas.screenshot", { canvas: "a", to: "canvases/b/cards/secret/index.html" })).ok, false, "canvas.screenshot over b's card");
 	} finally {
 		await doors.close();
 		await s.close();

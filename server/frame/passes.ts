@@ -21,10 +21,7 @@ export const FRAME_OWN: readonly string[] = [
  * Card calls the frame hands to the page instead, which asks the person first on their own token: a pass
  * never makes them, so a card's script cannot skip the question by calling the socket itself (Reader, 5).
  */
-const PAGE_ONLY = (name: string) => name.startsWith("agent.") || name === "view.goto" || WRITES_ANYWHERE.has(name);
-
-/** Card calls whose `to` may write anywhere in the deck, which no card needs on its pass (Reader, 7). */
-const WRITES_ANYWHERE = new Set(["canvas.export", "canvas.screenshot"]);
+const PAGE_ONLY = (name: string) => name.startsWith("agent.") || name === "view.goto";
 
 /** Every call a pass may make: the card set but the page's own, and the frame's own (its Scope's calls). */
 export const PASS_CALLS: readonly string[] = [...new Set([...[...callsFor("card")].filter((name) => !PAGE_ONLY(name)), ...FRAME_OWN])].sort();
