@@ -145,7 +145,7 @@
 	"canvas/entries/tools.ts: stage": 1,
 	"canvas/host/chrome.ts: stage": 3,
 	"canvas/host/host.ts: board": 3,
-	"canvas/host/inside/backend.ts: stage": 12,
+	"canvas/host/inside/backend.ts: stage": 3,
 	"canvas/host/inside/boot.ts: board": 4,
 	"canvas/host/inside/boot.ts: stage": 3,
 	"canvas/host/inside/card-calls.ts: board": 2,
