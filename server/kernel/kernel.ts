@@ -9,7 +9,7 @@ import { ownFeature } from "./own-calls.ts";
 import { Relay } from "./relay.ts";
 import { declaredOf, Router, handledOf, type MakeContext } from "./router.ts";
 import { MemoryStore, memoryVersion, readJson, readMostly, writeJson, type Stores } from "./store.ts";
-import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Store, VersionFile } from "./types.ts";
+import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Scope, Stop, Store, VersionFile } from "./types.ts";
 
 // Builds the kernel from a deck, a store per feature and the features: the
 // deck wrapped in history, the callers, the event stream, the canvas source,
@@ -49,12 +49,13 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 		after: (hear) => router.after(hear),
 		call: (name, args, caller) => router.call(name, args, caller),
 		sees: (one) => void events.sees.push(one),
+		belongs: (one) => void events.belongs.push(one),
 		...(options.run ? { run: options.run } : {}),
 		...{ url: () => address.url, folder: () => options.deck.root, machine: () => machine, deckId: () => deckId },
 	};
 	source = canvasSource(features, kernel);
 	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);
-	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, ...(client ? { client } : {}) });
+	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, scope: callers.scopeOf(caller), ...(client ? { client } : {}) });
 	const declared = declaredOf(features);
 	const router: Router = new Router(handledOf(features, declared), makeContext, options.checkAnswers ?? false, (name, args, caller) => relay.forward(name, args, caller), declared);
 	const version = options.version ?? memoryVersion();
@@ -89,7 +90,7 @@ function canvasSource(features: Feature[], kernel: Kernel): CanvasSource | undef
 	return givers[0]?.canvases?.(kernel);
 }
 
-type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; nameOf: (name: string) => string;
+type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; nameOf: (name: string) => string; scope: Scope | undefined;
 	call: (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => Promise<Envelope<unknown>>; client?: Context["client"] };
 
 function contextFor(parts: ContextParts): Context {
@@ -108,6 +109,7 @@ function contextFor(parts: ContextParts): Context {
 			if (!answer.ok) throw new Refused(answer.error.code, answer.error.message, answer.error.hint);
 			return answer.value as T;
 		},
+		...(parts.scope ? { scope: parts.scope } : {}),
 		...(parts.client ? { client: parts.client } : {}),
 	};
 }

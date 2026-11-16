@@ -75,9 +75,26 @@ export function handler(built: Built) {
 		if (req.headers.origin === "null" && token) res.setHeader("access-control-allow-origin", "null");
 		if (req.headers.origin && !token && !open) return json(res, 403, refusal("refused", "A page in a browser must send a token; the origin alone says nothing."));
 		const caller = built.callers.resolve(token) ?? (open ? PUBLIC : undefined);
+		if (found && caller && !reaches(built, found.route, caller, method, new URL(req.url ?? "/", "http://decks.local"))) return json(res, 403, refusal("refused", "This pass does not reach this address.", "canvas.here"));
 		if (found) return caller ? serveRoute(built, found, caller, req, res) : json(res, 401, NO_TOKEN);
 		return api(built, req, res, url, token, caller);
 	};
+}
+
+/** Until every route that takes a pass declares scoped, a route without it still lets one through; the next
+ *  step (Mason's rule) makes this false, refusing a scoped caller wherever nothing was written for it. */
+const OPEN_UNTIL_DECLARED = true;
+
+/** Whether a caller reaches a route: a whole caller always; a scoped one only where the route's scoped says. */
+function reaches(built: Built, route: Route, caller: Caller, method: string, url: URL): boolean {
+	const scope = built.callers.scopeOf(caller);
+	if (!scope) return true;
+	if (!route.scoped) return OPEN_UNTIL_DECLARED;
+	try {
+		return route.scoped?.(scope, { method, path: url.pathname, query: url.searchParams }) === true;
+	} catch {
+		return false;
+	}
 }
 
 function tokenOf(req: IncomingMessage, url: URL): string | undefined {

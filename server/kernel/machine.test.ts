@@ -6,7 +6,22 @@ import { MemoryDeck } from "./memory-deck.ts";
 import { memoryStores } from "./store.ts";
 import { testServer } from "./testing.ts";
 
-// The kernel keeps a machine folder outside any deck and a stable id per deck.
+// The kernel keeps a machine folder outside any deck and a stable id per deck,
+// hands an upgrade the stores it needs, and leaves nothing running once closed.
+
+test("a server started on a folder and closed leaves no timer, socket or watcher behind", async () => {
+	const { startServer } = await import("./server.ts");
+	const deck = await tempFolder("keel-handles");
+	const lasting = () => process.getActiveResourcesInfo().filter((one) => /Timeout|TCP|FSEvent/.test(one)).sort();
+	const before = lasting();
+	const running = await startServer({ deck: deck.folder, port: 0, features: [] });
+	running.built.callers.issue({ kind: "person", id: "person~frame-1", name: "x" }, "pass", { canvas: "a", until: Date.now() + 1000 });
+	await running.close();
+	await new Promise((r) => setTimeout(r, 50));
+	const after = lasting();
+	await deck.remove();
+	assert.deepEqual(after, before);
+});
 
 test("the kernel gives a machine folder and a deck id that stays across starts", async () => {
 	const server = await testServer();

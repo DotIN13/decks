@@ -46,6 +46,8 @@ export interface Context {
 	note(text: string): void;
 	/** The handling feature's own private state, never readable as a deck file. */
 	store: Store;
+	/** The scope the caller is held to (a pass's), or undefined for a whole caller. */
+	scope?: Scope;
 	/** The connection the call came on; undefined for a one-shot HTTP call. */
 	client?: Client;
 	/** Make another call through the router, as the same caller and client; a refusal throws Refused. */
@@ -110,6 +112,22 @@ export function toDeckPath(raw: string): DeckPath {
 	return path as DeckPath;
 }
 
+/** A path as it came in an address: decoded once, "." and empty parts dropped, then checked as toDeckPath
+ *  does. Test a prefix only on what this answers; a part still encoded is refused. */
+export function deckPathFrom(raw: string): DeckPath {
+	let path: string;
+	try {
+		path = decodeURIComponent(raw);
+	} catch {
+		throw new Refused("invalid", `${raw} is not a path.`, "file.list");
+	}
+	if (/%[0-9a-f]{2}/i.test(path)) throw new Refused("invalid", `${raw} is encoded twice.`, "file.list");
+	return toDeckPath(path.split("\\").join("/").split("/").filter((part) => part !== "" && part !== ".").join("/"));
+}
+
+/** Whether a deck path is a folder or inside it. */
+export const inside = (path: string, folder: string): boolean => path === folder || path.startsWith(`${folder}/`);
+
 /** One recorded write: which file, its revision, who wrote it and when. */
 export type Revision = { path: DeckPath; rev: number; by: string; at: number };
 /** One name in a folder. */
@@ -169,6 +187,8 @@ export interface Kernel {
 	deckId(): string;
 	/** A check before every handler or relay, after the who and argument checks; throw Refused to refuse. */
 	guard(guard: Guard): void;
+	/** Say that an event with no canvas belongs to a scope's canvas (an app placed there, a document it shows). */
+	belongs(belongs: (scope: Scope, event: string, payload: Record<string, unknown>) => boolean): void;
 	/** Hear every call that reached a handler or a host, after it answered; a hearer cannot change it. */
 	after(hear: (done: Done) => void): Stop;
 	/** Trim a call's value before it is answered (a list to what the caller may see); several run in order. */
@@ -249,6 +269,8 @@ export interface Route {
 	public?: true;
 	/** The raw request, unbuffered, called instead of answer: for a proxy. Decks-local only. */
 	serve?(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void>;
+	/** What a scoped caller (a pass) may reach here; a route without it, or answering false, refuses it. */
+	scoped?(scope: Scope, asked: { method: string; path: string; query: URLSearchParams }): boolean;
 	/** A token carried in the path, as /app/t/<pass>/<name>/: the token, and the path the route then sees. */
 	tokenOf?(url: URL): { token: string; path: string } | undefined;
 	/** A WebSocket or other upgrade under the prefix; the route resolves its caller itself. */

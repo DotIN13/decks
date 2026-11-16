@@ -1,4 +1,4 @@
-import { check, EVENTS, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
+import { check, EVENTS, layout, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
 import type { EmitOptions, Events, Scope, Sees, Stop } from "./types.ts";
 
 // One stream. A feature hears everything with on(); a door subscribes for its
@@ -17,6 +17,8 @@ export class EventBus implements Events {
 	readonly sees: Sees[] = [];
 	/** The scope a caller is held to; a scoped caller hears only its canvas's events. Set by the kernel. */
 	scopeOf?: (caller: Caller) => Scope | undefined;
+	/** Ways features say an event with no canvas belongs to a scope's canvas (Kernel.belongs). */
+	readonly belongs: ((scope: Scope, event: string, payload: Record<string, unknown>) => boolean)[] = [];
 	private listeners = new Map<string, Set<(payload: never) => void>>();
 	private subscribers = new Set<{ sub: Subscriber; hear: (heard: Heard) => void }>();
 
@@ -32,8 +34,7 @@ export class EventBus implements Events {
 			if (sub.canvas && record.canvas !== undefined && record.canvas !== sub.canvas) continue;
 			const canvas = typeof record.canvas === "string" ? record.canvas : undefined;
 			if (canvas && !this.sees.every((one) => one(sub.caller, canvas))) continue;
-			const scope = this.scopeOf?.(sub.caller);
-			if (scope?.canvas !== undefined && canvas !== scope.canvas) continue;
+			if (!this.inScope(sub.caller, event.name, record)) continue;
 			if (mayHear(sub.caller, event, record)) hear({ name: event.name, payload: record });
 		}
 	}
@@ -50,9 +51,18 @@ export class EventBus implements Events {
 		const event = BY_NAME.get(name);
 		const canvas = typeof payload.canvas === "string" ? payload.canvas : undefined;
 		if (!event || (canvas && !this.sees.every((one) => one(caller, canvas)))) return false;
+		return this.inScope(caller, name, payload) && mayHear(caller, event, payload);
+	}
+
+	/** Whether a scoped caller may hear an event: of its canvas, or with no canvas whose every id is a path
+	 *  inside its canvas's folder, or one a feature says belongs to it (an app placed there). */
+	private inScope(caller: Caller, name: string, payload: Record<string, unknown>): boolean {
 		const scope = this.scopeOf?.(caller);
-		if (scope?.canvas !== undefined && canvas !== scope.canvas) return false;
-		return mayHear(caller, event, payload);
+		if (scope?.canvas === undefined) return true;
+		if (typeof payload.canvas === "string") return payload.canvas === scope.canvas;
+		const ids = Array.isArray(payload.ids) ? payload.ids.map(String) : [];
+		if (ids.length && ids.every((id) => layout.canvasOfPath(id)?.name === scope.canvas)) return true;
+		return this.belongs.some((one) => one(scope, name, payload));
 	}
 
 	/** For a door: what one caller may hear, optionally narrowed to some events or a canvas. */

@@ -3,11 +3,44 @@ import assert from "node:assert/strict";
 import { calls, events, PROTOCOL_VERSION } from "../../protocol/index.ts";
 import { probeFeature } from "./probe.test.ts";
 import { callers, testServer } from "./testing.ts";
-import { defineFeature, handle } from "./types.ts";
+import { deckPathFrom, defineFeature, handle, inside, type Route } from "./types.ts";
 
 // A caller with a scope (a canvas pass) can never act outside it, whatever
 // the feature and whichever door: only its calls, only its canvas, its here
-// held to that canvas, and only that canvas's events heard.
+// held to that canvas, only what a route declares for it, only its events.
+
+test("a path from an address is decoded once and fenced before any prefix is tested", () => {
+	assert.equal(deckPathFrom("canvases/a/files/x%20y.txt"), "canvases/a/files/x y.txt");
+	assert.equal(deckPathFrom("assets/./icons//a.svg"), "assets/icons/a.svg");
+	for (const bad of ["assets/..%2fcanvases%2fb%2ffiles%2fsecret.txt", "assets/%2e%2e/canvases/b", "assets/%252e%252e/x", ".decks/tokens.json", "a/%2edecks/x", "%E0%A4%A"]) {
+		assert.throws(() => deckPathFrom(bad), { code: "invalid" }, bad);
+	}
+	assert.ok(inside("canvases/a/cards/x", "canvases/a"));
+	assert.ok(!inside("canvases/ab/cards/x", "canvases/a"));
+});
+
+test("a route that declares scoped holds a pass to what it says, a climb included", async () => {
+	const routes: Route[] = [
+		{ method: "GET", prefix: "/open/", answer: async () => ({ type: "text/plain", body: "whole callers only" }) },
+		{
+			method: "GET",
+			prefix: "/files/",
+			scoped: (scope, asked) => inside(deckPathFrom(asked.path.slice("/files/".length)), `canvases/${scope.canvas}`),
+			answer: async (_ctx, path) => ({ type: "text/plain", body: path }),
+		},
+	];
+	const server = await testServer({ features: [defineFeature({ name: "pages", calls: [], routes })] });
+	const doors = await server.listen(0);
+	const pass = server.callers.issue({ ...callers.person, id: "person~frame-9" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 });
+	const get = async (path: string, token: string) => (await fetch(`${doors.url}${path}`, { headers: { authorization: `Bearer ${token}` } })).status;
+	assert.equal(await get("/open/x", doors.token), 200);
+	assert.equal(await get("/open/x", pass), 200, "until every route declares scoped, one without it lets a pass through");
+	assert.equal(await get("/files/canvases/a/files/x.txt", pass), 200);
+	assert.equal(await get("/files/canvases/b/files/x.txt", pass), 403);
+	assert.equal(await get("/files/canvases/a/files/..%2f..%2fb%2ffiles%2fx.txt", pass), 403);
+	await doors.close();
+	await server.close();
+});
 
 test("a scoped token reaches only its calls and its canvas, through the router and the HTTP door", async () => {
 	const seen: (string | undefined)[] = [];
@@ -58,6 +91,22 @@ test("a scoped caller hears only its canvas's events, on the stream and the sock
 	assert.deepEqual(heard, ["item.changed:a"]);
 	ws.close();
 	await doors.close();
+	await server.close();
+});
+
+test("a scoped caller hears canvasless events of paths in its canvas, and those a feature says belong", async () => {
+	const placed = defineFeature({ name: "apps", calls: [], start: (kernel) => kernel.belongs((scope, event, payload) => event === "app.changed" && scope.canvas === "a" && (payload.ids as string[]).includes("notes")) });
+	const server = await testServer({ features: [placed] });
+	const pass = server.callers.resolve(server.callers.issue({ ...callers.person, id: "person~frame-8" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 }))!;
+	const heard: string[] = [];
+	server.events.subscribe({ caller: pass }, (one) => void heard.push(`${one.name}:${(one.payload.ids as string[]).join()}`));
+	server.events.emit(events.cardChanged, { ids: ["canvases/a/cards/x/index.html"], by: "x", rev: 1 });
+	server.events.emit(events.cardChanged, { ids: ["canvases/b/cards/y/index.html"], by: "x", rev: 2 });
+	server.events.emit(events.fileChanged, { ids: ["docs/elsewhere.md"], by: "x", rev: 3 });
+	server.events.emit(events.appChanged, { ids: ["notes"], by: "notes", rev: 4 });
+	server.events.emit(events.appChanged, { ids: ["other"], by: "other", rev: 5 });
+	server.events.emit(events.agentChanged, { ids: ["a_1"], by: "x", rev: 6 });
+	assert.deepEqual(heard, ["card.changed:canvases/a/cards/x/index.html", "app.changed:notes"]);
 	await server.close();
 });
 

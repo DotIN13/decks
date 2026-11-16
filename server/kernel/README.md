@@ -36,8 +36,8 @@ no feature; only `server/main.ts` does. Keel owns it.
    browser Origin with no token. Socket: hello first. MCP: JSON-RPC at `POST /mcp`.
 8. A declared call no feature handles goes to the host the people feature names (`Kernel.relay`), as an
    `ask` on its socket; its `reply` comes back. No host, a host gone, or 30 s: `unavailable`.
-9. A feature route needs a token or `?pass=`, unless it is `public` (GET only, a caller that may call
-   nothing). A route may take the raw request (`serve`) or an upgrade under its prefix (`upgrade`).
+9. A route needs a token or `?pass=` unless `public`; a scoped token reaches it only where `scoped` says,
+   on a path from `deckPathFrom` (decoded and fenced before any prefix test). A route may `serve` or `upgrade`.
 9b. A store on a folder keeps a key's parts as folders and a file in any script, escaping only what a
    name cannot hold; a part over 200 bytes is a stem, a hash and a hidden .<name>.key. Old names read.
 10. A deck from today's server keeps its paired tokens and card versions: adopted once, before history
