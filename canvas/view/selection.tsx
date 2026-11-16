@@ -1,3 +1,5 @@
+// What the canvas draws over the selection and under the pointer, and the pills over what is picked:
+// made inside `Stage` (`CanvasView.tsx`), one part per story, from the editor it reads.
 import type { Camera } from "@decks/protocol-old";
 import { Show, createEffect, createMemo, type Accessor } from "solid-js";
 import { boxOf, type Viewport } from "../camera/camera.ts";
@@ -63,6 +65,37 @@ type SelectionDeps = {
 export function createSelection(deps: SelectionDeps) {
 	const { props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld } = deps;
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
+	const { groupPicked, calloutPage, calloutPath, selectMade, shownDrag, penOutlines, penHandles, penAnchors, pageHandles } = pickedOutlines({ ctl, editor, penDrawn, penLayer, props, scene });
+	const { pillObstacles, quoteOf, penDeleteSelected, penDuplicate } = pillActions({ editor, freshIds, penEdit, penLayer, props, scene, selectMade });
+	const { dropBox, radiusHandle, lassoItems, calloutItems } = pillTargets({ editor, groupPicked, penHandles, penLayer, penOutlines, props, quoteOf, scene });
+	const { arrowEnds, gripBox, hoverBox, kinBoxes, penFrame, penDistances } = hoverBoxes({ editor, panning, penDrawn, penLayer, penOutlines, props, scene, shownDrag });
+	const { canvasPenPath, overlay } = overlayOf({ arrowEnds, dropBox, editor, gripBox, hoverBox, kinBoxes, pageHandles, penAnchors, penDistances, penFrame, penHandles, penOutlines, props, radiusHandle });
+	const { pagePill } = pagePillOf({ calloutPage, calloutPath, ctl, editor, frame, gliding, moving, panning, pillObstacles, props, pushCamera, scaling, view });
+	const { itemsPill } = itemsPillOf({ calloutItems, ctl, editor, frame, gliding, moving, panning, penAnchors, penDeleteSelected, penDuplicate, penNode, pillObstacles, pressHeld, props, pushCamera, scaling, canvasPenPath, view });
+	const { lassoPill } = lassoPillOf({ ctl, frame, freshIds, gliding, lassoItems, moving, panning, penEdit, pillObstacles, props, pushCamera, scaling, scene, canvasPenPath, view });
+
+	/** The pills: over the selected card, over drawn items or a group, and over the lasso's strokes. */
+	const pills = () => (
+		<>
+			{pagePill()}
+			{itemsPill()}
+			{lassoPill()}
+		</>
+	);
+
+	return { penHandles, pageHandles, radiusHandle, arrowEnds, penDeleteSelected, penDuplicate, overlay, pills };
+}
+
+/** What is picked, and where: the board the pill is for, each item's outline as moved or sized, its handles and anchors. */
+function pickedOutlines(ctx: {
+	ctl: SelectionDeps["ctl"];
+	editor: SelectionDeps["editor"];
+	penDrawn: SelectionDeps["penDrawn"];
+	penLayer: SelectionDeps["penLayer"];
+	props: SelectionDeps["props"];
+	scene: SelectionDeps["scene"];
+}) {
+	const { ctl, editor, penDrawn, penLayer, props, scene } = ctx;
 
 	/** More than one thing picked together, boards among them or not: the pill goes over the whole group (`calloutItems`). */
 	const groupPicked = () => editor.pagePicks().length + editor.items().length > 1;
@@ -94,18 +127,19 @@ export function createSelection(deps: SelectionDeps) {
 			scene,
 		);
 	});
-	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
-	const penHandles = createMemo(() => itemHandles(penOutlines(), scene, ctl.zoom()));
-	/**
+	/*
 	 * A card is as tall as the markdown in it (`@decks/pen`, `textSize`), the way it is when one is
 	 * made. So it is sized by its width alone: the two side handles, and no height written to the
 	 * file. Dragging a corner used to pin a height on it, and from then on its words were cut off or
 	 * swam in space.
 	 */
+	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
+	const penHandles = createMemo(() => itemHandles(penOutlines(), scene, ctl.zoom()));
+	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 	const penAnchors = createMemo(() => arrowAnchors(penHandles(), { editable: !!props.onPenEdit, drafting: !!editor.draft(), resizing: !!editor.resize() }, scene));
 	/*
 	 * Where each selected item is, for the properties panel's position and size: the box the stage
-	 * draws, kept current as the drawing changes (`state/pen-tools.ts`).
+	 * draws, kept current as the drawing changes (`editor/pen-tools.ts`).
 	 */
 	createEffect(() => {
 		penDrawn();
@@ -118,24 +152,20 @@ export function createSelection(deps: SelectionDeps) {
 	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
 	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: ctl.zoom() }));
+	return { groupPicked, calloutPage, calloutPath, selectMade, shownDrag, penOutlines, penHandles, penAnchors, pageHandles };
+}
 
-	/**
-	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
-	 * round the item. What the *sheet* draws is told separately, as a preview the worker applies to
-	 * its own copy (`penLayer.preview`): a turn used to send the whole drawing to the worker on every
-	 * frame, which is a relayout of the whole stage sixty times a second, and that was the flicker.
-	 *
-	 * Neither is cleared when the gesture ends. The worker lets a preview go when the server's answer
-	 * arrives — "whatever a drag was previewing is now the drawing itself" — and clearing it first is
-	 * what shows the item at its old angle for a frame.
-	 */
-	/*
-	 * The radius (`editor.radius`) is let go of when the drawing comes back with the change in it, not
-	 * when the hand lifts (`editor/core/gesture.ts`, `drawn`). The sheet's own preview works that way
-	 * already; the outline and the handles are drawn from it, and dropping it first shows the item
-	 * upright for the frame or two the save takes. A time limit is for an edit that is refused, which
-	 * would otherwise leave the handles turned for an item that is not.
-	 */
+/** What the pills do: where they may sit, what a comment quotes, and deleting or duplicating the selection. */
+function pillActions(ctx: {
+	editor: SelectionDeps["editor"];
+	freshIds: SelectionDeps["freshIds"];
+	penEdit: SelectionDeps["penEdit"];
+	penLayer: SelectionDeps["penLayer"];
+	props: SelectionDeps["props"];
+	scene: SelectionDeps["scene"];
+	selectMade: ReturnType<typeof pickedOutlines>["selectMade"];
+}) {
+	const { editor, freshIds, penEdit, penLayer, props, scene, selectMade } = ctx;
 
 	/**
 	 * What the pill should not sit on (`PageCallout`): every board and drawn item but those touching the
@@ -180,10 +210,42 @@ export function createSelection(deps: SelectionDeps) {
 		penEdit(ops);
 		if (made.length) selectMade(made);
 	};
+	return { pillObstacles, quoteOf, penDeleteSelected, penDuplicate };
+}
+
+/** What the drop outline, the radius handle and the pills are over: a frame, a corner, the lasso, a group. */
+function pillTargets(ctx: {
+	editor: SelectionDeps["editor"];
+	groupPicked: ReturnType<typeof pickedOutlines>["groupPicked"];
+	penHandles: ReturnType<typeof pickedOutlines>["penHandles"];
+	penLayer: SelectionDeps["penLayer"];
+	penOutlines: ReturnType<typeof pickedOutlines>["penOutlines"];
+	props: SelectionDeps["props"];
+	quoteOf: ReturnType<typeof pillActions>["quoteOf"];
+	scene: SelectionDeps["scene"];
+}) {
+	const { editor, groupPicked, penHandles, penLayer, penOutlines, props, quoteOf, scene } = ctx;
 
 	/** Where the frame a drag would drop into is, for the outline that says so. */
 	const dropBox = createMemo(() => dropBoxOf(editor.dropInto(), scene));
 
+	/*
+	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
+	 * round the item. What the *sheet* draws is told separately, as a preview the worker applies to
+	 * its own copy (`penLayer.preview`): a turn used to send the whole drawing to the worker on every
+	 * frame, which is a relayout of the whole stage sixty times a second, and that was the flicker.
+	 *
+	 * Neither is cleared when the gesture ends. The worker lets a preview go when the server's answer
+	 * arrives — "whatever a drag was previewing is now the drawing itself" — and clearing it first is
+	 * what shows the item at its old angle for a frame.
+	 */
+	/*
+	 * The radius (`editor.radius`) is let go of when the drawing comes back with the change in it, not
+	 * when the hand lifts (`editor/core/gesture.ts`, `drawn`). The sheet's own preview works that way
+	 * already; the outline and the handles are drawn from it, and dropping it first shows the item
+	 * upright for the frame or two the save takes. A time limit is for an edit that is refused, which
+	 * would otherwise leave the handles turned for an item that is not.
+	 */
 	/**
 	 * The one selected item's corner radius, when it has corners to round: a rounded shape from the
 	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
@@ -230,8 +292,21 @@ export function createSelection(deps: SelectionDeps) {
 				: words || (typeof first?.name === "string" ? first.name : first?.type) || "item";
 		return { box, ids, cards, words, name };
 	});
-	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
+	return { dropBox, radiusHandle, lassoItems, calloutItems };
+}
 
+/** The boxes round what the pointer is near: an arrow's ends, the grip, the hover, kin and distances. */
+function hoverBoxes(ctx: {
+	editor: SelectionDeps["editor"];
+	panning: Accessor<boolean>;
+	penDrawn: SelectionDeps["penDrawn"];
+	penLayer: SelectionDeps["penLayer"];
+	penOutlines: ReturnType<typeof pickedOutlines>["penOutlines"];
+	props: SelectionDeps["props"];
+	scene: SelectionDeps["scene"];
+	shownDrag: ReturnType<typeof pickedOutlines>["shownDrag"];
+}) {
+	const { editor, panning, penDrawn, penLayer, penOutlines, props, scene, shownDrag } = ctx;
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
 	const arrowEnds = createMemo(() => {
 		penDrawn();
@@ -275,8 +350,29 @@ export function createSelection(deps: SelectionDeps) {
 		const picked = !!over?.board && !!path && editor.pagePicks().includes(path);
 		return distancesOf({ editing: props.mode === "edit", alt: editor.altHeld(), busy: !!editor.gesture() || !!editor.pageDrag() || panning(), selection: penFrame(), over: picked ? undefined : over });
 	});
+	return { arrowEnds, gripBox, hoverBox, kinBoxes, penFrame, penDistances };
+}
 
-	const stagePenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
+/** Everything the editor draws over the canvas, as one overlay for `OverlayLayer`. */
+function overlayOf(ctx: {
+	arrowEnds: ReturnType<typeof hoverBoxes>["arrowEnds"];
+	dropBox: ReturnType<typeof pillTargets>["dropBox"];
+	editor: SelectionDeps["editor"];
+	gripBox: ReturnType<typeof hoverBoxes>["gripBox"];
+	hoverBox: ReturnType<typeof hoverBoxes>["hoverBox"];
+	kinBoxes: ReturnType<typeof hoverBoxes>["kinBoxes"];
+	pageHandles: ReturnType<typeof pickedOutlines>["pageHandles"];
+	penAnchors: ReturnType<typeof pickedOutlines>["penAnchors"];
+	penDistances: ReturnType<typeof hoverBoxes>["penDistances"];
+	penFrame: ReturnType<typeof hoverBoxes>["penFrame"];
+	penHandles: ReturnType<typeof pickedOutlines>["penHandles"];
+	penOutlines: ReturnType<typeof pickedOutlines>["penOutlines"];
+	props: SelectionDeps["props"];
+	radiusHandle: ReturnType<typeof pillTargets>["radiusHandle"];
+}) {
+	const { arrowEnds, dropBox, editor, gripBox, hoverBox, kinBoxes, pageHandles, penAnchors, penDistances, penFrame, penHandles, penOutlines, props, radiusHandle } = ctx;
+
+	const canvasPenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
 	/** A dragged arrow handle's dashed route, where it sits. */
 	const routeShown = editor.route;
 	/**
@@ -309,9 +405,29 @@ export function createSelection(deps: SelectionDeps) {
 		route: routeShown(),
 		endDraft: editor.endDraft(),
 	}));
+	return { canvasPenPath, overlay };
+}
 
-	/** The pills: over the selected board, over drawn items or a group, and over the lasso's strokes. */
-	const pills = () => (
+/** The selected card's pill, made with what it reads. */
+function pagePillOf(ctx: {
+	calloutPage: ReturnType<typeof pickedOutlines>["calloutPage"];
+	calloutPath: ReturnType<typeof pickedOutlines>["calloutPath"];
+	ctl: SelectionDeps["ctl"];
+	editor: SelectionDeps["editor"];
+	frame: SelectionDeps["frame"];
+	gliding: Accessor<boolean>;
+	moving: Accessor<boolean>;
+	panning: Accessor<boolean>;
+	pillObstacles: ReturnType<typeof pillActions>["pillObstacles"];
+	props: SelectionDeps["props"];
+	pushCamera: (cam: Camera) => void;
+	scaling: Accessor<boolean>;
+	view: SelectionDeps["view"];
+}) {
+	const { calloutPage, calloutPath, ctl, editor, frame, gliding, moving, panning, pillObstacles, props, pushCamera, scaling, view } = ctx;
+
+	/** The selected card's pill: its name and actions. */
+	const pagePill = () => (
 		<>
 
 			{/*
@@ -355,6 +471,37 @@ export function createSelection(deps: SelectionDeps) {
 					);
 				}}
 			</Show>
+		</>
+	);
+	return { pagePill };
+}
+
+/** The pill over drawn items or a group, made with what it reads. */
+function itemsPillOf(ctx: {
+	calloutItems: ReturnType<typeof pillTargets>["calloutItems"];
+	ctl: SelectionDeps["ctl"];
+	editor: SelectionDeps["editor"];
+	frame: SelectionDeps["frame"];
+	gliding: Accessor<boolean>;
+	moving: Accessor<boolean>;
+	panning: Accessor<boolean>;
+	penAnchors: ReturnType<typeof pickedOutlines>["penAnchors"];
+	penDeleteSelected: ReturnType<typeof pillActions>["penDeleteSelected"];
+	penDuplicate: ReturnType<typeof pillActions>["penDuplicate"];
+	penNode: SelectionDeps["penNode"];
+	pillObstacles: ReturnType<typeof pillActions>["pillObstacles"];
+	pressHeld: SelectionDeps["pressHeld"];
+	props: SelectionDeps["props"];
+	pushCamera: (cam: Camera) => void;
+	scaling: Accessor<boolean>;
+	canvasPenPath: ReturnType<typeof overlayOf>["canvasPenPath"];
+	view: SelectionDeps["view"];
+}) {
+	const { calloutItems, ctl, editor, frame, gliding, moving, panning, penAnchors, penDeleteSelected, penDuplicate, penNode, pillObstacles, pressHeld, props, pushCamera, scaling, canvasPenPath, view } = ctx;
+
+	/** The pill over drawn items, or a group picked together. */
+	const itemsPill = () => (
+		<>
 			<Show when={calloutItems()}>
 				{(items) => (
 					<PageCallout
@@ -376,7 +523,7 @@ export function createSelection(deps: SelectionDeps) {
 												onComment: () =>
 													props.onComment?.({
 														// A drawn item is found by its canvas's file and its id (`CardComment.items`).
-														path: stagePenPath() ?? "the canvas",
+														path: canvasPenPath() ?? "the canvas",
 														items: items().ids,
 														quote: items().words,
 														title: items().name,
@@ -402,6 +549,34 @@ export function createSelection(deps: SelectionDeps) {
 					/>
 				)}
 			</Show>
+		</>
+	);
+	return { itemsPill };
+}
+
+/** The pill over the lasso's strokes, made with what it reads. */
+function lassoPillOf(ctx: {
+	ctl: SelectionDeps["ctl"];
+	frame: SelectionDeps["frame"];
+	freshIds: SelectionDeps["freshIds"];
+	gliding: Accessor<boolean>;
+	lassoItems: ReturnType<typeof pillTargets>["lassoItems"];
+	moving: Accessor<boolean>;
+	panning: Accessor<boolean>;
+	penEdit: SelectionDeps["penEdit"];
+	pillObstacles: ReturnType<typeof pillActions>["pillObstacles"];
+	props: SelectionDeps["props"];
+	pushCamera: (cam: Camera) => void;
+	scaling: Accessor<boolean>;
+	scene: SelectionDeps["scene"];
+	canvasPenPath: ReturnType<typeof overlayOf>["canvasPenPath"];
+	view: SelectionDeps["view"];
+}) {
+	const { ctl, frame, freshIds, gliding, lassoItems, moving, panning, penEdit, pillObstacles, props, pushCamera, scaling, scene, canvasPenPath, view } = ctx;
+
+	/** The pill over the lasso's strokes. */
+	const lassoPill = () => (
+		<>
 			<Show when={lassoItems()}>
 				{(held) => (
 					<PageCallout
@@ -423,7 +598,7 @@ export function createSelection(deps: SelectionDeps) {
 							? {
 									onComment: () =>
 										props.onComment?.({
-											path: stagePenPath() ?? "the canvas",
+											path: canvasPenPath() ?? "the canvas",
 											items: held().ids,
 											quote: "",
 											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,
@@ -446,6 +621,5 @@ export function createSelection(deps: SelectionDeps) {
 			</Show>
 		</>
 	);
-
-	return { penHandles, pageHandles, radiusHandle, arrowEnds, penDeleteSelected, penDuplicate, overlay, pills };
+	return { lassoPill };
 }

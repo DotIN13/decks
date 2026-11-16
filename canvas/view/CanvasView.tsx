@@ -1,19 +1,17 @@
+// The canvas element: its props, and the component that makes each part of the canvas in order and
+// draws the outer element they sit in.
 import { probes } from "../debug.ts";
 import type { JSX } from "solid-js";
 import type { Page, Camera } from "@decks/protocol-old";
-import { Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
+import { createEffect, type Component, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { boxOf, fitInto, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
-import { createCameraController } from "../camera/controller.ts";
-import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin } from "../camera/scroll-area.ts";
 import { stagePoint } from "../camera/coords.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { DocEdits, DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../drawing/doc-index.ts";
-import { StageInk } from "../ink/InkLayer.tsx";
 import { strokeOf } from "../ink/model.ts";
-import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../editor/pen-tools.ts";
-import { HoldMenu, type HoldAction } from "../chrome/HoldMenu.tsx";
+import { penLive, penTool, setPenLive, setPenTool, type PenTool } from "../editor/pen-tools.ts";
 import { overlayJson } from "../editor/core/overlay-json.ts";
 import { rgbOf } from "../editor/dom/colours.ts";
 import { COARSE, HANDLE_DOT_PX } from "../input/touch-rules.ts";
@@ -22,22 +20,10 @@ import { scheme } from "../theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
 import { StageEngine } from "../render/engine.ts";
 import { ENGINE, LAYERS } from "../render/device.ts";
-import {
-	createStageEditor,
-	dropSlot as dropSlotIn,
-	frameUnder as frameUnderIn,
-	idMaker,
-	InsertMenu,
-	moveOps,
-	OverlayLayer,
-	TextEditor,
-	tsScene,
-	tsSeam,
-} from "../editor/index.ts";
+import { dropSlot as dropSlotIn, frameUnder as frameUnderIn, idMaker, moveOps, tsScene } from "../editor/index.ts";
 import { createStageInput } from "../input/canvas-input.ts";
 import { createItemsLayer } from "./items-layer.tsx";
 import { createSelection } from "./selection.tsx";
-
 
 /**
  * The stage: one transform over the boards, and the gestures that move it.
@@ -61,7 +47,9 @@ import { createSelection } from "./selection.tsx";
  */
 export type { InkRequest, StageComment, StageShots } from "../types.ts";
 import type { InkRequest, StageComment, StageShots } from "../types.ts";
-
+import { worldHostOf, worldLayerOf, fixedLayerOf } from "./canvas-markup.tsx";
+import { editorEffectsOf, editorPointerOf, editorOf } from "./canvas-editor.ts";
+import { viewAndOrigin, cameraOf, scrollFollows } from "./canvas-camera.ts";
 
 /** What the stage is given by its host. */
 export type StageProps = {
@@ -85,7 +73,7 @@ export type StageProps = {
 	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
 	 * against (`render/engine.ts`). Drawn under the boards, with the same camera. `edits`, when the
 	 * host has them: what made this drawing from the one it gave before, applied by the engines in
-	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
+	 * place of finding what changed (`render/engine-doc.ts`, `setDoc`).
 	 */
 	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter; /** The person's own edit or step, drawn by their hand already: nothing to glide. */ own?: true };
 	/**
@@ -96,7 +84,7 @@ export type StageProps = {
 	onPenEdit?: (ops: unknown[]) => void;
 	/** Take back the person's last edit to the drawing, or put it back (`stage.pen.step`). */
 	onPenStep?: (direction: "undo" | "redo") => void;
-	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/InkLayer.tsx`). */
+	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`ink/InkLayer.tsx`). */
 	drawing?: boolean;
 	/** A Pencil pressed bare canvas with the select tool: turn the pen on (and leave edit mode), so the press can start a stroke. */
 	onPencil?: () => void;
@@ -173,155 +161,88 @@ export type StageProps = {
 	onRefer?: (pills: Array<{ kind: "card" | "item"; id: string; label: string; name?: string }>) => void;
 };
 
-/*
- * The stage is four files: this one, which wires the pieces together and draws the tree; `canvas-input.ts`,
- * what the stage hears from the person; `items-layer.tsx`, the placed items; and `selection.tsx`, what
- * is drawn over the selection and under the pointer.
+/** The props, as the parts take them. */
+export type Props = StageProps;
+
+/**
+ * The canvas, made part by part in order: its camera (`canvas-camera.ts`), input, editor's host
+ * (`canvas-editor.ts`), placed items, selection, and the world and chrome (`canvas-markup.tsx`).
  */
-export function Stage(props: StageProps) {
-	/* The host's board, read once: a component, not a value that changes. */
-	const Frame = untrack(() => props.frame);
-	let element!: HTMLDivElement;
-	let worldEl!: HTMLDivElement;
-	/** The camera moved: a press in hand runs its last step again (`editor/dom/pointer.ts`, `follow`). */
-	const cameraChanged = () => editor.cameraMoved();
-	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
-	/**
-	 * The camera: where it is, whether it is moving, and the one place that moves it (`camera/controller.ts`).
-	 * The stage hands it the window, how to place the world and the drawing at a camera, and its host's
-	 * camera to follow.
-	 */
-	/*
-	 * The stage scrolls (`camera/scroll-area.ts`): the camera's position is the stage's scroll, and the
-	 * world is placed in the scrolled content at `origin`, scaled by the zoom. A pan is the browser
-	 * scrolling, which moves the world on its compositor; a step of ours (a zoom, a key, a glide, a
-	 * drag) sets the scroll and, when the zoom or the origin changed, the world's transform.
-	 */
-	let origin: Origin = { x: props.camera.x, y: props.camera.y };
-	/** The origin as a signal, for the host's world layer (`props.world`), which is placed from it. */
-	const [worldOrigin, setWorldOrigin] = createSignal<Origin>(origin);
-	/** The origin and zoom the world's transform was last written for (`placeWorld`): what a child of the world is placed in. */
-	const [worldPlaced, setWorldPlaced] = createSignal<{ x: number; y: number; zoom: number }>({ x: origin.x, y: origin.y, zoom: props.camera.zoom });
-	/** The origin and zoom the world's transform was last written for. */
-	let worldFor: { x: number; y: number; zoom: number } | undefined;
-	/** The scroll this file last set, so the scroll event that answers it is not taken for the person's. */
-	let ownScroll: { left: number; top: number } | undefined;
-	const placeWorld = (zoom: number, force = false) => {
-		if (!force && worldFor && worldFor.x === origin.x && worldFor.y === origin.y && worldFor.zoom === zoom) return;
-		worldFor = { x: origin.x, y: origin.y, zoom };
-		setWorldPlaced(worldFor);
-		worldEl.style.transform = worldTransform(origin, zoom);
-	};
-	const placeScroll = (cam: Camera) => {
-		if (!element || view().width === 0) return;
-		const to = scrollFor(cam, origin, view());
-		ownScroll = to;
-		element.scrollTo(to.left, to.top);
-	};
-	/**
-	 * While the zoom is changing, the scroll it found when it began (read once): the view then changes
-	 * by the world's origin alone (`originFor`), and the scroll is left where it is until the zoom rests.
-	 * One rule for every zoom: fingers, a trackpad's pinch, Ctrl and the wheel, Safari's gesture events,
-	 * the zoom keys, a glide. Setting the scroll at each step made the browser lay out and scroll the
-	 * whole area: a third of a pinch's script time on an iPad mini, and 8 to 27% of a zoom's on a Mac.
-	 */
-	let zoomScroll: { left: number; top: number } | undefined;
-	/** Whether this zoom moves nothing in the DOM (`place` above): no card node is in the world. */
-	let zoomStill = false;
-	/** The zoom the world was last placed at, to tell a zoom step from a pan. */
-	let placedZoom: number | undefined;
-	const ctl = createCameraController({
-		view,
-		place: (cam) => {
-			const zooming = placedZoom !== undefined && cam.zoom !== placedZoom;
-			placedZoom = cam.zoom;
-			if (zooming && !zoomScroll && element) {
-				zoomScroll = { left: element.scrollLeft, top: element.scrollTop };
-				/*
-				 * A zoom with no card node in the world moves nothing in the DOM: the world and the sheet's
-				 * canvas stay where they are, the canvas covering the window as it did, and the engine draws
-				 * the window at each step's camera into it (`holdStill`). Each step set two inline transforms,
-				 * and in Chromium each set rebuilt the paint property tree and assigned every layer on the
-				 * page again, even with the transform promised: a quarter of a zoom's main thread over 100
-				 * cards as pictures. With a card's page in the world the world has to move, as its page is
-				 * stretched on its own layer (`data-scaling`); nothing wakes mid-gesture, so this is decided once.
-				 */
-				zoomStill = !worldEl.querySelector(".card-node");
-				penLayer.holdStill(zoomStill);
-			}
-			if (zoomScroll) {
-				origin = originFor(cam, zoomScroll, view());
-				setWorldOrigin(origin);
-				if (!zoomStill) placeWorld(cam.zoom, true);
-				penLayer.setCamera(cam);
-				return;
-			}
-			placeWorld(cam.zoom);
-			placeScroll(cam);
-			// The drawing moves in the same call as the boards, so the two can never be a frame apart.
-			penLayer.setCamera(cam);
-		},
-		follow: (cam) => penLayer.setCamera(cam),
-		moved: () => cameraChanged(),
-		publish: (cam) => props.setCamera(cam),
-		asked: () => ({ camera: props.camera, glide: props.glide }),
-		flush: () => penLayer.flush(),
-	});
-	/*
-	 * For the browser checks: the camera as the world's transform said it before the stage scrolled
-	 * (`translate(half the window) scale(zoom) translate(−camera)`), which they read and parse; the
-	 * world's own transform now holds only the origin and the zoom (`camera/scroll-area.ts`).
-	 */
-	probes.cameraTransform = () => {
-		const c = ctl.now();
-		const v = view();
-		return `translate(${v.width / 2}px, ${v.height / 2}px) scale(${c.zoom}) translate(${-c.x}px, ${-c.y}px)`;
-	};
-	/*
-	 * Back to the middle of the scroll area once the camera rests near an edge of it: the origin moves
-	 * to the camera and the scroll to the middle in one task, so nothing on screen moves.
-	 */
-	createEffect(
-		on(ctl.moving, (moving) => {
-			if (moving || !element || view().width === 0) return;
-			if (!nearEdge({ left: element.scrollLeft, top: element.scrollTop }, view())) return;
-			const cam = ctl.now();
-			origin = { x: cam.x, y: cam.y };
-			setWorldOrigin(origin);
-			placeWorld(cam.zoom, true);
-			placeScroll(cam);
-			// A zoom not yet rested keeps the scroll it now has.
-			if (zoomScroll) zoomScroll = scrollFor(cam, origin, view());
-		}, { defer: true }),
+export function Stage(props: Props) {
+	const { Frame, element, worldEl, penLayer, ahead, cameraChanged, view, setView, origin, worldOrigin, setWorldOrigin, worldPlaced, ownScroll, placeWorld, placeScroll, zoomScroll, zoomStill, placedZoom } = viewAndOrigin({ props });
+	const { ctl } = cameraOf({ cameraChanged, element, origin, penLayer, placedZoom, placeScroll, placeWorld, props, setWorldOrigin, view, worldEl, zoomScroll, zoomStill });
+	const { moving, scaling, gliding, panning, scrolled } = scrollFollows({ ctl, element, origin, ownScroll, penLayer, placeScroll, placeWorld, setWorldOrigin, view, zoomScroll, zoomStill });
+	const { frame, holdMenu, setHoldMenu, penEdit, worldAt, freshId, freshIds, penNode, input, grabbing } = editsAndInput({ ahead, ctl, element, penLayer, props, scrolled, setView, view });
+	const { engineNotice, scene } = engineOf({ penLayer, props, view });
+	const { penDrawn, setPenDrawn, editorEffects } = editorEffectsOf({ ahead, ctl, element, penLayer, props, view });
+	const { editorPointer } = editorPointerOf({ ahead, element, grabbing, input, penLayer, props, setHoldMenu, worldAt });
+	const { editor } = editorOf({ ahead, armPenTool: (...a: Parameters<typeof armPenTool>) => armPenTool(...a), ctl, editorEffects, editorPointer, freshId, freshIds, penDrawn, penEdit, penLayer, props, scene, view, worldAt, worldEl });
+	const { items } = itemsOf({ ahead, ctl, editor, element, frame, Frame, gliding, input, moving, panning, penDrawn, penLayer, props, scaling, view });
+	const { engineOverlays } = overlayColours({ ahead, ctl, editor, element, penLayer, props, setPenDrawn });
+	const { selection } = selectionOf({ ahead, ctl, editor, frame, freshIds, input, items, penDrawn, penEdit, penLayer, penNode, props, scene, view });
+	const { inkStrokes } = checkProbes({ ctl, dropSlot: (...a: Parameters<typeof dropSlot>) => dropSlot(...a), editor, element, frameUnder: (...a: Parameters<typeof frameUnder>) => frameUnder(...a), penDrawn, penLayer, penNode, view, worldAt });
+	const { armPenTool, penMoveBy, frameUnder, dropSlot, overLink } = penActions({ editor, frame, penEdit, props, scene, view });
+	const { worldHost } = worldHostOf({ ctl, props, worldOrigin, worldPlaced });
+	const { worldLayer } = worldLayerOf({ ctl, editor, items, penLayer, selection, worldEl, worldHost });
+	const { fixedLayer } = fixedLayerOf({ ctl, editor, engineNotice, freshId, holdMenu, inkStrokes, penEdit, penLayer, penMoveBy, penNode, props, selection, setHoldMenu, view });
+
+	return (
+		<div
+			class="stage"
+			/*
+			 * Focusable, and focused when a press lands outside a board.
+			 *
+			 * A press on the canvas is a press on a `<div>`, and a `<div>` takes no focus — so the board's
+			 * frame never learned it had lost it, `focusout` never fired inside it, and an open run or caret
+			 * stayed open with its outline on while the person had visibly clicked away. Measured: pressing
+			 * bare stage left the run `contenteditable` and its border drawn.
+			 *
+			 * `-1` because this is a place for focus to *land*, not something to tab to, and the outline is
+			 * suppressed because the ring would be chrome nobody asked for.
+			 */
+			tabindex={-1}
+			data-mode={props.mode}
+			data-engine="true"
+			data-engine-overlays={engineOverlays() ? "true" : undefined}
+			data-panning={panning()}
+			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
+			/* The scale is moving and the awake items go on layers (`canvas.css`), where this engine takes them (`LAYERS` in `render/device.ts`). */
+			data-scaling={LAYERS[ENGINE].scaling && items.layered()}
+			/* A pinch on pictures (`?card-pictures=1`): the awake cards are hidden and the sheet draws their pictures (`items-layer.tsx`). */
+			data-card-pictures={items.cardsHidden() ? "true" : undefined}
+			data-gliding={gliding()}
+			/* The camera rests at or above this device's live zoom: items near the window have their slots. */
+			data-live={items.liveNow() ? "true" : undefined}
+			data-moving={moving() || panning() || gliding() ? "true" : undefined}
+			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`), where this engine takes it (`LAYERS`). Off in the frame a zoom starts, so the layer is never stretched. */
+			data-sliding={LAYERS[ENGINE].sliding && (moving() || panning() || gliding()) && !scaling() ? "true" : undefined}
+			/* A board being moved or sized: its title bars and news glows step aside until it lands (`canvas.css`). */
+			data-carrying={editor.carrying() ? "true" : undefined}
+			ref={element.now}
+			onWheel={input.onWheel}
+			onPointerDown={editor.onPointerDown}
+			onPointerMove={editor.onPointerMove}
+			onPointerLeave={editor.onPointerLeave}
+			onDblClick={editor.onDblClick}
+			style={{ cursor: grabbing() ? "grab" : overLink() ? "pointer" : undefined }}
+		>
+			{/* The scrolled content: the world in it, and over it the stage's own chrome held to the window (`camera/scroll-area.ts`). */}
+			<div class="stage-content">
+				{worldLayer()}
+				{fixedLayer()}
+			</div>
+		</div>
 	);
-	// The camera's motion, as the controller tracks it (`camera/controller.ts`).
-	const { moving, scaling, gliding, panning } = ctl;
-	// The zoom has rested: from here the scroll and the camera agree again, and a pan sets the scroll as before.
-	createEffect(
-		on(scaling, (now) => {
-			if (now) return;
-			zoomScroll = undefined;
-			// A zoom that moved nothing: the world and the canvas are placed for where it rested.
-			if (zoomStill) {
-				zoomStill = false;
-				placeWorld(ctl.now().zoom, true);
-				penLayer.holdStill(false);
-			}
-		}, { defer: true }),
-	);
-	/*
-	 * The stage scrolled: the browser has moved the world already, and the camera follows. A scroll
-	 * this file set (`placeScroll`) comes back here too, and is not the person's.
-	 */
-	const scrolled = () => {
-		const at = { left: element.scrollLeft, top: element.scrollTop };
-		const own = ownScroll;
-		if (own && Math.abs(at.left - own.left) < 1 && Math.abs(at.top - own.top) < 1) return;
-		ownScroll = undefined;
-		// A scroll in the middle of a zoom (fingers, a wheel): its later steps keep the view at the scroll it moved to.
-		if (zoomScroll) zoomScroll = at;
-		ctl.scrolled(cameraFor(at, origin, ctl.now().zoom, view()));
-	};
+}
+
+/** Fitting into the canvas column, editing the drawing, new ids, and what the stage hears from the person. */
+export function editsAndInput(ctx: {
+	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	element: ReturnType<typeof viewAndOrigin>["element"]; penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
+	props: Props; scrolled: ReturnType<typeof scrollFollows>["scrolled"];
+	setView: ReturnType<typeof viewAndOrigin>["setView"]; view: ReturnType<typeof viewAndOrigin>["view"];
+}) {
+	const { ahead, ctl, element, penLayer, props, scrolled, setView, view } = ctx;
 
 	/*
 	 * Fit into the canvas column rather than into the whole stage.
@@ -334,7 +255,7 @@ export function Stage(props: StageProps) {
 	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
 		fitInto(boxes, view(), canvasBox(view()));
 
-	/** A hold's menu, open at the finger (`ui/HoldMenu.tsx`): the items held, or none for bare canvas. */
+	/** A hold's menu, open at the finger (`chrome/HoldMenu.tsx`): the items held, or none for bare canvas. */
 	const [holdMenu, setHoldMenu] = createSignal<{ ids: string[]; at: { x: number; y: number }; stage: { x: number; y: number } } | undefined>();
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
@@ -349,11 +270,11 @@ export function Stage(props: StageProps) {
 	/* What the stage hears from the person (`canvas-input.ts`): made where its listeners were, before the engine. */
 	const input = createStageInput({
 		props,
-		element: () => element,
+		element: () => element.now,
 		ctl,
 		view,
 		frame,
-		editor: () => editor,
+		editor: () => ahead.editor,
 		scrolled,
 		measured: (viewport) => {
 			setView(viewport);
@@ -363,13 +284,16 @@ export function Stage(props: StageProps) {
 		worldAt,
 	});
 	const { grabbing } = input;
+	return { frame, holdMenu, setHoldMenu, penEdit, worldAt, freshId, freshIds, penNode, input, grabbing };
+}
 
-	/*
-	 * The stage's engine (`stage/engine.ts`): the drawing and the boards' pictures, drawn with WebGPU
-	 * on two canvases, one under the item slots and one over them, in the same call that moves the
-	 * slots (`writeTransform`). The document, the window's size and the colour scheme reach it here.
-	 */
-	const penLayer = new StageEngine();
+/** The engine told who holds it, what it says when it cannot start, and the scene the editor asks of it. */
+export function engineOf(ctx: {
+	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
+	view: ReturnType<typeof viewAndOrigin>["view"];
+}) {
+	const { penLayer, props, view } = ctx;
+
 	props.onEngine?.(penLayer);
 	/* An engine that cannot start says so over the stage (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
 	const [engineNotice, setEngineNotice] = createSignal<string>();
@@ -392,140 +316,21 @@ export function Stage(props: StageProps) {
 		// The drawing has the change in it now, so the panel is no longer showing one (`penLive`).
 		if (untrack(penLive)) setPenLive(undefined);
 	});
+	return { engineNotice, scene };
+}
 
-	/*
-	 * Editing the drawing by hand, in edit mode (`state/pen-tools.ts` holds the tool and reads the
-	 * editor's selection, `pen/PenBar.tsx` shows them). Every change is sent as the same pen operation an
-	 * agent would send, and the drawing redraws from the server's answer; until it arrives, a drag
-	 * or a resize is drawn as a preview.
-	 *
-	 * The editor (`editor/dom/controller.ts`) holds the selection, what the pointer is over, the
-	 * gesture in hand and what is drawn for it, stepped by `editor/core/gesture.ts`. The handlers
-	 * here follow the pointer and tell it each step.
-	 */
-	/** Counted up each time the engine lays the drawing out (`penLayer.drawn`): what reads where items are reads it. */
-	const [penDrawn, setPenDrawn] = createSignal(0);
-	const editor = createStageEditor({
-		scene,
-		engine: tsSeam(penLayer),
-		mode: () => props.mode,
-		tool: penTool,
-		zoom: () => ctl.now().zoom,
-		view: () => {
-			const v = view();
-			const a = toWorld(ctl.now(), v, { x: 0, y: 0 });
-			const b = toWorld(ctl.now(), v, { x: v.width, y: v.height });
-			return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
-		},
-		nextIds: () => freshIds(),
-		boards: () => props.boards,
-		onPenEdit: (ops) => penEdit(ops),
-		effects: {
-			element: () => element,
-			toScreen: (point) => toScreen(ctl.now(), view(), point),
-			box: (id) => penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box,
-			cutFromCarried: (rect) => penLayer.cutFromCarried(rect),
-			showCarriedLayer: (on) => penLayer.showCarriedLayer(on),
-			pen: () => props.pen,
-			get onRefer() {
-				return props.onRefer;
-			},
-			get onOpenPage() {
-				return props.onOpenPage;
-			},
-			onSelect: (path) => props.onSelect(path),
-			onMove: (path, x, y) => props.onMove(path, x, y),
-			onResize: (path, size) => props.onResize?.(path, size),
-			toggleMedia: (id, media) => items.toggleMedia(id, media),
-		},
-		// The pointer's half (`editor/dom/pointer.ts`): the stage keeps the camera, its finger pool and its pan.
-		pointer: {
-			element: () => element,
-			worldAt: (event) => worldAt(event),
-			editable: () => !!props.onPenEdit,
-			drawing: () => !!props.drawing,
-			mode: () => props.mode,
-			tool: penTool,
-			spaceHeld: () => grabbing(),
-			pagesNear: (at) =>
-				items.pageIndex()
-					.search({ x: at.x, y: at.y, w: 0, h: 0 })
-					.sort((a, b) => a - b)
-					.map((index) => props.boards[index]!),
-			rendered: () => items.renderedPaths(),
-			linkAt: (at) => penLayer.linkAt(at),
-			onSelect: (path) => props.onSelect(path),
-			fingers: () => input.touches.count(),
-			caught: () => input.caught(),
-			holdMenu: (menu) => setHoldMenu(menu),
-			pencil: (event) => {
-				if (!props.onPencil) return false;
-				props.onPencil();
-				// The ink sheet is there now (the pen is on): the press is given to it, as a Pencil's own.
-				const sheet = element.querySelector("svg.stage-ink");
-				if (!sheet) return false;
-				sheet.dispatchEvent(
-					new PointerEvent("pointerdown", {
-						bubbles: true,
-						cancelable: true,
-						composed: true,
-						pointerId: event.pointerId,
-						pointerType: "pen",
-						isPrimary: event.isPrimary,
-						clientX: event.clientX,
-						clientY: event.clientY,
-						screenX: event.screenX,
-						screenY: event.screenY,
-						pressure: event.pressure,
-						tiltX: event.tiltX,
-						tiltY: event.tiltY,
-						width: event.width,
-						height: event.height,
-						button: 0,
-						buttons: 1,
-					}),
-				);
-				return true;
-			},
-			claim: (pointer) => input.claimed.add(pointer),
-			beginTouch: (event) => input.beginTouch(event),
-			keepTouch: (event) => input.keptTouches.add(event.pointerId),
-			pan: (event, how) => input.panFrom(event, how),
-			toggleMedia: (id, media) => items.toggleMedia(id, media),
-			open: { liveFile: (id) => items.openLiveFile(id) },
-			handles: { item: () => selection.penHandles(), board: () => selection.pageHandles(), radius: () => selection.radiusHandle(), arrow: () => selection.arrowEnds() },
-		},
-		// The drawing's keys (`editor/dom/keys.ts`).
-		keys: {
-			editable: () => !!props.onPenEdit,
-			drawing: () => !!props.drawing,
-			tool: penTool,
-			pageSelected: () => !!props.selected,
-			selectedPage: () => props.selected,
-			canStep: () => !!props.onPenStep,
-			step: (direction) => props.onPenStep?.(direction),
-			deleteSelected: (selected, ops) => selection.penDeleteSelected(selected, ops),
-			...(props.onDeleteCard ? { deletePages: (paths: readonly string[]) => paths.forEach((path) => props.onDeleteCard?.(path)) } : {}),
-			setTool: (tool) => setPenTool(tool),
-			arm: (tool) => armPenTool(tool),
-			onMove: (path, x, y) => props.onMove(path, x, y),
-		},
-		// The words typed over an item (`editor/dom/TextEditing.tsx`).
-		text: {
-			pen: () => props.pen,
-			scheme: () => scheme(),
-			world: () => worldEl,
-			redrawn: () => penDrawn(),
-			editable: () => !!props.onPenEdit,
-			freshId: () => freshId(),
-		},
-		// What a tool and a double-click on bare canvas add (`editor/dom/InsertMenu.tsx`).
-		insert: {
-			worldAt: (event) => worldAt(event),
-			freshId: () => freshId(),
-			idsBut: (id) => freshIds(id),
-		},
-	});
+/** Writers' colours as the sheet paints them, and the placed items. */
+export function itemsOf(ctx: {
+	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof viewAndOrigin>["element"];
+	frame: ReturnType<typeof editsAndInput>["frame"]; Frame: ReturnType<typeof viewAndOrigin>["Frame"];
+	gliding: ReturnType<typeof scrollFollows>["gliding"]; input: ReturnType<typeof editsAndInput>["input"];
+	moving: ReturnType<typeof scrollFollows>["moving"]; panning: ReturnType<typeof scrollFollows>["panning"];
+	penDrawn: ReturnType<typeof editorEffectsOf>["penDrawn"];
+	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
+	scaling: ReturnType<typeof scrollFollows>["scaling"]; view: ReturnType<typeof viewAndOrigin>["view"];
+}) {
+	const { ahead, ctl, editor, element, frame, Frame, gliding, input, moving, panning, penDrawn, penLayer, props, scaling, view } = ctx;
 	/*
 	 * Boards picked up with the drawing (`editor.pagePicks`): by a marquee, or Shift and a press on a
 	 * title bar. They move with the selected items as one selection. The app's own selected board is
@@ -565,7 +370,7 @@ export function Stage(props: StageProps) {
 	const items = createItemsLayer({
 		props,
 		Frame,
-		element: () => element,
+		element: () => element.now,
 		ctl,
 		view,
 		editor,
@@ -575,8 +380,20 @@ export function Stage(props: StageProps) {
 		frame,
 		gestures: input.gestures,
 	});
+	ahead.items = items;
 
 	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
+	return { items };
+}
+
+/** The editor's outlines painted by the engine, in the colours read through the browser, and each drawn frame. */
+function overlayColours(ctx: {
+	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof viewAndOrigin>["element"];
+	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
+	setPenDrawn: ReturnType<typeof editorEffectsOf>["setPenDrawn"];
+}) {
+	const { ahead, ctl, editor, element, penLayer, props, setPenDrawn } = ctx;
 	/*
 	 * The editor's outlines, handles and guides are painted by the engine with the drawing, in the same
 	 * frame (`editor/core/overlay-json.ts`): written again when the overlay or the zoom changes, and the
@@ -610,9 +427,9 @@ export function Stage(props: StageProps) {
 	};
 	createEffect(() => {
 		const dark = scheme();
-		if (!element) return;
-		const { accent, panel, guide } = untrack(() => coloursFor(dark, element!));
-		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, accent, panel, guide, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT });
+		if (!element.now) return;
+		const { accent, panel, guide } = untrack(() => coloursFor(dark, element.now!));
+		const json = overlayJson(ahead.selection.overlay(), ctl.zoom(), { coarse: COARSE, accent, panel, guide, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT });
 		setEngineOverlays(penLayer.setOverlay(json));
 	});
 	penLayer.drawn = () => {
@@ -627,6 +444,20 @@ export function Stage(props: StageProps) {
 		editor.drawn(penLayer.drawnDoc, props.pen?.doc);
 		setPenDrawn((n) => n + 1);
 	};
+	return { engineOverlays };
+}
+
+/** Edits in both modes, the drag and glide the editor follows, and the selection drawn over it all. */
+export function selectionOf(ctx: {
+	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	editor: ReturnType<typeof editorOf>["editor"]; frame: ReturnType<typeof editsAndInput>["frame"];
+	freshIds: ReturnType<typeof editsAndInput>["freshIds"]; input: ReturnType<typeof editsAndInput>["input"];
+	items: ReturnType<typeof itemsOf>["items"]; penDrawn: ReturnType<typeof editorEffectsOf>["penDrawn"];
+	penEdit: ReturnType<typeof editsAndInput>["penEdit"]; penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
+	penNode: ReturnType<typeof editsAndInput>["penNode"]; props: Props;
+	scene: ReturnType<typeof engineOf>["scene"]; view: ReturnType<typeof viewAndOrigin>["view"];
+}) {
+	const { ahead, ctl, editor, frame, freshIds, input, items, penDrawn, penEdit, penLayer, penNode, props, scene, view } = ctx;
 	/*
 	 * The drawing is edited in both modes — browse keeps the boards' pages as they are, edit opens
 	 * them for editing too — but not while the pen is out: ink has its own selection (the lasso).
@@ -650,10 +481,11 @@ export function Stage(props: StageProps) {
 
 	/* What is drawn over the selection and under the pointer, and the pills (`selection.tsx`). */
 	const selection = createSelection({ props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld: input.pressHeld });
+	ahead.selection = selection;
 
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
-	 * (`state/pen-tools.ts`, `penLive`). The same preview a drag of an item uses, so the sheet draws
+	 * (`editor/pen-tools.ts`, `penLive`). The same preview a drag of an item uses, so the sheet draws
 	 * the item once per frame with the new colour in it, and the file takes one edit when the hand
 	 * lifts. The worker lets it go when the saved drawing arrives.
 	 */
@@ -676,18 +508,31 @@ export function Stage(props: StageProps) {
 			 * of the shape at every step. Each step waits in the editor for the frame painted with it.
 			 */
 			editor.presented();
-			// The dashed outline of what a tool drew goes once the item is drawn (`editor/dom/InsertMenu.tsx`).
+			// The dashed outline of what a tool drew goes once the item is drawn (`chrome/InsertMenu.tsx`).
 			editor.insert.presented();
 		};
 	}
+	return { selection };
+}
+
+/** For the browser checks: where drawn items, frames, pictures and cards are on screen. */
+export function checkProbes(ctx: {
+	ctl: ReturnType<typeof cameraOf>["ctl"]; dropSlot: ReturnType<typeof penActions>["dropSlot"];
+	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof viewAndOrigin>["element"];
+	frameUnder: ReturnType<typeof penActions>["frameUnder"];
+	penDrawn: ReturnType<typeof editorEffectsOf>["penDrawn"];
+	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; penNode: ReturnType<typeof editsAndInput>["penNode"];
+	view: ReturnType<typeof viewAndOrigin>["view"]; worldAt: ReturnType<typeof editsAndInput>["worldAt"];
+}) {
+	const { ctl, dropSlot, editor, element, frameUnder, penDrawn, penLayer, penNode, view, worldAt } = ctx;
 	/** For the browser checks: where a drawn item is on screen, since most have no click shape to measure. */
 	probes.penBox = (id) => {
 		const placed = penLayer.placed.get(id);
-		if (!placed || !element) return undefined;
+		if (!placed || !element.now) return undefined;
 		const box = penLayer.bounds.get(id) ?? placed.box;
 		const a = toScreen(ctl.now(), view(), { x: box.x, y: box.y });
 		const b = toScreen(ctl.now(), view(), { x: box.x + box.w, y: box.y + box.h });
-		const r = element.getBoundingClientRect();
+		const r = element.now.getBoundingClientRect();
 		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
 	};
 	/** For the browser checks: the frame a drop at a point on the screen would go into, and its box. */
@@ -704,20 +549,30 @@ export function Stage(props: StageProps) {
 		});
 	});
 
-	probes.pictureAt = (x, y) => (element ? editor.pictureUnder({ clientX: x, clientY: y }) : undefined);
+	probes.pictureAt = (x, y) => (element.now ? editor.pictureUnder({ clientX: x, clientY: y }) : undefined);
 	/*
 	 * The card under a screen point and the slot between its blocks there, for files dropped from the
-	 * desktop (`app/files.ts`): they go into the card where they land, as a picture or a file dragged
+	 * desktop (`harness/page/state/types/files.ts`): they go into the card where they land, as a picture or a file dragged
 	 * from the canvas does.
 	 */
 	probes.cardAt = (x, y) => {
-		if (!element) return undefined;
+		if (!element.now) return undefined;
 		const at = toWorld(ctl.now(), view(), stagePoint({ clientX: x, clientY: y } as MouseEvent));
 		const id = frameUnder(at, []);
 		const card = id ? penNode(id) : undefined;
 		if (!id || !card || !isCard(card)) return undefined;
 		return { card: id, index: dropSlot(id, at, [])?.index ?? (card.children ?? []).length, inner: editor.textEditing.cardInner(card) };
 	};
+	return { inkStrokes };
+}
+
+/** Reading a card that is news, arming a pen tool, moving and dropping items, and the opening fit. */
+export function penActions(ctx: {
+	editor: ReturnType<typeof editorOf>["editor"]; frame: ReturnType<typeof editsAndInput>["frame"];
+	penEdit: ReturnType<typeof editsAndInput>["penEdit"]; props: Props;
+	scene: ReturnType<typeof engineOf>["scene"]; view: ReturnType<typeof viewAndOrigin>["view"];
+}) {
+	const { editor, frame, penEdit, props, scene, view } = ctx;
 
 	/*
 	 * Looking at a card that is news reads it: selected (a press on it, or the page putting the selection
@@ -772,167 +627,5 @@ export function Stage(props: StageProps) {
 		fitted = true;
 		props.setCamera(props.opening.camera ?? frame(props.boards.map(boxOf)));
 	});
-
-	return (
-		<div
-			class="stage"
-			/*
-			 * Focusable, and focused when a press lands outside a board.
-			 *
-			 * A press on the canvas is a press on a `<div>`, and a `<div>` takes no focus — so the board's
-			 * frame never learned it had lost it, `focusout` never fired inside it, and an open run or caret
-			 * stayed open with its outline on while the person had visibly clicked away. Measured: pressing
-			 * bare stage left the run `contenteditable` and its border drawn.
-			 *
-			 * `-1` because this is a place for focus to *land*, not something to tab to, and the outline is
-			 * suppressed because the ring would be chrome nobody asked for.
-			 */
-			tabindex={-1}
-			data-mode={props.mode}
-			data-engine="true"
-			data-engine-overlays={engineOverlays() ? "true" : undefined}
-			data-panning={panning()}
-			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
-			/* The scale is moving and the awake items go on layers (`canvas.css`), where this engine takes them (`LAYERS` in `render/device.ts`). */
-			data-scaling={LAYERS[ENGINE].scaling && items.layered()}
-			/* A pinch on pictures (`?card-pictures=1`): the awake cards are hidden and the sheet draws their pictures (`items-layer.tsx`). */
-			data-card-pictures={items.cardsHidden() ? "true" : undefined}
-			data-gliding={gliding()}
-			/* The camera rests at or above this device's live zoom: items near the window have their slots. */
-			data-live={items.liveNow() ? "true" : undefined}
-			data-moving={moving() || panning() || gliding() ? "true" : undefined}
-			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`), where this engine takes it (`LAYERS`). Off in the frame a zoom starts, so the layer is never stretched. */
-			data-sliding={LAYERS[ENGINE].sliding && (moving() || panning() || gliding()) && !scaling() ? "true" : undefined}
-			/* A board being moved or sized: its title bars and news glows step aside until it lands (`canvas.css`). */
-			data-carrying={editor.carrying() ? "true" : undefined}
-			ref={element}
-			onWheel={input.onWheel}
-			onPointerDown={editor.onPointerDown}
-			onPointerMove={editor.onPointerMove}
-			onPointerLeave={editor.onPointerLeave}
-			onDblClick={editor.onDblClick}
-			style={{ cursor: grabbing() ? "grab" : overLink() ? "pointer" : undefined }}
-		>
-			{/* The scrolled content: the world in it, and over it the stage's own chrome held to the window (`camera/scroll-area.ts`). */}
-			<div class="stage-content">
-			<div class="world" data-sizing={items.sizingPaths().size > 0 ? "true" : undefined} ref={worldEl}>
-				{/*
-				 * A place for every board on the canvas, in file order, filled while it is within reach.
-				 *
-				 * A list of only the boards in reach was reconciled as boards came and went, and the
-				 * reconciler kept the order by moving nodes: **moving an iframe reloads its page**, and
-				 * zooming out from 60 to 40% reloaded six loaded boards of twenty-three. Even a list that
-				 * only gains boards in the middle is diffed with moves. So each board has a slot of its own
-				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
-				 * is within reach: only a slot's inside changes, and boards still stack in file order.
-				 */}
-				{items.slots()}
-				{/*
-				 * The stage's one sheet — the drawing, and each board's picture or a hole over its
-				 * document — and the invisible shapes that catch clicks on the drawing: after the boards,
-				 * so over them; a click goes through to a board wherever nothing drawn is in the way. See
-				 * `render/engine.ts`.
-				 */}
-				{items.fileNodes()}
-				{/* The engine's canvas over the slots (`stage/engine.ts`): the pictures of boards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}
-				<canvas
-					class="stage-engine stage-engine-over"
-					aria-hidden="true"
-					ref={(canvas) => {
-						penLayer.attachCanvas(canvas);
-					}}
-				/>
-				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
-				{/* By index, not by box: a drag makes a new box every move, and a new element for it every
-				    move made the page restyle what it holds (`Index` keeps the element and moves it). */}
-				<OverlayLayer
-					overlay={selection.overlay}
-					zoom={ctl.zoom()}
-					sizing={(path) => items.sizingPaths().has(path)}
-					onGrip={editor.onGrip}
-					onAnchor={editor.insert.fromAnchor}
-					onArrowEnd={editor.onArrowEnd}
-					onArrowBend={editor.onArrowBend}
-					onHandle={editor.onHandle}
-					onRadius={editor.onRadius}
-					onPageHandle={editor.onPageHandle}
-				>
-					{items.player()}
-				</OverlayLayer>
-				<TextEditor text={editor.textEditing} zoom={ctl.zoom()} />
-				{/*
-				 * The host's layer (others' cursors, outlines), in canvas units: in the world, so a pan carries it,
-				 * placed as the world's children are, from the origin at the world's own origin and at the zoom.
-				 */}
-				<Show when={props.world}>
-					{(world) => {
-						/*
-						 * In canvas units whatever the world's transform says: the world is written for an origin
-						 * and a zoom (`placeWorld`), and while a zoom is held still it keeps an older pair, so a
-						 * child in canvas units goes through the difference. Nothing when they agree.
-						 */
-						const transform = () => {
-							const z = ctl.zoom();
-							const o = worldOrigin();
-							const w = worldPlaced();
-							const s = z / w.zoom;
-							return `translate(${w.x - o.x * s}px, ${w.y - o.y * s}px) scale(${s})`;
-						};
-						return (
-							<div class="world-host" style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", transform: transform() }}>
-								{world()()}
-							</div>
-						);
-					}}
-				</Show>
-			</div>
-			<div class="stage-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
-			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
-			<Show when={engineNotice()}>
-				{(notice) => (
-					<div class="stage-notice" role="alert">
-						{notice()}
-					</div>
-				)}
-			</Show>
-			<InsertMenu menu={editor.insert} />
-			{selection.pills()}
-			<Show when={holdMenu()} keyed>
-				{(menu) => {
-					const node = menu.ids[0] ? penNode(menu.ids[0]) : undefined;
-					const words = node ? String((node as { content?: unknown; name?: unknown }).content ?? (node as { name?: unknown }).name ?? "") : "";
-					const preview = words ? words.slice(0, 80) : undefined;
-					const tops = () => props.pen?.doc?.children?.length ?? 0;
-					const actions: HoldAction[] = menu.ids.length
-						? [
-								{ label: "Properties", hint: "drawer", run: () => setPropsOpen(true) },
-								{ label: "Duplicate", run: () => selection.penDuplicate() },
-								{ label: "Bring to front", run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
-								...(props.onComment ? [{ label: "Ask the agent", hint: "→", run: () => props.onComment?.({ path: props.stageName ? `canvases/${props.stageName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? "An item", anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
-								{ label: "Delete", danger: true, run: () => selection.penDeleteSelected() },
-							]
-						: [
-								{ label: "Add a shape…", run: () => setInsertPanel({ tab: "shapes", at: menu.stage, client: menu.at }) },
-								{ label: "Add an icon…", run: () => setInsertPanel({ tab: "icons", at: menu.stage, client: menu.at }) },
-							];
-					return <HoldMenu at={menu.at} preview={preview} actions={actions} onClose={() => setHoldMenu(undefined)} />;
-				}}
-			</Show>
-			<Show when={props.drawing && props.onPenEdit}>
-				<StageInk
-					camera={props.camera}
-					view={view()}
-					toStage={(event) => toWorld(ctl.now(), view(), stagePoint(event))}
-					strokes={inkStrokes}
-					layer={penLayer}
-					onEdit={(ops) => penEdit(ops)}
-					newId={freshId}
-					onShift={(ids, dx, dy) => penMoveBy(ids, dx, dy)}
-					{...(props.onPenStep ? { onStep: props.onPenStep } : {})}
-				/>
-			</Show>
-			</div>
-			</div>
-		</div>
-	);
+	return { armPenTool, penMoveBy, frameUnder, dropSlot, overLink };
 }

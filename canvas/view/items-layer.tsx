@@ -1,3 +1,5 @@
+// The placed items on the canvas: which are near, awake and have a slot, how the sheet draws each, the
+// live files and the one film or sound playing; made inside `Stage` (`CanvasView.tsx`), one part per story.
 import { probes } from "../debug.ts";
 import type { Page, Camera } from "@decks/protocol-old";
 import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
@@ -42,6 +44,9 @@ type ItemsLayerDeps = {
 	gestures: ItemSlotProps["gestures"];
 };
 
+/** A file shown live (`liveFiles`): which item, what it is, and its deck path. */
+type LiveFile = { id: string; file: string; name: string };
+
 /**
  * The placed items: cards, documents, apps and boards, which of them are near, have a slot and are
  * awake, how the sheet draws each, their sizes easing, the SVGs shown live, and the one film or sound
@@ -50,6 +55,30 @@ type ItemsLayerDeps = {
 export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { props, Frame, ctl, view, editor, penLayer, penDrawn, resolveColour, frame, gestures } = deps;
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
+	const { BUDGET, COVER, cardsHidden, cardPictures, LAYER_BUDGET } = whileMoving({ scaling });
+	const { liveCards, markLive, holesShown, setHolesShown, holesAsked } = liveAndHoles();
+	const { playing, setPlaying, playingElement, playedTo, toggleMedia } = mediaPlaying();
+	const { appStates } = appStatus({ props });
+	const { covering } = coveringOf({ COVER, gliding, moving, panning, scaling });
+	sheetCards({ appStates, cardPictures, COVER, covering, editor, isLive: (...a: Parameters<typeof isLive>) => isLive(...a), liveCards, pageIndex: (...a: Parameters<typeof pageIndex>) => pageIndex(...a), penLayer, props, resolveColour });
+	const { carriedPages, picturedNow, draggedAsPicture, LIVE_FILES } = carriedAndPictured({ ctl, deps, editor, liveCards, penLayer, props, renderedPaths: (...a: Parameters<typeof renderedPaths>) => renderedPaths(...a), view });
+	const { playingBox } = playerPlace({ editor, penDrawn, penLayer, playing, setPlaying });
+	const { isNear, isVisible, liveNow, pageIndex, pageSlot, livePaths, keptPaths } = awakeChoice({ BUDGET, ctl, editor, leaving: (...a: Parameters<typeof leaving>) => leaving(...a), liveCards, props, view });
+	const { leaving, leavingPaths, isLeaving, isPictured, isKept, isLive } = leavingCards({ keptPaths, livePaths, picturedNow });
+	const { isRendered, renderedPaths, layered, restCamera } = renderedSlots({ cardsHidden, editor, gliding, isVisible, keptPaths, LAYER_BUDGET, leavingPaths, liveCards, livePaths, moving, pageSlot, panning, penLayer, props, scaling, view });
+	const { liveFiles } = liveFilesOf({ holesAsked, LIVE_FILES, penDrawn, penLayer, props, restCamera, scaling, view });
+	const { liveBox, openLiveFile } = liveFileActions({ editor, penDrawn, penLayer, props });
+	const { pageNode } = slotOf({ carriedPages, ctl, draggedAsPicture, editor, frame, Frame, gestures, isKept, isLeaving, isLive, isNear, isPictured, markLive, props, pushCamera });
+	const { sizingPaths, presented } = sizesEased({ editor, holesAsked, penLayer, props, setHolesShown });
+	const { slots, fileNodes } = slotsMarkup({ holesShown, isRendered, liveBox, liveFiles, pageNode, props });
+	const { player } = playerMarkup({ playedTo, playingBox, playingElement, setPlaying });
+
+	return { isLive, renderedPaths, pageIndex, liveNow, layered, cardsHidden, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };
+}
+
+/** How the awake items show while the camera moves: covered by their pictures, hidden, or on layers of their own. */
+function whileMoving(ctx: { scaling: Accessor<boolean> }) {
+	const { scaling } = ctx;
 	/** How many of each kind are awake at once besides the selected one, and how many let go are kept: this device's (`render/device.ts`). */
 	const BUDGET = AWAKE[DEVICE];
 	/**
@@ -113,6 +142,11 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * was measured.
 	 */
 	const LAYER_BUDGET = 128;
+	return { BUDGET, COVER, cardsHidden, cardPictures, LAYER_BUDGET };
+}
+
+/** Which cards' surfaces are showing, and which file items the sheet shows as holes. */
+function liveAndHoles() {
 
 	/**
 	 * Cards whose surfaces are showing, by how many of their slots say so: the sheet is a hole over each
@@ -131,7 +165,12 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 
 	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
 	const [holesShown, setHolesShown] = createSignal<ReadonlySet<string>>(new Set());
-	let holesAsked: { ids: ReadonlySet<string>; mark: number } | undefined;
+	const holesAsked: { now: { ids: ReadonlySet<string>; mark: number } | undefined } = { now: undefined };
+	return { liveCards, markLive, holesShown, setHolesShown, holesAsked };
+}
+
+/** The one film or sound playing, and a press on one: play, pause or go on. */
+function mediaPlaying() {
 	/**
 	 * The one film or sound playing, if any.
 	 *
@@ -142,7 +181,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 */
 	const [playing, setPlaying] = createSignal<{ id: string; kind: "video" | "audio"; file: string } | undefined>();
 	/** The playing element, for a click on the item to pause and resume. */
-	let playingElement: HTMLMediaElement | undefined;
+	const playingElement: { now: HTMLMediaElement | undefined } = { now: undefined };
 	/** When the one playing was started, so the second press of a double-click does not pause it at once. */
 	let playingSince = 0;
 	/** Where each film or sound was left, so pressing it again goes on from there. */
@@ -153,14 +192,20 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 */
 	const toggleMedia = (id: string, media: { kind: "video" | "audio"; file: string }) => {
 		const now = playing();
-		if (now?.id === id && playingElement) {
-			if (playingElement.paused) void playingElement.play().catch(() => {});
-			else if (performance.now() - playingSince > 400) playingElement.pause();
+		if (now?.id === id && playingElement.now) {
+			if (playingElement.now.paused) void playingElement.now.play().catch(() => {});
+			else if (performance.now() - playingSince > 400) playingElement.now.pause();
 			return;
 		}
 		playingSince = performance.now();
 		setPlaying({ id, kind: media.kind, file: media.file });
 	};
+	return { playing, setPlaying, playingElement, playedTo, toggleMedia };
+}
+
+/** Each app's status, for the dot on the window the engine paints. */
+function appStatus(ctx: { props: ItemsLayerDeps["props"] }) {
+	const { props } = ctx;
 
 	/**
 	 * Each app's status, by name, for the dot on the window the engine paints: read once per app on the
@@ -186,6 +231,15 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	onCleanup(() => {
 		for (const stop of appWatched.values()) stop();
 	});
+	return { appStates };
+}
+
+/** Whether the camera's motion covers an app or a document with its picture. */
+function coveringOf(ctx: {
+	COVER: ReturnType<typeof whileMoving>["COVER"]; gliding: Accessor<boolean>; moving: Accessor<boolean>;
+	panning: Accessor<boolean>; scaling: Accessor<boolean>;
+}) {
+	const { COVER, gliding, moving, panning, scaling } = ctx;
 
 	/**
 	 * Whether the camera's motion covers an app or a document with its picture (`COVER`): read by the list
@@ -194,6 +248,19 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * at rest, to the same 112 cards: 17 ms each on a 4× slowed CPU, a dropped frame at either end.
 	 */
 	const covering = createMemo(() => (COVER.app || COVER.document) && (moving() || panning() || scaling() || gliding()));
+	return { covering };
+}
+
+/** Each card as the sheet draws it: where it is, and a hole or a picture. */
+function sheetCards(ctx: {
+	appStates: ReturnType<typeof appStatus>["appStates"];
+	cardPictures: ReturnType<typeof whileMoving>["cardPictures"]; COVER: ReturnType<typeof whileMoving>["COVER"];
+	covering: ReturnType<typeof coveringOf>["covering"]; editor: ItemsLayerDeps["editor"];
+	isLive: ReturnType<typeof leavingCards>["isLive"]; liveCards: ReturnType<typeof liveAndHoles>["liveCards"];
+	pageIndex: ReturnType<typeof awakeChoice>["pageIndex"]; penLayer: ItemsLayerDeps["penLayer"];
+	props: ItemsLayerDeps["props"]; resolveColour: ItemsLayerDeps["resolveColour"];
+}) {
+	const { appStates, cardPictures, COVER, covering, editor, isLive, liveCards, pageIndex, penLayer, props, resolveColour } = ctx;
 
 	/**
 	 * Each board as the sheet draws it: where it is, and whether it is a hole or a picture.
@@ -264,6 +331,16 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				}),
 		);
 	});
+}
+
+/** The cards a drag carries, those drawn as pictures, and where every card is, for the checks. */
+function carriedAndPictured(ctx: {
+	ctl: ItemsLayerDeps["ctl"]; deps: ItemsLayerDeps; editor: ItemsLayerDeps["editor"];
+	liveCards: ReturnType<typeof liveAndHoles>["liveCards"]; penLayer: ItemsLayerDeps["penLayer"];
+	props: ItemsLayerDeps["props"]; renderedPaths: ReturnType<typeof renderedSlots>["renderedPaths"];
+	view: ItemsLayerDeps["view"];
+}) {
+	const { ctl, deps, editor, liveCards, penLayer, props, renderedPaths, view } = ctx;
 	// The boards a drag carries go with it on the engine's carried layer (`editor/dom/controller.ts`).
 	/** The items whose carried picture is on screen: their slots hide where they were picked up (`item-slot.tsx`). */
 	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
@@ -283,8 +360,6 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return new Set(paths.filter((path) => !live.has(path)));
 	});
 
-	/** A file shown live (`liveFiles`): which item, what it is, and its deck path. */
-	type LiveFile = { id: string; file: string; name: string };
 	/** The most file items alive at once, the nearest the middle of the screen: a frame each is a page's worth of work. */
 	const LIVE_FILES = 12;
 	/**
@@ -304,6 +379,15 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			});
 	};
 	probes.cards = cardsOnScreen;
+	return { carriedPages, picturedNow, draggedAsPicture, LIVE_FILES };
+}
+
+/** Where the player sits while something plays, and letting its file go when it stops. */
+function playerPlace(ctx: {
+	editor: ItemsLayerDeps["editor"]; penDrawn: ItemsLayerDeps["penDrawn"]; penLayer: ItemsLayerDeps["penLayer"];
+	playing: ReturnType<typeof mediaPlaying>["playing"]; setPlaying: ReturnType<typeof mediaPlaying>["setPlaying"];
+}) {
+	const { editor, penDrawn, penLayer, playing, setPlaying } = ctx;
 
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
@@ -338,6 +422,16 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	createEffect(() => {
 		if (playing() && !playingBox()) setPlaying(undefined);
 	});
+	return { playingBox };
+}
+
+/** Which items are awake: what is near the window, as of the settled camera, and the chooser's answer. */
+function awakeChoice(ctx: {
+	BUDGET: ReturnType<typeof whileMoving>["BUDGET"]; ctl: ItemsLayerDeps["ctl"]; editor: ItemsLayerDeps["editor"];
+	leaving: ReturnType<typeof leavingCards>["leaving"]; liveCards: ReturnType<typeof liveAndHoles>["liveCards"];
+	props: ItemsLayerDeps["props"]; view: ItemsLayerDeps["view"];
+}) {
+	const { BUDGET, ctl, editor, leaving, liveCards, props, view } = ctx;
 
 	/** The camera boards and their bookkeeping see: the settled one (`camera/controller.ts`). */
 	const pageCamera = ctl.settled;
@@ -397,6 +491,15 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const keptPaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().kept), new Set(), {
 		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
 	});
+	return { isNear, isVisible, liveNow, pageIndex, pageSlot, livePaths, keptPaths };
+}
+
+/** Cards just let go, kept until the sheet draws their pictures over them, and what each slot is told. */
+function leavingCards(ctx: {
+	keptPaths: ReturnType<typeof awakeChoice>["keptPaths"]; livePaths: ReturnType<typeof awakeChoice>["livePaths"];
+	picturedNow: ReturnType<typeof carriedAndPictured>["picturedNow"];
+}) {
+	const { keptPaths, livePaths, picturedNow } = ctx;
 	/*
 	 * Cards just let go, kept on the page until the sheet draws their pictures over them: put away at once,
 	 * a card left a frame or more of bare canvas in its place (the sheet still had a hole there, or its
@@ -432,13 +535,30 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const isKept = createSelector(keptPaths, (path: string, paths) => paths.has(path));
 	/** Whether a card is awake: each slot is told only when its own answer changes. */
 	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
+	return { leaving, leavingPaths, isLeaving, isPictured, isKept, isLive };
+}
+
+/** The items that have a slot on the page, which of them take a press, and which go on layers. */
+function renderedSlots(ctx: {
+	cardsHidden: ReturnType<typeof whileMoving>["cardsHidden"]; editor: ItemsLayerDeps["editor"];
+	gliding: Accessor<boolean>; isVisible: ReturnType<typeof awakeChoice>["isVisible"];
+	keptPaths: ReturnType<typeof awakeChoice>["keptPaths"];
+	LAYER_BUDGET: ReturnType<typeof whileMoving>["LAYER_BUDGET"];
+	leavingPaths: ReturnType<typeof leavingCards>["leavingPaths"];
+	liveCards: ReturnType<typeof liveAndHoles>["liveCards"];
+	livePaths: ReturnType<typeof awakeChoice>["livePaths"]; moving: Accessor<boolean>;
+	pageSlot: ReturnType<typeof awakeChoice>["pageSlot"]; panning: Accessor<boolean>;
+	penLayer: ItemsLayerDeps["penLayer"]; props: ItemsLayerDeps["props"]; scaling: Accessor<boolean>;
+	view: ItemsLayerDeps["view"];
+}) {
+	const { cardsHidden, editor, gliding, isVisible, keptPaths, LAYER_BUDGET, leavingPaths, liveCards, livePaths, moving, pageSlot, panning, penLayer, props, scaling, view } = ctx;
 	/**
 	 * The items that have a slot on the page at all: the awake ones (`items/awake.ts`: live, kept and
 	 * leaving), the selected item, one being dragged or resized, and the sleeping item under the pointer,
 	 * which gets its bar and edge band to move it by. A sleeping item is its picture on the sheet and
 	 * nothing else, at any zoom, its title painted over it by the engine: 400 nodes cost a pan step 10 ms
 	 * of the page's time, and each camera step reached every one. The stage finds the one under a press
-	 * itself (`editor/dom/pointer.ts`, `pictureUnder`).
+	 * itself (`input/pointer.ts`, `pictureUnder`).
 	 */
 	const rendered = createMemo<readonly Page[]>((was) => {
 		const boards = props.boards;
@@ -495,6 +615,18 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 
 	/** The camera as of its last rest. */
 	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
+	return { isRendered, renderedPaths, layered, restCamera };
+}
+
+/** The files shown live: their elements, and the holes the sheet leaves for them. */
+function liveFilesOf(ctx: {
+	holesAsked: ReturnType<typeof liveAndHoles>["holesAsked"];
+	LIVE_FILES: ReturnType<typeof carriedAndPictured>["LIVE_FILES"]; penDrawn: ItemsLayerDeps["penDrawn"];
+	penLayer: ItemsLayerDeps["penLayer"]; props: ItemsLayerDeps["props"];
+	restCamera: ReturnType<typeof renderedSlots>["restCamera"]; scaling: Accessor<boolean>;
+	view: ItemsLayerDeps["view"];
+}) {
+	const { holesAsked, LIVE_FILES, penDrawn, penLayer, props, restCamera, scaling, view } = ctx;
 
 	/*
 	 * SVGs shown live on the canvas (`liveFileItem`), each as an image. Each is an element in the boards' layer, under the sheet, which draws a hole
@@ -542,9 +674,18 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	createEffect(
 		on(fileHoles, (ids) => {
 			penLayer.holes(ids);
-			holesAsked = { ids, mark: penLayer.mark() };
+			holesAsked.now = { ids, mark: penLayer.mark() };
 		}),
 	);
+	return { liveFiles };
+}
+
+/** Where a live file is on the stage, and opening one in a tab. */
+function liveFileActions(ctx: {
+	editor: ItemsLayerDeps["editor"]; penDrawn: ItemsLayerDeps["penDrawn"]; penLayer: ItemsLayerDeps["penLayer"];
+	props: ItemsLayerDeps["props"];
+}) {
+	const { editor, penDrawn, penLayer, props } = ctx;
 	/** Where each live file is on the stage, from the layout the sheet drew. */
 	const liveBox = (id: string) => {
 		penDrawn();
@@ -567,6 +708,21 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		openInTab(canvasHost().fileUrl(node.metadata.file));
 		return true;
 	};
+	return { liveBox, openLiveFile };
+}
+
+/** One placed item's slot, and the item whose page takes the fingers on a touch screen. */
+function slotOf(ctx: {
+	carriedPages: ReturnType<typeof carriedAndPictured>["carriedPages"]; ctl: ItemsLayerDeps["ctl"];
+	draggedAsPicture: ReturnType<typeof carriedAndPictured>["draggedAsPicture"]; editor: ItemsLayerDeps["editor"];
+	frame: ItemsLayerDeps["frame"]; Frame: ItemsLayerDeps["Frame"]; gestures: ItemsLayerDeps["gestures"];
+	isKept: ReturnType<typeof leavingCards>["isKept"]; isLeaving: ReturnType<typeof leavingCards>["isLeaving"];
+	isLive: ReturnType<typeof leavingCards>["isLive"]; isNear: ReturnType<typeof awakeChoice>["isNear"];
+	isPictured: ReturnType<typeof leavingCards>["isPictured"];
+	markLive: ReturnType<typeof liveAndHoles>["markLive"]; props: ItemsLayerDeps["props"];
+	pushCamera: (cam: Camera) => void;
+}) {
+	const { carriedPages, ctl, draggedAsPicture, editor, frame, Frame, gestures, isKept, isLeaving, isLive, isNear, isPictured, markLive, props, pushCamera } = ctx;
 
 	/**
 	 * On a touch screen, the one item whose page takes the fingers (`item-slot.tsx`, `active`): activated by
@@ -606,6 +762,16 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				: {})}
 		/>
 	);
+	return { pageNode };
+}
+
+/** Cards whose size changed from outside a drag, eased to it; and the frame that shows the holes asked for. */
+function sizesEased(ctx: {
+	editor: ItemsLayerDeps["editor"]; holesAsked: ReturnType<typeof liveAndHoles>["holesAsked"];
+	penLayer: ItemsLayerDeps["penLayer"]; props: ItemsLayerDeps["props"];
+	setHolesShown: ReturnType<typeof liveAndHoles>["setHolesShown"];
+}) {
+	const { editor, holesAsked, penLayer, props, setHolesShown } = ctx;
 
 	/*
 	 * Boards whose size just changed from outside a drag (`decks.canvas.fit`, an agent's `decks.canvas.update`, a write that
@@ -650,11 +816,22 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 
 	/** A frame on screen shows the holes asked for: their files' elements show from then (`liveFiles`). */
 	const presented = () => {
-		if (holesAsked && penLayer.shows(holesAsked.mark)) {
-			setHolesShown(holesAsked.ids);
-			holesAsked = undefined;
+		if (holesAsked.now && penLayer.shows(holesAsked.now.mark)) {
+			setHolesShown(holesAsked.now.ids);
+			holesAsked.now = undefined;
 		}
 	};
+	return { sizingPaths, presented };
+}
+
+/** Every card's slot, and the live files' elements after them. */
+function slotsMarkup(ctx: {
+	holesShown: ReturnType<typeof liveAndHoles>["holesShown"];
+	isRendered: ReturnType<typeof renderedSlots>["isRendered"];
+	liveBox: ReturnType<typeof liveFileActions>["liveBox"]; liveFiles: ReturnType<typeof liveFilesOf>["liveFiles"];
+	pageNode: ReturnType<typeof slotOf>["pageNode"]; props: ItemsLayerDeps["props"];
+}) {
+	const { holesShown, isRendered, liveBox, liveFiles, pageNode, props } = ctx;
 
 	/** Every board's slot, in the world. */
 	const slots = () => (
@@ -705,6 +882,17 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				</For>
 		</>
 	);
+	return { slots, fileNodes };
+}
+
+/** The one player, over the item it belongs to. */
+function playerMarkup(ctx: {
+	playedTo: ReturnType<typeof mediaPlaying>["playedTo"];
+	playingBox: ReturnType<typeof playerPlace>["playingBox"];
+	playingElement: ReturnType<typeof mediaPlaying>["playingElement"];
+	setPlaying: ReturnType<typeof mediaPlaying>["setPlaying"];
+}) {
+	const { playedTo, playingBox, playingElement, setPlaying } = ctx;
 	/** The one player, over the item it belongs to (inside the overlay layer). */
 	const player = () => (
 		<>
@@ -732,13 +920,13 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 										radius={now().radius}
 										scheme={scheme()}
 										{...(playedTo.get(id) ? { from: playedTo.get(id)! } : {})}
-										ref={(element) => (playingElement = element)}
+										ref={(element) => (playingElement.now = element)}
 										onEnded={() => {
 											playedTo.delete(id);
 											setPlaying(undefined);
 										}}
 										onLeave={(at) => {
-											playingElement = undefined;
+											playingElement.now = undefined;
 											if (at > 0.5) playedTo.set(id, at);
 										}}
 									/>
@@ -748,6 +936,5 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 					</Show>
 		</>
 	);
-
-	return { isLive, renderedPaths, pageIndex, liveNow, layered, cardsHidden, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };
+	return { player };
 }
