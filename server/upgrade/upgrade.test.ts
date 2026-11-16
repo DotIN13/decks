@@ -15,6 +15,7 @@ function fixtureFiles(dir = FIXTURE): Record<string, string> {
 	const out: Record<string, string> = {};
 	for (const name of readdirSync(dir)) {
 		const path = join(dir, name);
+		if (name === ".decks") continue;
 		if (statSync(path).isDirectory()) Object.assign(out, fixtureFiles(path));
 		else if (!/\.(pdf|png|jpg)$/.test(name)) out[relative(FIXTURE, path)] = readFileSync(path, "utf8");
 	}
@@ -25,7 +26,8 @@ const text = (deck: MemoryDeck, path: string) => deck.read(path as never).then((
 
 test("the fixture deck upgrades to the latest and keeps its friend's old board", async () => {
 	const deck = new MemoryDeck(fixtureFiles());
-	const file = memoryVersion();
+	// The fixture is at the floor, as every deck from today is, so its old pages at the root (boards/) open.
+	const file = memoryVersion(readFileSync(join(FIXTURE, ".decks/migrations.json"), "utf8"));
 	assert.deepEqual(await upgradeDeck(deck, file), []);
 	assert.equal((await readRecord(file)).version, LATEST);
 	assert.match(await text(deck, "shared/canvases/ada/old-notes/canvas.pen"), /decks\.board/);

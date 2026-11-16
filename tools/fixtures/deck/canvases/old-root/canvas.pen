@@ -1,0 +1,33 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "browser",
+      "id": "root-app",
+      "name": "Notes",
+      "url": "boards/apps/notes.html",
+      "width": 900,
+      "height": 600,
+      "metadata": {
+        "type": "decks.app",
+        "name": "notes"
+      },
+      "x": 0,
+      "y": 0
+    },
+    {
+      "type": "browser",
+      "id": "root-doc",
+      "name": "Old root notes",
+      "url": "boards/old-root-notes.html",
+      "width": 700,
+      "height": 600,
+      "metadata": {
+        "type": "decks.document",
+        "path": "canvases/old-root/files/notes.md"
+      },
+      "x": 1100,
+      "y": 0
+    }
+  ]
+}
