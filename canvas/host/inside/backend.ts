@@ -69,7 +69,8 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 		(opened ??= openLine({
 			api: base,
 			token: () => token,
-			watch: () => [{ canvas, ...(sinceOf ? { since: sinceOf() } : {}) }],
+			// Nothing to watch: every event the frame hears comes on its socket (`sock`), and a watch here asks canvas.get, a pass's refusal.
+			watch: () => [],
 			// The drawing is the socket's now (`sock`): the line's copies of its changes are passed over.
 			hear: (message) => {
 				if (LINE_DONE.has((message as { type?: string }).type ?? "")) return;
