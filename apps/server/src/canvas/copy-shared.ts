@@ -111,7 +111,7 @@ export function relinkDrawing(value: unknown, plan: ReadonlyMap<string, string>)
 export function copySharedCanvas(deck: string, pens: StagePens, from: string, title?: string): string {
 	if (!isSharedCanvas(from)) throw new Error(`${from} is not a canvas shared with you: a friend's canvas is named shared/<owner>/<canvas> (decks canvas list says which).`);
 	if (!pens.has(from)) throw new Error(`There is no shared canvas ${from}: decks canvas list names them.`);
-	const sharing = pens.sharing(from);
+	const sharing = pens.rights.sharing(from);
 	const owner = sharing?.ownerName || sharing?.owner || "its owner";
 	const source = join(deck, canvasFolder(from));
 	const wanted = (typeof title === "string" && title.trim()) || `Copy of ${pens.titleOf(from)}`;

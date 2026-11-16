@@ -544,7 +544,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			paste: async (clip: { id?: unknown; canvas?: unknown }, options?: { canvas?: string; at?: { x: number; y: number } }) => {
 				const name = canvasOf(options?.canvas);
 				const pens = needPens();
-				if (pens.sharing(name)?.role === "view") throw new Error(`${pens.titleOf(name)} was shared with you to view, so nothing can be pasted on it. Make your own copy of it first.`);
+				if (pens.rights.sharing(name)?.role === "view") throw new Error(`${pens.titleOf(name)} was shared with you to view, so nothing can be pasted on it. Make your own copy of it first.`);
 				const copy = heldClip(clip?.id);
 				if (clip?.canvas !== copy.canvas) throw new Error("That copy was made on another canvas than the clip says: copy the items again.");
 				if (!pens.has(copy.canvas)) throw new Error("The canvas those items were copied from is not one you can read any more.");
@@ -578,9 +578,9 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			step: async (direction: "undo" | "redo", options?: { canvas?: string }) => {
 				const name = canvasOf(options?.canvas);
 				const pens = needPens();
-				if (pens.sharing(name)?.role === "view") throw new Error("This canvas was shared with you to view, so there is nothing of yours on it to undo.");
-				pens.step(name, direction === "redo" ? "redo" : "undo");
-				return pens.steps(name);
+				if (pens.rights.sharing(name)?.role === "view") throw new Error("This canvas was shared with you to view, so there is nothing of yours on it to undo.");
+				pens.log.step(name, direction === "redo" ? "redo" : "undo");
+				return pens.log.steps(name);
 			},
 			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
 				const name = canvasOf(options?.canvas);

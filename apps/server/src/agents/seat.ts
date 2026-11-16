@@ -300,7 +300,7 @@ export class Seat {
 		for (const path of [...this.playing].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		this.of.arranged?.();
 		this.publishContext();
-		this.of.emit(pens.frame(this.of.id, name));
+		this.of.emit(pens.log.frame(this.of.id, name));
 	}
 
 	/**
@@ -318,7 +318,7 @@ export class Seat {
 		this.of.arranged?.();
 		this.publishContext();
 		const pens = this.of.stage.pens;
-		if (pens) this.of.emit(pens.frame(this.of.id, to));
+		if (pens) this.of.emit(pens.log.frame(this.of.id, to));
 	}
 
 	/**
@@ -454,7 +454,7 @@ export class Seat {
 	canvasNotes(): string[] {
 		const pens = this.of.stage.pens;
 		if (!pens) return [];
-		const names = new Set([...(this.folder ? [this.folder] : []), ...pens.takeWritten(this.of.id), ...this.seen.keys()]);
+		const names = new Set([...(this.folder ? [this.folder] : []), ...pens.log.takeWritten(this.of.id), ...this.seen.keys()]);
 		const agents = this.of.agents();
 		const nameOf = (id: string) => agents.find((one) => one.id === id)?.name ?? "another agent";
 		const lines: string[] = [];
@@ -466,7 +466,7 @@ export class Seat {
 			const entry = pens.get(name);
 			if (entry.error) continue;
 			const before = this.seen.get(name);
-			if (before && before.rev !== entry.rev) lines.push(...canvasNews(pens.titleOf(name), name, before.doc, entry.doc, pens.changesSince(name, before.rev), this.of.id, nameOf));
+			if (before && before.rev !== entry.rev) lines.push(...canvasNews(pens.titleOf(name), name, before.doc, entry.doc, pens.log.changesSince(name, before.rev), this.of.id, nameOf));
 			this.seen.set(name, { rev: entry.rev, doc: entry.doc });
 		}
 		return lines;

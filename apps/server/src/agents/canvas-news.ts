@@ -1,4 +1,5 @@
-import type { PenDocument, PenEdit, PenNode } from "@decks/pen";
+import type { PenDocument, PenNode } from "@decks/pen";
+import type { Author, ChangeRecord } from "../canvas/log.ts";
 
 /**
  * What changed on a canvas since an agent last heard, as the lines put in front of its next message.
@@ -6,25 +7,9 @@ import type { PenDocument, PenEdit, PenNode } from "@decks/pen";
  * An agent's instructions say changes others make on a canvas reach it with its next message, and
  * for a long time nothing did: the one note there was ("the user edited this board") went with board
  * editing. So each message now carries this: the agent's canvases as they are, against what they were
- * at its last message, item by item, with who made each change (`ChangeRecord`, kept by the canvas
- * store at every write) and its own changes left out, since it knows those.
+ * at its last message, item by item, with who made each change (`ChangeRecord`, kept by the canvas's
+ * log at every write, `canvas/log.ts`) and its own changes left out, since it knows those.
  */
-
-/** Who wrote a canvas: the person (an edit from a page), an agent (its own call), or the file itself. */
-export type Author = { kind: "person" } | { kind: "agent"; id: string } | { kind: "file" } | { kind: "studio"; id: string };
-
-/**
- * One write of a canvas: its revision, its author, the items it touched, and the edits that made it
- * from the revision before (`@decks/pen`'s `diff`), with the names the browser gave its own among them
- * (`made`). The edits are what a browser or another harness holding the revision before is sent.
- */
-export interface ChangeRecord {
-	rev: number;
-	by: Author;
-	ids: string[];
-	edits: PenEdit[];
-	made?: string[];
-}
 
 /** The most lines a note has before it says how many more. */
 const MOST = 8;

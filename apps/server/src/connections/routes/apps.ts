@@ -69,7 +69,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			return;
 		}
 		const pens = app.stage?.pens;
-		if (!pens?.has(principal.canvas) || !pens.yoursAlone(principal.canvas)) {
+		if (!pens?.has(principal.canvas) || !pens.rights.yoursAlone(principal.canvas)) {
 			res.status(403).json({ error: "Apps open inside a canvas only on a canvas that is yours alone; on this one, open it in a tab.", tab: true });
 			return;
 		}

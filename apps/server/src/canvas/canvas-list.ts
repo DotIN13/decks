@@ -19,11 +19,11 @@ export function canvasListMessage(pens: StagePens, everyone: ReadonlyArray<{ id:
 		} catch {
 			/* gone between the listing and the look */
 		}
-		const shared = pens.sharing(name);
+		const shared = pens.rights.sharing(name);
 		return {
 			name,
 			title: pens.titleOf(name),
-			...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role } } : !pens.yoursAlone(name) ? { othersEdit: true as const } : {}),
+			...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role } } : !pens.rights.yoursAlone(name) ? { othersEdit: true as const } : {}),
 			...(changedAt ? { changedAt } : {}),
 			boards,
 			rev,

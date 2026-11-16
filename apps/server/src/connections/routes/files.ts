@@ -184,7 +184,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				const pens = app.stage.pens;
 				if (!pens || !canvasNameOk(canvas) || !pens.has(canvas)) throw new UploadRefused(`There is no canvas ${canvas} to put the file in.`, 404);
 				try {
-					pens.mayWrite(canvas);
+					pens.rights.mayWrite(canvas);
 				} catch (error) {
 					throw new UploadRefused((error as Error).message, 403);
 				}

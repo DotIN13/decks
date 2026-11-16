@@ -256,11 +256,11 @@ export class Line {
 		for (const [other, otherState] of this.sockets) if (other !== socket && otherState.principal && otherState.present.has(canvas)) send(socket, { type: "presence.changed", canvas, by: this.by(otherState), ...otherState.present.get(canvas)! });
 		for (const one of this.elsewhere.get(canvas)?.values() ?? []) send(socket, one);
 		if (whole === true) {
-			send(socket, this.app.pens.whole(canvas));
+			send(socket, this.app.pens.log.whole(canvas));
 			return;
 		}
 		if (typeof since !== "number") return;
-		const caught = this.app.pens.caughtUp(canvas, since);
+		const caught = this.app.pens.log.caughtUp(canvas, since);
 		if (caught) send(socket, caught);
 	}
 

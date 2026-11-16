@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { PenDocument, PenNode } from "@decks/pen";
-import { canvasNews, type ChangeRecord } from "./canvas-news.ts";
+import type { ChangeRecord } from "../canvas/log.ts";
+import { canvasNews } from "./canvas-news.ts";
 
 const doc = (children: PenNode[]): PenDocument => ({ version: "2.6", children }) as PenDocument;
 const note = (id: string, content: string, x = 0, y = 0): PenNode => ({ id, type: "note", content, x, y }) as PenNode;

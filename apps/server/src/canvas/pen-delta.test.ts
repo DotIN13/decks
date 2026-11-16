@@ -13,16 +13,16 @@ test("stage.pen.delta carries an edit, a reroute and a hand edit of the file", (
 	try {
 		const name = pens.claim("Delta test");
 		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);
-		const first = pens.frame("agent", name) as { rev: number; doc: PenDocument };
+		const first = pens.log.frame("agent", name) as { rev: number; doc: PenDocument };
 		let held = first.doc;
 		let rev = first.rev;
 		const take = () => {
-			const delta = (pens.changes(["agent"], name) as unknown as Array<{ type: string; from: number; rev: number; edits: never[]; doc?: PenDocument }>).find((one) => one.type === "stage.pen.delta");
+			const delta = (pens.log.changes(["agent"], name) as unknown as Array<{ type: string; from: number; rev: number; edits: never[]; doc?: PenDocument }>).find((one) => one.type === "stage.pen.delta");
 			assert.equal(delta!.type, "stage.pen.delta");
 			assert.equal(delta!.from, rev);
 			held = applyEdits(held, delta!.edits);
 			rev = delta!.rev;
-			const whole = pens.frame("agent", name) as { doc: PenDocument };
+			const whole = pens.log.frame("agent", name) as { doc: PenDocument };
 			assert.deepEqual(JSON.parse(JSON.stringify(held)), JSON.parse(JSON.stringify(whole.doc)));
 		};
 		pens.edit(name, [{ op: "update", id: "a", set: { x: 40, fill: "#f00" } }, { op: "insert", node: { type: "ellipse", id: "b" } }] as never);
@@ -42,7 +42,7 @@ test("an edit or a step made under a browser's name says so in the delta that ha
 	const deck = mkdtempSync(join(tmpdir(), "pen-made-"));
 	const sent: Array<{ type: string; made?: string[] }> = [];
 	let pens!: StagePens;
-	pens = new StagePens(deck, (name) => sent.push(...(pens.changes(["agent"], name) as never[])));
+	pens = new StagePens(deck, (name) => sent.push(...(pens.log.changes(["agent"], name) as never[])));
 	try {
 		const name = pens.claim("Made test");
 		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);
@@ -57,7 +57,7 @@ test("an edit or a step made under a browser's name says so in the delta that ha
 		pens.edit(name, [{ op: "update", id: "a", set: { y: 6 } }] as never);
 		assert.equal(sent.at(-1)!.made, undefined);
 		penEditBy.run("tab.3", () => pens.edit(name, [{ op: "update", id: "a", set: { x: 41 } }] as never, undefined, { undoable: true }));
-		penEditBy.run("tab.4", () => pens.step(name, "undo"));
+		penEditBy.run("tab.4", () => pens.log.step(name, "undo"));
 		assert.deepEqual(sent.at(-1)!.made, ["tab.4"]);
 	} finally {
 		pens.close();
@@ -72,16 +72,16 @@ test("a drawing sent whole to one browser takes no names from the others' next d
 	try {
 		const name = pens.claim("Frame test");
 		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);
-		pens.changes(["agent"], name);
+		pens.log.changes(["agent"], name);
 		penEditBy.run("tab.1", () => pens.edit(name, [{ op: "update", id: "a", set: { x: 40 } }] as never));
-		const whole = pens.frame("agent", name) as { made?: string[] };
+		const whole = pens.log.frame("agent", name) as { made?: string[] };
 		assert.deepEqual(whole.made, ["tab.1"], "the one asking hears it too");
-		const delta = (pens.changes(["agent"], name) as Array<{ type: string; made?: string[] }>).find((one) => one.type === "stage.pen.delta");
+		const delta = (pens.log.changes(["agent"], name) as Array<{ type: string; made?: string[] }>).find((one) => one.type === "stage.pen.delta");
 		assert.equal(delta!.type, "stage.pen.delta");
 		assert.deepEqual(delta!.made, ["tab.1"], "and so do the others");
 		penEditBy.run("tab.2", () => pens.edit(name, [{ op: "update", id: "a", set: { x: 41 } }] as never));
-		pens.changes(["agent"], name);
-		assert.deepEqual((pens.frame("agent", name) as { made?: string[] }).made, ["tab.1", "tab.2"], "recent names, already sent, for a browser that missed them");
+		pens.log.changes(["agent"], name);
+		assert.deepEqual((pens.log.frame("agent", name) as { made?: string[] }).made, ["tab.1", "tab.2"], "recent names, already sent, for a browser that missed them");
 	} finally {
 		pens.close();
 		rmSync(deck, { recursive: true, force: true });

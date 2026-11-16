@@ -50,7 +50,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 				if (!pens) return [];
 				const gone: string[] = [];
 				for (const canvas of pens.names()) {
-					if (pens.isShared(canvas)) continue;
+					if (pens.rights.isShared(canvas)) continue;
 					const ids = (pens.get(canvas).doc.children ?? [])
 						.filter((node) => node.type === "browser" && (node.metadata as { type?: unknown; name?: unknown } | undefined)?.type === "decks.app" && (node.metadata as { name?: unknown }).name === name)
 						.map((node) => node.id);

@@ -200,13 +200,13 @@ test("a placeholder frame an agent draws names that agent as the canvas's writer
 	try {
 		await must("canvas.insert", [{ type: "frame", name: "Hero", placeholder: true, width: 400, height: 200 }, { at: { x1: 0, y1: 0 } }]);
 		const stage = agent.seat.stageName()!;
-		assert.equal(app.pens.writerOf(stage), agent.id);
-		const frame = app.pens.frame(agent.id, stage);
+		assert.equal(app.pens.log.writerOf(stage), agent.id);
+		const frame = app.pens.log.frame(agent.id, stage);
 		assert.equal(frame.type === "stage.pen" && frame.by, agent.id);
 		// A person's edit over the wire leaves the writer as it was.
 		app.pens.edit(stage, [{ op: "update", id: "hero", set: { x: 10 } }] as never);
-		assert.equal(app.pens.writerOf(stage), agent.id);
-		const delta = app.pens.changes([agent.id], stage).find((one) => one.type === "stage.pen.delta");
+		assert.equal(app.pens.log.writerOf(stage), agent.id);
+		const delta = app.pens.log.changes([agent.id], stage).find((one) => one.type === "stage.pen.delta");
 		assert.equal(delta?.type === "stage.pen.delta" && delta.by, agent.id);
 	} finally {
 		cleanup();

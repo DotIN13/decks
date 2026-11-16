@@ -63,7 +63,7 @@ function harness(url: string, key: string) {
 			},
 		},
 	});
-	pens.wrote = (name, change) => sync.edited(name, change);
+	pens.log.wrote = (name, change) => sync.edited(name, change);
 	return { deck, pens, sync, heard, present, async stop() {
 		await sync.stop();
 		pens.close();
@@ -98,11 +98,11 @@ test("two harnesses on one canvas: an edit on either reaches the other through S
 		assert.equal(content(a.pens, name, "n"), "two");
 		assert.ok(await until(() => content(b.pens, name, "n") === "two"), `B hears A's edit: B has ${content(b.pens, name, "n")}`);
 		assert.equal((s.store.canvas(id)!.pen.children[0] as { content?: string }).content, "two", "Studio has it");
-		const onB = b.pens.changesSince(name, 0).at(-1)!;
+		const onB = b.pens.log.changesSince(name, 0).at(-1)!;
 		assert.equal(onB.by.kind, "studio", "B's store records the write as Studio's");
 		// A's own edit came back down as a live message naming A as its client: nothing of it is written on A again as Studio's.
 		await new Promise((done) => setTimeout(done, 300));
-		assert.equal(a.pens.changesSince(name, 0).some((r) => r.by.kind === "studio"), false, "A wrote nothing of its own edit again");
+		assert.equal(a.pens.log.changesSince(name, 0).some((r) => r.by.kind === "studio"), false, "A wrote nothing of its own edit again");
 
 		// B edits: up, and down to A.
 		b.pens.edit(name, [{ op: "insert", node: { type: "note", id: "m", content: "from b" }, box: { x1: 400, y1: 0 } }]);

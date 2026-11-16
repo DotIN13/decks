@@ -192,7 +192,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				res.status(404).type("text").send("No such canvas.");
 				return;
 			}
-			const frame = pens.frame("", name) as Extract<ServerMessage, { type: "stage.pen" }>;
+			const frame = pens.log.frame("", name) as Extract<ServerMessage, { type: "stage.pen" }>;
 			const until = Date.now() + 60_000;
 			const { bytes } = await buildBundle({
 				deckPath: app.deck.path,
@@ -225,7 +225,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			res.status(404).end();
 			return;
 		}
-		const frame = pens.frame("", name) as { doc: unknown; base: string; rev: number; by?: string };
+		const frame = pens.log.frame("", name) as { doc: unknown; base: string; rev: number; by?: string };
 		res.setHeader("Cache-Control", "no-store");
 		/*
 		 * Each card and board on it with its record (title, revision, card or not, who wrote it and when,

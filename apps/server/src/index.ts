@@ -90,7 +90,7 @@ line.onPresence = (message) => {
 	studio.presence(canvas, { by: { kind: by.kind, id: by.id, ...(by.name ? { name: by.name } : {}), color: by.color }, ...rest });
 };
 // Every write of a canvas, as logged: a canvas on Studio has its edits sent up at once (`HarnessSync.edited`).
-app.pens.wrote = (name, change) => studio.edited(name, change);
+app.pens.log.wrote = (name, change) => studio.edited(name, change);
 
 /*
  * One upgrade listener, two websockets.

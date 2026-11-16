@@ -18,7 +18,7 @@ export function fileVerbs(ctx: VerbContext): Pick<Stage, "file"> {
 	/** A path about to be written: a shared canvas's folder takes it only from someone who may edit that canvas. */
 	const mayWrite = (path: unknown) => {
 		const shared = typeof path === "string" ? /^(?:\.\/)?shared\/canvases\/([^/]+)\/([^/]+)(?:\/|$)/.exec(path.trim()) : undefined;
-		if (shared) ctx.needPens().mayWrite(`shared/${shared[1]}/${shared[2]}`);
+		if (shared) ctx.needPens().rights.mayWrite(`shared/${shared[1]}/${shared[2]}`);
 	};
 	/** The caller wrote this file: a card's page gets them as its writer. */
 	const wrote = (path: string) => {

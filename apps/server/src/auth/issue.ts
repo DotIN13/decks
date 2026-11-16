@@ -362,10 +362,10 @@ export function doorRoutes(app: App): express.Router {
 			res.status(404).json({ error: `There is no canvas called ${canvas || "that"}.` });
 			return;
 		}
-		const role = pens.sharing(canvas)?.role === "view" ? "view" : "edit";
+		const role = pens.rights.sharing(canvas)?.role === "view" ? "view" : "edit";
 		const { pass, expires } = app.passes.canvas(canvas, role, req.tokenId);
 		// The deck's import map, for the frame to hand its cards before their scripts run; none for a friend's canvas, whose cards run no script.
-		const imports = pens.sharing(canvas) ? {} : app.deckImports();
+		const imports = pens.rights.sharing(canvas) ? {} : app.deckImports();
 		res.set("cache-control", "no-store").json({ pass, role, expires, imports });
 	});
 

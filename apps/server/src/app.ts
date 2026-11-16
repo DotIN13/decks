@@ -178,13 +178,13 @@ export class App {
 				role: (canvas) => {
 					const pens = this.stage?.pens;
 					if (!pens?.has(canvas)) return undefined;
-					return pens.sharing(canvas)?.role === "view" ? "view" : "edit";
+					return pens.rights.sharing(canvas)?.role === "view" ? "view" : "edit";
 				},
 				appRun: (name) => this.apps?.runOf(name),
 				// An app on a canvas runs in its frame only while it is placed there and the canvas is yours alone.
 				appOnCanvas: (name, canvas) => {
 					const pens = this.stage?.pens;
-					return !!pens?.has(canvas) && pens.yoursAlone(canvas) && canvasShowsApp(pens, canvas, name);
+					return !!pens?.has(canvas) && pens.rights.yoursAlone(canvas) && canvasShowsApp(pens, canvas, name);
 				},
 			},
 			passSecret(config.dataDir),
@@ -372,7 +372,7 @@ export class App {
 			borrow: (use) => this.thumbs.borrow(use),
 			...(process.env.DECKS_NATIVE_SHOTS === "0" ? {} : { native: this.nativeShots }),
 			writer: (stage) => {
-				const id = this.pens.writerOf(stage);
+				const id = this.pens.log.writerOf(stage);
 				return id ? this.agents.get(id)?.who() : undefined;
 			},
 		});
@@ -523,6 +523,8 @@ export class App {
 	 */
 	openDeck(path: string): void {
 		const deckPath = join(path, DECK_DIR);
+		// A deck kept in an older shape is moved to this one before anything reads it, as at start-up (`migrations/`).
+		for (const line of runAtOpen(deckPath, { dataDir: path })) console.log(`[decks] ${line}`);
 		const existing = existsSync(join(deckPath, "deck.json")) || existsSync(join(deckPath, "boards"));
 		this.deck = existing ? Deck.open(deckPath) : Deck.create(deckPath, App.runtimeLib);
 		if (existing) App.refreshLib(this.deck);
@@ -607,7 +609,7 @@ export class App {
 		 * showing it (`/api/v1/events`), which follows the canvas rather than an agent.
 		 */
 		const ids = on.length ? on.map((agent) => agent.id) : [""];
-		for (const message of this.pens.changes(ids, name)) this.send(message);
+		for (const message of this.pens.log.changes(ids, name)) this.send(message);
 		// The manager lists what each stage holds, and this is the moment that changed.
 		this.publishStages();
 	}
@@ -624,7 +626,7 @@ export class App {
 	/** The drawing for one agent's stage, for a browser opening its chat; nothing if it has never drawn. */
 	penMessage(agentId: string): ServerMessage | undefined {
 		const name = this.agents.get(agentId)?.seat.stageName();
-		return name ? this.pens.frame(agentId, name) : undefined;
+		return name ? this.pens.log.frame(agentId, name) : undefined;
 	}
 
 	dispose(): void {

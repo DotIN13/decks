@@ -2,11 +2,11 @@
 	"counts": {
 		"files over 1,000 lines": 10,
 		"functions over 150 lines": 69,
-		"classes over 30 methods": 12,
-		"server folder pairs that import each other": 14,
+		"classes over 30 methods": 11,
+		"server folder pairs that import each other": 13,
 		"imports across packages by relative path": 6,
 		"\"one release\" notes": 0,
-		"server imports that point up a layer": 21
+		"server imports that point up a layer": 19
 	},
 	"upward": [
 		"apps/server/src/agents/backend.ts -> apps/server/src/calls/tool.ts",
@@ -17,8 +17,6 @@
 		"apps/server/src/calls/person-table.ts -> apps/server/src/connections/routes/shared.ts",
 		"apps/server/src/calls/person-table.ts -> apps/server/src/connections/tab-socket.ts",
 		"apps/server/src/canvas/admin.ts -> apps/server/src/agents/session.ts",
-		"apps/server/src/canvas/pens.ts -> apps/server/src/agents/canvas-news.ts",
-		"apps/server/src/canvas/pens.ts -> apps/server/src/migrations/index.ts",
 		"apps/server/src/canvas/service.ts -> apps/server/src/apps/check.ts",
 		"apps/server/src/canvas/service.ts -> apps/server/src/apps/service.ts",
 		"apps/server/src/connections/http.ts -> apps/server/src/app.ts",

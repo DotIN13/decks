@@ -40,7 +40,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 			throw new Error(`A ${what} is made in a canvas: name it with { canvas }, as in decks ${what} create '{"title":"…","canvas":"launch-plan"}'. ${(error as Error).message}`);
 		}
 		if (!name) throw new Error(`A ${what} is made in a canvas: name it with { canvas }. decks canvas list names them.`);
-		needPens().mayWrite(name);
+		needPens().rights.mayWrite(name);
 		return name;
 	};
 

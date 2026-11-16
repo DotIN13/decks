@@ -122,17 +122,17 @@ test("the person's edits undo and redo, and a step is refused once an agent has 
 		const ids = () => pens.get(name).doc.children.map((n) => n.id);
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "a" } }], undefined, { undoable: true });
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "b" } }], undefined, { undoable: true });
-		assert.deepEqual(pens.steps(name), { undo: true, redo: false });
-		pens.step(name, "undo");
+		assert.deepEqual(pens.log.steps(name), { undo: true, redo: false });
+		pens.log.step(name, "undo");
 		assert.deepEqual(ids(), ["a"]);
-		pens.step(name, "redo");
+		pens.log.step(name, "redo");
 		assert.deepEqual(ids(), ["a", "b"]);
-		pens.step(name, "undo");
+		pens.log.step(name, "undo");
 		// An agent's edit is not the person's, and undoing past it would take it back too.
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "agent" } }]);
-		assert.throws(() => pens.step(name, "undo"), /changed since/);
+		assert.throws(() => pens.log.step(name, "undo"), /changed since/);
 		assert.deepEqual(ids(), ["a", "agent"]);
-		assert.throws(() => pens.step(name, "redo"), /Nothing to redo/);
+		assert.throws(() => pens.log.step(name, "redo"), /Nothing to redo/);
 	} finally {
 		pens.close();
 		rmSync(dir, { recursive: true, force: true });
@@ -198,7 +198,7 @@ test("a stage's imports are read from inside the deck, used for its boxes and it
 		);
 		const view = pens.read(name);
 		assert.deepEqual(view.children[0]!.box, { x1: 10, y1: 20, x2: 130, y2: 60 }, "the imported card's own size");
-		const frame = pens.frame("agent", name) as unknown as { doc: Record<string, unknown> };
+		const frame = pens.log.frame("agent", name) as unknown as { doc: Record<string, unknown> };
 		assert.deepEqual(Object.keys((frame.doc["decks.imported"] ?? {}) as object), ["deck", "far"], "a file outside the deck is read too");
 		const saved = readFileSync(join(dir, "canvases", name, "canvas.pen"), "utf8");
 		assert.equal(saved.includes("decks.imported"), false);
@@ -388,28 +388,28 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 	const heard: Array<[string, PenEntry]> = [];
 	const pens = new StagePens(dir, (name, entry) => heard.push([name, entry]));
 	const wrote: Array<{ name: string; rev: number; ops: string[]; by: string }> = [];
-	pens.wrote = (name, change) => wrote.push({ name, rev: change.rev, ops: change.edits.map((e) => e.op), by: change.by.kind });
+	pens.log.wrote = (name, change) => wrote.push({ name, rev: change.rev, ops: change.edits.map((e) => e.op), by: change.by.kind });
 	try {
 		const name = pens.claim("Log");
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "a", content: "one" }, box: { x1: 0, y1: 0 } }]);
 		const first = pens.get(name).rev;
 		// The drawing was sent whole once; what follows is the log's edits, revision by revision.
-		pens.changes([""], name);
+		pens.log.changes([""], name);
 		pens.edit(name, [{ op: "update", id: "a", set: { content: "two" } }]);
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "b", content: "b" }, box: { x1: 400, y1: 0 } }]);
 		const now = pens.get(name).rev;
 		assert.equal(now, first + 2);
-		const since = pens.changesSince(name, first);
+		const since = pens.log.changesSince(name, first);
 		assert.deepEqual(since.map((r) => [r.rev, r.by.kind, r.ids]), [[first + 1, "person", ["a"]], [first + 2, "person", ["b"]]]);
 		assert.deepEqual(since.map((r) => r.edits.map((e) => e.op)), [["set"], ["insert"]]);
-		const span = pens.editsSince(name, first)!;
+		const span = pens.log.editsSince(name, first)!;
 		assert.equal(span.from, first);
 		assert.equal(span.rev, now);
 		assert.deepEqual(span.edits.map((e) => e.op), ["set", "insert"]);
-		assert.equal(pens.editsSince(name, -1), undefined, "a revision from before the log has no edits to offer");
+		assert.equal(pens.log.editsSince(name, -1), undefined, "a revision from before the log has no edits to offer");
 		// Published from the log: the delta from the revision last sent carries exactly those edits, in order.
 		// Said first as canvas.changed, once for every client on the line, then as the tab's per-agent delta: the same edits.
-		const published = pens.changes([""], name) as Array<{ type: string; from: number; rev: number; edits: Array<{ op: string }>; author?: { kind: string } }>;
+		const published = pens.log.changes([""], name) as Array<{ type: string; from: number; rev: number; edits: Array<{ op: string }>; author?: { kind: string } }>;
 		assert.deepEqual(published.map((m) => m.type), ["canvas.changed", "stage.pen.delta"]);
 		assert.equal(published[0]!.author?.kind, "person");
 		const delta = published[1];
@@ -421,8 +421,8 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 		put(file, JSON.stringify({ version: "2.14", children: [{ type: "note", id: "a", content: "by hand", x: 0, y: 0 }] }));
 		const hand = pens.get(name);
 		assert.equal(hand.rev, now + 1);
-		assert.equal(pens.editsSince(name, now), undefined);
-		const [fallback] = pens.changes([""], name) as Array<{ from: number; rev: number; edits: Array<{ op: string; id?: string }> }>;
+		assert.equal(pens.log.editsSince(name, now), undefined);
+		const [fallback] = pens.log.changes([""], name) as Array<{ from: number; rev: number; edits: Array<{ op: string; id?: string }> }>;
 		assert.equal((fallback as { type?: string }).type, "canvas.changed");
 		assert.deepEqual([fallback!.from, fallback!.rev], [now, now + 1]);
 		assert.ok(fallback!.edits.some((e) => e.op === "remove" && e.id === "b"), "the drawings compared say b went");

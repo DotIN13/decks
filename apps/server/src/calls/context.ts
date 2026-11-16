@@ -125,13 +125,13 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 		} catch {
 			/* a canvas whose file does not parse holds no cards we can count */
 		}
-		const shared = pens.sharing(name);
+		const shared = pens.rights.sharing(name);
 		return {
 			name,
 			title: pens.titleOf(name),
 			// A friend's canvas: who shared it, and whether you may change it (`deck/layout.ts`).
 			...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role, ...(shared.studio ? { studio: shared.studio } : {}) } } : {}),
-			...(!shared && pens.studioId(name) ? { studio: pens.studioId(name) } : {}),
+			...(!shared && pens.rights.studioId(name) ? { studio: pens.rights.studioId(name) } : {}),
 			open: agent
 				.agents()
 				.filter((other) => (other.id === agent.id && !agent.app ? mine : other.stage) === name)

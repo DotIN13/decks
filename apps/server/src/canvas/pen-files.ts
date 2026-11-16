@@ -147,7 +147,7 @@ export class PenFiles {
 	 * everywhere it is used.
 	 */
 	saveFrame(stage: string, id: string, path: string, replace = true): { frame: string; ref: string; replaced: boolean; overwrote: boolean } {
-		if (replace) this.of.mayWrite(stage);
+		if (replace) this.of.rights.mayWrite(stage);
 		const entry = this.of.get(stage);
 		if (entry.error) throw new PenError(`${entry.error}. Fix the file before saving from it.`);
 		// A frame is saved in the canvas's own frames/, so the canvas still stands alone (`deck/layout.ts`).
@@ -227,7 +227,7 @@ export class PenFiles {
 	private writePen(file: string, doc: PenDocument): void {
 		// A frame in a friend's canvas shared with you to view is theirs, as its drawing is.
 		const at = canvasOfPath(relative(this.of.deckPath, file).split(sep).join("/"));
-		if (at && isSharedCanvas(at.name)) this.of.mayWrite(at.name);
+		if (at && isSharedCanvas(at.name)) this.of.rights.mayWrite(at.name);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, serialize(doc));
 		this.importCache.delete(file);
