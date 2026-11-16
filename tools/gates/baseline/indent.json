@@ -1,5 +1,4 @@
 {
 	"canvas/cards/card-syntax.ts: line shallower than its block": 1,
-	"canvas/documents/page.ts: line shallower than its block": 6,
 	"canvas/editor/editor.tsx: line shallower than its block": 4
 }
