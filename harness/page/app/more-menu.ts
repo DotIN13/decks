@@ -9,12 +9,9 @@ import { call } from "../state/line.ts";
 import { setOps, setSettings } from "../state/ui.ts";
 
 /**
- * What `⋯` holds: clearing the canvas, then the app's own. Highlighting is the pointer's menu now. Fit is the zoom bar's, and the
- * context reading the composer's (a phone's ⋯ adds it back, `TopRight.tsx`).
- *
- * "Highlight on hover" is the canvas's mode: on (`edit`), what is under the pointer is outlined,
- * a flow board shows its blocks' grips, and Alt shows distances; off (`browse`), nothing lights
- * up and everything still moves, sizes and snaps.
+ * What `⋯` holds: clearing the canvas, then the app's own: dark mode, the shortcuts and the settings.
+ * Highlighting is the pointer's menu now, Fit the zoom bar's, and the context reading the composer's
+ * (a phone's ⋯ adds it back, `TopRight.tsx`).
  */
 export const moreItems = (stagePages: () => Page[]) => [
 	{

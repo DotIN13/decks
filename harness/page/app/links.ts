@@ -4,15 +4,12 @@ import { boxOf, canvasBox, fitInto } from "@decks/canvas/camera";
 import { moveCamera } from "../state/camera.ts";
 import { setState, state } from "../state/deck.ts";
 import { act, stageOnScreen } from "../state/decks.ts";
-
-/** The canvas on screen, as a call's option. */
-const onScreen = () => {
-	const canvas = stageOnScreen();
-	return canvas ? { canvas } : {};
-};
 import { notice } from "../state/notices.ts";
 import { setSelected } from "../state/selection.ts";
 import { call, warnIfFailed } from "../state/line.ts";
+
+// Flying the camera to cards: framing a list of them, framing one once the server has placed it,
+// and following a link from one card to another, placed beside it.
 
 /*
  * Frame these boards, whatever they are: the camera moves to hold them all.
@@ -37,15 +34,6 @@ export const flyToPages = (boards: Page[], options?: { animate?: boolean }) => {
 export const flyTo = (board: Page) => {
 	setSelected(board.path);
 	flyToPages([board], { animate: true });
-};
-
-const move = (path: string, x: number, y: number) => {
-	// Optimistic, and in place: the board is already where it was dropped, and the
-	// server's answer confirms it. Replacing the object here would re-create the
-	// row and reload the document that is sitting in it.
-	const index = state.pages.findIndex((board) => board.path === path);
-	if (index >= 0) setState("pages", index, { x, y });
-	void act("item.move", { id: path, at: { x, y }, ...onScreen() });
 };
 
 /**
@@ -142,4 +130,19 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 	};
 	wait();
 	return true;
+};
+
+const move = (path: string, x: number, y: number) => {
+	// Optimistic, and in place: the board is already where it was dropped, and the
+	// server's answer confirms it. Replacing the object here would re-create the
+	// row and reload the document that is sitting in it.
+	const index = state.pages.findIndex((board) => board.path === path);
+	if (index >= 0) setState("pages", index, { x, y });
+	void act("item.move", { id: path, at: { x, y }, ...onScreen() });
+};
+
+/** The canvas on screen, as a call's option. */
+const onScreen = () => {
+	const canvas = stageOnScreen();
+	return canvas ? { canvas } : {};
 };

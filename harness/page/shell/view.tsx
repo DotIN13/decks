@@ -39,11 +39,45 @@ import { createPage, type PageWiring } from "./actions.ts";
 type P = { page: PageWiring };
 type Trigger = (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 
-const canvasMenu = (trigger: Trigger, placement: "bottom-start" | "bottom-end" = "bottom-start") => (
-	<CanvasSwitcher stages={stages()} here={stageOf(state.focused)?.name} scheme={scheme()} placement={placement} onPick={openCanvas} onNew={() => newCanvas()} onAll={() => void setStagesOpen(true)} trigger={trigger} />
-);
+/** The page. */
+export function Shell(): JSX.Element {
+	const page = createPage();
+	return (
+		<div class="app" data-presenting={page.presenting.presenting() ? "true" : undefined} data-phone={page.layout.phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
+			<div class="work">
+				<div class="surface" data-surface="stage">
+					<div class="surface-layer" data-layer="stage">
+						<CanvasHost host={hostOf(page)} />
+					</div>
+				</div>
+				<Top page={page} />
+				<Overlays page={page} />
+				<Panel page={page} />
+				<Show when={page.layout.phone() && page.layout.phoneChat()}>
+					<Chat page={page} sheet />
+				</Show>
+				<Modals page={page} />
+				<Dock page={page} />
+				<NoticeStrip />
+			</div>
+		</div>
+	);
+}
 
-const usageOf = () => (state.focused ? state.agents[state.focused]?.usage : undefined);
+/** The inputs the canvas host takes from the wiring. */
+const hostOf = (page: PageWiring): CanvasHostInputs => ({
+	stagePen: page.stagePen as never,
+	personMoved: page.landing.personMoved,
+	setPenSelected: page.setPenSelected,
+	setEditorHandle: page.setEditorHandle,
+	dockCover: page.dock.dockCover,
+	composerBox: page.dock.composerBox,
+	underSheet: page.setUnderSheet,
+	openAppsPanel: page.openAppsPanel,
+	files: page.files,
+	frameWhenPlaced: page.frameWhenPlaced,
+	moveConversation,
+});
 
 function Top(props: P): JSX.Element {
 	const page = props.page;
@@ -103,23 +137,6 @@ function Overlays(props: P): JSX.Element {
 	);
 }
 
-function Chat(props: P & { sheet?: boolean }): JSX.Element {
-	const page = props.page;
-	const layout = page.layout;
-	return (
-		<ChatSection
-			chat={page.focusedChat()}
-			identity={state.identities[state.focused ?? ""]}
-			unread={state.focused ? (unread[state.focused] ?? 0) : 0}
-			folded={props.sheet ? false : layout.chatFolded()}
-			onFold={(folded: boolean, gone?: unknown) => (props.sheet ? (folded ? layout.setPhoneChat(false, undefined, gone as never) : undefined) : (layout.setChatFolded(folded), layout.holdHistory()))}
-			{...(props.sheet ? { from: layout.sheetFrom(), leaving: layout.sheetLeaving(), sheet: true } : {})}
-		>
-			<FocusedStream shown={layout.chatShown()} items={page.transcript()} chat={page.focusedChat()} atTurn={page.atTurn()} />
-		</ChatSection>
-	);
-}
-
 function Panel(props: P): JSX.Element {
 	const page = props.page;
 	const here = () => stageOf(state.focused);
@@ -172,6 +189,23 @@ function Panel(props: P): JSX.Element {
 	);
 }
 
+function Chat(props: P & { sheet?: boolean }): JSX.Element {
+	const page = props.page;
+	const layout = page.layout;
+	return (
+		<ChatSection
+			chat={page.focusedChat()}
+			identity={state.identities[state.focused ?? ""]}
+			unread={state.focused ? (unread[state.focused] ?? 0) : 0}
+			folded={props.sheet ? false : layout.chatFolded()}
+			onFold={(folded: boolean, gone?: unknown) => (props.sheet ? (folded ? layout.setPhoneChat(false, undefined, gone as never) : undefined) : (layout.setChatFolded(folded), layout.holdHistory()))}
+			{...(props.sheet ? { from: layout.sheetFrom(), leaving: layout.sheetLeaving(), sheet: true } : {})}
+		>
+			<FocusedStream shown={layout.chatShown()} items={page.transcript()} chat={page.focusedChat()} atTurn={page.atTurn()} />
+		</ChatSection>
+	);
+}
+
 function Modals(props: P): JSX.Element {
 	return (
 		<>
@@ -182,6 +216,32 @@ function Modals(props: P): JSX.Element {
 				<Settings prefs={props.page.prefs()} onPrefs={props.page.setPrefs} accounts={state.accounts} active={state.activeAccount} onAdd={addAccount} onForget={forgetAccount} web={state.web} onWebRepair={() => void repairTab()} onWebStop={stopTab} phone={props.page.layout.phone()} onClose={() => setSettings(false)} />
 			</Show>
 		</>
+	);
+}
+
+function Dock(props: P): JSX.Element {
+	const page = props.page;
+	return (
+		<div class="dock" ref={page.dock.watchDock} data-under={page.underSheet() ? "true" : undefined}>
+			<button type="button" class="stowtab" data-stowtab aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => page.dock.unstow()}>
+				<Icon of={ChevronLeft} size={16} />
+			</button>
+			<Show when={dialog()}>
+				{(prompt) => (
+					<Dialog
+						prompt={prompt()}
+						onAnswer={(answer) => {
+							if (state.focused) answerAgent(state.focused, prompt().id, answer);
+							clearDialog();
+						}}
+					/>
+				)}
+			</Show>
+			<Show when={!page.layout.chatShown() && (page.layout.phone() || !panelOpen())}>
+				<StatusPill chat={page.focusedChat()} identity={state.identities[state.focused ?? ""]} onOpen={page.layout.openChat} />
+			</Show>
+			<DockedComposer page={page} />
+		</div>
 	);
 }
 
@@ -237,68 +297,9 @@ function DockedComposer(props: P): JSX.Element {
 	);
 }
 
-function Dock(props: P): JSX.Element {
-	const page = props.page;
-	return (
-		<div class="dock" ref={page.dock.watchDock} data-under={page.underSheet() ? "true" : undefined}>
-			<button type="button" class="stowtab" data-stowtab aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => page.dock.unstow()}>
-				<Icon of={ChevronLeft} size={16} />
-			</button>
-			<Show when={dialog()}>
-				{(prompt) => (
-					<Dialog
-						prompt={prompt()}
-						onAnswer={(answer) => {
-							if (state.focused) answerAgent(state.focused, prompt().id, answer);
-							clearDialog();
-						}}
-					/>
-				)}
-			</Show>
-			<Show when={!page.layout.chatShown() && (page.layout.phone() || !panelOpen())}>
-				<StatusPill chat={page.focusedChat()} identity={state.identities[state.focused ?? ""]} onOpen={page.layout.openChat} />
-			</Show>
-			<DockedComposer page={page} />
-		</div>
-	);
-}
+// Read by several pieces above: the canvas switcher, and the focused agent's usage.
+const canvasMenu = (trigger: Trigger, placement: "bottom-start" | "bottom-end" = "bottom-start") => (
+	<CanvasSwitcher stages={stages()} here={stageOf(state.focused)?.name} scheme={scheme()} placement={placement} onPick={openCanvas} onNew={() => newCanvas()} onAll={() => void setStagesOpen(true)} trigger={trigger} />
+);
 
-/** The inputs the canvas host takes from the wiring. */
-const hostOf = (page: PageWiring): CanvasHostInputs => ({
-	stagePen: page.stagePen as never,
-	personMoved: page.landing.personMoved,
-	setPenSelected: page.setPenSelected,
-	setEditorHandle: page.setEditorHandle,
-	dockCover: page.dock.dockCover,
-	composerBox: page.dock.composerBox,
-	underSheet: page.setUnderSheet,
-	openAppsPanel: page.openAppsPanel,
-	files: page.files,
-	frameWhenPlaced: page.frameWhenPlaced,
-	moveConversation,
-});
-
-/** The page. */
-export function Shell(): JSX.Element {
-	const page = createPage();
-	return (
-		<div class="app" data-presenting={page.presenting.presenting() ? "true" : undefined} data-phone={page.layout.phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
-			<div class="work">
-				<div class="surface" data-surface="stage">
-					<div class="surface-layer" data-layer="stage">
-						<CanvasHost host={hostOf(page)} />
-					</div>
-				</div>
-				<Top page={page} />
-				<Overlays page={page} />
-				<Panel page={page} />
-				<Show when={page.layout.phone() && page.layout.phoneChat()}>
-					<Chat page={page} sheet />
-				</Show>
-				<Modals page={page} />
-				<Dock page={page} />
-				<NoticeStrip />
-			</div>
-		</div>
-	);
-}
+const usageOf = () => (state.focused ? state.agents[state.focused]?.usage : undefined);

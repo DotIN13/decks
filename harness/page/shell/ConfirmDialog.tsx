@@ -4,9 +4,6 @@ import X from "lucide-solid/icons/x";
 import { question, type Question } from "../state/confirm.ts";
 import { Icon } from "@decks/ui";
 
-/** Whether the answer removes something. */
-const danger = (q: Question) => q.danger ?? /^(delete|remove|forget)\b/i.test(q.yes);
-
 /** The app's one yes-or-no question (`state/confirm.ts`), over everything, answered with a press or Enter and Escape. */
 export function ConfirmDialog() {
 	return (
@@ -62,3 +59,6 @@ export function ConfirmDialog() {
 		</Show>
 	);
 }
+
+/** Whether the answer removes something. */
+const danger = (q: Question) => q.danger ?? /^(delete|remove|forget)\b/i.test(q.yes);

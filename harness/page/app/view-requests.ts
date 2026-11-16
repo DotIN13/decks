@@ -11,6 +11,8 @@ import { todaysCall, type Requested } from "./view-call.ts";
 // reaches this screen as view.requested; it is run here as today's page ran
 // today's view.called, on the frame's camera and selection.
 
+type Box = { x: number; y: number; w: number; h: number };
+
 /** Hear view calls for this screen and run them on the frame. Answers the stop. */
 export function answerViews(deps: { editor: () => FramedHandle | undefined; took: () => void; boxOf: (id: string) => { x: number; y: number; w: number; h: number } | undefined; moveConversation: (agent: string, canvas: string) => void; rememberView: (agent: string, camera: Camera, selected?: string) => void }): () => void {
 	return on("view.requested", (event) => void answer(event as Requested, deps));
@@ -36,8 +38,6 @@ async function answer(event: Requested, deps: Parameters<typeof answerViews>[0])
 			cursor: () => true,
 		});
 }
-
-type Box = { x: number; y: number; w: number; h: number };
 
 /** Whether a focus names an item the page's copy lacks, or a card the page's list does not hold. */
 function lacks(event: Requested, boxOf: (id: string) => Box | undefined): boolean {

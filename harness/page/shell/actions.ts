@@ -48,31 +48,38 @@ import { installTooltips } from "./tooltip.ts";
 // its sync, the drawing on screen, the floats and the dock, files, keys and
 // the canvas host's inputs. It holds no data: stores are in state/.
 
-/** Open the line, read everything when it comes up, and hear the events after. */
-function mountLine(raise: ReturnType<typeof createAlerts>["raise"], landed: () => void, hearCreated: (request: string, path: string) => void): void {
-	const hooks = { raise, landed, hearCreated };
-	onMount(() => {
-		setFailureSink((text) => notice("warn", text));
-		hearOld((message) => applyOld(message, hooks));
-		const stop = listen(hooks);
-		void start((up) => {
-			if (!up) return;
-			scratch.forgetAsked();
-			forgetAskedResults();
-			rewatch();
-			void readAll(hooks);
-		});
-		setTimeout(releasePages, 2500);
-		setToolResultSender((itemId) => {
-			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
-			if (!agentId) return false;
-			void call<ChatItem>("chat.get", { agent: agentId, item: itemId }).then((answer) => answer.ok && receiveToolResult(itemId, (answer.value as { result?: string }).result ?? ""));
-			return true;
-		});
-		createEffect(() => watchCanvas(stageOf(state.focused)?.name));
-		onCleanup(stop);
-	});
+/** The whole page's wiring. Call once, inside the shell's view. */
+export function createPage() {
+	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
+	const { prefs, setPrefs, raise } = createAlerts({ focusAgent });
+	const views = keepViews();
+	const viewOnlyStage = browseWhenReadOnly();
+	const layout = createChatLayout();
+	const conversation = focusedConversation(layout.chatShown);
+	const onScreen = canvasOnScreen();
+	const [deckSeen, setDeckSeen] = createSignal(0);
+	const files = createFileDrops();
+	mountLine(raise, () => setDeckSeen((n) => n + 1), (request, path) => files.hearCreated(request, path));
+	const [editorHandle, setEditorHandle] = createSignal<FramedHandle>();
+	const [penSelected, setPenSelected] = createSignal<string[]>([]);
+	const { frameWhenPlaced, playAndFrame } = createFraming(onScreen.stagePages);
+	const pills = createPills({ stagePen: onScreen.stagePen, editorHandle, setPenSelected, playAndFrame });
+	const bar = createBar({ titleOf: (path) => pills.titleOf(path), itemName: (id) => pills.itemName(id) });
+	setCommentSender((ids) => bar.sendFromBar("", ids));
+	const floats = createFloats();
+	const dock = createDock({ phone: layout.phone, phoneChat: layout.phoneChat, setPhoneChat: (open, from) => layout.setPhoneChat(open, from), viewWidth: layout.viewWidth }, floats);
+	const [underSheet, setUnderSheet] = createSignal(false);
+	const panels = panelAsks();
+	const landing = createCameraLanding({ views, stagePen: onScreen.stagePen, stagePages: onScreen.stagePages, deckSeen });
+	const apps = createAppsPanel(onScreen.stagePages, frameWhenPlaced);
+	const [findAt, setFindAt] = createSignal(0);
+	wireBrowser({ files, editorHandle, park: landing.park, find: setFindAt });
+	const hereAgents = createMemo(() => agentsHere(state.chats, (id) => stageOf(id)?.name, state.focused));
+	onMount(() => onCleanup(answerViews({ editor: editorHandle, took: () => landing.stop(), boxOf: (id) => canvasItems(onScreen.stagePen()?.doc).items.find((one) => one.id === id)?.box, moveConversation, rememberView })));
+	return { atTurn, setAtTurn, prefs, setPrefs, views, viewOnlyStage, layout, ...conversation, ...onScreen, files, editorHandle, setEditorHandle, penSelected, setPenSelected, frameWhenPlaced, playAndFrame, pills, bar, dock, underSheet, setUnderSheet, ...panels, landing, apps, findAt, hereAgents, presenting: createPresenting(), pickFile };
 }
+
+export type PageWiring = ReturnType<typeof createPage>;
 
 /** What the browser keeps per conversation: its views on this device, and comments made before canvases. */
 function keepViews() {
@@ -135,6 +142,32 @@ function canvasOnScreen() {
 	return { stagePen, stagePages: (): Page[] => shownPages };
 }
 
+/** Open the line, read everything when it comes up, and hear the events after. */
+function mountLine(raise: ReturnType<typeof createAlerts>["raise"], landed: () => void, hearCreated: (request: string, path: string) => void): void {
+	const hooks = { raise, landed, hearCreated };
+	onMount(() => {
+		setFailureSink((text) => notice("warn", text));
+		hearOld((message) => applyOld(message, hooks));
+		const stop = listen(hooks);
+		void start((up) => {
+			if (!up) return;
+			scratch.forgetAsked();
+			forgetAskedResults();
+			rewatch();
+			void readAll(hooks);
+		});
+		setTimeout(releasePages, 2500);
+		setToolResultSender((itemId) => {
+			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
+			if (!agentId) return false;
+			void call<ChatItem>("chat.get", { agent: agentId, item: itemId }).then((answer) => answer.ok && receiveToolResult(itemId, (answer.value as { result?: string }).result ?? ""));
+			return true;
+		});
+		createEffect(() => watchCanvas(stageOf(state.focused)?.name));
+		onCleanup(stop);
+	});
+}
+
 /** Which tab of the panel to open, asked by a button elsewhere. */
 function panelAsks() {
 	const [panelAsk, setPanelAsk] = createSignal<{ tab: PanelTab; at: number } | undefined>();
@@ -143,49 +176,6 @@ function panelAsks() {
 		setPanelAsk({ tab, at: Date.now() });
 	};
 	return { panelAsk, openAgentsPanel: () => ask("agents"), openAppsPanel: () => ask("apps") };
-}
-
-/** Ask the person for a file from the deck. */
-const pickFile = () =>
-	new Promise<string | undefined>((resolve) => {
-		setPicking({
-			purpose: "attach",
-			resolve: (picked: string | undefined) => {
-				setPicking(undefined);
-				resolve(picked);
-			},
-		});
-	});
-
-/** The whole page's wiring. Call once, inside the shell's view. */
-export function createPage() {
-	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
-	const { prefs, setPrefs, raise } = createAlerts({ focusAgent });
-	const views = keepViews();
-	const viewOnlyStage = browseWhenReadOnly();
-	const layout = createChatLayout();
-	const conversation = focusedConversation(layout.chatShown);
-	const onScreen = canvasOnScreen();
-	const [deckSeen, setDeckSeen] = createSignal(0);
-	const files = createFileDrops();
-	mountLine(raise, () => setDeckSeen((n) => n + 1), (request, path) => files.hearCreated(request, path));
-	const [editorHandle, setEditorHandle] = createSignal<FramedHandle>();
-	const [penSelected, setPenSelected] = createSignal<string[]>([]);
-	const { frameWhenPlaced, playAndFrame } = createFraming(onScreen.stagePages);
-	const pills = createPills({ stagePen: onScreen.stagePen, editorHandle, setPenSelected, playAndFrame });
-	const bar = createBar({ titleOf: (path) => pills.titleOf(path), itemName: (id) => pills.itemName(id) });
-	setCommentSender((ids) => bar.sendFromBar("", ids));
-	const floats = createFloats();
-	const dock = createDock({ phone: layout.phone, phoneChat: layout.phoneChat, setPhoneChat: (open, from) => layout.setPhoneChat(open, from), viewWidth: layout.viewWidth }, floats);
-	const [underSheet, setUnderSheet] = createSignal(false);
-	const panels = panelAsks();
-	const landing = createCameraLanding({ views, stagePen: onScreen.stagePen, stagePages: onScreen.stagePages, deckSeen });
-	const apps = createAppsPanel(onScreen.stagePages, frameWhenPlaced);
-	const [findAt, setFindAt] = createSignal(0);
-	wireBrowser({ files, editorHandle, park: landing.park, find: setFindAt });
-	const hereAgents = createMemo(() => agentsHere(state.chats, (id) => stageOf(id)?.name, state.focused));
-	onMount(() => onCleanup(answerViews({ editor: editorHandle, took: () => landing.stop(), boxOf: (id) => canvasItems(onScreen.stagePen()?.doc).items.find((one) => one.id === id)?.box, moveConversation, rememberView })));
-	return { atTurn, setAtTurn, prefs, setPrefs, views, viewOnlyStage, layout, ...conversation, ...onScreen, files, editorHandle, setEditorHandle, penSelected, setPenSelected, frameWhenPlaced, playAndFrame, pills, bar, dock, underSheet, setUnderSheet, ...panels, landing, apps, findAt, hereAgents, presenting: createPresenting(), pickFile };
 }
 
 /** The browser's own hooks: files dropped and pasted, keys, the viewport, tooltips, rings, the theme. */
@@ -218,4 +208,14 @@ function wireBrowser(inputs: { files: ReturnType<typeof createFileDrops>; editor
 	});
 }
 
-export type PageWiring = ReturnType<typeof createPage>;
+/** Ask the person for a file from the deck. */
+const pickFile = () =>
+	new Promise<string | undefined>((resolve) => {
+		setPicking({
+			purpose: "attach",
+			resolve: (picked: string | undefined) => {
+				setPicking(undefined);
+				resolve(picked);
+			},
+		});
+	});
