@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { GAPS } from "./messages.gaps.ts";
+import { GAPS, NOT_THIS_LINE } from "./messages.gaps.ts";
 
 const ROOT = new URL("../../", import.meta.url).pathname;
 const read = (path: string) => readFileSync(`${ROOT}${path}`, "utf8");
@@ -26,7 +26,7 @@ export function heard(): string[] {
 const compat = ["line.ts", "events.ts", "docs.ts"].map((f) => read(`server/compat/${f}`)).join("\n");
 const answered = (type: string) => compat.includes(`"${type}"`);
 const told = (type: string) => compat.includes(`type: "${type}"`);
-const gap = (type: string, way: "sent" | "heard") => GAPS.some((g) => g.type === type && g.way === way);
+const gap = (type: string, way: "sent" | "heard") => GAPS.some((g) => g.type === type && g.way === way) || (way === "heard" && NOT_THIS_LINE.includes(type));
 
 test("every message the frame sends on the line is answered, or listed with its owner", () => {
 	const silent = sent().filter((t) => !answered(t) && !gap(t, "sent"));
