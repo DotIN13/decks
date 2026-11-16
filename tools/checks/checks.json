@@ -295,6 +295,9 @@
 		"card-keys": {
 			"path": "tools/checks/library/card-keys.mjs"
 		},
+		"documents-typing": {
+			"path": "tools/checks/library/documents-typing.mjs"
+		},
 		"card-tab": {
 			"path": "tools/checks/cards/card-tab.mjs"
 		},
