@@ -485,45 +485,45 @@ function PlainWords(props: WordsProps): JSX.Element {
 	let area: HTMLTextAreaElement | undefined;
 	return (
 		<>
-		<ScribbleCatch target={() => area} onEnd={() => area && props.text.commit(area.value)} />
-		<textarea
-			class="pen-text"
-			data-grows={look.grows}
-			spellcheck={false}
-			style={{
-				left: `${box().x}px`,
-				top: `${box().y}px`,
-				...(look.grows === "wide" ? { "min-width": `${box().w + 1}px` } : { width: `${box().w}px` }),
-				"min-height": `${box().h}px`,
-				padding: `${look.pad}px`,
-				"font-family": look.font,
-				"font-size": `${look.size}px`,
-				"font-weight": String(look.weight),
-				"font-style": look.italic ? "italic" : "normal",
-				"letter-spacing": `${look.spacing}px`,
-				"line-height": look.line === undefined ? "normal" : String(look.line),
-				"text-align": look.align as "left",
-				color: look.ink,
-				background: look.paper ?? "transparent",
-				"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
-				"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
-			}}
-			value={open.value}
-			ref={(el) => {
-				area = el;
-				requestAnimationFrame(() => {
-					el.focus({ preventScroll: true });
-					el.select();
-				});
-			}}
-			onInput={(event) => props.text.preview(open.id, event.currentTarget.value)}
-			onBlur={(event) => {
-				// The pencil writing over the canvas (`ScribbleCatch`): committed when it is done, not now.
-				if (isScribbleCatch(event.relatedTarget)) return;
-				props.text.commit(event.currentTarget.value);
-			}}
-			onKeyDown={(event) => textareaKeys(event, cancel)}
-		/>
+			<ScribbleCatch target={() => area} onEnd={() => area && props.text.commit(area.value)} />
+			<textarea
+				class="pen-text"
+				data-grows={look.grows}
+				spellcheck={false}
+				style={{
+					left: `${box().x}px`,
+					top: `${box().y}px`,
+					...(look.grows === "wide" ? { "min-width": `${box().w + 1}px` } : { width: `${box().w}px` }),
+					"min-height": `${box().h}px`,
+					padding: `${look.pad}px`,
+					"font-family": look.font,
+					"font-size": `${look.size}px`,
+					"font-weight": String(look.weight),
+					"font-style": look.italic ? "italic" : "normal",
+					"letter-spacing": `${look.spacing}px`,
+					"line-height": look.line === undefined ? "normal" : String(look.line),
+					"text-align": look.align as "left",
+					color: look.ink,
+					background: look.paper ?? "transparent",
+					"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
+					"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
+				}}
+				value={open.value}
+				ref={(el) => {
+					area = el;
+					requestAnimationFrame(() => {
+						el.focus({ preventScroll: true });
+						el.select();
+					});
+				}}
+				onInput={(event) => props.text.preview(open.id, event.currentTarget.value)}
+				onBlur={(event) => {
+					// The pencil writing over the canvas (`ScribbleCatch`): committed when it is done, not now.
+					if (isScribbleCatch(event.relatedTarget)) return;
+					props.text.commit(event.currentTarget.value);
+				}}
+				onKeyDown={(event) => textareaKeys(event, cancel)}
+			/>
 		</>
 	);
 }
