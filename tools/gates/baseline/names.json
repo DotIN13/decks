@@ -68,7 +68,7 @@
 	"canvas/chrome/Properties.tsx: stage": 1,
 	"canvas/debug.ts: stage": 5,
 	"canvas/documents/build-live-doc.mjs: board": 1,
-	"canvas/documents/gview.ts: board": 1,
+	"canvas/documents/google/typing.ts: board": 1,
 	"canvas/documents/live-doc.ts: board": 11,
 	"canvas/documents/live/input.ts: board": 1,
 	"canvas/documents/page.ts: board": 3,
