@@ -1,5 +1,5 @@
 import { CALL_BY_NAME, check, Refused, refusal, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
-import type { Client, Context, Feature, Filter, Guard, Translator } from "./types.ts";
+import type { Client, Context, Done, Feature, Filter, Guard, Translator } from "./types.ts";
 
 // Find the call, check who may call it, check the arguments against its
 // shape, run its handler, answer in the envelope. A declared call no feature
@@ -22,6 +22,7 @@ export class Router {
 	private translator: Translator | undefined;
 	private guards: Guard[] = [];
 	private filters: Filter[] = [];
+	private hearers = new Set<(done: Done) => void>();
 
 	// Answering a call: find it, check it, run or relay it, trim and check the answer.
 	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
@@ -29,14 +30,32 @@ export class Router {
 		const notes: string[] = [];
 		const found = this.find(name, caller, args ?? {}, notes);
 		if ("error" in found) return found.error;
+		const envelope = await this.run(found, name, args ?? {}, caller, notes, client);
+		this.heard({ call: "relay" in found ? found.relay : found.entry.call, args: (args ?? {}) as Record<string, unknown>, caller, envelope });
+		return envelope;
+	}
+
+	/** Guards, then the handler or the host, then the answer; a throw becomes a refusal. */
+	private async run(found: { entry: Entry } | { relay: AnyCall }, name: string, args: unknown, caller: Caller, notes: string[], client?: Client): Promise<Envelope<unknown>> {
 		try {
-			for (const guard of this.guards) await guard(name, args ?? {}, caller);
-			if ("relay" in found) return await this.relayed(found.relay, args ?? {}, caller, notes);
-			const value = await found.entry.run(this.makeContext(found.entry.feature, caller, notes, client), (args ?? {}) as never);
+			for (const guard of this.guards) await guard(name, args, caller);
+			if ("relay" in found) return await this.relayed(found.relay, args, caller, notes);
+			const value = await found.entry.run(this.makeContext(found.entry.feature, caller, notes, client), args as never);
 			return await this.answer(found.entry.call, value, notes, caller);
 		} catch (error) {
 			if (error instanceof Refused) return refusal(error.code, error.message, error.hint, notes);
 			return refusal("unavailable", `${name} failed on the server: ${(error as Error).message}`, undefined, notes);
+		}
+	}
+
+	/** Tells each hearer of after(); a hearer that throws is ignored, and none changes the answer. */
+	private heard(done: Done): void {
+		for (const hear of this.hearers) {
+			try {
+				hear(done);
+			} catch {
+				// A hearer's error is its own.
+			}
 		}
 	}
 
@@ -85,6 +104,12 @@ export class Router {
 	/** A check run before every handler or relay, after the who and argument checks; it throws Refused. */
 	guard(guard: Guard): void {
 		this.guards.push(guard);
+	}
+
+	/** Hears every call that reached a handler or a host, once it has answered. */
+	after(hear: (done: Done) => void): () => void {
+		this.hearers.add(hear);
+		return () => void this.hearers.delete(hear);
 	}
 
 	/** Trims a call's value before it is answered, from a handler or a host; several run in order. */

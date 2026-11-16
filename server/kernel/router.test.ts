@@ -150,3 +150,24 @@ test("a feature may declare calls of its own, guard every call, and say who sees
 	const twice = defineFeature({ name: "twice", declares: [calls.port.list], calls: [] });
 	await assert.rejects(testServer({ features: [twice] }), /declared already/);
 });
+
+test("after() hears each call that ran, with its answer, and cannot change it", async () => {
+	const heard: string[] = [];
+	const listener = defineFeature({
+		name: "listener",
+		calls: [],
+		start: (kernel) => {
+			kernel.after((done) => void heard.push(`${done.caller.id}:${done.call.name}:${done.envelope.ok}`));
+			kernel.after(() => {
+				throw new Error("a hearer's own trouble");
+			});
+		},
+	});
+	const server = await testServer({ features: [listener, probeFeature()] });
+	assert.equal((await server.call("port.open", { port: 7 }, callers.agent("ann"))).ok, true);
+	await server.call("port.open", { port: 7 }, callers.agent("ann"));
+	await server.call("port.open", { port: "x" }, callers.agent("ann"));
+	await server.call("no.such", {});
+	assert.deepEqual(heard, ["ann:port.open:true", "ann:port.open:false"]);
+	await server.close();
+});

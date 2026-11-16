@@ -44,6 +44,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 		translate: (one) => router.translate(one),
 		guard: (one) => router.guard(one),
 		filter: (one) => router.filter(one),
+		after: (hear) => router.after(hear),
 		call: (name, args, caller) => router.call(name, args, caller),
 		sees: (one) => void events.sees.push(one),
 		...(options.run ? { run: options.run } : {}),

@@ -163,6 +163,8 @@ export interface Kernel {
 	deckId(): string;
 	/** A check before every handler or relay, after the who and argument checks; throw Refused to refuse. */
 	guard(guard: Guard): void;
+	/** Hear every call that reached a handler or a host, after it answered; a hearer cannot change it. */
+	after(hear: (done: Done) => void): Stop;
 	/** Trim a call's value before it is answered (a list to what the caller may see); several run in order. */
 	filter(filter: Filter): void;
 	/** Whether a caller may see a canvas; an event of a canvas it may not see is not sent to it. */
@@ -200,6 +202,8 @@ export type RunResult = { code: number | null; signal?: string; out: string; mis
 
 /** Refuses a call by throwing Refused; for a server with many people (Studio). */
 export type Guard = (name: string, args: unknown, caller: Caller) => void | Promise<void>;
+/** A call that has answered: what was called, with what, by whom, and the answer. */
+export type Done = { call: AnyCall; args: Record<string, unknown>; caller: Caller; envelope: Envelope<unknown> };
 /** A call's value as the caller may have it. */
 export type Filter = (name: string, value: unknown, caller: Caller) => unknown | Promise<unknown>;
 /** Whether a caller may see a canvas. */
