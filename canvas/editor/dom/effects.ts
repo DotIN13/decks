@@ -44,17 +44,58 @@ export type EffectHost = {
 
 /** The page's half of the editor: each effect a step asks for, done. */
 export function createEffects(host: EffectHost) {
-	/**
-	 * The composer under a point, when a drag of drawn items could be a mention instead of a move.
-	 *
-	 * `elementFromPoint` rather than a rectangle we keep: the composer is a float the person can
-	 * drag anywhere and can be folded away to a tab, so where it is is a question only the
-	 * document can answer. Pointer capture does not change hit testing, so this works mid-drag.
-	 *
-	 * Boards as well as drawn items, and a drag of both mentions both. The composer is a small
-	 * target a hand has to aim at, so a board parked at the bottom of the canvas is parked *beside*
-	 * it rather than on it; and a board is the thing most worth saying "this one" about.
-	 */
+	const composer = composerMark(host);
+	const ghost = dragGhost(host);
+	const openLink = (href: string) => openCardLink(host, href);
+	const run = (effect: Effect) => {
+		switch (effect.do) {
+			case "select-board":
+				return host.onSelect(effect.path);
+			case "ghost-take":
+				return ghost.take(effect.ids);
+			case "ghost-show":
+				return ghost.show(effect.over, effect.client, effect.gap);
+			case "ghost-drop":
+				return ghost.drop();
+			case "composer":
+				return composer.mark(effect.client ? composer.under(effect.client, effect.ids, effect.boards) : undefined);
+			case "refer":
+				return host.onRefer?.(referPills(host, effect.ids, effect.boards));
+			case "open-link":
+				return openLink(effect.href);
+			case "media":
+				return host.toggleMedia(effect.id, effect.media);
+			case "move-boards":
+				for (const move of effect.moves) host.onMove(move.path, move.x, move.y);
+				return;
+			case "board-size":
+				return host.onResize?.(effect.path, effect.size);
+			case "settle":
+				return host.settle(effect.landing);
+			case "wake":
+				return host.wake(effect.at);
+			case "panned":
+				return host.panned();
+			case "await-frame":
+				return host.awaitFrame(effect.resize);
+		}
+	};
+
+	return { run, openLink, ghostDrop: ghost.drop, overComposer: (at: Pt, ids: readonly string[], boards: readonly string[]) => composer.under(at, ids, boards) !== undefined };
+}
+
+/**
+ * The composer under a point, when a drag of drawn items could be a mention instead of a move.
+ *
+ * `elementFromPoint` rather than a rectangle we keep: the composer is a float the person can
+ * drag anywhere and can be folded away to a tab, so where it is is a question only the
+ * document can answer. Pointer capture does not change hit testing, so this works mid-drag.
+ *
+ * Boards as well as drawn items, and a drag of both mentions both. The composer is a small
+ * target a hand has to aim at, so a board parked at the bottom of the canvas is parked *beside*
+ * it rather than on it; and a board is the thing most worth saying "this one" about.
+ */
+function composerMark(host: EffectHost) {
 	/** Where the composer was last seen on the screen, read again every 200 ms: a point far from it needs no hit test. */
 	let composerSeen: { rect: DOMRect | undefined; at: number } | undefined;
 	const nearComposer = (at: Pt): boolean => {
@@ -73,31 +114,6 @@ export function createEffects(host: EffectHost) {
 		const outside = canvasHost().composer;
 		return outside?.at(at.x, at.y) ? outside : undefined;
 	};
-	/**
-	 * What to call each thing that was dropped on the composer.
-	 *
-	 * A board is its title, which is the sentence on its own bar; an item is its name, or the
-	 * words it draws when it has none — a note reads as what it says — and its id when it is a
-	 * shape with neither. The id is what the mention *is*; this is only what it shows.
-	 */
-	const referPills = (ids: readonly string[], boards: readonly string[]): ReferPill[] => {
-		const named = new Map<string, PenNode>();
-		const pen = host.pen();
-		if (pen) for (const node of walk(pen.doc.children)) named.set(node.id, node);
-		return [
-			...boards.map((path) => {
-				const name = host.boards().find((board) => board.path === path)?.title || (path.split("/").pop() ?? path);
-				return { kind: "card" as const, id: path, label: shortLabel(name), name };
-			}),
-			...ids.map((id) => {
-				const node = named.get(id);
-				const content = (node as { content?: unknown } | undefined)?.content;
-				const words = (node?.name || (typeof content === "string" ? content : "")).replace(/\s+/g, " ").trim();
-				return { kind: "item" as const, id, label: shortLabel(words) || id, name: words || id };
-			}),
-		];
-	};
-
 	/** The composer being told it is a drop target, so the mark can be taken off wherever the drag ends. */
 	let referTarget: ReferTarget | undefined;
 	const mark = (target: ReferTarget, on: boolean) => {
@@ -111,12 +127,40 @@ export function createEffects(host: EffectHost) {
 		referTarget = target;
 		if (target) mark(target, true);
 	};
+	return { under: composerUnder, mark: markComposer };
+}
 
-	/*
-	 * The ghost of what a drag carries over a card: a picture of the items cut from the sheet as the
-	 * drag starts, laid beside the pointer with a shadow and a slight tilt, as the card's own pieces are
-	 * (`pen/CardEditor.tsx`), while the carried picture and the selection's handles stand aside.
-	 */
+/**
+ * What to call each thing that was dropped on the composer.
+ *
+ * A board is its title, which is the sentence on its own bar; an item is its name, or the
+ * words it draws when it has none — a note reads as what it says — and its id when it is a
+ * shape with neither. The id is what the mention *is*; this is only what it shows.
+ */
+function referPills(host: EffectHost, ids: readonly string[], boards: readonly string[]): ReferPill[] {
+	const named = new Map<string, PenNode>();
+	const pen = host.pen();
+	if (pen) for (const node of walk(pen.doc.children)) named.set(node.id, node);
+	return [
+		...boards.map((path) => {
+			const name = host.boards().find((board) => board.path === path)?.title || (path.split("/").pop() ?? path);
+			return { kind: "card" as const, id: path, label: shortLabel(name), name };
+		}),
+		...ids.map((id) => {
+			const node = named.get(id);
+			const content = (node as { content?: unknown } | undefined)?.content;
+			const words = (node?.name || (typeof content === "string" ? content : "")).replace(/\s+/g, " ").trim();
+			return { kind: "item" as const, id, label: shortLabel(words) || id, name: words || id };
+		}),
+	];
+}
+
+/*
+ * The ghost of what a drag carries over a card: a picture of the items cut from the sheet as the
+ * drag starts, laid beside the pointer with a shadow and a slight tilt, as the card's own pieces are
+ * (`pen/CardEditor.tsx`), while the carried picture and the selection's handles stand aside.
+ */
+function dragGhost(host: EffectHost) {
 	let ghost: { el?: HTMLCanvasElement; rect: { left: number; top: number; width: number; height: number } } | undefined;
 	/** Where the carried items lie on screen as the drag starts: the ghost is cut from there. */
 	const ghostTake = (ids: readonly string[]) => {
@@ -160,59 +204,24 @@ export function createEffects(host: EffectHost) {
 		host.element()?.removeAttribute("data-ghosting");
 		host.showCarriedLayer(true);
 	};
+	return { take: ghostTake, show: ghostShow, drop: ghostDrop };
+}
 
-	/**
-	 * A card's link. A link to a board of this deck opens that board on the canvas, exactly as
-	 * the host opens one (`onOpenLink`, `types.ts`); anything else is a new tab. A
-	 * relative link is read against the stage's own folder.
-	 */
-	const openLink = (href: string) => {
-		const base = host.pen()?.base ?? "";
-		const board = canvasHost().cardLink(href, base);
-		if (board && host.onOpenPage?.(board, "")) return;
-		let url: URL;
-		try {
-			url = new URL(href, new URL(base || "/", location.href));
-		} catch {
-			return;
-		}
-		if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "mailto:") return;
-		openInTab(url.href);
-	};
-
-	const run = (effect: Effect) => {
-		switch (effect.do) {
-			case "select-board":
-				return host.onSelect(effect.path);
-			case "ghost-take":
-				return ghostTake(effect.ids);
-			case "ghost-show":
-				return ghostShow(effect.over, effect.client, effect.gap);
-			case "ghost-drop":
-				return ghostDrop();
-			case "composer":
-				return markComposer(effect.client ? composerUnder(effect.client, effect.ids, effect.boards) : undefined);
-			case "refer":
-				return host.onRefer?.(referPills(effect.ids, effect.boards));
-			case "open-link":
-				return openLink(effect.href);
-			case "media":
-				return host.toggleMedia(effect.id, effect.media);
-			case "move-boards":
-				for (const move of effect.moves) host.onMove(move.path, move.x, move.y);
-				return;
-			case "board-size":
-				return host.onResize?.(effect.path, effect.size);
-			case "settle":
-				return host.settle(effect.landing);
-			case "wake":
-				return host.wake(effect.at);
-			case "panned":
-				return host.panned();
-			case "await-frame":
-				return host.awaitFrame(effect.resize);
-		}
-	};
-
-	return { run, openLink, ghostDrop, overComposer: (at: Pt, ids: readonly string[], boards: readonly string[]) => composerUnder(at, ids, boards) !== undefined };
+/**
+ * A card's link. A link to a board of this deck opens that board on the canvas, exactly as
+ * the host opens one (`onOpenLink`, `types.ts`); anything else is a new tab. A
+ * relative link is read against the stage's own folder.
+ */
+function openCardLink(host: EffectHost, href: string): void {
+	const base = host.pen()?.base ?? "";
+	const board = canvasHost().cardLink(href, base);
+	if (board && host.onOpenPage?.(board, "")) return;
+	let url: URL;
+	try {
+		url = new URL(href, new URL(base || "/", location.href));
+	} catch {
+		return;
+	}
+	if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "mailto:") return;
+	openInTab(url.href);
 }

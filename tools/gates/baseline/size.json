@@ -11,7 +11,6 @@
 	"canvas/documents/page.ts: function mountDocPage over 80 lines": 1,
 	"canvas/documents/tex.ts: function texMeta over 80 lines": 1,
 	"canvas/editor/dom/controller.ts: function createEditor over 80 lines": 1,
-	"canvas/editor/dom/effects.ts: function createEffects over 80 lines": 1,
 	"canvas/editor/dom/OverlayLayer.tsx: function OverlayLayer over 80 lines": 1,
 	"canvas/editor/dom/TextEditing.tsx: function (anonymous) over 80 lines": 1,
 	"canvas/editor/dom/TextEditing.tsx: function createTextEditing over 80 lines": 1,

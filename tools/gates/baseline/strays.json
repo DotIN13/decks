@@ -27,7 +27,7 @@
 	"canvas/editor/core/snapping.ts: names a path no file has": 1,
 	"canvas/editor/core/text.ts: names a path no file has": 3,
 	"canvas/editor/dom/controller.ts: names a path no file has": 3,
-	"canvas/editor/dom/effects.ts: doc above another doc": 2,
+	"canvas/editor/dom/effects.ts: doc above another doc": 1,
 	"canvas/editor/dom/effects.ts: names a path no file has": 1,
 	"canvas/editor/dom/TextEditing.tsx: names a path no file has": 2,
 	"canvas/editor/index.ts: names a path no file has": 3,
