@@ -8,8 +8,8 @@ import { walk } from "./files.ts";
 // through a call, or claimed it since (a claim, or the person's resize). It is
 // news to the person when a file in its folder changed after they last read it.
 
-const CLAIMS = "claims/";
-const SEEN = "seen/";
+export const CLAIMS = "claims/";
+export const SEEN = "seen/";
 export type News = { by?: string; named?: number; changed?: number; seen?: number };
 
 /** What the person sees of a card's news: its writer and when, its last change, their last read. */

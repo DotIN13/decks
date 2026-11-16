@@ -10,8 +10,8 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
 - The card as an item kind (item.ts): `{ type: "card", card, title, box }` on a call, a `browser` node
   tagged `decks.card` in canvas.pen.
 - A card's page and its modules (page.ts), and the card runtime in a deck's `lib/` (lib.ts).
-- no-disk.test.ts: a client builds a card and a document by calls alone, with every feature
-  main.ts runs. Any feature may add its own test to it.
+- upgrade/: a deck from today brought up to these rules (rule 20), the only place old names are read.
+- no-disk.test.ts: a client builds a card and a document by calls alone, every feature running.
 
 ## May import
 
@@ -50,9 +50,9 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
    its bytes differ, and one this build no longer ships is removed.
 16. A card item given as html is written into a new folder of the canvas before it is placed.
 17. A card placed with no box takes the size its file declares (`<meta name="card">`), else 1000 by 600.
-18. A card resized on its canvas writes its new size into its file's meta tag, and its resizer is
-   its writer.
+18. A card resized on its canvas writes its new size into its file's meta tag; its resizer is its writer.
 19. A card is news when a file in its folder changed (`changed`) after the person read it (`seen`).
+20. A deck from today keeps its news, once: `.decks/authors.json` becomes claims, `seen.json` reads.
 
 ## Check
 

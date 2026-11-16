@@ -5,6 +5,7 @@ import { cardKindWith } from "./prepare.ts";
 import { followSizes } from "./resize.ts";
 import { syncLib, type LibSource } from "./lib.ts";
 import { routes } from "./page.ts";
+import { upgradeNews } from "./upgrade/news.ts";
 
 // The cards feature: every file in the deck, cards, a card's page, lib/.
 
@@ -18,6 +19,8 @@ export function cards(options: CardsOptions = {}): Feature {
 		calls: [...fileCalls, ...cardCalls(() => kernel)],
 		items: [cardKindWith(() => kernel?.deck)],
 		routes,
+		// A deck from today keeps its cards' bylines and what the person has read (upgrade/news.ts).
+		upgrade: (deck, _version, parts) => upgradeNews(deck, parts),
 		async start(given) {
 			kernel = given;
 			if (options.lib) await syncLib(options.lib, given.deck);
