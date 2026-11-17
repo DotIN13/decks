@@ -56,7 +56,7 @@ export const Agent = named(
 		avatarChanged: opt(str()),
 		outside: opt(obj({ client: str(), seen: num(), waiting: num() })),
 	}),
-	"Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how much is waiting for it. `outside` marks an agent that works in its own app (Claude Code, Codex): the app, when it last called, and how many messages wait for its next call.",
+	"Who works. `canvas` is the canvas the agent's chat has its camera on, where the person sees it; `state` and `queued` say what it is doing and how much is waiting for it. `outside` marks an agent that works in its own app (Claude Code, Codex): the app, when it last called, and how many messages wait for its next call.",
 );
 
 export const Message = named(

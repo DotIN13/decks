@@ -193,7 +193,7 @@ export function verbsJson() {
 }
 
 const GROUP_TITLES = {
-	canvas: "Canvas: every call takes { canvas }; left out, it is decks.here()",
+	canvas: "Canvas: every call names its { canvas }: an agent has no home canvas",
 	card: "Cards and the deck: files in the deck folder",
 	file: "Files, for a caller with no disk: with a shell, use your own tools on the deck folder instead",
 	agent: "Agent: you, or another agent",

@@ -56,7 +56,12 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 	const namedCards = (work: { cards?: string[] }): string[] | undefined => (work.cards ? [...new Set(work.cards)] : undefined);
 
 	return {
-		here: async () => canvasRow(canvasOf()),
+		// Where the person is looking in this chat: told, and no call's default (`context.ts`, `cameraCanvas`).
+		here: async () => {
+			const name = ctx.cameraCanvas();
+			if (!name) throw new Error("No canvas is open beside your chat yet. decks canvas list names the canvases; decks view goto <canvas> puts your chat's camera on one.");
+			return canvasRow(canvasOf(name));
+		},
 		agent: {
 			me: async () => me(),
 			update: async (patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }) => {

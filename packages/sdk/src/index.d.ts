@@ -54,9 +54,10 @@ export type TextEdit = { find: string; replace: string; all?: boolean };
 /** A line that matched a search: the file, the line's number from 1, and the line. */
 export type FileMatch = { path: string; line: number; text: string };
 /**
- * Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how
- * much is waiting for it. `outside` marks an agent that works in its own app (Claude Code, Codex):
- * the app, when it last called, and how many messages wait for its next call.
+ * Who works. `canvas` is the canvas the agent's chat has its camera on, where the person sees it;
+ * `state` and `queued` say what it is doing and how much is waiting for it. `outside` marks an
+ * agent that works in its own app (Claude Code, Codex): the app, when it last called, and how many
+ * messages wait for its next call.
  */
 export type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string; outside?: { client: string; seen: number; waiting: number } };
 /**
@@ -77,8 +78,9 @@ export type WebTarget = string | { ref: string } | { name: string; nth?: number 
 /** Every call Decks answers. */
 export interface Verbs {
 	/**
-	 * The canvas a call means when it names none: your home canvas for an agent, the card's canvas for
-	 * a card's button, the canvas on screen for the person. Asked, never set.
+	 * Where the person is looking: for an agent, the canvas its chat's camera is on, the one the person
+	 * sees beside it; for a card's button, the card's canvas; for the person, the canvas on screen.
+	 * Told, and never a default: an agent names the canvas in every canvas call.
 	 */
 	here(): Promise<Canvas>;
 	/**
@@ -250,11 +252,11 @@ export interface Verbs {
 		/** Every card in the deck, placed or not. */
 		list(): Promise<Card[]>;
 		/**
-		 * Write a blank card in a canvas's own cards/ (`canvas`, or your own canvas) and return it: a
-		 * folder, cards/<title>/, holding its index.html and whatever it keeps beside it (card.css,
-		 * chart.js, data.json). Placing it is the canvas's job (decks.canvas.insert({ type: "card", card:
-		 * path }, { beside })). The title is the finding, as a sentence; the card is a piece of HTML you
-		 * design, drawn in the canvas's own page.
+		 * Write a blank card in a canvas's own cards/ (name the `canvas`) and return it: a folder,
+		 * cards/<title>/, holding its index.html and whatever it keeps beside it (card.css, chart.js,
+		 * data.json). Placing it is the canvas's job (decks.canvas.insert({ type: "card", card: path }, {
+		 * beside })). The title is the finding, as a sentence; the card is a piece of HTML you design,
+		 * drawn in the canvas's own page.
 		 */
 		create(options: { title: string; w?: number; h?: number; canvas?: string }): Promise<Card>;
 		/** A card's path and title (the finding it states), and who last wrote it. */
@@ -267,9 +269,10 @@ export interface Verbs {
 	frame: {
 		/**
 		 * A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in
-		 * your canvas's own frames/. Placed on that canvas with { type: "ref", ref }; read and edited with
-		 * the canvas item calls given { frame: ref }. A frame from the deck's own frames/ placed on a
-		 * canvas is copied into it.
+		 * a canvas's own frames/ when the path starts with the canvas ("canvases/plan/frames/ui/button"),
+		 * else in the deck's own frames/, a library to place from. Placed on a canvas with { type: "ref",
+		 * ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck's
+		 * own frames/ placed on a canvas is copied into it.
 		 */
 		create(path: string, item?: PenItem): Promise<{ file: string; ref?: string; id: string }>;
 	};
@@ -320,14 +323,12 @@ export interface Verbs {
 		delete(path: string): Promise<{ deleted: string; trash: string }>;
 	};
 	agent: {
-		/** You: name, avatar, colour, workspace, tags and home canvas. */
+		/** You: name, avatar, colour, workspace and tags, and the canvas your chat's camera is on. */
 		me(): Promise<Agent>;
 		/**
 		 * Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the
-		 * project) or tags (up to four, for what you are doing now), or your home canvas: the one the app
-		 * shows beside you, and what decks.here() means for a call that names none. A new home is moved to
-		 * as view.goto moves: the screen follows when your chat is on screen, and the person is asked first
-		 * while they use the canvas. Set the first four early in every session.
+		 * project) or tags (up to four, for what you are doing now). `canvas` puts your chat's camera on a
+		 * canvas, as view.goto does. Set the first four early in every session.
 		 */
 		update(patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }): Promise<Agent>;
 		/** Say these cards carry your work, without showing them: you become their writer. */
@@ -365,33 +366,33 @@ export interface Verbs {
 		/**
 		 * Start a new agent, then send or queue it work. `kind` is the runtime ("claude", "pi", "opencode",
 		 * "opencode2", "antigravity"; yours when left out), `model` any model that kind runs, `thinking`
-		 * how hard it thinks as that kind names it, `mode` its permission mode, `canvas` its home canvas (a
-		 * new one when left out).
+		 * how hard it thinks as that kind names it, `mode` its permission mode, `canvas` the canvas the
+		 * camera of its chat starts on (the latest of its workspace, or a new one, when left out).
 		 */
 		create(spec: { name: string; kind?: "pi" | "claude" | "opencode" | "opencode2" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; workspace?: string; tags?: string[]; canvas?: string }): Promise<Agent>;
 	};
 	view: {
 		/**
-		 * Move your conversation to a canvas, as the person's canvas switcher does: it becomes your home
-		 * canvas, and the person's screen goes with it when your chat is the one on screen. In the
-		 * background it just moves, and the person sees it when they open your chat. While they are using
-		 * the canvas they are offered a button instead, and nothing moves until they press it. `moved` says
-		 * whether the screen went.
+		 * Put your chat's camera on a canvas: the person's screen goes there when your chat is the one on
+		 * screen. In the background the camera just moves, and the person sees that canvas when they open
+		 * your chat. While they are using the canvas they are offered a button instead, and nothing moves
+		 * until they press it. `moved` says whether the screen went. It changes nothing about where your
+		 * calls act: each names its canvas.
 		 */
 		goto(canvas: string): Promise<{ canvas: string; moved: boolean; note?: string }>;
 		/**
 		 * Move the camera to a card or a drawn item (a list frames them all), optionally outlining one
 		 * data-id block inside a card. `animate: true` glides. The canvas is the one named, else the one a
-		 * card's path names, else your own; one not your own is gone to first, as view.goto goes. In the
-		 * background your view waits for your chat; while the person is using the canvas they are offered a
-		 * button.
+		 * card's path names; your camera goes to that canvas first, as view.goto goes. In the background
+		 * your view waits for your chat; while the person is using the canvas they are offered a button.
 		 */
 		focus(target: string | string[], options?: { canvas?: string; highlight?: string; animate?: boolean }): Promise<{ canvas: string; target: string | string[]; deferred?: string }>;
 		/**
-		 * Open a canvas, a card, a document or an app whole, as a tab in the person's window: nobody moves,
-		 * and your home canvas stays yours. `what` is a canvas's name, a card's path, a document's path in
-		 * the deck, or an app's name; `kind` says which when a name could be two. From the chat on screen
-		 * the tab comes forward; from the background the person is offered a button that opens it.
+		 * Open a canvas, a card, a document or an app whole, as a tab in the person's window, and put your
+		 * chat's camera on it. `what` is a canvas's name, a card's path, a document's path in the deck, or
+		 * an app's name; `kind` says which when a name could be two. From the chat on screen the tab comes
+		 * forward; from the background it waits in your chat, and the person is offered a button that opens
+		 * it.
 		 */
 		open(what: string, options?: { kind?: "canvas" | "card" | "document" | "app" }): Promise<{ kind: "canvas" | "card" | "document" | "app"; target: string; opened: boolean; note?: string }>;
 		/** Where the person's screen is looking, and its zoom. */

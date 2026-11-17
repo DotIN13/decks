@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { namingCanvas } from "./names-canvas.test-helper.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -36,7 +37,9 @@ async function open() {
 	const agent = app.agents.focused();
 	const headers = { authorization: `Bearer ${app.bridge.issue(agent.id)}` };
 	type Answer = { ok: boolean; value?: any; error?: string; notes: string[] };
-	const call = async (verb: string, args: unknown[] = []): Promise<Answer> => {
+	// The agent's calls name the canvas it works on, the one its chat is on here (`names-canvas.test-helper.ts`).
+	const call = async (verb: string, given: unknown[] = []): Promise<Answer> => {
+		const args = namingCanvas(verb, given, agent.seat.stageName(true));
 		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
 		return (await response.json()) as Answer;
 	};

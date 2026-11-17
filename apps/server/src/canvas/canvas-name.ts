@@ -28,14 +28,14 @@ export function canvasNameReminder(pens: CanvasPens | undefined, stage: string |
 	if (boards.length === 0) return undefined;
 	const naming = pens.naming(stage);
 	if (!naming.title || naming.provisional) {
-		return `[Decks] Your canvas is called "${pens.titleOf(stage)}", which says nothing about what is on it. Name it for its content with decks canvas rename "…".`;
+		return `[Decks] The canvas beside your chat is called "${pens.titleOf(stage)}", which says nothing about what is on it. Name it for its content with decks canvas rename "…" --canvas ${stage}.`;
 	}
 	// Named before anything was on it: that was a choice about what would go there, and it stands.
 	const then = new Set(naming.boards ?? []);
 	if (then.size === 0) return undefined;
 	const fresh = boards.filter((path) => !then.has(path)).length;
 	if (fresh >= NEW_AT_LEAST && fresh > boards.length / 2) {
-		return `[Decks] Your canvas "${naming.title}" now holds mostly cards it did not have when it was named (${fresh} of ${boards.length}). If the name no longer fits, rename it with decks canvas rename "…"; to keep it, give it the same name again: decks canvas rename "${naming.title}".`;
+		return `[Decks] The canvas beside your chat, "${naming.title}", now holds mostly cards it did not have when it was named (${fresh} of ${boards.length}). If the name no longer fits, rename it with decks canvas rename "…" --canvas ${stage}; to keep it, give it the same name again: decks canvas rename "${naming.title}" --canvas ${stage}.`;
 	}
 	return undefined;
 }

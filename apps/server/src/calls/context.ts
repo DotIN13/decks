@@ -24,18 +24,25 @@ export interface VerbContext {
 	here(): ReturnType<CanvasService["boards"]>;
 	askedWorkspace(raw: unknown): string;
 	/**
-	 * The canvas a call means when it names none (`decks.here()`): the one the call says it was made
-	 * on (a person's or a board's `X-Decks-Stage`), else the caller's own: an agent's home canvas, the
-	 * canvas holding a board whose button is pressed.
+	 * The canvas a call means when it names none: the one the call says it was made on (a person's or a
+	 * card's `X-Decks-Stage`), the canvas showing an app, the canvas the person is looking at for their
+	 * own calls. None for an agent: an agent has no home canvas, and names the canvas in every call, so
+	 * its work lands where it meant whatever the person is looking at.
 	 */
 	hereCanvas(): string | undefined;
-	/** A canvas as a caller names it (folder, title, or `canvases/<name>/canvas.pen`), or `here()` when it names none. */
+	/** The canvas the camera of the caller's conversation is on (`decks.here()`): where the person is looking in that chat. Told, never a default. */
+	cameraCanvas(): string | undefined;
+	/** A canvas as a caller names it (folder, title, or `canvases/<name>/canvas.pen`); with none named, `hereCanvas()`, or for an agent a refusal that says to name one. */
 	canvasOf(asked?: unknown): string;
 	/** A canvas as the `Canvas` type has it: its name, title, who has it open, how many boards. */
 	canvasRow(name: string): { name: string; title: string; open: string[]; cards: number };
 	/** The canvas the request says it was made on, for this one call (`DecksTool.call`). */
 	callOn: { stage?: string };
 }
+
+/** What an agent is told when a canvas call names no canvas. */
+const NAME_A_CANVAS =
+	"Name the canvas this call works on: --canvas <name or title> (in a script, { canvas }). An agent has no home canvas, so its work lands where it says whatever the person is looking at. decks canvas list names them, decks canvas create makes one, and decks here says which one the person has open beside your chat.";
 
 export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; port: number }): VerbContext {
 	const { stage: service, agent, port } = deps;
@@ -100,13 +107,20 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 	const hereCanvas = (): string | undefined => {
 		const pens = service.pens;
 		if (callOn.stage && pens?.has(callOn.stage)) return callOn.stage;
+		if (agent.here) return agent.here();
+		// The person acts where they are looking. An agent has no canvas of its own to fall back on: it names one.
+		return agent.person ? agent.stageName?.() : undefined;
+	};
+	const cameraCanvas = (): string | undefined => {
+		const pens = service.pens;
+		if (callOn.stage && pens?.has(callOn.stage)) return callOn.stage;
 		return agent.here?.() ?? agent.stageName?.();
 	};
 	const canvasOf = (asked?: unknown): string => {
 		const pens = needPens();
 		if (asked === undefined || asked === null || asked === "") {
 			const name = hereCanvas();
-			if (!name) throw new Error("There is no canvas here to act on: name one with { canvas }. decks canvas list names them.");
+			if (!name) throw new Error(NAME_A_CANVAS);
 			return name;
 		}
 		if (typeof asked !== "string") throw new Error('canvas is a canvas\'s name or title, as in { canvas: "launch-plan" }.');
@@ -139,7 +153,7 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 			cards,
 		};
 	};
-	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, needWeb, needTarget, here, askedWorkspace, hereCanvas, canvasOf, canvasRow, callOn };
+	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, needWeb, needTarget, here, askedWorkspace, hereCanvas, cameraCanvas, canvasOf, canvasRow, callOn };
 }
 
 /** A board with its box as both corners, beside `x`, `y`, `w`, `h`, so a reader never adds a width. */

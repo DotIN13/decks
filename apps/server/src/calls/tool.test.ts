@@ -10,6 +10,7 @@ import { type CanvasServiceHost, CanvasService } from "../canvas/service.ts";
 import { createDecksTool } from "./tool.ts";
 import type { CreateSpec, QueuedWork, SendSpec } from "../agents/work.ts";
 import { CanvasPens } from "../canvas/pens.ts";
+import { onCanvas } from "./names-canvas.test-helper.ts";
 import { runCode } from "./run-code.test-helper.ts";
 
 /**
@@ -96,7 +97,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		...(options.stageful ? { boards: () => deck.boards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
 	});
 
-	const tool = createDecksTool({
+	// The agent in these tests works on its canvas, "ada", and its calls name it (`names-canvas.test-helper.ts`).
+	const tool = onCanvas(createDecksTool({
 		stage: service,
 		port: 4329,
 		agent: {
@@ -135,7 +137,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			boardPathOf: () => undefined,
 			stageName: () => "ada",
 		},
-	});
+	}), "ada");
 	/** The deck's canvases, which `card.create` and every canvas call need. */
 	const withPens = () => (service.pens ??= new CanvasPens(root, () => {}));
 	/** Put a board on the agent's canvas ("ada") at its file's size: `canvas.fit` measures at the width it has there. */

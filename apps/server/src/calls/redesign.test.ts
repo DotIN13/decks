@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { namingCanvas } from "./names-canvas.test-helper.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -40,8 +41,10 @@ async function open() {
 	// Who is calling is a token (`auth/guard.ts`): the agent's own, as its shell has it.
 	const as = (id: string) => ({ authorization: `Bearer ${app.bridge.issue(id)}` });
 	type Answer = { ok: boolean; value?: any; error?: string; notes: string[] };
-	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = as(agent.id)): Promise<Answer> => {
-		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
+	// The agent's own calls name the canvas it works on, the one its chat is on here (`names-canvas.test-helper.ts`); another caller's go as they are.
+	const call = async (verb: string, given: unknown[] = [], headers?: Record<string, string>): Promise<Answer> => {
+		const args = headers ? given : namingCanvas(verb, given, agent.seat.stageName(true));
+		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...(headers ?? as(agent.id)) }, body: JSON.stringify({ args }) });
 		return (await response.json()) as Answer;
 	};
 	const must = async (verb: string, args: unknown[] = [], headers?: Record<string, string>) => {
@@ -298,25 +301,26 @@ test("an arrow joined at both ends goes between them, with no note to say where"
 test("the item calls take a frame file instead of a canvas, and its change shows on the canvas placing it", async () => {
 	const { deck, must, call, cleanup } = await open();
 	try {
-		const made = (await must("frame.create", ["frames/card", { type: "frame", width: 200, height: "fit_content", layout: "vertical", children: [] }])).value;
 		const home = (await must("here")).value.name;
-		// Made in the caller's canvas's own frames/, and placed there by its ref.
+		// An agent names the canvas a frame is made in, in its path; it is placed there by its ref.
+		const FRAME = `canvases/${home}/frames/card`;
+		const made = (await must("frame.create", [FRAME, { type: "frame", width: 200, height: "fit_content", layout: "vertical", children: [] }])).value;
 		assert.deepEqual([made.file, made.ref], [`canvases/${home}/frames/card.pen`, "frames/card"]);
 		await must("canvas.insert", [{ type: "ref", id: "c", ref: "frames/card" }, { canvas: home, at: { x1: 0, y1: 0 } }]);
 		const rev = async () => (await must("canvas.read", [{ canvas: home }])).value.rev as number;
 		const before = await rev();
 
-		const read = (await must("canvas.read", [{ frame: "frames/card" }])).value;
-		assert.equal(read.frame, `canvases/${home}/frames/card.pen`, "frames/card is the caller's canvas's own");
+		const read = (await must("canvas.read", [{ frame: FRAME }])).value;
+		assert.equal(read.frame, `canvases/${home}/frames/card.pen`, "the canvas's own frame, by its path");
 		assert.deepEqual(read.items.map((one: { id: string }) => one.id), [made.id]);
 		// The same item shapes and answers as on a canvas.
-		const note = (await must("canvas.insert", [{ type: "text", id: "t1", content: "Hello" }, { frame: "frames/card", parent: made.id }])).value;
+		const note = (await must("canvas.insert", [{ type: "text", id: "t1", content: "Hello" }, { frame: FRAME, parent: made.id }])).value;
 		assert.equal(note.id, "t1");
 		assert.ok(note.box, "an inserted item answers with its box");
-		await must("canvas.update", ["t1", { set: { content: "Hello there" } }, { frame: "frames/card" }]);
-		const batch = (await must("canvas.batch", [[{ op: "insert", item: { type: "text", id: "t2", content: "Two" }, parent: made.id }, { op: "delete", id: "t1" }], { frame: "frames/card" }])).value;
+		await must("canvas.update", ["t1", { set: { content: "Hello there" } }, { frame: FRAME }]);
+		const batch = (await must("canvas.batch", [[{ op: "insert", item: { type: "text", id: "t2", content: "Two" }, parent: made.id }, { op: "delete", id: "t1" }], { frame: FRAME }])).value;
 		assert.deepEqual(batch.map((one: { id: string; type: string }) => [one.id, one.type]), [["t2", "text"], ["t1", "deleted"]]);
-		await must("canvas.variables", [{ ink: { type: "color", value: "#123456" } }, { frame: "frames/card" }]);
+		await must("canvas.variables", [{ ink: { type: "color", value: "#123456" } }, { frame: FRAME }]);
 		const file = JSON.parse(readFileSync(join(deck, "canvases", home, "frames", "card.pen"), "utf8"));
 		assert.deepEqual(file.children[0].children.map((one: { id: string }) => one.id), ["t2"], "the frame's own file is what changed");
 		assert.equal(file.variables.ink.value, "#123456");
@@ -326,7 +330,7 @@ test("the item calls take a frame file instead of a canvas, and its change shows
 
 		const both = await call("canvas.read", [{ canvas: home, frame: "frames/card" }]);
 		assert.ok(!both.ok && /canvas or a frame, not both/.test(both.error ?? ""), both.error);
-		const board = await call("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { frame: "frames/card" }]);
+		const board = await call("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { frame: FRAME }]);
 		assert.ok(!board.ok && /not cards/.test(board.error ?? ""), board.error);
 		const notFrame = await call("canvas.read", [{ frame: `canvases/${home}/canvas.pen` }]);
 		assert.ok(!notFrame.ok && /not a frame/.test(notFrame.error ?? ""), notFrame.error);

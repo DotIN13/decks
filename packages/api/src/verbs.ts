@@ -48,9 +48,11 @@ import {
  *   ports and the clock.
  * - `effect`: `change` if it changes what it touches, `read` if it only reads.
  *
- * Calls are stateless: every canvas call takes an optional `canvas`, and left out it means
- * `decks.here()`. No call changes a "current canvas"; `agent.update({ canvas })` changes an
- * agent's home canvas, which is what `here()` answers for that agent.
+ * Calls are stateless, and an agent has no home canvas: every canvas call an agent makes names its
+ * `canvas`, so its work lands where it says whatever the person is looking at. Left out, a call
+ * means a canvas only for a caller that is somewhere: the person (the canvas they are looking at),
+ * a card's button (the card's canvas), an app (a canvas showing it). What an agent has is a camera:
+ * the place the person sees beside its chat, which `here()` tells and `view.*` moves.
  */
 
 export type Effect = "change" | "read";
@@ -299,7 +301,7 @@ export const VERBS: readonly Verb[] = [
 		group: "card",
 		...deckChange,
 		summary:
-			'Write a blank card in a canvas\'s own cards/ (`canvas`, or your own canvas) and return it: a folder, cards/<title>/, holding its index.html and whatever it keeps beside it (card.css, chart.js, data.json). Placing it is the canvas\'s job (decks.canvas.insert({ type: "card", card: path }, { beside })). The title is the finding, as a sentence; the card is a piece of HTML you design, drawn in the canvas\'s own page.',
+			'Write a blank card in a canvas\'s own cards/ (name the `canvas`) and return it: a folder, cards/<title>/, holding its index.html and whatever it keeps beside it (card.css, chart.js, data.json). Placing it is the canvas\'s job (decks.canvas.insert({ type: "card", card: path }, { beside })). The title is the finding, as a sentence; the card is a piece of HTML you design, drawn in the canvas\'s own page.',
 		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
 		result: Card,
 	},
@@ -329,7 +331,7 @@ export const VERBS: readonly Verb[] = [
 		card: "canvas",
 		group: "card",
 		...deckChange,
-		summary: 'A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in your canvas\'s own frames/. Placed on that canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck\'s own frames/ placed on a canvas is copied into it.',
+		summary: 'A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in a canvas\'s own frames/ when the path starts with the canvas ("canvases/plan/frames/ui/button"), else in the deck\'s own frames/, a library to place from. Placed on a canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck\'s own frames/ placed on a canvas is copied into it.',
 		params: [p("path", str()), o("item", PenItem)],
 		result: obj({ file: str(), ref: opt(str()), id: str() }),
 	},
@@ -403,13 +405,13 @@ export const VERBS: readonly Verb[] = [
 	},
 
 	// --- agent: who works --------------------------------------------------------------------
-	{ name: "agent.me", card: "page", group: "agent", ...agentsRead, summary: "You: name, avatar, colour, workspace, tags and home canvas.", params: [], result: Agent },
+	{ name: "agent.me", card: "page", group: "agent", ...agentsRead, summary: "You: name, avatar, colour, workspace and tags, and the canvas your chat's camera is on.", params: [], result: Agent },
 	{
 		name: "agent.update",
 		group: "agent",
 		...agentsChange,
 		summary:
-			"Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the project) or tags (up to four, for what you are doing now), or your home canvas: the one the app shows beside you, and what decks.here() means for a call that names none. A new home is moved to as view.goto moves: the screen follows when your chat is on screen, and the person is asked first while they use the canvas. Set the first four early in every session.",
+			"Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the project) or tags (up to four, for what you are doing now). `canvas` puts your chat's camera on a canvas, as view.goto does. Set the first four early in every session.",
 		params: [p("patch", AgentPatch)],
 		result: Agent,
 	},
@@ -418,7 +420,7 @@ export const VERBS: readonly Verb[] = [
 		card: "frame",
 		group: "agent",
 		...agentsRead,
-		summary: "The canvas a call means when it names none: your home canvas for an agent, the card's canvas for a card's button, the canvas on screen for the person. Asked, never set.",
+		summary: "Where the person is looking: for an agent, the canvas its chat's camera is on, the one the person sees beside it; for a card's button, the card's canvas; for the person, the canvas on screen. Told, and never a default: an agent names the canvas in every canvas call.",
 		params: [],
 		result: Canvas,
 	},
@@ -468,7 +470,7 @@ export const VERBS: readonly Verb[] = [
 		group: "agent",
 		...agentsChange,
 		summary:
-			'Start a new agent, then send or queue it work. `kind` is the runtime ("claude", "pi", "opencode", "opencode2", "antigravity"; yours when left out), `model` any model that kind runs, `thinking` how hard it thinks as that kind names it, `mode` its permission mode, `canvas` its home canvas (a new one when left out).',
+			'Start a new agent, then send or queue it work. `kind` is the runtime ("claude", "pi", "opencode", "opencode2", "antigravity"; yours when left out), `model` any model that kind runs, `thinking` how hard it thinks as that kind names it, `mode` its permission mode, `canvas` the canvas the camera of its chat starts on (the latest of its workspace, or a new one, when left out).',
 		params: [p("spec", obj({ name: str(), kind: opt(AgentKind), model: opt(str()), thinking: opt(str()), mode: opt(AgentMode), workspace: opt(str()), tags: opt(arr(str())), canvas: opt(str()) }))],
 		result: Agent,
 	},
@@ -480,7 +482,7 @@ export const VERBS: readonly Verb[] = [
 		group: "view",
 		...screenChange,
 		summary:
-			"Move your conversation to a canvas, as the person's canvas switcher does: it becomes your home canvas, and the person's screen goes with it when your chat is the one on screen. In the background it just moves, and the person sees it when they open your chat. While they are using the canvas they are offered a button instead, and nothing moves until they press it. `moved` says whether the screen went.",
+			"Put your chat's camera on a canvas: the person's screen goes there when your chat is the one on screen. In the background the camera just moves, and the person sees that canvas when they open your chat. While they are using the canvas they are offered a button instead, and nothing moves until they press it. `moved` says whether the screen went. It changes nothing about where your calls act: each names its canvas.",
 		params: [p("canvas", str())],
 		result: obj({ canvas: str(), moved: bool(), note: opt(str()) }),
 	},
@@ -490,7 +492,7 @@ export const VERBS: readonly Verb[] = [
 		group: "view",
 		...screenChange,
 		summary:
-			"Move the camera to a card or a drawn item (a list frames them all), optionally outlining one data-id block inside a card. `animate: true` glides. The canvas is the one named, else the one a card's path names, else your own; one not your own is gone to first, as view.goto goes. In the background your view waits for your chat; while the person is using the canvas they are offered a button.",
+			"Move the camera to a card or a drawn item (a list frames them all), optionally outlining one data-id block inside a card. `animate: true` glides. The canvas is the one named, else the one a card's path names; your camera goes to that canvas first, as view.goto goes. In the background your view waits for your chat; while the person is using the canvas they are offered a button.",
 		params: [{ ...p("target", union(str(), arr(str()))), variadic: true }, onCanvas({ highlight: opt(str()), animate: opt(bool()) })],
 		result: obj({ canvas: str(), target: union(str(), arr(str())), deferred: opt(str()) }),
 	},
@@ -499,7 +501,7 @@ export const VERBS: readonly Verb[] = [
 		group: "view",
 		...screenChange,
 		summary:
-			"Open a canvas, a card, a document or an app whole, as a tab in the person's window: nobody moves, and your home canvas stays yours. `what` is a canvas's name, a card's path, a document's path in the deck, or an app's name; `kind` says which when a name could be two. From the chat on screen the tab comes forward; from the background the person is offered a button that opens it.",
+			"Open a canvas, a card, a document or an app whole, as a tab in the person's window, and put your chat's camera on it. `what` is a canvas's name, a card's path, a document's path in the deck, or an app's name; `kind` says which when a name could be two. From the chat on screen the tab comes forward; from the background it waits in your chat, and the person is offered a button that opens it.",
 		params: [p("what", str()), o("options", obj({ kind: opt(lit("canvas", "card", "document", "app")) }))],
 		result: obj({ kind: lit("canvas", "card", "document", "app"), target: str(), opened: bool(), note: opt(str()) }),
 	},

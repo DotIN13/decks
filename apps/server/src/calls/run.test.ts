@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { namingCanvas } from "./names-canvas.test-helper.ts";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -32,8 +33,10 @@ async function open() {
 	// The agent's own token, as its shell has it (`DECKS_TOKEN`): who is calling comes from this alone.
 	const token = app.bridge.issue(agent.id);
 	const bearer = (one: string) => ({ authorization: `Bearer ${one}` });
-	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = bearer(token)) => {
-		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
+	// The agent's own calls name the canvas it works on, the one its chat is on here (`names-canvas.test-helper.ts`); another caller's go as they are.
+	const call = async (verb: string, given: unknown[] = [], headers?: Record<string, string>) => {
+		const args = headers ? given : namingCanvas(verb, given, agent.seat.stageName(true));
+		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...(headers ?? bearer(token)) }, body: JSON.stringify({ args }) });
 		// A refusal at the gate is a sentence, not the verbs' JSON.
 		const text = await response.text();
 		let body: { ok: boolean; value?: unknown; error?: string; notes: string[] };
@@ -162,10 +165,58 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 		const env = { ...process.env, DECKS_TOKEN: "", ...decksEnv(Number(new URL(base).port), agent.id, token) };
 		const listed = await run("sh", ["-c", "decks card get canvases/t/cards/tall/index.html | head -c 2000"], { env });
 		assert.equal(JSON.parse(listed.stdout).path, "canvases/t/cards/tall/index.html");
-		const made = await run("sh", ["-c", 'decks card create --title "From the shell"'], { env });
-		assert.match(made.stdout, /canvases\/[^/]+\/cards\/from-the-shell\//);
+		// An agent has no home canvas: a canvas call that names none is refused, with how to name one.
+		await assert.rejects(run("sh", ["-c", 'decks card create --title "From the shell"'], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /Name the canvas this call works on: --canvas/.test(error.stderr));
+		// `decks here` says which canvas the person has open beside its chat; the call that names it goes through.
+		const here = JSON.parse((await run("sh", ["-c", "decks here"], { env })).stdout) as { name: string };
+		assert.equal(here.name, agent.seat.stageName(true));
+		const made = await run("sh", ["-c", `decks card create --title "From the shell" --canvas ${here.name}`], { env });
+		assert.match(made.stdout, new RegExp(`canvases/${here.name}/cards/from-the-shell/`));
 		assert.ok(made.stderr.trim().length > 0, `the notes reach the shell on stderr: ${made.stderr}`);
 		await assert.rejects(run("sh", ["-c", "decks card get"], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /card\.get needs card/.test(error.stderr));
+	} finally {
+		cleanup();
+	}
+});
+
+test("an agent names the canvas in every canvas call; the person's acts where they are looking", async () => {
+	const { app, base, agent, token, cleanup } = await open();
+	try {
+		const raw = async (verb: string, args: unknown[], headers: Record<string, string>) => {
+			const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
+			return (await response.json()) as { ok: boolean; value?: any; error?: string; notes?: string[] };
+		};
+		const asAgent = { authorization: `Bearer ${token}` };
+		const camera = agent.seat.stageName(true)!;
+		const other = app.pens.claim("Somewhere else");
+		// Every canvas call an agent makes with no canvas is refused, reading and writing alike, and nothing is written.
+		for (const [verb, args] of [["canvas.read", []], ["canvas.insert", [{ type: "note", content: "x" }]], ["canvas.batch", [[{ op: "insert", item: { type: "note", content: "x" } }]]], ["card.create", [{ title: "No canvas" }]], ["canvas.rename", ["A name"]], ["view.focus", ["some-item"]]] as Array<[string, unknown[]]>) {
+			const refused = await raw(verb, args, asAgent);
+			assert.ok(!refused.ok && /Name the canvas this call works on/.test(refused.error ?? ""), `${verb}: ${refused.error}`);
+		}
+		assert.equal((app.pens.get(camera).doc.children ?? []).length, 0, "nothing landed on the canvas its chat is on");
+		// Named, the call lands there, whichever canvas its chat's camera is on.
+		const there = await raw("canvas.insert", [{ type: "note", id: "n-there", content: "there" }, { canvas: other }], asAgent);
+		assert.ok(there.ok, there.error);
+		assert.deepEqual((app.pens.get(other).doc.children ?? []).map((one) => one.id), ["n-there"]);
+		// The camera moved by the person (their canvas switcher) changes nothing about where the agent's next call lands.
+		agent.seat.openStage(other);
+		const still = await raw("canvas.insert", [{ type: "note", id: "n-first", content: "first" }, { canvas: camera }], asAgent);
+		assert.ok(still.ok, still.error);
+		assert.deepEqual((app.pens.get(camera).doc.children ?? []).map((one) => one.id), ["n-first"]);
+		// `here` tells where the person is looking in its chat, now the other canvas: told, not a default.
+		assert.equal((await raw("here", [], asAgent)).value?.name, other);
+		assert.ok(!(await raw("canvas.read", [], asAgent)).ok, "and a call with no canvas is still refused");
+		// A card's own path names its canvas: fit and focus need no canvas beside it.
+		const card = await raw("card.create", [{ title: "Named", canvas: camera }], asAgent);
+		assert.ok(card.ok, card.error);
+		const fit = await raw("canvas.fit", [card.value.path], asAgent);
+		assert.ok(!/Name the canvas/.test(fit.error ?? ""), fit.error);
+		// The person's own call, with no canvas, acts on the canvas they are looking at in that chat.
+		const person = { authorization: `Bearer ${app.tokens.issue({ kind: "person" }, { label: "run test" }).token}`, "x-decks-agent": agent.id };
+		const mine = await raw("canvas.insert", [{ type: "note", id: "n-person", content: "mine" }], person);
+		assert.ok(mine.ok, mine.error);
+		assert.ok((app.pens.get(other).doc.children ?? []).some((one) => one.id === "n-person"), "on the canvas the chat's camera is on");
 	} finally {
 		cleanup();
 	}

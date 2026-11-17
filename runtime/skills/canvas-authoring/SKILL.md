@@ -14,7 +14,7 @@ as it is, and every type and field here is pen's, untranslated. It holds two kin
   path is the canvas's own folder's, so the folder stands alone and can be shared whole. Every canvas
   call reads and writes it as **`{ type: "card", card: "canvases/<name>/cards/<card>/index.html" }`**,
   its path in the deck, and takes a card's path wherever it takes an item's id. Make it with
-  `decks.card.create` (it goes in your canvas's `cards/`, or `{ canvas }`'s), then place it with
+  `decks.card.create({ title, canvas })` (it goes in that canvas's `cards/`), then place it with
   `decks.canvas.insert({ type: "card", card: path }, { beside })`; `canvas.move`, `canvas.update`
   (`{ size: { w, h } }`) and `canvas.delete` (the folder stays) do the rest, or put it inside a frame.
 - **Apps and documents** are items with no file of their own: `{ type: "app", app: "<name>" }` shows an
@@ -45,24 +45,31 @@ bash: `decks canvas read`, `decks canvas insert '{…}' --beside <id>`, `decks c
 
 ## Canvases
 
-Every canvas call takes `{ canvas }` last: a canvas's folder name or its title. Left out, it is
-`decks.here()`, your home canvas, the one the person sees beside you. The first three move nobody:
+Every canvas call takes `{ canvas }` last: a canvas's folder name or its title. **An agent has no
+home canvas, so it is never left out**: a call that names none is refused. Your work lands on the
+canvas you name, while the person looks wherever they like. Choose it when a piece of work starts,
+and keep to it:
 
 ```ts
-await decks.canvas.list();                    // every canvas: { name, title, open: [agents], cards }
-await decks.canvas.create("Launch plan");     // a new, empty canvas; nobody is moved to it
-await decks.canvas.read({ canvas: "deploy" }); // another canvas, read where it is
-await decks.view.goto("deploy");              // move your conversation there: it becomes your home
+const here = (await decks.here()).name;        // the canvas the person has open beside your chat
+await decks.canvas.list();                     // every canvas: { name, title, open: [agents], cards }
+await decks.canvas.create("Launch plan");      // a new, empty canvas; nobody's camera moves to it
+await decks.canvas.read({ canvas: here });     // every call names its canvas
+await decks.view.goto("deploy");               // put your chat's camera on a canvas
 ```
 
-`view.goto` does what the person's canvas switcher does, for your conversation only: when your chat is
-the one on screen, the screen goes with you; in the background you just move, and the person sees it
-when they open your chat; while they are using the canvas they get a button instead, and nothing moves
-until they press it (`moved: false`, with a note). `agent.update({ canvas })` moves you the same way.
-`view.focus` on a card of another canvas goes there first by the same rule.
+In the examples below a call that shows no `{ canvas }` has it left out for room: yours names one.
 
-Two agents with one home canvas share its cards and its drawing. Make a new canvas for a new
-piece of work; make an old one your home to continue it.
+What you have in place of a home is a camera: the tab the person sees beside your chat. `view.goto`
+puts it on a canvas: when your chat is the one on screen, the screen goes there; in the background
+it just moves, and the person sees that canvas when they open your chat; while they are using the
+canvas they get a button instead, and nothing moves until they press it (`moved: false`, with a
+note). `view.focus` on a card goes to the card's canvas first by the same rule, and `view.open`
+opens a canvas, a card, a document or an app whole, as a tab. None of them changes where your
+calls act.
+
+Two agents naming one canvas share its cards and its drawing. Make a new canvas for a new piece
+of work; name an old one to continue it.
 
 **A friend's canvas.** A canvas shared with you through Decks Studio is named `shared/<owner>/<canvas>`
 (`canvas.list` gives `shared: { owner, role }`) and lives in `shared/canvases/<owner>/<canvas>/`, the

@@ -70,8 +70,8 @@ Everything that used to be a board is a card. A board file left in a deck from b
 - Patterns that work: a highlighted row in a comparison table; before and after side by side; a
   sequence diagram with three lifelines; a row of large numbers with a one-line label each; one
   chart with a labelled axis and the winning series in the accent colour.
-- Then `decks canvas insert --type card --card <path> --beside <id or path>` (or `--below`,
-  `--at.x1 --at.y1`) puts it on your canvas, and `decks canvas fit <path>` sizes it. `fit` reports the
+- Then `decks canvas insert --type card --card <path> --canvas <name> --beside <id or path>` (or
+  `--below`, `--at.x1 --at.y1`) puts it on the canvas you name, and `decks canvas fit <path>` sizes it. `fit` reports the
   height, the word count, the smallest type and any content wider than the card. Fix what it says is
   over; when it says "One screen", stop.
 

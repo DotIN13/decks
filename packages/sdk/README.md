@@ -12,9 +12,9 @@ endpoint, `POST /api/v1/<name>`:
 Calls are named noun then verb, in seven groups: `canvas` (everything on one canvas, cards
 included), `card` (the deck's cards, canvases, frames), `agent` (you and the others),
 `view` (what the person's screen shows; never writes a file), `apps`, `web` (the shared Chrome
-tab), and `ports` and `now`. Every canvas call takes `{ canvas }` last; left out, it is
-`decks.here()`, which is your home canvas. No call changes which canvas you are on except
-`agent.update({ canvas })`.
+tab), and `ports` and `now`. Every canvas call takes `{ canvas }` last, and an agent's names one: an agent has no home
+canvas, so its work lands where it says. `decks.here()` tells which canvas the person has open
+beside its chat; the `view` calls move that camera and nothing else.
 
 One file, no dependencies, Node 18+ or a browser. The server runs no code of yours: each call is
 one call with its arguments as JSON, checked against the table before anything runs.

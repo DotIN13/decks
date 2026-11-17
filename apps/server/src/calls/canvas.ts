@@ -1,4 +1,5 @@
 import { copySharedCanvas } from "../canvas/copy-shared.ts";
+import { canvasOfPath } from "./move-home.ts";
 import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../canvas/canvas-files.ts";
@@ -583,7 +584,8 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				return pens.log.steps(name);
 			},
 			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
-				const name = canvasOf(options?.canvas);
+				// The canvas named; else, for an agent, the one the card's own path names (a card says where it is); the person's fit is where they are looking.
+				const name = canvasOf(options?.canvas ?? (!ctx.agent.person && typeof board === "string" ? canvasOfPath(board) : undefined));
 				const { board: sized, canvas, said } = await fitOn(ctx, board, name, options?.margin);
 				return { card: sized.path, canvas, w: sized.w, h: sized.h, notes: said };
 			},
