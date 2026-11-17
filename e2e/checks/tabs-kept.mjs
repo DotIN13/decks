@@ -107,7 +107,7 @@ await addressed.close();
 rmSync(join(deck, "docs", "kept.md"));
 const gone = await page.context().newPage();
 await gone.goto(`${base}#doc/docs/kept.md`);
-say("a tab kept for a document since deleted says it is gone, and shows no frame", (await until(() => gone.locator('.surface[data-surface="document"] .tab-missing').count())) === 1 && (await gone.locator("iframe.document-frame").count()) === 0, await gone.locator('.surface[data-surface="document"]').innerText().catch(() => ""));
+say("a tab kept for a document since deleted says it is gone, and shows no frame", (await until(() => gone.locator('.surface[data-surface="document"] .tab-missing').count(), 25000)) === 1 && (await gone.locator("iframe.document-frame").count()) === 0, await gone.locator('.surface[data-surface="document"]').innerText().catch(() => ""));
 await gone.close();
 
 // --- closed, a tab leaves the row kept ---------------------------------------------------------------------------

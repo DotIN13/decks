@@ -65,6 +65,8 @@ export function rememberTabs(): void {
 		const asked = tabAt(location.hash);
 		if (asked) openTab(asked.kind, asked.target);
 	};
+	/** The tab the page's address named when it was opened, until it has been opened: read now, before the address is put in step with the row. */
+	let opening = tabAt(location.hash);
 	createEffect(() => {
 		const deck = state.deck?.path;
 		if (!deck) return;
@@ -79,11 +81,12 @@ export function rememberTabs(): void {
 	 * which the page learns a moment after the deck, so it waits for one (a deck with no agent has none
 	 * to wait for, and no tab is anyone's).
 	 */
-	let addressed = false;
+	const [addressed, setAddressed] = createSignal(opening === undefined);
 	createEffect(() => {
-		if (addressed || !loaded() || !state.focused) return;
-		addressed = true;
-		openAddressed();
+		if (addressed() || !loaded() || !state.focused) return;
+		if (opening) openTab(opening.kind, opening.target);
+		opening = undefined;
+		setAddressed(true);
 	});
 	createEffect(() => {
 		const key = loaded();
@@ -94,6 +97,8 @@ export function rememberTabs(): void {
 		} catch {
 			/* a browser that keeps nothing: the row lasts as long as the page */
 		}
+		// Not before the tab the address came with has been opened: it would be written over.
+		if (!addressed()) return;
 		const address = addressOf(front());
 		if (location.hash !== address) history.replaceState(history.state, "", `${location.pathname}${location.search}${address}`);
 	});

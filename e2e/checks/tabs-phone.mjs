@@ -39,6 +39,30 @@ const plan = card("plan");
 await call("view.open", [plan]);
 say("a tab opened shows as one chip with the count, washed while it is in front, on the screen with the +", (await until(() => fold.count())) === 1 && (await fold.innerText()).trim() === "1" && (await fold.getAttribute("data-front")) === "true" && (await within(fold)) && (await within(plus)) && (await page.locator(".tab-chip[data-kind]").count()) === 0, await fold.innerText().catch(() => ""));
 say("the card fills the screen under the bar", (await until(() => page.locator('.surface[data-surface="card"] iframe.card-frame').count())) === 1);
+// A card wider than the phone is fitted to its width, whole; a button shows it at its own size.
+const inCard = async (run) => {
+	for (const one of page.frames()) {
+		if (one === page.mainFrame()) continue;
+		if (await one.evaluate(() => !!document.querySelector(".card-tab")).catch(() => false)) return one.evaluate(run);
+	}
+	return undefined;
+};
+const cardAt = () => inCard(() => {
+	const box = document.querySelector(".card-tab-card").getBoundingClientRect();
+	return { left: box.left, right: box.right, window: innerWidth, scale: Number(document.querySelector(".card-tab").dataset.scale), button: document.querySelector(".card-tab-fit")?.textContent ?? null };
+});
+const fitted = await until(async () => {
+	const at = await cardAt();
+	return at && at.scale < 1 ? at : undefined;
+});
+say("a card wider than the phone is fitted to its width, with nothing cut off at the edge", !!fitted && fitted.left >= 0 && fitted.right <= fitted.window && /%$/.test(fitted.button ?? ""), JSON.stringify(fitted));
+await inCard(() => document.querySelector(".card-tab-fit").click());
+const full = await until(async () => {
+	const at = await cardAt();
+	return at && at.scale === 1 ? at : undefined;
+});
+say("…and its button shows it at its own size, wider than the window, and offers Fit", !!full && full.right > full.window && full.button === "Fit", JSON.stringify(full));
+await inCard(() => document.querySelector(".card-tab-fit").click());
 await call("view.open", ["phone-app"]);
 await until(async () => ((await fold.innerText()).trim() === "2" ? true : undefined));
 const appFrame = () => page.frames().find((one) => !one.isDetached() && one.url().includes("/app/t/") && one.url().includes("/phone-app/"));
@@ -53,9 +77,23 @@ await until(async () => (await page.evaluate(() => localStorage.getItem("decks.a
 // --- the chip opens the tabs as a list --------------------------------------------------------------------------
 await fold.tap();
 const rows = page.locator(".tab-row");
-say("the chip opens the tabs as a list: home first, then each, the one in front marked", (await until(async () => ((await rows.count()) === 3 ? true : undefined))) === true && (await rows.nth(0).innerText()).includes("Home") && (await rows.nth(1).getAttribute("data-kind")) === "card" && (await rows.nth(2).getAttribute("data-kind")) === "app" && (await rows.nth(2).getAttribute("data-current")) === "true", (await rows.allInnerTexts()).join(" | "));
+// The list is placed a frame after it is made: read once its first row can be seen.
+await until(async () => ((await rows.count()) === 3 && (await rows.nth(0).innerText()).includes("Home") ? true : undefined));
+say("the chip opens the tabs as a list: home first, then each, the one in front marked", (await rows.count()) === 3 && (await rows.nth(0).innerText()).includes("Home") && (await rows.nth(1).getAttribute("data-kind")) === "card" && (await rows.nth(2).getAttribute("data-kind")) === "app" && (await rows.nth(2).getAttribute("data-current")) === "true", (await rows.allInnerTexts()).join(" | "));
 await rows.nth(0).tap();
 say("home picked comes forward, and the chip is no longer washed", (await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await fold.getAttribute("data-front")) === null ? true : undefined))) === true);
+
+// --- the side panel open: the bars and the tool row go aside with it, the + still there ---------------------------
+await page.locator('.v3-topbar [aria-label="Show the side panel"]').first().tap();
+const aside = await until(async () => {
+	const panel = await page.locator(".panel-shell").boundingBox();
+	const row = await page.locator(".frame-tool-row").boundingBox();
+	const bar = await page.locator(".v3-topbar").boundingBox();
+	return panel && row && bar && panel.width > 200 && Math.abs(row.x - bar.x) <= 2 && row.x >= panel.x + panel.width ? { panel: panel.width, row: row.x, bar: bar.x } : undefined;
+}, 6000);
+say("with the side panel open the canvas's tool row goes aside with the bars, not over the panel", !!aside, JSON.stringify(aside ?? { row: await page.locator(".frame-tool-row").boundingBox(), panel: await page.locator(".panel-shell").boundingBox() }));
+await page.locator('.panel-shell [aria-label="Hide the side panel"]').first().tap();
+await until(async () => (((await page.locator(".v3-topbar").boundingBox())?.x ?? 99) < 20 ? true : undefined));
 
 // --- the budget: no app runs behind the front tab on a phone ----------------------------------------------------
 say("behind home the app is put away: a phone keeps none running", (await until(async () => ((await page.locator("iframe.app-frame").count()) === 0 ? true : undefined))) === true && (await fold.innerText()).trim() === "2");

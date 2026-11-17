@@ -57,7 +57,7 @@ export function Top(props: { parts: Parts }) {
 				{...(homeCanvas() ? { stage: homeCanvas()!.title } : {})}
 				home={{ front: homeInFront(), show: () => showTab("home") }}
 				/* A chip is about 150 px: the row folds into one chip when the bar, beside the side panel, has room for fewer than there are; always on a phone. */
-				tabs={<TabStrip room={phone() ? 0 : Math.max(0, Math.floor((layout.viewWidth() - (panelOpen() ? 360 : 0) - 600) / 150))} />}
+				tabs={<TabStrip phone={phone()} room={phone() ? 0 : Math.max(0, Math.floor((layout.viewWidth() - (panelOpen() ? 360 : 0) - 600) / 150))} />}
 				{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
 				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
 				{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}

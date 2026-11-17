@@ -14,10 +14,10 @@ import { canvasOnScreen, closeTab, front, homeCanvas, homeInFront, openTab, show
 
 /**
  * The row folded: one chip with how many tabs are open beside home, washed while one of them is in
- * front, that opens them as a list: home first, then each with its ✕. What a phone's bar shows, and
- * any bar with more tabs than it has room for.
+ * front and, off a phone, naming that one, that opens them as a list: home first, then each with its
+ * ✕. What a phone's bar shows, and any bar with more tabs than it has room for.
  */
-function TabFold(): JSX.Element {
+function TabFold(props: { /** Room to name the tab in front beside the count: not on a phone. */ named: boolean }): JSX.Element {
 	const others = () => tabs().filter((tab) => tab.target !== undefined);
 	const titleOf = (tab: Tab) => kindOf(tab.kind)?.title(tab) ?? tab.target ?? "";
 	return (
@@ -28,6 +28,11 @@ function TabFold(): JSX.Element {
 			trigger={(popover) => (
 				<button type="button" class="tab-chip tab-fold" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-front={homeInFront() ? undefined : "true"} data-tip="Tabs" aria-label={`${others().length} ${others().length === 1 ? "tab" : "tabs"} open beside home`} onClick={popover.toggle}>
 					<span class="tab-fold-count">{others().length}</span>
+					{/* Which of them is in front, where the bar has room to say: its mark and its name. */}
+					<Show when={props.named && !homeInFront()}>
+						<Show when={kindOf(front().kind)}>{(kind) => <Dynamic component={kind().icon} size={16} />}</Show>
+						<span class="v3-canvas-name">{titleOf(front())}</span>
+					</Show>
 				</button>
 			)}
 		>
@@ -58,13 +63,13 @@ function TabFold(): JSX.Element {
  * conversation's canvas and opens the canvas list): each other tab with its kind's mark, its name and
  * a ✕, and the + that opens one. A press brings a tab forward; nothing here moves an agent.
  */
-export function TabStrip(props: { /** How many chips the bar has room for: with more tabs than that, the row folds into one chip that lists them. None on a phone. */ room: number }): JSX.Element {
+export function TabStrip(props: { /** How many chips the bar has room for: with more tabs than that, the row folds into one chip that lists them. None on a phone. */ room: number; /** A phone: the folded chip is the count alone. */ phone: boolean }): JSX.Element {
 	const others = () => tabs().filter((tab) => tab.target !== undefined);
 	const folded = () => others().length > props.room;
 	return (
 		<>
 			<Show when={folded() && others().length > 0}>
-				<TabFold />
+				<TabFold named={!props.phone} />
 			</Show>
 			<For each={folded() ? [] : others()}>
 				{(tab) => {

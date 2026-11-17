@@ -250,8 +250,8 @@ body {
 		min-width: 0;
 		flex: 0 1 auto;
 	}
-	/* Tight, the bar drops the agent's kind and its +, which the canvas menu also has (New canvas). */
-	.app[data-tight-top] .v3-topbar :is(.v3-agent-kind, .v3-canvas-chip ~ .v3-icon) {
+	/* Tight, the bar drops the agent's kind; the tabs' chip and the + that opens one stay, and the canvas's name gives way. */
+	.app[data-tight-top] .v3-topbar .v3-agent-kind {
 		display: none;
 	}
 	.v3-canvas-name {
@@ -318,7 +318,9 @@ body {
 	}
 	/* The row folded into one chip (`tabs/TabStrip.tsx`, `TabFold`): how many tabs are open, in a small square, as a phone's browser shows it. */
 	.tab-fold {
-		flex: none;
+		min-width: 0;
+		flex: 0 1 auto;
+		gap: 6px;
 		padding: 0 7px;
 		border: 0;
 		background: transparent;
@@ -327,6 +329,7 @@ body {
 	}
 	.tab-fold-count {
 		display: grid;
+		flex: none;
 		min-width: 18px;
 		height: 18px;
 		padding: 0 3px;
@@ -1787,6 +1790,20 @@ body {
 		right: auto;
 		left: calc(var(--inset-left, 0px) + 8px);
 		width: calc(100vw - 16px);
+		transition: left 200ms ease;
+	}
+	/* The canvas's tool row goes with them: it stood where it was, over the open panel. */
+	.app[data-phone="true"] .frame-tool-row {
+		right: auto;
+		left: calc(var(--inset-left, 0px) + 8px);
+		width: calc(100vw - 16px);
+		transition: left 200ms ease;
+	}
+	/* So does a card, a document or an app in a tab: pushed aside whole, at the screen's width, not squeezed into the strip beside the panel. */
+	.app[data-phone="true"] .surface:is([data-surface="card"], [data-surface="document"], [data-surface="app"]) {
+		right: auto;
+		left: var(--inset-left, 0px);
+		width: 100vw;
 		transition: left 200ms ease;
 	}
 }

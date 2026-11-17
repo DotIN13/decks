@@ -32,19 +32,21 @@ const plan = card("plan");
 const { browser, page, errors } = await open({ width: 2000, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-// The agent whose chat the page opens on, by the name on its chip; and every agent there is before another is made.
-const firstName = (await page.locator(".v3-topbar .v3-agent-name").first().innerText()).trim();
+// Every agent there is before another is made.
 const agentsNow = () => link.last("agent.list")?.chats ?? [];
+await until(() => agentsNow().length > 0);
 const before = new Set(agentsNow().map((one) => one.id));
-const first = agentsNow().find((one) => one.name === firstName)?.id;
+// The agent whose chat the page opens on, by the name on its chip.
+const nameOnChip = async () => (await page.locator(".v3-topbar .v3-agent-name").first().innerText()).trim();
+const firstName = await nameOnChip();
 const chips = () => page.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
 const homeFront = async () => (await page.locator(".v3-topbar .v3-canvas-chip").getAttribute("data-front")) === "true";
 const reading = async () => Number((await page.locator(".v3-zoom-value").first().textContent()).replace(/[^0-9.]/g, ""));
-/** Open an agent's chat from the agent list, by name. */
+/** Open an agent's chat from the agent list, by the name the page shows for it. */
 const openChat = async (name) => {
 	await openAgents(page);
-	await page.locator('.popover [data-row][data-flat="true"]').filter({ hasText: name }).first().click();
-	await until(async () => ((await page.locator(".v3-topbar .v3-agent-name").first().innerText()).trim() === name ? true : undefined));
+	await page.locator('.popover [data-row][data-agent="true"]').filter({ hasText: name }).first().click();
+	await until(async () => ((await nameOnChip()) === name ? true : undefined));
 	await settle(page, 400);
 };
 
@@ -55,8 +57,12 @@ say("with the first agent, a card opened is the tab in front", JSON.stringify(aw
 // --- another agent: its camera is on its own canvas; the card's tab stays in the row --------------------------------
 await newAgent(page, "pi");
 const other = await until(() => agentsNow().map((one) => one.id).find((id) => !before.has(id)));
-const otherName = agentsNow().find((one) => one.id === other)?.name;
-say("two agents to tell apart", !!first && !!other && first !== other && !!otherName && otherName !== firstName, JSON.stringify({ firstName, otherName }));
+// The page opens the new agent's chat, and its chip says its name.
+const otherName = await until(async () => {
+	const name = await nameOnChip();
+	return name && name !== firstName ? name : undefined;
+}, 15000);
+say("two agents to tell apart, by the names the page shows", !!other && !!otherName, JSON.stringify({ firstName, otherName }));
 say("a second agent opens on its own canvas: home in front, the card's tab still in the row", (await until(async () => ((await homeFront()) && JSON.stringify(await chips()) === '["card"]' ? true : undefined))) === true, JSON.stringify([await chips(), await homeFront()]));
 await openChat(firstName);
 say("the first agent opened again: its camera is on the card, which is in front", (await until(async () => (JSON.stringify(await chips()) === '["card*"]' ? true : undefined))) === true, JSON.stringify(await chips()));
