@@ -34,7 +34,6 @@ export function feedEngine(d: FeedEngineNeeds) {
 	});
 
 	d.penLayer.drawn = () => {
-		d.editor.textEditing.drawn();
 		/*
 		 * The answer to a drag has been drawn: the layout is where the drag left things, so the offset
 		 * goes (`editor/core/gesture.ts`, `drawn`). Not when the answer *arrives* — the layout is only

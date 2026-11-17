@@ -12,7 +12,6 @@ export interface TextCommitNeeds {
 	readonly host: TextHost;
 	readonly unmuteNow: () => void;
 	readonly dropTyped: () => void;
-	readonly unmute: { id: string; value: string; timer: ReturnType<typeof setTimeout>; } | undefined;
 	typedValue: { id: string; value: string; } | undefined;
 	readonly showTyped: () => void;
 	readonly measurePictures: (markdown: string) => Promise<void>;
@@ -43,7 +42,6 @@ export function createTextCommit(d: TextCommitNeeds) {
 				return d.dropTyped();
 		}
 		const session = now!;
-		if (d.unmute) clearTimeout(d.unmute.timer);
 		/*
 		 * The words as typed are drawn at once, from a copy of the drawing (`showTyped`), and the canvas
 		 * may draw them now: the editor's still copy stands over them until that frame is on screen. It

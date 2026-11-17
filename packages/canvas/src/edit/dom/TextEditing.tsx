@@ -10,11 +10,11 @@
  *
  * Also the openers a double-click or a double tap reaches for that are not words: a file's chip.
  */
-import { isCard, type Op, type PenDocument, type PenNode } from "@decks/pen";
+import { type Op, type PenDocument, type PenNode } from "@decks/pen";
 import { isScribbleCatch, ScribbleCatch } from "@decks/ui";
 import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { setPenTyping } from "../pen-tools.ts";
-import { cardMarkdown, CARD_PAD } from "../../model/card-frame.ts";
+import { CARD_PAD } from "../../model/card-frame.ts";
 import { CardEditor } from "../../cards/CardEditor.tsx";
 import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../look/look.ts";
 import type { NextId } from "../core/ops.ts";
@@ -97,14 +97,8 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		const now = open();
 		return now ? (host.scene.item(now.id)?.box ?? now.box) : undefined;
 	});
-	/*
-	 * The canvas leaves the words out until it draws the new ones: taking the editor away before the
-	 * server's answer has been drawn shows the old words for a moment, and then the new.
-	 */
-	let unmute: { id: string; value: string; timer: ReturnType<typeof setTimeout> } | undefined;
+	/** The words are the canvas's to draw again. */
 	const unmuteNow = () => {
-		if (unmute) clearTimeout(unmute.timer);
-		unmute = undefined;
 		host.engine.muteText(undefined);
 		// The canvas draws the words on its next frame: the editor's still copy goes then, not before.
 		if (textGhost.editorGhost) textGhost.ghostUntil = host.engine.mark();
@@ -119,7 +113,6 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		host,
 		unmuteNow,
 		dropTyped,
-		get unmute() { return unmute; },
 		get typedValue() { return typedPreview.typedValue; },
 		set typedValue(next) { typedPreview.typedValue = next; },
 		showTyped,
@@ -140,8 +133,6 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		const ops = cancelOps(now);
 		if (ops.length) host.edit(ops);
 	};
-	/** The words an item holds, for telling when the canvas has drawn a save: a card's are its blocks'. */
-	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
 
 	return {
 		/** The words open for typing, if any. */
@@ -161,10 +152,6 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		commit: commitPenText,
 		cancel,
 		base: () => host.pen()?.base ?? "",
-		/** The engine laid the drawing out: words saved and drawn are the canvas's to draw again. */
-		drawn: () => {
-			if (unmute && wordsOf(host.scene.item(unmute.id)?.node) === unmute.value) unmuteNow();
-		},
 		/** The sheet put a frame on screen: the still copy goes once the words are in one. */
 		presented: () => {
 			if (textGhost.ghostUntil !== undefined && host.engine.shows(textGhost.ghostUntil)) dropGhost();
