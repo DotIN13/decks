@@ -210,6 +210,24 @@
 			background-color 120ms ease,
 			border-color 120ms ease;
 	}
+	/* The tab a message says it was written on (`tabs/about.ts`): the recipient's chip, quieter, struck out when left out. */
+	.dock-about {
+		max-width: 220px;
+		gap: 4px;
+		padding: 0 6px;
+	}
+	.dock-about-word {
+		color: var(--faint);
+	}
+	.dock-about-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dock-about[aria-pressed="false"] .dock-about-name {
+		color: var(--faint);
+		text-decoration: line-through;
+	}
 	.dock-to-chip:hover,
 	.dock-to-chip[aria-expanded="true"] {
 		border-color: var(--line-strong);

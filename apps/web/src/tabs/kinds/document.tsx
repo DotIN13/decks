@@ -19,6 +19,7 @@ export const documentKind: TabKind = {
 	name: "document",
 	address: "doc",
 	title: (tab) => nameOf(tab.target),
+	says: (tab) => (tab.target ? `the document @${tab.target}` : undefined),
 	icon: (props) => <Icon of={SquarePen} size={props.size ?? 16} />,
 	view: (tab, parts) => (
 		<Show when={tab()} keyed>

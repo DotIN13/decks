@@ -26,6 +26,11 @@ export interface TabKind {
 	address: string;
 	/** What a tab of this kind is called in the row. */
 	title(tab: Tab): string | undefined;
+	/**
+	 * What a message written while a tab of this kind is in front says the person was looking at, as
+	 * the agent reads it: what it is, by the name an agent can act on (`about.ts`).
+	 */
+	says(tab: Tab): string | undefined;
 	/** Its mark in the row. */
 	icon: Component<{ size?: number }>;
 	/**

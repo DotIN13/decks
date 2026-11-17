@@ -4,6 +4,7 @@ import type { Draft } from "@decks/agent-ui/composer";
 import { withComments } from "../markup/comments.ts";
 import { takeComments } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
+import { aboutLine } from "../tabs/about.ts";
 import { notice } from "../state/notices.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { destination, stripMention, withoutName } from "./send-from-bar.ts";
@@ -54,10 +55,16 @@ export function createBar(names: BarNames) {
 				 */
 				const stage = canvasOnScreen()?.name;
 				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
-				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : {};
+				/*
+				 * Written on a tab that is not home: the agent's text says what the person was looking at
+				 * (`tabs/about.ts`), and the message is kept as it was written, without that line.
+				 */
+				const about = aboutLine();
+				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : about ? { parts: written ?? [{ type: "text" as const, text: typed }] } : {};
+				const said = about ? `${about}\n\n${line}` : line;
 				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
-				if (queue) void call("chat.queue", [dest.id, { action: "add", text: line, ...parts }]).then(warnIfFailed);
-				else void call("chat.send", [dest.id, { text: line, ...parts }]).then(warnIfFailed);
+				if (queue) void call("chat.queue", [dest.id, { action: "add", text: said, ...parts }]).then(warnIfFailed);
+				else void call("chat.send", [dest.id, { text: said, ...parts }]).then(warnIfFailed);
 				return;
 			}
 			case "note":

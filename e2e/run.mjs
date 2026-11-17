@@ -185,6 +185,7 @@ const CHECKS = [
 	{ file: "tab-document.mjs", needsAgent: false },
 	{ file: "tab-app.mjs", needsAgent: false },
 	{ file: "tabs-kept.mjs", needsAgent: false },
+	{ file: "tab-about.mjs", needsAgent: false },
 	/* Between two of your canvases the frame moves in place; to and from a friend's it is made anew. */
 	{ file: "canvas-switch.mjs", needsAgent: false },
 	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */

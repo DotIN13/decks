@@ -18,6 +18,7 @@ export const appKind: TabKind = {
 	name: "app",
 	address: "app",
 	title: (tab) => tab.target,
+	says: (tab) => (tab.target ? `the app ${tab.target}` : undefined),
 	icon: (props) => <Icon of={AppWindow} size={props.size ?? 16} />,
 	view: (tab, parts) => (
 		<For each={tabs().flatMap((one) => (one.kind === "app" && one.target ? [one.target] : []))}>

@@ -17,6 +17,7 @@ export const canvasKind: TabKind = {
 	name: "canvas",
 	address: "canvas",
 	title: (tab) => (tab.target === undefined ? homeCanvas() : stages().find((one) => one.name === tab.target))?.title,
+	says: (tab) => (tab.target === undefined ? undefined : `the canvas "${stages().find((one) => one.name === tab.target)?.title ?? tab.target}" (${tab.target})`),
 	icon: (props) => <Icon of={Layers} size={props.size ?? 16} />,
 	// Kept while a tab of another kind is in front, out of sight: its frame, its canvas and where it was looking are as they were when it comes back.
 	view: (tab, parts) => (

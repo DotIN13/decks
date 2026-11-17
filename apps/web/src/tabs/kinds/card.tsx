@@ -27,6 +27,7 @@ export const cardKind: TabKind = {
 	name: "card",
 	address: "card",
 	title: (tab) => cardAt(tab.target)?.title,
+	says: (tab) => (tab.target ? `the card "${cardAt(tab.target)?.title ?? tab.target}" (@${tab.target})` : undefined),
 	icon: (props) => <Icon of={FileText} size={props.size ?? 16} />,
 	view: (tab, parts) => (
 		<Show when={tab()} keyed>
