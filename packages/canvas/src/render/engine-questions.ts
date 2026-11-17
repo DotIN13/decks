@@ -1,4 +1,4 @@
-import { isShape, pathBounds, type Placed } from "@decks/pen";
+import { chipLink, isShape, pathBounds, type Placed } from "@decks/pen";
 import { snapMove, type Box, type Guide } from "../edit/snap.ts";
 import { BoxIndex } from "./spatial.ts";
 import type { CardGeometry, SceneCard } from "./types.ts";
@@ -196,12 +196,25 @@ export class EngineQuestions {
 		return found ? { card: found, x: point.x - found.box.x - found.pad, y: point.y - found.box.y - found.pad } : undefined;
 	}
 
-	/** The link under a stage point, in a markdown card. */
+	/**
+	 * A link chip under a stage point: the address of the topmost item there when it is one, or is in
+	 * one (`@decks/pen`, `chipLink`). A chip under something else is not under the point.
+	 */
+	private chipAt(point: { x: number; y: number }): string | undefined {
+		const top = this.pickAll(point)[0];
+		for (let at = top === undefined ? undefined : this.of.placed.get(top); at; at = at.parent ? this.of.placed.get(at.parent) : undefined) {
+			const to = chipLink(at.node);
+			if (to) return to;
+		}
+		return undefined;
+	}
+
+	/** The link under a stage point: one in a markdown card's words, or a link chip. */
 	linkAt(point: { x: number; y: number }): string | undefined {
 		const found = this.cardAt(point);
-		if (!found) return undefined;
+		if (!found) return this.chipAt(point);
 		const { card, x, y } = found;
-		return card.links.find((l) => {
+		const inWords = card.links.find((l) => {
 			let lx = l.x;
 			if (l.scroller !== null && l.scroller !== undefined) {
 				const view = card.scrollers[l.scroller];
@@ -210,6 +223,7 @@ export class EngineQuestions {
 			}
 			return x >= lx && x <= lx + l.w && y >= l.y && y <= l.y + l.h;
 		})?.href;
+		return inWords ?? this.chipAt(point);
 	}
 
 	/** Scroll the wide table under a stage point sideways; true when there was one to scroll. */

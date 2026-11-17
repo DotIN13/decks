@@ -2,7 +2,7 @@
  * What a press, a hover or a marquee picks. The engine says what is under a point (`under`,
  * `onLine`); this decides which of it the editor means.
  */
-import { isCard, isMarkdownText, isShape, type PenNode, type Placed } from "@decks/pen";
+import { chipLink, isCard, isMarkdownText, isShape, type PenNode, type Placed } from "@decks/pen";
 import { isFile, isLiveFile } from "../../model/file-kinds.ts";
 import type { PageBox, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
@@ -56,8 +56,8 @@ function topAt(scene: SceneQuery, point: Pt, skip?: (node: PenNode) => boolean):
 	return undefined;
 }
 
-/** One thing made of parts: a press on a part picks it whole (a card, only from its markdown). */
-const isWhole = (up: PenNode, hit: PenNode) => isShape(up) || isFile(up) || isLiveFile(up) || (isCard(up) && isMarkdownText(hit));
+/** One thing made of parts: a press on a part picks it whole (a card, only from its markdown; a link chip, by its mark, its name or its arrow). */
+const isWhole = (up: PenNode, hit: PenNode) => isShape(up) || isFile(up) || isLiveFile(up) || chipLink(up) !== undefined || (isCard(up) && isMarkdownText(hit));
 /** Whether a press on `hit` climbs to `up`, one of the parents round it, under a policy. */
 const climbsTo = (policy: PickPolicy, up: PenNode, hit: PenNode) => (policy === "outermost" && up.type === "group") || isWhole(up, hit);
 

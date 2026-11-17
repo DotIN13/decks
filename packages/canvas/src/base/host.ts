@@ -77,7 +77,7 @@ export interface CanvasHost {
 	 */
 	openItem?(item: { kind: "card" | "document" | "app"; target: string; browser?: true }): void;
 	/**
-	 * Follow a link to something in the deck, by its address in the host's window (`model/deck-link.ts`):
+	 * Follow a link to something in the deck, by its address in the host's window (`@decks/pen`, `link.ts`):
 	 * a canvas, a card, a document or an app, opened as a tab of the host's own, or with `browser` in the
 	 * browser's. The host reads the address. Absent, such a link goes nowhere.
 	 */

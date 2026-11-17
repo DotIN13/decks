@@ -4,9 +4,8 @@
  * ghost of what a drag carries over a card, a card's link opened, a film played, boards moved and
  * sized, and when the camera was last dragged.
  */
-import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
+import { isDeckLink, walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
 import { canvasHost, openInTab, type CanvasHost } from "../../base/host.ts";
-import { isDeckLink } from "../../model/deck-link.ts";
 import { shortLabel } from "@decks/ui";
 import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";
@@ -120,7 +119,7 @@ export function createEffects(host: EffectHost) {
 
 	/**
 	 * A link followed. One to something in the deck by its address in the window (`#canvas/…`,
-	 * `model/deck-link.ts`) is the host's to open, as a tab of its own, or with `browser` the browser's.
+	 * `@decks/pen`, `link.ts`) is the host's to open, as a tab of its own, or with `browser` the browser's.
 	 * A link to a board of this deck opens that board on the canvas, exactly as the host opens one
 	 * (`onOpenLink`, `types.ts`); anything else is a new tab. A relative link is read against the
 	 * stage's own folder.
