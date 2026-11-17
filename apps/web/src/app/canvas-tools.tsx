@@ -18,7 +18,7 @@ import { viewOnlyStage } from "./person.ts";
  *
  * They stood inside the frame, beside the canvas, where a float could go no further than the frame's
  * own edge. Here each is the page's, as the top bars, the side panel and the composer are: the tool
- * column is dragged anywhere on the window. They read and set the same signals as before
+ * column and the pen tray are floats beside the composer and the conversation (`tools-float.ts`). They read and set the same signals as before
  * (`@decks/canvas/tools`), which the canvas package keeps the same on this page and in the frame
  * (`frame/tools-mirror.ts`), with what is selected as the canvas has it now (`penPicked`), your own edits
  * in it before the server confirms them; what they ask of the canvas itself (an edit, undo, a fit, the camera) goes
@@ -30,7 +30,7 @@ import { viewOnlyStage } from "./person.ts";
  * keyboard, and gives it back when it is left.
  */
 export function CanvasTools(props: { parts: Parts }): JSX.Element {
-	const { layout, dock, editorHandle, stagePen, canvasHost } = props.parts;
+	const { layout, dock, floats, editorHandle, stagePen, canvasHost } = props.parts;
 	const handle = () => editorHandle();
 	const canWrite = () => !viewOnlyStage();
 	const step = (direction: "undo" | "redo") => handle()?.step(direction);
@@ -52,7 +52,7 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 		onCleanup(() => document.removeEventListener("decks-sheet", sheet));
 	});
 
-	const floatTools = createToolsFloat(() => dock.dockCover());
+	const floatTools = createToolsFloat(floats, () => layout.phone());
 
 	/** A file of any kind, chosen in the file picker and placed in the middle of the view by what it is. */
 	const openFile = () => {
@@ -90,7 +90,7 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 	return (
 		<div class="canvas-tools" style={{ display: "contents" }} onMouseDown={keepKeys} on:focusout={giveKeysBack}>
 			<Show when={drawing() && mode() === "browse"}>
-				<PenTray onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => handle()?.edit(ids.map((id) => ({ op: "delete", id })))} />
+				<PenTray onFloat={(tray, grip) => floatTools(tray, grip, "pen-tray")} onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => handle()?.edit(ids.map((id) => ({ op: "delete", id })))} />
 			</Show>
 			<Show when={!(drawing() && mode() === "browse")}>
 				{/* The dock's height as a variable, for the properties sheet on a phone to sit above the composer (`properties.css`). */}

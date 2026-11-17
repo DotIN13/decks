@@ -2,12 +2,12 @@ import { makeFloat } from "@decks/ui/float";
 import { insets, insetsMoving } from "@decks/canvas/camera";
 
 /*
- * The two floats: the composer and the conversation.
+ * The floats: the composer, the conversation, and the canvas's tools (`tools-float.ts`).
  *
- * Both are the app's own chrome, kept where they are by default. Taken by the grip or
+ * All are the app's own chrome, kept where they are by default. Taken by the grip or
  * the header they go where they are put, clamped to the surface, snapping home within
  * 24px, remembered per person in localStorage as a corner and an offset so a narrower
- * window keeps them on screen. Neither is an inset: a float over the canvas does not move
+ * window keeps them on screen. None is an inset: a float over the canvas does not move
  * what is centred on the canvas, which is the rule `camera/insets.ts` keeps.
  */
 export function createFloats() {
@@ -52,7 +52,7 @@ export function createFloats() {
 	 * a conversation that is shut and a toolbar that is not mounted all say so on their own.
 	 * Of a tucked float only its tab shows, so its tab is what there is to run into.
 	 */
-	const FLOATS = ".dock, .stream[data-shown='true']";
+	const FLOATS = ".dock, .pen-tools:not([data-row='true']), .stream[data-shown='true']";
 	const otherFloats = (el: HTMLElement) => () => {
 		const work = document.querySelector(".work")?.getBoundingClientRect();
 		return [...document.querySelectorAll<HTMLElement>(FLOATS)]

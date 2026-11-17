@@ -196,5 +196,5 @@ export function createParts() {
 		moveConversation,
 	};
 
-	return { ...onScreen, atTurn, prefs, setPrefs, bar, dock, underSheet, pickFile, files, findAt, layout, presenting, present, apps, editorHandle, penSelected, setPenSelected, pills, canvasHost };
+	return { ...onScreen, atTurn, prefs, setPrefs, bar, dock, floats, underSheet, pickFile, files, findAt, layout, presenting, present, apps, editorHandle, penSelected, setPenSelected, pills, canvasHost };
 }

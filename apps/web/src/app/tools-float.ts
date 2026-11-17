@@ -1,24 +1,30 @@
-import { insets } from "@decks/canvas/camera";
+import { insets, insetsMoving } from "@decks/canvas/camera";
 import { setPenToolsAt } from "@decks/canvas/tools";
-import { makeFloat } from "@decks/ui/float";
 import { createEffect, onCleanup } from "solid-js";
+import type { Floats } from "./floats.ts";
 
 /**
- * The tool column as a float: dragged by the grip at its head anywhere on the window, and a hard
- * throw at either edge tucks it behind that edge with its tab showing. Home is where the stylesheet
- * puts it, measured while it stands there, clear of the side panel.
+ * The canvas's tools as floats, beside the composer and the conversation (`floats.ts`): the tool
+ * column, and the pen tray under its own key. Taken by the grip at its head, one goes anywhere in the
+ * canvas's column, from the side panel's edge to the window's and down to its foot; dropped near an
+ * edge it stands against it, dropped on the composer or the conversation it takes the nearest place
+ * clear of them, as they do of it; and a hard throw at either edge tucks it behind that edge with its
+ * tab showing. Not on a phone, where the column is a row at the foot and the tray a strip at the head.
+ *
+ * Home is the stylesheet's own place, so it is measured whenever the float is standing there rather
+ * than worked out again here, with the column's middle only until it first has been.
  */
-export function createToolsFloat(dockCover: () => number) {
-	return (tools: HTMLElement, grip: HTMLElement): { unstow: () => void } => {
+export function createToolsFloat({ workBox, mountFloat }: Floats, phone: () => boolean) {
+	return (tools: HTMLElement, grip: HTMLElement, key = "pen-tools"): { unstow: () => void } => {
 		let seen: { x: number; y: number } | undefined;
-		const bounds = () => ({ x: 0, y: 0, w: innerWidth, h: innerHeight - dockCover() });
 		const home = () => {
+			const work = document.querySelector(".work")?.getBoundingClientRect();
 			if (!tools.hasAttribute("data-floating") && !tools.hasAttribute("data-stowed")) {
 				const r = tools.getBoundingClientRect();
-				seen = { x: r.left, y: r.top };
+				seen = { x: r.left - (work?.left ?? 0), y: r.top - (work?.top ?? 0) };
 			}
-			const { left, top } = insets();
-			return seen ?? { x: left + 12, y: top + (innerHeight - top) / 2 - tools.offsetHeight / 2 };
+			const box = workBox();
+			return seen ?? { x: box.x + 12, y: box.y + box.h / 2 - tools.offsetHeight / 2 };
 		};
 		const cssPx = (name: string, fallback: number) => parseFloat(getComputedStyle(tools).getPropertyValue(name)) || fallback;
 		/*
@@ -40,37 +46,23 @@ export function createToolsFloat(dockCover: () => number) {
 			clearTimeout(again);
 			again = setTimeout(measure, 600);
 		};
-		const float = makeFloat(tools, {
-			key: "pen-tools",
-			handle: grip,
-			ignore: "button, input, label",
-			home,
-			bounds,
-			size: () => ({ w: tools.offsetWidth, h: tools.offsetHeight }),
-			read: () => ({ x: tools.offsetLeft, y: tools.offsetTop }),
-			stow: { tab: () => cssPx("--stowtab-w", 20), tabHeight: () => cssPx("--stowtab-h", 48) },
-			apply: (p, atHome, stowed) => {
-				sayWhere();
-				// Put away, everything but the tab is out of reach as well as out of sight.
-				if (stowed) tools.setAttribute("data-stowed", stowed);
-				else tools.removeAttribute("data-stowed");
-				for (const child of tools.children) if (!child.hasAttribute("data-stowtab")) child.toggleAttribute("inert", stowed !== undefined);
-				if (atHome || !p) {
-					tools.removeAttribute("data-floating");
-					tools.style.left = "";
-					tools.style.top = "";
-					return;
-				}
-				tools.setAttribute("data-floating", "true");
-				tools.style.left = `${p.x}px`;
-				tools.style.top = `${p.y}px`;
-			},
-		});
+		const float = mountFloat(tools, key, grip, "button, input, label", home, "top", { tab: () => cssPx("--stowtab-w", 20) }, phone);
 		createEffect(() => {
 			insets();
+			phone();
+			// While the side panel is dragged a float follows it step by step, cheaply; it is put back properly once the drag ends.
+			if (insetsMoving()) return float.follow();
 			float.restore();
-			sayWhere();
 		});
+		// Only the column's place is said: the pen tray stands clear of where a card is typed into.
+		if (key !== "pen-tools") {
+			onCleanup(() => float.dispose());
+			return { unstow: () => float.unstow() };
+		}
+		/* Wherever the float system puts it (a drop, a glide, a tuck, a side panel that moved it), it is measured again. */
+		const placed = new MutationObserver(sayWhere);
+		placed.observe(tools, { attributes: true, attributeFilter: ["style", "data-floating", "data-stowed"] });
+		sayWhere();
 		const sized = new ResizeObserver(sayWhere);
 		sized.observe(tools);
 		addEventListener("resize", sayWhere);
@@ -79,12 +71,12 @@ export function createToolsFloat(dockCover: () => number) {
 			cancelAnimationFrame(saying);
 			clearTimeout(again);
 			sized.disconnect();
+			placed.disconnect();
 			removeEventListener("resize", sayWhere);
 			removeEventListener("transitionend", sayWhere, true);
 			setPenToolsAt(undefined);
 			float.dispose();
 		});
 		return { unstow: () => float.unstow() };
-	
 	};
 }
