@@ -6,7 +6,9 @@
 		"server folder pairs that import each other": 13,
 		"imports across packages by relative path": 6,
 		"\"one release\" notes": 0,
-		"server imports that point up a layer": 17
+		"server imports that point up a layer": 17,
+		"canvas package folder pairs that import each other": 13,
+		"canvas package imports that point up a layer": 20
 	},
 	"upward": [
 		"apps/server/src/agents/backend.ts -> apps/server/src/calls/tool.ts",
@@ -26,5 +28,27 @@
 		"apps/server/src/deck/loader.ts -> apps/server/src/cards/size.ts",
 		"apps/server/src/docs/writers.ts -> apps/server/src/agents/acts.ts",
 		"apps/server/src/runtimes/pi/extension.ts -> apps/server/src/calls/tool.ts"
+	],
+	"canvasUpward": [
+		"packages/canvas/src/camera/glide.ts -> packages/canvas/src/edit/core/model.ts",
+		"packages/canvas/src/camera/glide.ts -> packages/canvas/src/edit/core/scene.ts",
+		"packages/canvas/src/edit/index.ts -> packages/canvas/src/edit/dom/OverlayLayer.tsx",
+		"packages/canvas/src/edit/index.ts -> packages/canvas/src/edit/dom/TextEditing.tsx",
+		"packages/canvas/src/edit/index.ts -> packages/canvas/src/edit/dom/controller.ts",
+		"packages/canvas/src/edit/index.ts -> packages/canvas/src/edit/dom/keys.ts",
+		"packages/canvas/src/edit/index.ts -> packages/canvas/src/edit/dom/pointer.ts",
+		"packages/canvas/src/edit/index.ts -> packages/canvas/src/ui/InsertMenu.tsx",
+		"packages/canvas/src/frame/inside/frame.tsx -> packages/canvas/src/editor.tsx",
+		"packages/canvas/src/frame/inside/options.ts -> packages/canvas/src/editor.tsx",
+		"packages/canvas/src/host.ts -> packages/canvas/src/look/icons.ts",
+		"packages/canvas/src/items/item-slot.tsx -> packages/canvas/src/edit/dom/touch-rules.ts",
+		"packages/canvas/src/model/drawing.ts -> packages/canvas/src/render/types.ts",
+		"packages/canvas/src/render/engine.ts -> packages/canvas/src/camera/glide.ts",
+		"packages/canvas/src/render/engine.ts -> packages/canvas/src/edit/snap.ts",
+		"packages/canvas/src/render/engine.ts -> packages/canvas/src/items/missing.ts",
+		"packages/canvas/src/types.ts -> packages/canvas/src/camera/agent-views.ts",
+		"packages/canvas/src/types.ts -> packages/canvas/src/edit/pen-tools.ts",
+		"packages/canvas/src/types.ts -> packages/canvas/src/ink/ink.ts",
+		"packages/canvas/src/types.ts -> packages/canvas/src/render/types.ts"
 	]
 }

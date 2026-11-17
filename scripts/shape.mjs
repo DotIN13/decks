@@ -18,6 +18,9 @@
  * shrink: a new one fails, naming the two files. The old folder names and the new ones are both in
  * the table, so the gate holds while folders move.
  *
+ * **The canvas package's layers** (`CANVAS_LAYERS`), held the same way: base; model; look; render;
+ * camera; the editor's rules; items; the editor on the page; the view; the frame; the entry points.
+ *
  * After a change that lowers a count or removes an upward import, run `--update`: the gate then holds
  * the better number.
  */
@@ -51,6 +54,30 @@ const layerOf = (path) => {
 	return LAYERS.length - 1 - index;
 };
 const layerName = (level) => LAYERS[LAYERS.length - 1 - level][0];
+
+/**
+ * The canvas package's layers, lowest last, by the same rule: a path under `packages/canvas/src/`
+ * belongs to the first entry it starts with. The old folder names and the new ones are both here.
+ */
+const CANVAS = "packages/canvas/src/";
+const CANVAS_LAYERS = [
+	["entry points", ["index.ts", "editor.tsx", "public/"]],
+	["frame", ["frame/"]],
+	["view", ["view/", "stage/"]],
+	["the editor on the page", ["edit/dom/", "ui/"]],
+	["items", ["items/", "ink/", "cards/"]],
+	["the editor's rules", ["edit/"]],
+	["camera", ["camera/"]],
+	["render", ["render/"]],
+	["look", ["look/"]],
+	["model", ["model/"]],
+	["base", ["base/", ""]],
+];
+const canvasLayerOf = (path) => {
+	const rest = path.slice(CANVAS.length);
+	return CANVAS_LAYERS.length - 1 - CANVAS_LAYERS.findIndex(([, starts]) => starts.some((start) => rest.startsWith(start)));
+};
+const canvasLayerName = (level) => CANVAS_LAYERS[CANVAS_LAYERS.length - 1 - level][0];
 
 const tracked = execSync("git ls-files", { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
 const shipping = tracked.filter((file) => /\.(ts|tsx)$/.test(file) && /^(apps|packages|runtime|extension)\//.test(file) && !/\.d\.ts$|\.test\.|\.check\.|\/test\/|\/fixtures?\/|(^|\/)(dist|pkg|pkg-gl|lib|vendor)\//.test(file));
@@ -114,6 +141,17 @@ const pairs = [...edges].filter((edge) => {
 const packageOf = (path) => path.split("/").slice(0, 2).join("/");
 const across = imports.filter(([from, to]) => packageOf(from) !== packageOf(to) && /^(apps|packages|runtime|extension)\//.test(to)).map(([from, to]) => `${from} -> ${to}`).sort();
 const upward = [...new Set(server.filter(([from, to]) => layerOf(to) > layerOf(from)).map(([from, to]) => `${from} -> ${to}`))].sort();
+const canvas = imports.filter(([from, to]) => from.startsWith(CANVAS) && to.startsWith(CANVAS));
+const canvasUpward = [...new Set(canvas.filter(([from, to]) => canvasLayerOf(to) > canvasLayerOf(from)).map(([from, to]) => `${from} -> ${to}`))].sort();
+const canvasFolder = (path) => {
+	const rest = path.slice(CANVAS.length);
+	return rest.includes("/") ? rest.slice(0, rest.indexOf("/")) : "(top)";
+};
+const canvasEdges = new Set(canvas.map(([from, to]) => `${canvasFolder(from)}>${canvasFolder(to)}`).filter((edge) => edge.split(">")[0] !== edge.split(">")[1]));
+const canvasPairs = [...canvasEdges].filter((edge) => {
+	const [a, b] = edge.split(">");
+	return a < b && canvasEdges.has(`${b}>${a}`);
+}).map((edge) => edge.replace(">", " <> ")).sort();
 
 const counts = {
 	"files over 1,000 lines": longFiles.length,
@@ -123,6 +161,8 @@ const counts = {
 	"imports across packages by relative path": across.length,
 	'"one release" notes': notes.length,
 	"server imports that point up a layer": upward.length,
+	"canvas package folder pairs that import each other": canvasPairs.length,
+	"canvas package imports that point up a layer": canvasUpward.length,
 };
 
 // ---- report, update, or hold -------------------------------------------------------------------
@@ -142,6 +182,8 @@ if (process.argv.includes("--report")) {
 		byLayers.set(key, (byLayers.get(key) ?? 0) + 1);
 	}
 	show("Server imports that point up, by layer", [...byLayers].map(([key, count]) => `${key}: ${count}`));
+	show("Canvas package folder pairs that import each other", canvasPairs);
+	show("Canvas package imports that point up", canvasUpward.map((one) => one.replaceAll(CANVAS, "")));
 	process.exit(0);
 }
 
@@ -151,7 +193,7 @@ if (process.argv.includes("--json")) {
 }
 
 if (process.argv.includes("--update")) {
-	writeFileSync(BASELINE, `${JSON.stringify({ counts, upward }, null, "\t")}\n`);
+	writeFileSync(BASELINE, `${JSON.stringify({ counts, upward, canvasUpward }, null, "\t")}\n`);
 	console.log(`shape: the baseline is the code as it is (${Object.entries(counts).map(([name, count]) => `${count} ${name}`).join("; ")})`);
 	process.exit(0);
 }
@@ -164,6 +206,11 @@ for (const [name, count] of Object.entries(counts)) {
 }
 const known = new Set(baseline.upward);
 for (const one of upward) if (!known.has(one)) problems.push(`a new import points up a layer (${layerName(layerOf(one.split(" -> ")[0]))} to ${layerName(layerOf(one.split(" -> ")[1]))}): ${one}`);
+const knownCanvas = new Set(baseline.canvasUpward ?? canvasUpward);
+for (const one of canvasUpward) {
+	const [from, to] = one.split(" -> ");
+	if (!knownCanvas.has(one)) problems.push(`a new import points up a layer in the canvas package (${canvasLayerName(canvasLayerOf(from))} to ${canvasLayerName(canvasLayerOf(to))}): ${one}`);
+}
 if (problems.length) {
 	console.error(`shape: ${problems.length} thing${problems.length === 1 ? "" : "s"} got worse:\n${problems.map((one) => `  ${one}`).join("\n")}`);
 	process.exit(1);
