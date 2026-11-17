@@ -4,6 +4,7 @@ import { probes } from "../../base/debug.ts";
 import { dismissMenus } from "@decks/ui";
 import type { CardSlot } from "../protocol.ts";
 import { drawing, inkSelection } from "../../ink/ink.ts";
+import { penHolds } from "../../edit/pen-tools.ts";
 
 /** What `listenToPage` reads of `wireFrame` (`events.ts`). */
 export interface ListenToPageNeeds {
@@ -71,6 +72,17 @@ export function listenToPage(d: ListenToPageNeeds) {
 		event.preventDefault();
 		event.stopImmediatePropagation();
 		d.end.emit("keys", { key: event.key, code: event.code, meta: false, ctrl: false, alt: false, shift: event.shiftKey });
+	}, { capture: true, signal: life() });
+
+	/*
+	 * A popup of the page's tools that Escape shuts before anything else (the colour picker, `penHolds`):
+	 * Escape pressed here shuts it there, and does nothing here, so what is selected stays selected.
+	 */
+	addEventListener("keydown", (event) => {
+		if (!d.pageTools || event.key !== "Escape" || penHolds() === 0) return;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		d.end.emit("away", {});
 	}, { capture: true, signal: life() });
 
 	/*

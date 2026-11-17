@@ -83,6 +83,20 @@ export { penToolsAt, setPenToolsAt };
  */
 const [penCovers, setPenCovers] = createSignal<readonly { left: number; top: number; right: number; bottom: number }[] | undefined>();
 export { penCovers, setPenCovers };
+
+/**
+ * How many of the tools' popups are open that Escape closes before it does anything else (the colour
+ * picker, open over a selection that stays). They hear Escape on their own document; while the page
+ * draws the tools and the keyboard is with the canvas, the frame passes Escape on rather than acting
+ * on it (`frame/inside/page-events.ts`).
+ */
+const [penHolds, setPenHolds] = createSignal(0);
+export { penHolds, setPenHolds };
+/** Hold Escape for a popup while it is open; call what comes back when it shuts. */
+export function holdEscape(): () => void {
+	setPenHolds((count) => count + 1);
+	return () => setPenHolds((count) => Math.max(0, count - 1));
+}
 /**
  * What is selected, as the canvas has it now, for a properties panel that is not where the canvas is:
  * a small drawing holding the selected items whole, what its arrows join, and the drawing's variables,

@@ -1,6 +1,7 @@
 import type { Setter } from "solid-js";
 import { onCleanup, onMount } from "solid-js";
 import { onDismiss } from "@decks/ui";
+import { holdEscape } from "../edit/pen-tools.ts";
 import type { ColorPickerProps } from "./color-picker-props.ts";
 
 /** What `createColorPlace` reads of `ColorPicker` (`ColorPicker.tsx`). */
@@ -40,7 +41,10 @@ export function createColorPlace(d: ColorPlaceNeeds) {
 		window.addEventListener("keydown", key, true);
 		window.addEventListener("resize", position);
 		const stopDismiss = onDismiss(() => d.props.onClose());
+		// Escape shuts the picker and nothing else, wherever the keyboard is (`holdEscape`).
+		const letGo = holdEscape();
 		onCleanup(() => {
+			letGo();
 			stopDismiss();
 			window.removeEventListener("pointerdown", away, true);
 			window.removeEventListener("keydown", key, true);
