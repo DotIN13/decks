@@ -7,7 +7,7 @@ import { scheme } from "../lib/theme.ts";
 import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
-import { stages } from "../state/canvases.ts";
+import { stageOf, stages } from "../state/canvases.ts";
 import { canvasOnScreen, homeHeld } from "../tabs/tabs.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
@@ -29,12 +29,12 @@ interface LandingInputs {
  * its boards are the deck's.
  */
 /**
- * Whose view the camera on screen is: the conversation's while its canvas, the home tab, is in front,
- * as it always was; and the person's own, under one name, while a canvas in a tab of its own is
- * (`tabs/tabs.ts`), so picking another agent there moves nothing. A tab that is no canvas changes neither: the canvas behind it is held as it was.
+ * Whose view the camera on screen is: the conversation's, on whichever canvas its camera is on, its
+ * own or one in a tab (`tabs/tabs.ts`). Each agent has a place on each canvas it has looked at, kept
+ * on this device, and comes back to it. A tab that is no canvas changes nothing: the canvas behind
+ * it is held as it was.
  */
-export const LOOKING = "looking";
-const ownerNow = (): string | undefined => (homeHeld() ? state.focused : LOOKING);
+const ownerNow = (): string | undefined => state.focused;
 
 export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: LandingInputs) {
 	/**
@@ -74,8 +74,8 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		},
 		land: (next, to) => {
 			moveCamera(next);
-			// An agent is told where its canvas is looked at; a canvas in a tab of its own is nobody's to be told of.
-			if (to.scope !== LOOKING) reportCamera(next, to.scope);
+			// An agent is told where its own canvas is looked at; its camera on another canvas, in a tab, says nothing of that one.
+			if (to.canvas === stageOf(to.scope)?.name) reportCamera(next, to.scope);
 		},
 		select: (path) => setSelected(path),
 	});

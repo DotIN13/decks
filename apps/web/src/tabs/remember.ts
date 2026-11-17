@@ -3,14 +3,15 @@ import { storageKey } from "../connections/connection.ts";
 import { state } from "../state/deck.ts";
 import type { Tab } from "./kind.ts";
 import { kindAt, kindOf } from "./kinds.ts";
-import { front, openTab, restoreTabs, tabs } from "./tabs.ts";
+import { camerasNow, front, openTab, restoreTabs, tabs } from "./tabs.ts";
 
 /**
  * The row kept, and the window's address in step with it.
  *
- * **Kept**: the tabs open in this window and the one in front are remembered for the deck, on this
- * device (this browser's storage, per connection, as the cameras are): a reload, or the deck opened
- * again tomorrow, finds the row as it was left. Another deck has its own row.
+ * **Kept**: the tabs open in this window, and the tab each conversation's camera is on, are
+ * remembered for the deck, on this device (this browser's storage, per connection, as the cameras'
+ * places on a canvas are): a reload, or the deck opened again tomorrow, finds the row as it was left
+ * and each agent's chat on the tab it was on. Another deck has its own row.
  *
  * **The address**: the tab in front is named after `#`, as `#canvas/<name>`, `#card/<path>`,
  * `#doc/<path>` or `#app/<name>`; home has none. An address opened with one opens that tab, in front,
@@ -41,14 +42,16 @@ export const windowAddressOf = (tab: Pick<Tab, "kind" | "target">): string => `$
 
 interface Kept {
 	tabs: Array<{ kind: string; target: string }>;
-	front?: string;
+	/** The tab each conversation's camera is on, by agent id; one on home is left out. */
+	cameras?: Record<string, string>;
 }
 
 function read(key: string): Kept {
 	try {
 		const kept = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<Kept> | null;
 		const row = Array.isArray(kept?.tabs) ? kept.tabs.filter((one) => typeof one?.kind === "string" && typeof one?.target === "string" && !!kindOf(one.kind)) : [];
-		return { tabs: row, ...(typeof kept?.front === "string" ? { front: kept.front } : {}) };
+		const cameras = kept?.cameras && typeof kept.cameras === "object" ? Object.fromEntries(Object.entries(kept.cameras).filter(([, id]) => typeof id === "string")) : {};
+		return { tabs: row, cameras };
 	} catch {
 		return { tabs: [] };
 	}
@@ -68,16 +71,26 @@ export function rememberTabs(): void {
 		const key = `${KEY}${storageKey(deck)}`;
 		if (loaded() === key) return;
 		const kept = read(key);
-		restoreTabs(kept.tabs, kept.front);
-		openAddressed();
+		restoreTabs(kept.tabs, kept.cameras);
 		setLoaded(key);
+	});
+	/*
+	 * The address the page was opened with, once: it names the tab for the conversation on screen,
+	 * which the page learns a moment after the deck, so it waits for one (a deck with no agent has none
+	 * to wait for, and no tab is anyone's).
+	 */
+	let addressed = false;
+	createEffect(() => {
+		if (addressed || !loaded() || !state.focused) return;
+		addressed = true;
+		openAddressed();
 	});
 	createEffect(() => {
 		const key = loaded();
 		if (!key) return;
 		const row = tabs().flatMap((tab) => (tab.target === undefined ? [] : [{ kind: tab.kind, target: tab.target }]));
 		try {
-			localStorage.setItem(key, JSON.stringify({ tabs: row, front: front().id } satisfies Kept));
+			localStorage.setItem(key, JSON.stringify({ tabs: row, cameras: camerasNow() } satisfies Kept));
 		} catch {
 			/* a browser that keeps nothing: the row lasts as long as the page */
 		}

@@ -8,7 +8,7 @@ import { nameOf, state } from "../../state/deck.ts";
 import { offer } from "../../state/notices.ts";
 import { send } from "../../state/socket.ts";
 import type { FrameHooks, Of } from "../socket-messages.ts";
-import { canvasOnScreen, homeCanvas, homeHeld, homeInFront, openTab, showHome } from "../../tabs/tabs.ts";
+import { aim, aimHome, canvasOnScreen, homeCanvas, homeHeld, homeInFront, openTab, showHome } from "../../tabs/tabs.ts";
 import { flyToPages } from "../links.ts";
 
 /**
@@ -20,6 +20,8 @@ import { flyToPages } from "../links.ts";
  */
 export function rememberView(agentId: string, camera: Camera, selected?: string): void {
 	agentViews(state.deck?.path ?? "").keep(agentId, stageOf(agentId)?.name, viewToPark(camera, selected));
+	// Its camera is on its own canvas now, whichever tab it was on: opening its chat shows this view.
+	aimHome(agentId);
 	// So `decks.view.camera()` answers for that agent's stage rather than falling back to wherever the last person to look at anything was.
 	reportCamera(camera, agentId);
 }
@@ -82,16 +84,18 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 		}
 	}
 	/*
-	 * An agent opening something whole as a tab of this window (`view.open`): from the chat on screen
-	 * the tab opens, in front; from another, the person is offered a button, since nothing an agent
-	 * does in the background changes what is on screen.
+	 * An agent opening something whole as a tab of this window (`view.open`): its camera goes to that
+	 * tab (`tabs/tabs.ts`, `aim`). From the chat on screen that brings the tab forward; from another
+	 * the tab is put in the row and waits for that chat to be opened, and the person is offered a
+	 * button, since nothing an agent does in the background changes what is on screen.
 	 */
 	if (message.call.op === "open") {
 		const { kind, target, title } = message.call.args as { kind: string; target: string; title?: string };
 		const onScreen = message.call.agentId === state.focused;
-		if (onScreen) openTab(kind, target);
-		else offer(`${nameOf(message.call.agentId)} wants to show you ${title ?? target}`, { label: "Open", run: () => openTab(kind, target) }, "agent-view");
-		send({ type: "view.answered", id: message.call.id, value: onScreen ? { opened: true } : { offered: "another chat is on the person's screen, so they were offered a button that opens it" } });
+		// The agent's camera goes to that tab: in front when its chat is on screen, waiting there for when it is opened otherwise.
+		aim(message.call.agentId, kind, target);
+		if (!onScreen) offer(`${nameOf(message.call.agentId)} wants to show you ${title ?? target}`, { label: "Open", run: () => openTab(kind, target) }, "agent-view");
+		send({ type: "view.answered", id: message.call.id, value: onScreen ? { opened: true } : { offered: "another chat is on the person's screen: the tab waits in your chat, where it is in front when they open it, and they were offered a button that opens it now" } });
 		return;
 	}
 	/*

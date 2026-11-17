@@ -1,7 +1,7 @@
 import { createComputed, createSignal, For, type JSX } from "solid-js";
 import type { Parts } from "../app/parts.ts";
 import { kindOf } from "./kinds.ts";
-import { front } from "./tabs.ts";
+import { front, sawFront } from "./tabs.ts";
 
 /**
  * What fills the window: the tab in front, as its kind shows it.
@@ -16,5 +16,7 @@ export function TabView(props: { parts: Parts }): JSX.Element {
 		const kind = front().kind;
 		if (!used().includes(kind)) setUsed([...used(), kind]);
 	});
+	// Whichever way a tab came to be in front, it was seen: what a kind that keeps tabs alive goes by.
+	createComputed(() => sawFront(front().id));
 	return <For each={used()}>{(name) => kindOf(name)?.view(() => (front().kind === name ? front() : undefined), props.parts)}</For>;
 }

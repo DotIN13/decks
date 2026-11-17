@@ -73,15 +73,15 @@ say("something that is nothing is refused with a sentence", none.ok === false &&
 // --- from another chat: a button, and nothing opens until it is pressed ---------------------------------------
 const link = await socket();
 const other = await call("agent.create", [{ name: "Backstage", kind: "pi" }]);
-const otherId = other.value?.id ?? (await until(() => link.last("agent.list")?.agents?.find((one) => one.name === "Backstage")?.id));
+const otherId = other.value?.id ?? (await until(() => link.last("agent.list")?.chats?.find((one) => one.name === "Backstage")?.id));
 // The new agent's chat comes on screen when it is made (`new-agent-opens`): the first one is the one in the background now.
 const focused = await until(() => link.last("agent.list")?.focused);
-const background = (link.last("agent.list")?.agents ?? []).map((one) => one.id).find((id) => id !== focused) ?? otherId;
+const background = (link.last("agent.list")?.chats ?? []).map((one) => one.id).find((id) => id !== focused) ?? otherId;
 const offered = await call("view.open", ["kept-app"], { "x-decks-agent": background });
 const offer = page.locator(".notice .notice-action", { hasText: "Open" });
-say("from a chat that is not on screen, view open offers a button and opens nothing", offered.value?.opened === false && /offered a button/.test(offered.value?.note ?? "") && (await until(() => offer.count())) === 1 && !(await chips()).some((one) => one.startsWith("app")), JSON.stringify([offered.value, await chips(), focused, background]).slice(0, 300));
+say("from a chat that is not on screen, view open offers a button and puts the tab in the row, not in front", offered.value?.opened === false && /offered a button/.test(offered.value?.note ?? "") && (await until(() => offer.count())) === 1 && JSON.stringify(await until(async () => ((await chips()).length === 4 ? chips() : undefined))) === '["card","canvas","document*","app"]', JSON.stringify([offered.value, await chips(), focused, background]).slice(0, 300));
 await offer.click();
-say("…pressed, the app's tab opens in front", JSON.stringify(await until(async () => ((await chips()).length === 4 ? chips() : undefined))) === '["card","canvas","document","app*"]' && (await hash()) === "#app/kept-app", JSON.stringify([await chips(), await hash()]));
+say("…pressed, the app's tab comes forward", JSON.stringify(await until(async () => ((await chips()).some((one) => one === "app*") ? chips() : undefined))) === '["card","canvas","document","app*"]' && (await hash()) === "#app/kept-app", JSON.stringify([await chips(), await hash()]));
 
 // --- the row is kept: the deck opened again in another page of this browser ------------------------------------
 // (The checks' first page clears its storage at every load; a second page of the same browser reads what the first kept.)

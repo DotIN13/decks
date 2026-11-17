@@ -8,7 +8,6 @@ import { pens } from "../state/pens.ts";
 import { agentViews } from "../state/views.ts";
 import { focusedCanvas } from "./person.ts";
 import { canvasOnScreen, homeHeld } from "../tabs/tabs.ts";
-import { LOOKING } from "./landing.ts";
 
 /** The cards a drawing places, by their path in the deck, each with its box on the canvas. */
 function cardsOn(doc: PenDocument, canvas: string | undefined): Array<{ path: string; box: { x: number; y: number; w: number; h: number } }> {
@@ -58,8 +57,7 @@ export function createOnScreen() {
 	 */
 	createEffect(() => {
 		const ids = state.chats.map((chat) => chat.id);
-		// The person's own view of a canvas in a tab of its own is kept beside the conversations' (`landing.ts`, LOOKING).
-		if (ids.length > 0) views().retain([...ids, LOOKING]);
+		if (ids.length > 0) views().retain(ids);
 	});
 
 	const focusedChat = createMemo(() => state.chats.find((chat) => chat.id === state.focused));
