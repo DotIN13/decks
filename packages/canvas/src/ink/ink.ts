@@ -55,3 +55,9 @@ export function inkSize(): number {
 const [inkSelection, setInkSelection] = createSignal<{ path: string; ids: string[] } | undefined>(undefined);
 
 export { inkSelection, setInkSelection };
+
+/** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
+export const STAGE_INK = "stage";
+
+/** A touch this soon after the pencil leaves the glass is the hand that held it. */
+export const PALM_AFTER_MS = 500;

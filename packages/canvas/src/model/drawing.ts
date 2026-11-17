@@ -1,6 +1,8 @@
-import { apply, withDecksColors, baseTheme, diff, editDocument, num as penNum, parse, walk, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
+import { apply, baseTheme, diff, editDocument, num as penNum, parse, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
 import type { Page } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
+import { createDrawingEdits } from "./drawing-edits.ts";
+import { createDrawingSync } from "./drawing-sync.ts";
 
 /**
  * The edits that made a drawing from the one before it (`from`): the stage's engines apply them in
@@ -58,7 +60,7 @@ export interface Drawing {
 	removePage(path: string): void;
 }
 
-interface DrawingOptions {
+export interface DrawingOptions {
 	onEdits?: (edits: PenEdit[], doc: PenDocument) => void;
 	/** The scheme the drawing's theme variables are read in. */
 	look?: () => "light" | "dark";
@@ -208,6 +210,19 @@ export function together(edits: readonly (readonly unknown[])[]): unknown[] {
 	return out;
 }
 
+/**
+ * The person's edits sent and not yet in a drawing the host gave, oldest first: an edit's ops, or a
+ * step's drawing (`to`, what the step makes of `base`, the host's drawing it was taken from).
+ */
+export type Pending = { id: string; ops?: unknown[]; to?: PenDocument; base?: PenDocument; timer?: ReturnType<typeof setTimeout>; as?: string };
+
+/**
+ * The person's steps through their own edits, as the host's drawings before and after each (the
+ * host keeps the real history; this is to show a step ahead of its answer). Only what this page
+ * saw end to end: any other change to the host's drawing empties it, as it makes the host refuse.
+ */
+export type Change = { before: PenDocument; after: PenDocument };
+
 export function createDrawing(text: string | PenDocument, options: DrawingOptions = {}): Drawing {
 	const look = options.look ?? (() => "light" as const);
 	const depth = options.depth ?? 200;
@@ -255,11 +270,6 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	const [given, setGiven] = createSignal<PenDocument>(first);
 	const [waiting, setWaiting] = createSignal(0);
 	let scope: string | undefined;
-	/**
-	 * The person's edits sent and not yet in a drawing the host gave, oldest first: an edit's ops, or a
-	 * step's drawing (`to`, what the step makes of `base`, the host's drawing it was taken from).
-	 */
-	type Pending = { id: string; ops?: unknown[]; to?: PenDocument; base?: PenDocument; timer?: ReturnType<typeof setTimeout>; as?: string };
 	let pending: Pending[] = [];
 	/*
 	 * One call to the host at a time, when its `send` answers: edits made while one is on its way wait
@@ -272,12 +282,6 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	let inFlightTimer: ReturnType<typeof setTimeout> | undefined;
 	/** Steps asked for while edits were still to go: sent after them, in order. */
 	let stepsAfter: Array<() => void> = [];
-	/**
-	 * The person's steps through their own edits, as the host's drawings before and after each (the
-	 * host keeps the real history; this is to show a step ahead of its answer). Only what this page
-	 * saw end to end: any other change to the host's drawing empties it, as it makes the host refuse.
-	 */
-	type Change = { before: PenDocument; after: PenDocument };
 	const history: { undo: Change[]; redo: Change[] } = { undo: [], redo: [] };
 	/** Names this page gave its edits and steps, recent ones, and what each was. */
 	const sent = new Map<string, { step?: "undo" | "redo"; change?: Change }>();
@@ -327,187 +331,80 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		showOver(onTop(untrack(given)));
 	};
 	const wait = (id: string, ms: number) => setTimeout(() => drop(id), ms);
-	/** The edits waiting to go, sent as one call, when nothing is on its way; then any steps asked for after them. */
-	const flush = () => {
-		if (!host || inFlight) return;
-		const going = pending.filter((one) => one.ops && !one.as);
-		if (!going.length) {
-			const steps = stepsAfter;
-			stepsAfter = [];
-			for (const step of steps) step();
-			return;
-		}
-		const as = going[0]!.id;
-		for (const one of going) {
-			one.as = as;
-			// Its name is the first's now: only that one is listened for.
-			if (one.id !== as) sent.delete(one.id);
-			clearTimeout(one.timer);
-			one.timer = wait(as, PENDING_MS);
-		}
-		const answer = host.send(together(going.map((one) => one.ops!)), as);
-		if (!answer || typeof (answer as Promise<boolean>).then !== "function") return flush();
-		inFlight = as;
-		const done = () => {
-			if (inFlight !== as) return;
-			inFlight = undefined;
-			clearTimeout(inFlightTimer);
-			flush();
-		};
-		// A call that never answers holds nothing up for longer than an edit is shown ahead.
-		inFlightTimer = setTimeout(done, PENDING_MS);
-		void (answer as Promise<boolean>).then(
-			(ok) => {
-				if (!ok) drop(as);
-				else
-					for (const one of pending)
-						if (one.as === as) {
-							// Made: the drawing that has it is on its way, however long the socket takes; given up on only after a while more.
-							clearTimeout(one.timer);
-							one.timer = wait(as, PENDING_MS);
-						}
-				done();
-			},
-			() => {
-				drop(as);
-				done();
-			},
-		);
-	};
-	/** The host's drawing came: what it has of the person's edits is no longer shown on top of it. */
-	const receive = (next: PenDocument, edits: DocEdits | undefined, madeHere: readonly string[] | undefined, at: string | undefined) => {
-		const before = untrack(given);
-		if (at !== scope) {
-			// Another canvas: nothing on its way belongs to it.
-			scope = at;
-			for (const one of pending) clearTimeout(one.timer);
-			pending = [];
-			stepsAfter = [];
-			setWaiting(0);
-			forgetHistory();
-		}
-		const ours = (madeHere ?? []).map((id) => [id, sent.get(id)] as const).filter((one) => one[1] !== undefined);
-		if (next === before && !ours.length) return;
-		setGiven(next);
-		const wasShown = untrack(doc);
-		const hadPending = pending.length > 0;
-		// What the host's history now holds of the person's: their own edit or step, or nothing safe.
-		if (!ours.length) {
-			if (next !== before) forgetHistory();
-		} else
-			for (const [, what] of ours) {
-				if (what!.step && what!.change) {
-					// The step that was shown is made: its entry now ends on the drawing the host gave.
-					if (what!.step === "undo") what!.change.before = next;
-					else what!.change.after = next;
-				} else if (!what!.step) {
-					const change = { before, after: next };
-					history.undo.push(change);
-					if (history.undo.length > depth) history.undo.shift();
-					history.redo = [];
-				}
-			}
-		if (ours.length) {
-			const done = new Set(ours.map(([id]) => id));
-			// Heard once: a host that gives the same drawing again with the same names (`made` kept on it) changes nothing.
-			for (const id of done) sent.delete(id);
-			/*
-			 * What it has, and every edit sent before the last of those: one call goes at a time, each
-			 * answered after the host made it, so a drawing with a later one has the earlier ones too,
-			 * even where its name was not passed on.
-			 */
-			const last = pending.findLastIndex((one) => done.has(one.as ?? one.id));
-			const had = pending.filter((one, at) => done.has(one.as ?? one.id) || (at < last && one.as !== undefined && one.ops));
-			for (const one of had) clearTimeout(one.timer);
-			pending = pending.filter((one) => !had.includes(one));
-		}
-		if (!hadPending && pending.length === 0) {
-			setWaiting(0);
-			// Nothing was shown ahead: the host's drawing as it gave it, with its own edits when they follow from what is shown.
-			show(next, edits && edits.from === wasShown ? edits : undefined, false);
-			return;
-		}
-		showOver(onTop(next));
-	};
+	const { flush, receive } = createDrawingSync({
+		host,
+		get inFlight() {
+			return inFlight;
+		},
+		set inFlight(next) {
+			inFlight = next;
+		},
+		get pending() {
+			return pending;
+		},
+		set pending(next) {
+			pending = next;
+		},
+		get stepsAfter() {
+			return stepsAfter;
+		},
+		set stepsAfter(next) {
+			stepsAfter = next;
+		},
+		sent,
+		wait,
+		get inFlightTimer() {
+			return inFlightTimer;
+		},
+		set inFlightTimer(next) {
+			inFlightTimer = next;
+		},
+		drop,
+		given,
+		get scope() {
+			return scope;
+		},
+		set scope(next) {
+			scope = next;
+		},
+		setWaiting,
+		forgetHistory,
+		setGiven,
+		doc,
+		history,
+		depth,
+		show,
+		showOver,
+		onTop,
+	});
 
-	const edit = (given: unknown[]) => {
-		if (options.readOnly || given.length === 0) return false;
-		// What the tools make is coloured by the drawing's own light/dark variables: defined here when it lacks them.
-		const ops = withDecksColors(untrack(doc), given);
-		if (host) {
-			const prev = untrack(doc);
-			let next: PenDocument | undefined;
-			try {
-				next = applied(prev, ops);
-			} catch {
-				// Not one this page can make: the host's to answer, as it always was.
-				next = undefined;
-			}
-			if (!next) {
-				host.send(ops);
-				return true;
-			}
-			const id = nameOne({});
-			pending.push({ id, ops });
-			setWaiting(pending.length);
-			// Shown at once, even when nothing changed: the stage waits for the drawing that answers its gesture.
-			show(next, { from: prev, edits: diff(prev, next) });
-			flush();
-			return true;
-		}
-		const prev = untrack(doc);
-		let next: PenDocument;
-		try {
-			next = applied(prev, ops);
-		} catch (error) {
-			console.warn("[canvas] an edit was refused:", error instanceof Error ? error.message : error);
-			return false;
-		}
-		if (!commit(prev, next)) {
-			/*
-			 * Nothing changed (an item dropped back where it was), but the stage is waiting for the drawing
-			 * that answers its gesture, as a server sends one whatever the edit did: a fresh copy is that
-			 * answer, so what was let go glides back into place now rather than when the stage gives up.
-			 */
-			show({ ...prev }, { from: prev, edits: [] });
-			return false;
-		}
-		undoStack.push(prev);
-		if (undoStack.length > depth) undoStack.shift();
-		redoStack.length = 0;
-		return true;
-	};
-
-	const step = (direction: "undo" | "redo") => {
-		if (host) {
-			const base = untrack(given);
-			const stack = direction === "undo" ? history.undo : history.redo;
-			const change = stack[stack.length - 1];
-			// Shown ahead only when this page saw the edit it steps through and nothing else since.
-			if (!pending.length && change && (direction === "undo" ? change.after : change.before) === base) {
-				stack.pop();
-				(direction === "undo" ? history.redo : history.undo).push(change);
-				const to = direction === "undo" ? change.before : change.after;
-				const id = nameOne({ step: direction, change });
-				pending.push({ id, to, base, timer: wait(id, PENDING_MS) });
-				setWaiting(pending.length);
-				showOver(to);
-				host.step(direction, id);
-				return;
-			}
-			// After the edits still to go, which the host's history has to have first.
-			if (inFlight || pending.some((one) => one.ops && !one.as)) stepsAfter.push(() => host.step(direction));
-			else host.step(direction);
-			return;
-		}
-		const from = direction === "undo" ? undoStack : redoStack;
-		const to = direction === "undo" ? redoStack : undoStack;
-		const target = from.pop();
-		if (!target) return;
-		const now = untrack(doc);
-		to.push(now);
-		commit(now, target);
-	};
+	const { edit, step } = createDrawingEdits({
+		options,
+		doc,
+		host,
+		applied,
+		nameOne,
+		get pending() {
+			return pending;
+		},
+		setWaiting,
+		show,
+		flush,
+		commit,
+		undoStack,
+		depth,
+		redoStack,
+		given,
+		history,
+		wait,
+		showOver,
+		get inFlight() {
+			return inFlight;
+		},
+		get stepsAfter() {
+			return stepsAfter;
+		},
+	});
 
 	const pageId = (path: string) => untrack(doc).children?.find((node) => isPage(node) && pagePath(node) === path)?.id;
 
