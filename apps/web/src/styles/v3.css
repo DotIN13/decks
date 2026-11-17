@@ -3469,6 +3469,176 @@ body {
 	}
 }
 
+/* ---- the canvas manager on a phone: a drawer from the foot of the screen, the canvases a list ---- */
+@layer components {
+	body .stage-manager[data-form="drawer"] {
+		place-items: end stretch;
+		padding: 0;
+		background: rgb(10 10 12 / 30%);
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+		transition: opacity 240ms var(--v3-ease);
+	}
+	/* The drawer comes up and goes down; `CanvasManager.tsx` waits the same 300ms before it is taken away. */
+	body .stage-manager[data-form="drawer"] .stage-box {
+		width: 100%;
+		height: min(82dvh, 100dvh - 56px);
+		border: 0;
+		border-radius: 22px 22px 0 0;
+		box-shadow: 0 -4px 28px rgb(0 0 0 / 16%);
+		padding-bottom: env(safe-area-inset-bottom);
+		transform: translateY(100%);
+		transition: transform 300ms var(--v3-ease);
+	}
+	body .stage-manager[data-form="drawer"][data-open] .stage-box {
+		transform: none;
+	}
+	/* The head is the handle: a finger on it drags the drawer, so the browser pans nothing. */
+	body .stage-manager[data-form="drawer"] .stage-head {
+		gap: 10px;
+		padding: 8px 16px 10px;
+		touch-action: none;
+	}
+	.stage-grab {
+		align-self: center;
+		width: 36px;
+		height: 5px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--v3-fg, currentColor) 22%, transparent);
+	}
+	body .stage-manager[data-form="drawer"] .stage-title {
+		font-size: 17px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-new {
+		height: 36px;
+		padding: 0 14px 0 11px;
+		border-radius: 18px;
+		font-size: 15px;
+	}
+	/* Naming a new canvas takes the row: the heading gives it up. */
+	body .stage-manager[data-form="drawer"] .stage-title-row:has(> .stage-new-form) > .stage-title {
+		display: none;
+	}
+	body .stage-manager[data-form="drawer"] .stage-new-form {
+		flex: 1;
+	}
+	body .stage-manager[data-form="drawer"] .stage-new-form .stage-icon {
+		flex: none;
+		width: 36px;
+		height: 36px;
+	}
+	/* 16px in every field: under that, iOS zooms the page when the field takes the keyboard. */
+	body .stage-manager[data-form="drawer"] .stage-new-field,
+	body .stage-manager[data-form="drawer"] .stage-search > input,
+	body .stage-manager[data-form="drawer"] .stage-rename {
+		height: 36px;
+		font-size: 16px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-search {
+		height: 38px;
+		border-radius: 10px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-sort > button {
+		height: 34px;
+		padding: 0 12px;
+		font-size: 14px;
+	}
+	/* A list: one canvas a row, a small picture, its name and line, and rename and delete at the end. */
+	body .stage-manager[data-form="drawer"] .stage-wall {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 2px 8px 16px;
+		overscroll-behavior: contain;
+	}
+	body .stage-manager[data-form="drawer"] .stage-card {
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		gap: 12px;
+		min-height: 64px;
+		box-sizing: border-box;
+		padding: 8px;
+		border-radius: 14px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-card[data-here] {
+		background: var(--v3-bg2);
+	}
+	body .stage-manager[data-form="drawer"] .stage-open {
+		flex: none;
+		width: 76px;
+		border-radius: 8px;
+		background-size: 7px 7px;
+		transform: none;
+		box-shadow: none;
+	}
+	body .stage-manager[data-form="drawer"] .stage-card[data-here] .stage-open {
+		box-shadow: 0 0 0 1px var(--v3-accent);
+	}
+	body .stage-manager[data-form="drawer"] .stage-shot {
+		padding: 3px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-empty > span {
+		display: none;
+	}
+	body .stage-manager[data-form="drawer"] .stage-empty > svg {
+		width: 16px;
+		height: 16px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-foot {
+		flex: 1;
+		order: 2;
+		gap: 1px;
+	}
+	/* A long name takes a second line, not an ellipsis. */
+	body .stage-manager[data-form="drawer"] .stage-name-row > .row-label {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		font-size: 16px;
+		line-height: 1.25;
+		overflow-wrap: anywhere;
+		white-space: normal;
+	}
+	body .stage-manager[data-form="drawer"] .stage-meta {
+		overflow: hidden;
+		font-size: 13px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	body .stage-manager[data-form="drawer"] .stage-acts {
+		position: static;
+		flex: none;
+		order: 3;
+		gap: 2px;
+		opacity: 1;
+		transform: none;
+	}
+	body .stage-manager[data-form="drawer"] .stage-acts .stage-icon {
+		width: 36px;
+		height: 36px;
+		border: 0;
+		background: none;
+		box-shadow: none;
+	}
+	body .stage-manager[data-form="drawer"] .stage-acts .stage-icon > svg {
+		width: 17px;
+		height: 17px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-confirm {
+		height: 36px;
+		padding: 0 14px;
+		border-radius: 18px;
+		font-size: 14px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		body .stage-manager[data-form="drawer"],
+		body .stage-manager[data-form="drawer"] .stage-box {
+			transition: none;
+		}
+	}
+}
+
 /* ---- the canvas switcher: a small picture, the name, its faces and its age ------------------- */
 @layer components {
 	body .popover [data-row].switcher-canvas {

@@ -46,9 +46,20 @@ import { AuthedImg } from "../lib/authed.tsx";
  * changed. Rename and delete float on the picture's corner, shown on hover or focus, so a wall of
  * cards is a wall of pictures rather than of pencils and bins. The canvas you are on wears the
  * accent and says "Current".
+ *
+ * ### On a phone, a drawer
+ *
+ * A phone has no room for a panel with a margin round it, or for a wall: one picture filled the
+ * screen. There (`drawer`) it comes up from the foot of the screen at the screen's width, and the
+ * canvases are a list, a small picture, the name and its line, with rename and delete at the row's
+ * end. It goes away as a drawer does: a press on the canvas above it, or its head dragged down.
  */
 /** The panel's fade, in and out: `canvases.css` says the same 120ms. */
 const FADE_MS = 120;
+/** The drawer's slide, up and down: `v3.css` says the same 300ms. */
+const SLIDE_MS = 300;
+/** A drawer let go this far down closes; nearer, it goes back up. */
+const PULL_SHUT = 110;
 
 
 export function CanvasManager(props: {
@@ -68,6 +79,8 @@ export function CanvasManager(props: {
 	onDelete: (name: string) => void;
 	/** Make your own copy of a friend's canvas (`canvas.copyShared`), and go to it. */
 	onCopy?: (name: string) => void;
+	/** A phone's form: a drawer from the foot of the screen, the canvases as a list. */
+	drawer?: boolean;
 }) {
 	const [query, setQuery] = createSignal("");
 	let field: HTMLInputElement | undefined;
@@ -103,7 +116,7 @@ export function CanvasManager(props: {
 			);
 		} else {
 			setShown(false);
-			const gone = setTimeout(() => !props.open && setMounted(false), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : FADE_MS + 40);
+			const gone = setTimeout(() => !props.open && setMounted(false), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : (props.drawer ? SLIDE_MS : FADE_MS) + 40);
 			onCleanup(() => clearTimeout(gone));
 		}
 	});
@@ -129,6 +142,32 @@ export function CanvasManager(props: {
 		document.addEventListener("keydown", escape);
 		onCleanup(() => document.removeEventListener("keydown", escape));
 	});
+
+	/*
+	 * A drawer's head is its handle: dragged down it follows the finger, and let go far enough down,
+	 * or flung, it closes; nearer, it goes back up. A press on a control in the head is that control's.
+	 */
+	const [pull, setPull] = createSignal<number>();
+	const grab = (event: PointerEvent) => {
+		if (!props.drawer || (event.target as Element).closest("button, input, label, [role='radiogroup']")) return;
+		const head = event.currentTarget as HTMLElement;
+		const from = event.clientY;
+		const began = performance.now();
+		const down = (at: PointerEvent) => Math.max(0, at.clientY - from);
+		const move = (at: PointerEvent) => setPull(down(at));
+		const end = (at: PointerEvent) => {
+			head.removeEventListener("pointermove", move);
+			head.removeEventListener("pointerup", end);
+			head.removeEventListener("pointercancel", end);
+			const flung = down(at) > 24 && down(at) / Math.max(1, performance.now() - began) > 0.6;
+			setPull(undefined);
+			if (at.type === "pointerup" && (down(at) > PULL_SHUT || flung)) props.onClose();
+		};
+		head.setPointerCapture(event.pointerId);
+		head.addEventListener("pointermove", move);
+		head.addEventListener("pointerup", end);
+		head.addEventListener("pointercancel", end);
+	};
 
 	const offered = () => props.stages;
 	const rows = createMemo(() => searchStages(offered(), query()));
@@ -176,10 +215,16 @@ export function CanvasManager(props: {
 				role="dialog"
 				aria-label="Canvases"
 				data-open={shown() ? "true" : undefined}
-				onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}
+				data-form={props.drawer ? "drawer" : undefined}
+				onPointerDown={(event) => !props.drawer && event.target === event.currentTarget && props.onClose()}
+				/* Under a finger the press is taken whole, as a click: closed on the way down, its click went on to whatever was under the shade, and on the bar's title that opened the canvases again. */
+				onClick={(event) => props.drawer && event.target === event.currentTarget && props.onClose()}
 			>
-				<div class="stage-box">
-					<div class="stage-head">
+				<div class="stage-box" style={pull() === undefined ? undefined : { transform: `translateY(${pull()}px)`, transition: "none" }}>
+					<div class="stage-head" onPointerDown={grab}>
+						<Show when={props.drawer}>
+							<span class="stage-grab" aria-hidden="true" />
+						</Show>
 						<div class="stage-title-row">
 							<h2 class="stage-title">
 								Canvases

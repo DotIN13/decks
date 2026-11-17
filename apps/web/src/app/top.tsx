@@ -92,6 +92,7 @@ export function Top(props: { parts: Parts }) {
 				onPick={openCanvas}
 				onNew={createCanvas}
 				scheme={scheme()}
+				drawer={phone()}
 			/>
 
 			<Show

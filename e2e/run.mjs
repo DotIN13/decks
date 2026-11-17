@@ -187,6 +187,7 @@ const CHECKS = [
 	{ file: "tabs-kept.mjs", needsAgent: false },
 	{ file: "tab-about.mjs", needsAgent: false },
 	{ file: "tabs-phone.mjs", needsAgent: false },
+	{ file: "canvas-drawer.mjs", needsAgent: false },
 	{ file: "tabs-cameras.mjs", needsAgent: false },
 	/* Between two of your canvases the frame moves in place; to and from a friend's it is made anew. */
 	{ file: "canvas-switch.mjs", needsAgent: false },
