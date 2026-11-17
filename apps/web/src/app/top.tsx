@@ -114,7 +114,8 @@ export function Top(props: { parts: Parts }) {
 				}
 			>
 				<TopRight
-					here={hereAgents()}
+					/* On a touch bar the agent you talk to is the face at the left already: alone on the canvas, it is not said twice. */
+					here={touch() && hereAgents().length === 1 && hereAgents()[0]!.id === state.focused ? [] : hereAgents()}
 					identities={state.identities}
 					unread={unread}
 					focused={state.focused}
