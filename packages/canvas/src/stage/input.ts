@@ -1,4 +1,4 @@
-import { knobs } from "../debug.ts";
+import { knobs } from "../base/debug.ts";
 import type { Camera } from "@decks/protocol";
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { touchedCanvas } from "../camera/touched.ts";
@@ -10,7 +10,7 @@ import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
 import { handTool } from "../edit/pen-tools.ts";
 import { handPans } from "../edit/core/dispatch.ts";
 import { untilReleased } from "../edit/held.ts";
-import type { StageEditor } from "../edit/index.ts";
+import type { StageEditor } from "../edit/dom/index.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { StageProps } from "./Stage.tsx";
 

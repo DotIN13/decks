@@ -1,5 +1,5 @@
 import { readingOfCard } from "./card-reading.ts";
-import { freshAddress, passless } from "../host.ts";
+import { freshAddress, passless } from "../base/host.ts";
 /**
  * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
  * frame of its own.

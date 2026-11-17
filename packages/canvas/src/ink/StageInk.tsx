@@ -5,8 +5,8 @@ import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, set
 import { inkHex, inkItem } from "../model/ink.ts";
 import type { StageEngine } from "../render/engine.ts";
 import type { LiveInk, PenPreview } from "../render/types.ts";
-import { knobs } from "../debug.ts";
-import { scheme } from "../theme.ts";
+import { knobs } from "../base/debug.ts";
+import { scheme } from "../base/theme.ts";
 
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
 const STAGE_INK = "stage";

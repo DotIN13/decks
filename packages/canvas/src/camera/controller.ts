@@ -1,4 +1,4 @@
-import { knobs } from "../debug.ts";
+import { knobs } from "../base/debug.ts";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { between, pan, zoomAbout, type Viewport } from "./camera.ts";

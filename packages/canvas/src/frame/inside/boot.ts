@@ -2,7 +2,7 @@ import { life } from "./life.ts";
 import { createSignal, untrack } from "solid-js";
 import type { Page, Camera } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
-import type { Editor, StageComment } from "../../types.ts";
+import type { Editor, StageComment } from "../../stage/types.ts";
 import type { FrameChromeView, ViewOffer } from "../chrome.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { isNews } from "../../items/news.ts";
@@ -13,7 +13,7 @@ import { installPresence } from "./presence.ts";
 import { installMarks } from "./marks.ts";
 import { createStudioLine } from "./studio-line.ts";
 import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
-import { forgetMissing } from "../../items/missing.ts";
+import { forgetMissing } from "../../base/missing.ts";
 import { giveDeckImports } from "../../items/card.ts";
 
 /**

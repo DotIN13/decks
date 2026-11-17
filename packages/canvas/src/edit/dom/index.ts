@@ -5,11 +5,11 @@
  * rest is what the stage still does with the editor's pieces itself (the overlay's parts, the ops
  * the pill and the ink write), until those move in too.
  */
-import { createEditor, type EditorHost } from "./dom/controller.ts";
-import { createInsertMenu, type InsertHost } from "../ui/InsertMenu.tsx";
-import { createKeys, type KeysHost } from "./dom/keys.ts";
-import { createPointer, type Pointer, type PointerHost } from "./dom/pointer.ts";
-import { createTextEditing, type TextHost } from "./dom/TextEditing.tsx";
+import { createEditor, type EditorHost } from "./controller.ts";
+import { createInsertMenu, type InsertHost } from "../../ui/InsertMenu.tsx";
+import { createKeys, type KeysHost } from "./keys.ts";
+import { createPointer, type Pointer, type PointerHost } from "./pointer.ts";
+import { createTextEditing, type TextHost } from "./TextEditing.tsx";
 
 export type StageEditorHost = Omit<EditorHost, "effects"> & {
 	/** The page's side of the effects, but for the camera having been dragged, which the pointer keeps. */
@@ -49,12 +49,12 @@ export function createStageEditor(host: StageEditorHost) {
 }
 export type StageEditor = ReturnType<typeof createStageEditor>;
 
-export type { PageView, Openers } from "./dom/pointer.ts";
-export { OverlayLayer, ANCHOR_OUT, ANCHOR_PX } from "./dom/OverlayLayer.tsx";
-export { TextEditor } from "./dom/TextEditing.tsx";
-export { InsertMenu } from "../ui/InsertMenu.tsx";
+export type { PageView, Openers } from "./pointer.ts";
+export { OverlayLayer, ANCHOR_OUT, ANCHOR_PX } from "./OverlayLayer.tsx";
+export { TextEditor } from "./TextEditing.tsx";
+export { InsertMenu } from "../../ui/InsertMenu.tsx";
 export { tsScene, tsSeam } from "./scene-ts.ts";
-export { dropSlot, frameUnder } from "./core/drop.ts";
-export { deleteOps, duplicateOps, idMaker, moveOps } from "./core/ops.ts";
-export { arrowAnchors, arrowEnds, pageHandles, distances, dropBox, glideShift, gripBox, gripHidden, hoverBox, itemHandles, kinOutlines, radiusHandle, selectionFrame, selectionOutlines, type Overlay } from "./core/overlay.ts";
-export type { PenTool } from "./core/model.ts";
+export { dropSlot, frameUnder } from "../core/drop.ts";
+export { deleteOps, duplicateOps, idMaker, moveOps } from "../core/ops.ts";
+export { arrowAnchors, arrowEnds, pageHandles, distances, dropBox, glideShift, gripBox, gripHidden, hoverBox, itemHandles, kinOutlines, radiusHandle, selectionFrame, selectionOutlines, type Overlay } from "../core/overlay.ts";
+export type { PenTool } from "../core/model.ts";

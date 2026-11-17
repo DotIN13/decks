@@ -1,24 +1,24 @@
-import { probes } from "../debug.ts";
+import { probes } from "../base/debug.ts";
 import type { Page, Camera } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
 import { boxOf, LIVE_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import { canvasHost, openInTab } from "../host.ts";
+import { canvasHost, openInTab } from "../base/host.ts";
 import { appShowing } from "../items/item-surfaces.tsx";
 import MediaPlayer from "../items/MediaPlayer.tsx";
 import { chooseAwake, NO_AWAKE, sameAwake, type Awake, type AwakeItem } from "../items/awake.ts";
-import { missing } from "../items/missing.ts";
+import { missing } from "../base/missing.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { SceneCard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
 import { AWAKE, DEVICE, ENGINE, MOVING } from "../render/device.ts";
 import { drawing } from "../ink/ink.ts";
-import { scheme } from "../theme.ts";
+import { scheme } from "../base/theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
 import { isLiveFile } from "../model/card-frame.ts";
 import type { StageEngine } from "../render/engine.ts";
-import type { StageEditor } from "../edit/index.ts";
+import type { StageEditor } from "../edit/dom/index.ts";
 import type { StageProps } from "./Stage.tsx";
 
 /** What the items layer needs of the stage around it. */
@@ -372,7 +372,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
 	/** The placed items as the chooser sees them: the same order as `props.boards` and `pageIndex`, each with its kind. */
-	// A card its host has no copy of (`items/missing.ts`) is never woken, as a board is not: its page would be blank paper, and the sheet paints why.
+	// A card its host has no copy of (`base/missing.ts`) is never woken, as a board is not: its page would be blank paper, and the sheet paints why.
 	const awakeItems = createMemo<readonly AwakeItem[]>(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, kind: board.card ? (missing().has(board.path) ? undefined : "card") : board.item })));
 	/*
 	 * Which items are awake (`items/awake.ts`): chosen from the camera at rest, so nothing mounts or

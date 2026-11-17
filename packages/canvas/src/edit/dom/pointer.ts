@@ -14,7 +14,7 @@
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
 import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
-import { HOLD_MS, slopFor } from "./touch-rules.ts";
+import { HOLD_MS, slopFor } from "../core/touch-rules.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
 import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
 import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";

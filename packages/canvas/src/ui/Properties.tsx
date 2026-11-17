@@ -44,8 +44,8 @@ import { penBoxes, penSelection, penTyping, propsOpen, setInsertPanel, setPenLiv
 import { Icon } from "@decks/ui";
 import { adaptiveTitle, sameColor, swatchPaint } from "./adaptive.ts";
 import { ColorPicker } from "./ColorPicker.tsx";
-import { COARSE } from "../edit/dom/touch-rules.ts";
-import { scheme } from "../theme.ts";
+import { COARSE } from "../edit/core/touch-rules.ts";
+import { scheme } from "../base/theme.ts";
 import { ICON_LIBRARIES } from "../look/icon-index.ts";
 
 /**

@@ -3,10 +3,10 @@
  * knows `stage/engine.ts` exists.
  */
 import type { PenDocument } from "@decks/pen";
-import { docIndex } from "../model/doc-index.ts";
-import type { StageEngine } from "../render/engine.ts";
-import type { PageBox } from "./core/model.ts";
-import type { EngineSeam, SceneQuery } from "./core/scene.ts";
+import { docIndex } from "../../model/doc-index.ts";
+import type { StageEngine } from "../../render/engine.ts";
+import type { PageBox } from "../core/model.ts";
+import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 
 export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll" | "onLine" | "pageIdOf">, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
 	const found = (id: string) => {

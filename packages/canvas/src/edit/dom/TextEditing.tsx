@@ -24,7 +24,7 @@ import type { Picked } from "../core/pick.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
 import type { Editor } from "./controller.ts";
-import { openInTab, pictureAddress } from "../../host.ts";
+import { openInTab, pictureAddress } from "../../base/host.ts";
 
 export type TextHost = {
 	scene: SceneQuery;

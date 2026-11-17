@@ -1,7 +1,7 @@
 import type { Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { dismissMenus } from "@decks/ui";
-import type { EditorState, StageComment } from "../../types.ts";
+import type { EditorState, StageComment } from "../../stage/types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
 import type { InkTool } from "../../ink/ink.ts";
 import { insets } from "../../camera/insets.ts";

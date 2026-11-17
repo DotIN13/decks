@@ -10,7 +10,7 @@
  */
 import { sidePoint, type ArrowSide, type Op } from "@decks/pen";
 import { Show } from "solid-js";
-import { canvasHost } from "../host.ts";
+import { canvasHost } from "../base/host.ts";
 import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../edit/pen-tools.ts";
 import { newCard } from "../model/card-frame.ts";
 import { Insert } from "./Insert.tsx";

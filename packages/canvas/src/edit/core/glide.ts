@@ -4,8 +4,8 @@
  * ease-out. The maths is here; the engine runs it at the drawing that answers the drop
  * (`stage/engine.ts`, `settle`), so nothing is drawn where it lands before it has glided there.
  */
-import type { Offset, Rect } from "../edit/core/model.ts";
-import type { SceneQuery } from "../edit/core/scene.ts";
+import type { Offset, Rect } from "./model.ts";
+import type { SceneQuery } from "./scene.ts";
 
 /** How long a landing glides for. */
 export const GLIDE_MS = 150;

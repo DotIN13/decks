@@ -24,7 +24,7 @@ import type { Tokens } from "marked";
 import { cardMarked, FONT_GROUPS } from "../model/card-syntax.ts";
 import { cut, splitAround, STYLES, unwrap, type Style } from "./card-styles.ts";
 import { atom, h, inline, readCard, writeCard, ZW, type WordsHost } from "./card-words.ts";
-import { pictureAddress } from "../host.ts";
+import { pictureAddress } from "../base/host.ts";
 
 /**
  * The editor over a card (`Stage.tsx`): its words as they read, typed into in place, and written back

@@ -1,4 +1,4 @@
-import { probes } from "../debug.ts";
+import { probes } from "../base/debug.ts";
 import type { JSX } from "solid-js";
 import type { Page, Camera } from "@decks/protocol";
 import { Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
@@ -16,9 +16,9 @@ import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen,
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
 import { overlayJson } from "../edit/core/overlay-json.ts";
 import { rgbOf } from "../edit/dom/colours.ts";
-import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
+import { COARSE, HANDLE_DOT_PX } from "../edit/core/touch-rules.ts";
 import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
-import { scheme } from "../theme.ts";
+import { scheme } from "../base/theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
 import { StageEngine } from "../render/engine.ts";
 import { ENGINE, LAYERS } from "../render/device.ts";
@@ -33,7 +33,7 @@ import {
 	TextEditor,
 	tsScene,
 	tsSeam,
-} from "../edit/index.ts";
+} from "../edit/dom/index.ts";
 import { createStageInput } from "./input.ts";
 import { createItemsLayer } from "./items-layer.tsx";
 import { createSelection } from "./selection.tsx";
@@ -59,8 +59,8 @@ import { createSelection } from "./selection.tsx";
  * finger on the canvas moves the canvas unless it landed on something that says
  * otherwise, which on a board means a title bar or a component already selected.
  */
-export type { InkRequest, StageComment, CanvasShots } from "../types.ts";
-import type { InkRequest, StageComment, CanvasShots } from "../types.ts";
+export type { InkRequest, StageComment, CanvasShots } from "./types.ts";
+import type { InkRequest, StageComment, CanvasShots } from "./types.ts";
 
 
 /** What the stage is given by its host. */

@@ -1,4 +1,4 @@
-import { knobs, probes, type SheetStats } from "../debug.ts";
+import { knobs, probes, type SheetStats } from "../base/debug.ts";
 import renderWorkerUrl from "./render.worker.ts?worker&url";
 /**
  * The stage's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
@@ -13,12 +13,12 @@ import renderWorkerUrl from "./render.worker.ts?worker&url";
  * engines once each.
  */
 import type { PageEngine } from "@decks/stage";
-import { markMissing, saysMissing } from "../items/missing.ts";
+import { markMissing, saysMissing } from "../base/missing.ts";
 import { baseTheme, diff, isArrow, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../look/font-files.ts";
 import { iconUrl, parseIcon } from "../look/icons.ts";
-import { pictureAddress } from "../host.ts";
+import { pictureAddress } from "../base/host.ts";
 import { Recovery } from "./recovery.ts";
 import { snapMove, type Box, type Guide } from "../edit/snap.ts";
 import { boundsOf } from "../model/bounds.ts";
@@ -26,7 +26,7 @@ import { docIndex, drawnNodes } from "../model/doc-index.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { setStageWords, type Words } from "./measure.ts";
-import { glideShifts, glideStep, shiftsFrom, type Shift } from "../camera/glide.ts";
+import { glideShifts, glideStep, shiftsFrom, type Shift } from "../edit/core/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 import { ENGINE, knownGpuClass, PICTURES, readGpuClass } from "./device.ts";
@@ -688,7 +688,7 @@ export class StageEngine {
 
 	/**
 	 * The drawing that answers a drop is laid out: everything that moved glides from where it was let
-	 * go to where it is now (`camera/glide.ts`). Shown before this drawing's first frame, so nothing is
+	 * go to where it is now (`edit/core/glide.ts`). Shown before this drawing's first frame, so nothing is
 	 * drawn where it lands before it has glided there. False when nothing moved.
 	 */
 	private startGlide(): boolean {

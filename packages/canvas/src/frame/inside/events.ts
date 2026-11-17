@@ -1,5 +1,5 @@
 import { life } from "./life.ts";
-import { probes } from "../../debug.ts";
+import { probes } from "../../base/debug.ts";
 import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
 import { touchedBy } from "./marks.ts";

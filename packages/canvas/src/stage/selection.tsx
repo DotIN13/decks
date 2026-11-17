@@ -31,7 +31,7 @@ import {
 	type Overlay,
 	type StageEditor,
 	type tsScene,
-} from "../edit/index.ts";
+} from "../edit/dom/index.ts";
 import type { StageProps } from "./Stage.tsx";
 
 /** What the selection's drawing needs of the stage around it. */

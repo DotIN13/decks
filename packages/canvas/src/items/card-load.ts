@@ -1,4 +1,4 @@
-import { saysMissing } from "./missing.ts";
+import { saysMissing } from "../base/missing.ts";
 
 /**
  * How a card's file is read (`card-surface.tsx`): its HTML mounted once it has come, and nothing done
@@ -17,7 +17,7 @@ export function cardLoader(options: {
 	/** The file's address now. */
 	url(): string;
 	read(url: string): Promise<Pick<Response, "ok" | "text"> & Partial<Pick<Response, "status" | "headers">>>;
-	/** The host said it has no copy and no source (`items/missing.ts`): not asked again. */
+	/** The host said it has no copy and no source (`base/missing.ts`): not asked again. */
 	missing?(): void;
 	/** The file's HTML, to mount. */
 	mount(html: string): void;

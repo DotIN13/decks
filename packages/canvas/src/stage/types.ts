@@ -1,10 +1,10 @@
 import type { Frame, PenDocument, PenEdit } from "@decks/pen";
 import type { Page, Camera } from "@decks/protocol";
 import type { Accessor, JSX } from "solid-js";
-import type { ViewStorage } from "./camera/agent-views.ts";
-import type { DocEdits, DrawingWriter } from "./render/types.ts";
-import type { InkTool } from "./ink/ink.ts";
-import type { PenTool } from "./edit/pen-tools.ts";
+import type { ViewStorage } from "../camera/agent-views.ts";
+import type { DocEdits, DrawingWriter } from "../render/types.ts";
+import type { InkTool } from "../ink/ink.ts";
+import type { PenTool } from "../edit/pen-tools.ts";
 
 /*
  * The editor's types, apart from the code that makes it: what a host gives it and gets back

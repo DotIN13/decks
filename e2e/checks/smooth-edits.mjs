@@ -1,6 +1,6 @@
 /**
  * Every change of place glides, whoever made it: an agent's `canvas.move` of a note is drawn from where
- * the note was, catching up frame by frame (Pen's exponential smoothing, `camera/glide.ts`), never
+ * the note was, catching up frame by frame (Pen's exponential smoothing, `edit/core/glide.ts`), never
  * jumping; an inserted note rises in; a moved card's awake slot glides with its picture.
  */
 import { API, asPerson, canvasFrame, card, open, resetStage, rest, say, selectCard, settle } from "../harness.mjs";

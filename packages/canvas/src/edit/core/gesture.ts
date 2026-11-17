@@ -17,7 +17,7 @@ import { isCard, mediaOf, shapeRadius, type MediaItem, type Op, type PenNode } f
 import { snapMove, type Guide } from "../snap.ts";
 import { arrowOp, bendAt, bendStart, droppedEnd, joinAt, resetBendOp, resetEndOp, routeDraft, slideJoin, withEnd, type ArrowHandles, type JoinedEnd, type Which } from "./arrows.ts";
 import { dropSlot, frameUnder, NEAR_PX, nearDrops } from "./drop.ts";
-import { landingBoxes } from "../../camera/glide.ts";
+import { landingBoxes } from "./glide.ts";
 import type { PageBox, EditorState, Mods, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox } from "./model.ts";
 import { pageMoves, copyOps, moveOps, type PageMove, type NextId } from "./ops.ts";
 import { marqueePick, marqueeRect, pickAt, type Picked } from "./pick.ts";

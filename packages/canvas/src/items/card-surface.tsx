@@ -1,12 +1,12 @@
-import { probes } from "../debug.ts";
+import { probes } from "../base/debug.ts";
 import { createEffect, createMemo, on, onCleanup, untrack } from "solid-js";
 import { isCardSheet, mountCard, type MountedCard } from "./card.ts";
 import { ownInput } from "./input.ts";
 import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
 import { cardLoader } from "./card-load.ts";
-import { scheme } from "../theme.ts";
-import { markMissing } from "./missing.ts";
-import { canvasHost, freshAddress, openInTab } from "../host.ts";
+import { scheme } from "../base/theme.ts";
+import { markMissing } from "../base/missing.ts";
+import { canvasHost, freshAddress, openInTab } from "../base/host.ts";
 
 /** The cards mounted on this page, by path: how each is written out for an agent's screenshot (`card-snapshot.ts`). */
 const shots = new Map<string, () => CardShot | undefined>();

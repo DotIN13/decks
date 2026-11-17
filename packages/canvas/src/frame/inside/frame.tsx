@@ -1,8 +1,8 @@
-import { probes } from "../../debug.ts";
+import { probes } from "../../base/debug.ts";
 import { Show, For, createMemo, createRoot } from "solid-js";
 import { render } from "solid-js/web";
-import { createEditor } from "../../editor.tsx";
-import type { Editor } from "../../types.ts";
+import { createEditor } from "../../stage/editor.tsx";
+import type { Editor } from "../../stage/types.ts";
 import type { FrameChromeView } from "../chrome.ts";
 import { AgentCursor } from "../../ui/AgentCursor.tsx";
 import { openFrame } from "./boot.ts";
@@ -10,7 +10,7 @@ import { endLife } from "./life.ts";
 import { editorOptions, installHost } from "./options.ts";
 import { wireFrame } from "./events.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Start, type StartMessage } from "../protocol.ts";
-import { forgetMissing } from "../../items/missing.ts";
+import { forgetMissing } from "../../base/missing.ts";
 
 /**
  * The canvas, run inside its frame: says `hello` to its parent, takes `start` and the port, reads its

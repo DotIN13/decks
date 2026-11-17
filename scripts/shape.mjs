@@ -18,8 +18,8 @@
  * shrink: a new one fails, naming the two files. The old folder names and the new ones are both in
  * the table, so the gate holds while folders move.
  *
- * **The canvas package's layers** (`CANVAS_LAYERS`), held the same way: base; model; look; render;
- * camera; the editor's rules; items; the editor on the page; the view; the frame; the entry points.
+ * **The canvas package's layers** (`CANVAS_LAYERS`), held the same way: base; model; look; the
+ * editor's rules; render; camera; items; the editor on the page; the view; the frame; the entry points.
  *
  * After a change that lowers a count or removes an upward import, run `--update`: the gate then holds
  * the better number.
@@ -66,9 +66,10 @@ const CANVAS_LAYERS = [
 	["view", ["view/", "stage/"]],
 	["the editor on the page", ["edit/dom/", "ui/"]],
 	["items", ["items/", "ink/", "cards/"]],
-	["the editor's rules", ["edit/"]],
 	["camera", ["camera/"]],
 	["render", ["render/"]],
+	// The rules ask the drawing through an interface (`edit/core/scene.ts`), so they need no engine: the engine uses them.
+	["the editor's rules", ["edit/"]],
 	["look", ["look/"]],
 	["model", ["model/"]],
 	["base", ["base/", ""]],
