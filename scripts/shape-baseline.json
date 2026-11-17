@@ -1,6 +1,6 @@
 {
 	"counts": {
-		"files over 1,000 lines": 8,
+		"files over 1,000 lines": 7,
 		"functions over 150 lines": 63,
 		"classes over 30 methods": 10,
 		"server folder pairs that import each other": 13,
