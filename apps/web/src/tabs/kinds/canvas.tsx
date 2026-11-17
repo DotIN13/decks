@@ -15,6 +15,7 @@ import { CanvasTools } from "./canvas-tools.tsx";
  */
 export const canvasKind: TabKind = {
 	name: "canvas",
+	address: "canvas",
 	title: (tab) => (tab.target === undefined ? homeCanvas() : stages().find((one) => one.name === tab.target))?.title,
 	icon: (props) => <Icon of={Layers} size={props.size ?? 16} />,
 	// Kept while a tab of another kind is in front, out of sight: its frame, its canvas and where it was looking are as they were when it comes back.

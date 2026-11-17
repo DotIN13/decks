@@ -6,7 +6,14 @@ import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { state } from "../../state/deck.ts";
 import type { Tab, TabKind } from "../kind.ts";
-import { canvasOfPath } from "../open.ts";
+
+/** The canvas a card is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
+function canvasOfPath(path: string): string | undefined {
+	const own = /^canvases\/([^/]+)\//.exec(path);
+	if (own) return own[1];
+	const shared = /^shared\/canvases\/([^/]+)\/([^/]+)\//.exec(path);
+	return shared ? `shared/${shared[1]}/${shared[2]}` : undefined;
+}
 
 /** A card as the deck has it now, by its path. */
 const cardAt = (path: string | undefined) => state.pages.find((one) => one.path === path);
@@ -18,6 +25,7 @@ const cardAt = (path: string | undefined) => state.pages.find((one) => one.path 
  */
 export const cardKind: TabKind = {
 	name: "card",
+	address: "card",
 	title: (tab) => cardAt(tab.target)?.title,
 	icon: (props) => <Icon of={FileText} size={props.size ?? 16} />,
 	view: (tab, parts) => (

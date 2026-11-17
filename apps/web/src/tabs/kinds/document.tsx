@@ -17,6 +17,7 @@ const nameOf = (path: string | undefined) => path?.split("/").pop() ?? "Document
  */
 export const documentKind: TabKind = {
 	name: "document",
+	address: "doc",
 	title: (tab) => nameOf(tab.target),
 	icon: (props) => <Icon of={SquarePen} size={props.size ?? 16} />,
 	view: (tab, parts) => (

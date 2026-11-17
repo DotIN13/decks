@@ -25,12 +25,13 @@ import { createCalloutMenu } from "./callout-menu.ts";
 
 /**
  * The pill's New tab. The host opens the item whole in a tab of its own when it has them (`CanvasHost.openItem`),
- * told what it is; with ⌘ or ⌃ held, or with no such host, it is the browser's tab, as it always was.
+ * told what it is, and whether ⌘ or ⌃ was held, which asks for the browser's tab; with no such host it is the
+ * browser's tab on the item's own file or page, as it always was.
  */
 function newTab(board: Page, browser: boolean): void {
 	const host = canvasHost();
 	const app = board.item === "app" && board.app ? board.app : undefined;
-	if (host.openItem && !browser) return host.openItem(app ? { kind: "app", target: app } : board.item === "document" ? { kind: "document", target: board.file ?? board.path } : { kind: "card", target: board.path });
+	if (host.openItem) return host.openItem({ ...(app ? { kind: "app", target: app } : board.item === "document" ? { kind: "document", target: board.file ?? board.path } : { kind: "card", target: board.path }), ...(browser ? { browser: true } : {}) });
 	if (app) host.apps?.open(app);
 	else openInTab(host.fileUrl(board.path));
 }

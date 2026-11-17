@@ -16,6 +16,7 @@ import { tabs } from "../tabs.ts";
  */
 export const appKind: TabKind = {
 	name: "app",
+	address: "app",
 	title: (tab) => tab.target,
 	icon: (props) => <Icon of={AppWindow} size={props.size ?? 16} />,
 	view: (tab, parts) => (

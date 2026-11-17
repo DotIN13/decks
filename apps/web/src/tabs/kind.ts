@@ -22,6 +22,8 @@ export interface Tab {
 /** A kind of tab: what the row and the window ask of it, the same questions for every kind. */
 export interface TabKind {
 	name: string;
+	/** The word it goes by in the window's address, `#<address>/<target>` (`remember.ts`). */
+	address: string;
 	/** What a tab of this kind is called in the row. */
 	title(tab: Tab): string | undefined;
 	/** Its mark in the row. */

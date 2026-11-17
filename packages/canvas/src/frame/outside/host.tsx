@@ -42,7 +42,7 @@ export interface FrameHostOptions {
 	/** Open an app in a tab of its own (`decks.app`), outside the canvas's sandbox. */
 	openApp?(name: string): void;
 	/** The page has tabs of its own: a card, a document or an app opened whole from its pill (New tab) comes here, by what it is. Without it the pill opens the browser's tab. */
-	openTab?(item: { kind: "card" | "document" | "app"; target: string }): void;
+	openTab?(item: { kind: "card" | "document" | "app"; target: string; browser?: true }): void;
 	/** The page's composer: the frame is told where it is, so a drag let go over it mentions what it carries. */
 	composer?(): HTMLElement | undefined;
 	/** How far up from the bottom the page's dock reaches, in pixels: a phone's tool row goes above it. */

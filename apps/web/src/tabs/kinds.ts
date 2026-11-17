@@ -8,3 +8,6 @@ import { documentKind } from "./kinds/document.tsx";
 const KINDS: Record<string, TabKind> = { [canvasKind.name]: canvasKind, [cardKind.name]: cardKind, [documentKind.name]: documentKind, [appKind.name]: appKind };
 
 export const kindOf = (name: string): TabKind | undefined => KINDS[name];
+
+/** The kind that goes by a word in the window's address (`TabKind.address`). */
+export const kindAt = (address: string): TabKind | undefined => Object.values(KINDS).find((kind) => kind.address === address);

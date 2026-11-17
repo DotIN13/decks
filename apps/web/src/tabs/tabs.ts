@@ -66,6 +66,17 @@ export function openTab(kind: string, target: string): void {
 	bring(id);
 }
 
+/**
+ * Put back a row as it was left (`remember.ts`): the tabs after home, in their order, and the one that
+ * was in front, or home when that one is not among them. What was open before is let go.
+ */
+export function restoreTabs(row: ReadonlyArray<{ kind: string; target: string }>, frontId?: string): void {
+	const kept = row.map((one) => ({ id: `${one.kind}:${one.target}`, kind: one.kind, target: one.target }));
+	setOpened([HOME, ...kept.filter((tab, at) => kept.findIndex((other) => other.id === tab.id) === at)]);
+	setLastCanvasId(HOME.id);
+	bring(kept.some((tab) => tab.id === frontId) ? frontId! : HOME.id);
+}
+
 /** Bring a tab forward. */
 export const showTab = (id: string): void => bring(id);
 

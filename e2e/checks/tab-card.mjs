@@ -5,8 +5,8 @@
  * The pill's New tab on a card opens it as a tab of this window, where it opened the browser's. The
  * card runs in a sandboxed frame, as on its canvas, with the same carrier for its calls: its button,
  * which adds a note to its canvas through `card.decks`, works there, where a card on a page of its own
- * could call nothing. Its file changed shows in the tab. With ⌘ held the pill still opens the
- * browser's tab; the canvas is as it was left when the tab is closed.
+ * could call nothing. Its file changed shows in the tab. With ⌘ held the pill opens the browser's
+ * tab, on Decks at the card's address; the canvas is as it was left when the tab is closed.
  */
 import { API, CANVAS, asPerson, canvasFrame, deckState, flyToCard, focusCanvas, open, pressCardAction, resetStage, rest, say, selectCard, settle } from "../harness.mjs";
 import { writeFileSync } from "node:fs";
@@ -102,7 +102,7 @@ say("the ✕ closes it, and the canvas is back with its tools", (await until(asy
 const canvas = await canvasFrame(page);
 say("…the same canvas frame, not one made anew", (await canvas.evaluate(() => (globalThis.__decksProbes?.frameDrawn?.().children ?? []).length)) > 0);
 
-// --- with ⌘ held, the browser's tab, as before ----------------------------------------------------------------
+// --- with ⌘ held, the browser's tab -------------------------------------------------------------------------
 await focusCanvas(page);
 await selectCard(page, path);
 const popup = page.context().waitForEvent("page", { timeout: 5000 }).catch(() => undefined);
@@ -110,7 +110,9 @@ await page.keyboard.down("Meta");
 await pressCardAction(page, "New tab");
 await page.keyboard.up("Meta");
 const opened = await popup;
-say("with ⌘ held, New tab opens the browser's tab as before, and no tab here", !!opened && (await page.locator(".tab-chip").count()) === 0);
+say("with ⌘ held, New tab opens the browser's tab, and no tab here", !!opened && (await page.locator(".tab-chip").count()) === 0);
+// The browser's tab is this window's address with the card's after #: Decks there, with the card's tab in front.
+say("…at this window's address with the card's after #, where the card's tab is in front", !!opened && opened.url().endsWith(`#card/${path}`) && (await until(() => opened.locator('.tab-chip[data-kind="card"][data-front="true"]').count())) === 1, opened?.url());
 await opened?.close().catch(() => {});
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
