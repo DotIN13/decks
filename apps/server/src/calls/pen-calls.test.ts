@@ -359,6 +359,10 @@ test("a link is placed by what it opens, kept as a tagged pill, and read back as
 		assert.ok(!none.ok && /Nothing to open is called/.test(none.error ?? ""), none.error);
 		const gone = (await must("canvas.insert", [{ type: "link", to: "#canvas/long-gone" }, { at: { x1: 0, y1: 400 } }])).value;
 		assert.deepEqual([gone.to, gone.title, gone.opacity], ["#canvas/long-gone", "long-gone", 0.45]);
+		// The canvas called something else: the chip that showed its name follows, and the one with words of its own keeps them.
+		await must("canvas.rename", ["Field notes", { canvas: notes }]);
+		const after = (await must("canvas.read", [])).value.items as Array<{ id: string; to?: string; title?: string }>;
+		assert.deepEqual(after.filter((item) => item.id === chip.id || item.id === named.id).map((item) => [item.to, item.title]), [[`#canvas/${notes}`, "Field notes"], [`#canvas/${notes}`, "The interviews"]]);
 	} finally {
 		cleanup();
 	}

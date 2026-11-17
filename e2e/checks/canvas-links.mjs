@@ -11,6 +11,8 @@
  * its own (`decks canvas insert --type link --to …`): a click opens it and leaves nothing selected,
  * Shift-click selects it and opens nothing, and a drag moves it and opens nothing. One is added by
  * hand from the card tool's menu (Link to…, the finder the row of tabs' + has) or by pasting an address.
+ * And a chip follows the canvas it points at: renamed, it says the new name; deleted, it is dimmed
+ * and a click says so.
  */
 import { API, CANVAS, asPerson, canvasFrame, card, open, resetStage, rest, say, settle } from "../harness.mjs";
 
@@ -211,6 +213,20 @@ const cursor = () => canvasFrame(page).then((frame) => frame.evaluate(() => getC
 say("over a chip the pointer is a link's", (await until(async () => ((await cursor()) === "pointer" ? true : undefined), 2000)) === true, await cursor());
 await page.mouse.click(at.x, at.y);
 say("a chip to a canvas takes the camera there", (await until(async () => ((await cameraName()) === "Tab two" ? true : undefined))) === true, await cameraName());
+
+// --- kept in step with the canvas it points at ------------------------------------------------------------------------
+await page.locator(".v3-topbar .tab-chip[data-tab]").first().locator(".tab-chip-name").click();
+await until(async () => ((await cameraName()) === firstTitle ? true : undefined));
+await call("canvas.rename", ["Second tab", { canvas: second }]);
+say("the canvas called something else: its chip says the new name", (await until(async () => ((await links()).includes(`#canvas/${second}|Second tab`) ? true : undefined))) === true, JSON.stringify(await links()));
+const removed = await call("canvas.remove", [second]);
+const dimmed = await until(async () => (((await call("canvas.read", [{ canvas: CANVAS }])).value?.items ?? []).find((item) => item.type === "link" && item.to === `#canvas/${second}`)?.opacity === 0.45 ? true : undefined));
+say("the canvas deleted: its chip stays, dimmed", removed.ok === true && dimmed === true, JSON.stringify(removed).slice(0, 200));
+await show([chip.id]);
+at = await whole(chip.id);
+await page.mouse.click(at.x, at.y);
+const gone = await until(async () => (await page.locator(".notice").allInnerTexts()).find((one) => one.includes(second) && /not in the deck any more/.test(one)));
+say("…and a click on it says the canvas is not in the deck any more", !!gone, gone ?? JSON.stringify(await page.locator(".notice").allInnerTexts()));
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();
