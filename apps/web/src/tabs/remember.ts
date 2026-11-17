@@ -6,6 +6,16 @@ import { kindAt, kindOf } from "./kinds.ts";
 import { stages } from "../state/canvases.ts";
 import { aimCanvas, front, openTab, restoreTabs, rowNow } from "./tabs.ts";
 
+/** The canvas each conversation's camera was last seen on, or was put on by this page: what a canvases frame is news against. */
+const seen = new Map<string, string>();
+
+/**
+ * This page moved a conversation's camera to a canvas itself (`app/person.ts`, `moveConversation`).
+ * The harness's word of it comes a moment later and is no news: taken for a move then, it put the
+ * canvas in front over a card the person had picked in that moment.
+ */
+export const movedHere = (agent: string, canvas: string): void => void seen.set(agent, canvas);
+
 /**
  * The row kept, and the window's address in step with it.
  *
@@ -108,9 +118,9 @@ export function rememberTabs(): void {
 	/*
 	 * A conversation's camera moved to another canvas (its agent's own `view goto` or `view focus`,
 	 * the person on another device): it is on that canvas, with no card, document or app left over it.
-	 * Not at the first sight of where each one is, which is no move.
+	 * Not at the first sight of where each one is, which is no move; and not a move this page made,
+	 * which said what is in front when it made it (`movedHere`).
 	 */
-	const seen = new Map<string, string>();
 	createEffect(() => {
 		for (const stage of stages()) {
 			for (const agent of stage.agents) {

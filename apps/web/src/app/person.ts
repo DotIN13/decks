@@ -7,7 +7,8 @@ import { ensureHistory } from "../state/history.ts";
 import { notice } from "../state/notices.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { setDraft, setPanelOpen, setUnread } from "../state/ui.ts";
-import { canvasOnScreen, setCameraMover } from "../tabs/tabs.ts";
+import { movedHere } from "../tabs/remember.ts";
+import { aimCanvas, canvasOnScreen, setCameraMover } from "../tabs/tabs.ts";
 
 /**
  * What the person does to agents and canvases from the page's chrome.
@@ -90,8 +91,11 @@ export { setStagesOpen, stagesOpen };
  * and an agent's move the person said Go to (`view.goto` offered) moves that agent's. The camera follows when the server
  * says the agent is there (the landing, `app/landing.ts`).
  */
-export const moveConversation = (agentId: string | undefined, name: string) => {
+export const moveConversation = (agentId: string | undefined, name: string, forward = true) => {
 	if (!agentId || stageOf(agentId)?.name === name) return;
+	// The canvas comes in front of a card, a document or an app that chat had over the one it leaves, unless the mover says otherwise (a canvas tab closed).
+	if (forward) aimCanvas(agentId);
+	movedHere(agentId, name);
 	// On screen at once; the server is told beside it, and a refusal (a notice from act) moves back.
 	void moveTo(agentId, name, async () => {
 		if ((await act("agent.update", [{ canvas: name }], agentId)) === undefined) throw new Error(`not moved to ${name}`);

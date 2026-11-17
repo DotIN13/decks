@@ -44,9 +44,9 @@ const canvasTab = (name: string): Tab => {
 /** The tab of a chat with no canvas yet: a canvas tab with none to show. */
 const NONE: Tab = { id: "canvas:", kind: "canvas" };
 
-/** Moves a conversation's camera to a canvas, as the harness keeps it: the app's own (`app/person.ts`, `moveConversation`), given here once. */
-let moveCamera: (agent: string, canvas: string) => void = () => {};
-export const setCameraMover = (move: (agent: string, canvas: string) => void): void => void (moveCamera = move);
+/** Moves a conversation's camera to a canvas, as the harness keeps it: the app's own (`app/person.ts`, `moveConversation`), given here once. `forward: false` leaves a card, a document or an app in front of it. */
+let moveCamera: (agent: string, canvas: string, forward?: boolean) => void = () => {};
+export const setCameraMover = (move: (agent: string, canvas: string, forward?: boolean) => void): void => void (moveCamera = move);
 
 /** The canvas the camera of the chat on screen is on: what is on screen, or held behind a card, a document or an app. */
 export const canvasOnScreen = (): StageRow | undefined => stageOf(state.focused);
@@ -161,7 +161,8 @@ export function closeTab(id: string): void {
 	if (id === cameraCanvasTab().id) {
 		const beside = canvasBeside();
 		if (!beside?.target) return;
-		moveCamera(who(), beside.target);
+		// What is in front stays in front: a card over the canvas closed is over the one beside it now.
+		moveCamera(who(), beside.target, false);
 	}
 	setOpened((was) => was.filter((tab) => tab.id !== id));
 	setCameraTabs((was) => Object.fromEntries(Object.entries(was).filter(([, tab]) => tab !== id)));

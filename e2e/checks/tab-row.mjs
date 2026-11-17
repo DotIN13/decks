@@ -28,7 +28,20 @@ await call("canvas.create", ["Research notes"]);
 await call("apps.create", ["tracker", { title: "Tracker", starter: "static" }]);
 await call("apps.create", ["budget", { title: "Budget", starter: "static" }]);
 
-const { browser, page, errors } = await open({ width: 1500, height: 800 });
+/** How long the harness's words take to reach the page: raised for a moment below, to stand in for a harness far away. */
+let lag = 0;
+const { browser, page, errors } = await open({
+	width: 1500,
+	height: 800,
+	before: (made) =>
+		made.routeWebSocket(/\/api\/v1\/socket/, (ws) => {
+			const server = ws.connectToServer();
+			server.onMessage((message) => (lag ? setTimeout(() => ws.send(message), lag) : ws.send(message)));
+			server.onClose(() => ws.close().catch(() => {}));
+			ws.onClose(() => server.close().catch(() => {}));
+			ws.onMessage((message) => server.send(message));
+		}),
+});
 await rest(page, { start: 0 });
 const row = () => page.locator(".v3-topbar .tab-chip[data-tab]").evaluateAll((all) => all.map((one) => `${one.dataset.kind}:${one.innerText.trim()}${one.dataset.front ? "*" : ""}`));
 /** How each tab is drawn: its parts, its size, its type and its ground. */
@@ -63,6 +76,20 @@ for (const at of [0, 2, 1]) {
 	const now = await until(async () => ((await row())[at]?.endsWith("*") ? row() : undefined));
 	say(`a press on tab ${at + 1} brings it in front, and every tab stays in its place`, !!now && JSON.stringify(names(now)) === JSON.stringify(names(four)) && now.filter((one) => one.endsWith("*")).length === 1, JSON.stringify(now));
 }
+
+// --- a canvas tab, then at once a card's: the card stays in front when the harness answers ---------------------
+// The page moves the camera at once and the harness says so a moment later; that word is no news, and must not put the canvas back in front.
+await page.locator(".v3-topbar .tab-chip[data-tab]").nth(0).locator(".tab-chip-name").click();
+await until(async () => ((await row())[0]?.endsWith("*") ? true : undefined));
+await settle(page, 600);
+lag = 700;
+await page.locator(".v3-topbar .tab-chip[data-tab]").nth(1).locator(".tab-chip-name").click();
+await page.locator(".v3-topbar .tab-chip[data-tab]").nth(2).locator(".tab-chip-name").click();
+await settle(page, 1800);
+const after = await row();
+say("a canvas tab picked and then, before the harness answers, a card's: the card stays in front, over the canvas picked", after[2]?.endsWith("*") && after.filter((one) => one.endsWith("*")).length === 1 && (await page.locator(".v3-topbar .tab-chip[data-tab]").nth(1).getAttribute("data-camera")) === "true", JSON.stringify(after));
+lag = 0;
+await settle(page, 300);
 
 // --- more tabs than the bar has room for -----------------------------------------------------------------------------
 // Opened by the + as the person opens them: an app, then a canvas, which comes in front.

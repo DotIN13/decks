@@ -48,8 +48,10 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 			offer(`${nameOf(message.call.agentId)} wants to show you ${what}`, { label: "Show", run: () => showCanvas() }, "agent-view");
 		}
 	}
-	// A chat going to the canvas its camera is already on, from behind a card, a document or an app: nothing moves at the harness, so it is brought forward here.
-	if (message.call.op === "goto" && message.call.agentId && (message.call.args as { stage?: unknown } | undefined)?.stage === stageOf(message.call.agentId)?.name) aimCanvas(message.call.agentId);
+	// An agent going to the canvas its chat's camera is already on, from behind a card, a document or an app: nothing moves at the harness, so it is brought forward here.
+	// Not the person's own move of a camera, which this page made, is already on, and said what is in front when it made it (`moveConversation`); a `view open` is always one to bring forward.
+	const going = message.call.op === "goto" ? (message.call.args as { stage?: unknown; person?: unknown; keep?: unknown } | undefined) : undefined;
+	if (going && message.call.agentId && (going.person !== true || going.keep === true) && going.stage === stageOf(message.call.agentId)?.name) aimCanvas(message.call.agentId);
 	// The chat on screen opening a canvas as a tab (`view.open`): that canvas and the one its camera leaves stay in the row, whoever answers whether it may move.
 	if (message.call.op === "goto" && message.call.agentId === state.focused && (message.call.args as { keep?: unknown } | undefined)?.keep === true) {
 		const to = (message.call.args as { stage?: unknown }).stage;
