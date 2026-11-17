@@ -10,7 +10,8 @@
  * something that is not in the deck says so and opens nothing. And a link chip, a link as an item of
  * its own (`decks canvas insert --type link --to …`): a click opens it and leaves nothing selected,
  * Shift-click selects it and opens nothing, and a drag moves it and opens nothing. One is added by
- * hand from the card tool's menu (Link to…, the finder the row of tabs' + has) or by pasting an address.
+ * hand from the card tool's menu (Link to…, the finder the row of tabs' + has), by pasting an address,
+ * or by dragging a tab down from the row onto the canvas.
  * A link in a card's own HTML (`<a href="#app/budget">`) opens the tab too.
  * And a chip follows the canvas it points at: renamed, it says the new name; deleted, it is dimmed
  * and a click says so.
@@ -214,6 +215,31 @@ const cursor = () => canvasFrame(page).then((frame) => frame.evaluate(() => getC
 say("over a chip the pointer is a link's", (await until(async () => ((await cursor()) === "pointer" ? true : undefined), 2000)) === true, await cursor());
 await page.mouse.click(at.x, at.y);
 say("a chip to a canvas takes the camera there", (await until(async () => ((await cameraName()) === "Tab two" ? true : undefined))) === true, await cameraName());
+
+// --- a tab dragged from the row onto the canvas ------------------------------------------------------------------------
+await page.locator(".v3-topbar .tab-chip[data-tab]").first().locator(".tab-chip-name").click();
+await until(async () => ((await cameraName()) === firstTitle ? true : undefined));
+await settle(page, 400);
+const cardTab = page.locator('.v3-topbar .tab-chip[data-kind="card"] .tab-chip-name').first();
+const from = await cardTab.boundingBox();
+const linksWas = await links();
+const rowWas = JSON.stringify(await row());
+await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+await page.mouse.down();
+for (let step = 1; step <= 8; step++) {
+	// Down to bare canvas, under the chips and over the composer.
+	await page.mouse.move(from.x + from.width / 2 + step * 10, from.y + from.height / 2 + step * 78);
+	await new Promise((resolve) => setTimeout(resolve, 25));
+}
+const ghost = await page.locator(".tab-ghost").evaluate((one) => ({ over: one.dataset.over, text: one.textContent })).catch(() => undefined);
+if (process.env.LOOK_SHOTS) await page.screenshot({ path: `${process.env.LOOK_SHOTS}/links-drag-tab.png` });
+await page.mouse.up();
+const dropped = await until(async () => {
+	const now = await links();
+	return now.length === linksWas.length + 1 ? now.filter((one) => one.startsWith(`#card/${plan}|`)).length : undefined;
+});
+say("a tab dragged down from the row shows a copy of itself that follows the pointer, marked over the canvas", ghost?.over === "true" && (ghost.text ?? "").length > 3, JSON.stringify(ghost));
+say("let go on the canvas it leaves a chip that points at it, and the tab itself is not pressed", dropped === 2 && JSON.stringify(await row()) === rowWas && (await page.locator(".tab-ghost").count()) === 0, `${dropped} ${JSON.stringify(await row())}`);
 
 // --- a link in a card's own HTML ---------------------------------------------------------------------------------------
 await page.locator(".v3-topbar .tab-chip[data-tab]").first().locator(".tab-chip-name").click();
