@@ -1,5 +1,3 @@
-import { setIconSource, type IconSource } from "../look/icons.ts";
-
 /**
  * What the canvas asks of whoever mounted it, in the few places it reaches past its own state.
  *
@@ -9,6 +7,9 @@ import { setIconSource, type IconSource } from "../look/icons.ts";
  * name another board — set once by the host (`setCanvasHost`) and read where they are needed.
  * Module state, like the tool signals beside it (`state/pen-tools.ts`): one canvas to a page.
  */
+/** Where a host keeps its icons, asked before the CDN; undefined there falls through. */
+export type IconSource = (library: string, name: string, weight: number) => string | undefined;
+
 export interface CanvasHost {
 	/** The address a deck file is read at (an image fill, an embed, a file opened in a tab). */
 	fileUrl(path: string, rev?: number): string;
@@ -108,7 +109,6 @@ let current: CanvasHost = fallback;
 /** Answer the canvas's questions; fields left out keep what they had. */
 export function setCanvasHost(next: Partial<CanvasHost>): void {
 	current = { ...current, ...next };
-	if ("iconUrl" in next) setIconSource(next.iconUrl);
 }
 
 /** The host's answers, read at the moment they are needed. */

@@ -1,7 +1,18 @@
 import { apply, withDecksColors, baseTheme, diff, editDocument, num as penNum, parse, walk, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
 import type { Page } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
-import type { DocEdits } from "../render/types.ts";
+
+/**
+ * The edits that made a drawing from the one before it (`from`): the stage's engines apply them in
+ * place of working out what changed, when `from` is the drawing they hold. A host that hears a
+ * drawing's changes as edits (the Decks app's `canvas.changed`, a mounted canvas's own `onEdits`)
+ * hands them along with the drawing they make.
+ */
+export interface DocEdits {
+	from: import("@decks/pen").PenDocument;
+	edits: readonly import("@decks/pen").PenEdit[];
+}
+
 
 /**
  * The drawing a canvas edits (`editor.tsx`): the document, the person's edits applied to it

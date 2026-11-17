@@ -13,17 +13,6 @@ export interface PenPreview {
 }
 
 /**
- * The edits that made a drawing from the one before it (`from`): the stage's engines apply them in
- * place of working out what changed, when `from` is the drawing they hold. A host that hears a
- * drawing's changes as edits (the Decks app's `canvas.changed`, a mounted canvas's own `onEdits`)
- * hands them along with the drawing they make.
- */
-export interface DocEdits {
-	from: import("@decks/pen").PenDocument;
-	edits: readonly import("@decks/pen").PenEdit[];
-}
-
-/**
  * Who last wrote a drawing, as its placeholder frames (`placeholder: true`) are marked: a dashed
  * outline in `color` (any CSS colour, a `var()` too) with `name` on a tag in the frame's corner.
  */

@@ -8,7 +8,7 @@
 		"\"one release\" notes": 0,
 		"server imports that point up a layer": 17,
 		"canvas package folder pairs that import each other": 3,
-		"canvas package imports that point up a layer": 3
+		"canvas package imports that point up a layer": 0
 	},
 	"upward": [
 		"apps/server/src/agents/backend.ts -> apps/server/src/calls/tool.ts",
@@ -29,9 +29,5 @@
 		"apps/server/src/docs/writers.ts -> apps/server/src/agents/acts.ts",
 		"apps/server/src/runtimes/pi/extension.ts -> apps/server/src/calls/tool.ts"
 	],
-	"canvasUpward": [
-		"packages/canvas/src/base/host.ts -> packages/canvas/src/look/icons.ts",
-		"packages/canvas/src/items/item-slot.tsx -> packages/canvas/src/edit/dom/index.ts",
-		"packages/canvas/src/model/drawing.ts -> packages/canvas/src/render/types.ts"
-	]
+	"canvasUpward": []
 }

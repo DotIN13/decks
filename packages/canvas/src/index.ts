@@ -9,7 +9,8 @@ export { canvasHost, setCanvasHost, type CanvasHost } from "./base/host.ts";
 export type { InkRequest, StageComment } from "./stage/types.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";
 export type { PenTool } from "./edit/pen-tools.ts";
-export type { DocEdits, DrawingWriter } from "./render/types.ts";
+export type { DocEdits } from "./model/drawing.ts";
+export type { DrawingWriter } from "./render/types.ts";
 // The canvas frame (`frame/`): the canvas in a sandboxed page of its own, and the protocol to it.
 export { bootFrame } from "./frame/inside/frame.tsx";
 export type { FrameChrome, FrameChromeView } from "./frame/chrome.ts";

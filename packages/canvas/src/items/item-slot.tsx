@@ -1,6 +1,6 @@
 import type { Page } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import type { PageView } from "../edit/dom/index.ts";
+import type { PageView } from "./page-view.ts";
 import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
