@@ -255,6 +255,7 @@ const CHECKS = [
 	/* Pictures of the canvas and its kit in light and dark, for a change to the look before and after (`LOOK_SHOTS`). Run only when named. */
 	{ file: "look-shots.mjs", needsAgent: false, named: true },
 	{ file: "tab-shots.mjs", needsAgent: false, named: true },
+	{ file: "link-shots.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },
