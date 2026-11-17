@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { relative } from "node:path";
 import type { Resolved } from "@decks/docs/server";
 import { containedIn, resolveFileRequest, type ResolvedRoots } from "../deck/roots.ts";
@@ -20,4 +21,18 @@ export function resolveDoc(roots: ResolvedRoots, path: string): Resolved {
 	}
 	const root = roots.roots.find((r) => r.exists && containedIn(r.path, file));
 	return { file, key: file, writable: !!root?.writable };
+}
+
+/**
+ * The name a document is kept under, for a file a document may be and that is there: in the deck or a
+ * root it declares, never the app's own records. What a document pass names (`auth/passes.ts`), and
+ * what `view.open` opens.
+ */
+export function documentKeyOf(roots: ResolvedRoots, path: string): string | undefined {
+	try {
+		const found = resolveDoc(roots, path);
+		return statSync(found.file).isFile() ? found.key : undefined;
+	} catch {
+		return undefined;
+	}
 }

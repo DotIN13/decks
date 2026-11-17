@@ -8,7 +8,7 @@ import { nameOf, state } from "../../state/deck.ts";
 import { offer } from "../../state/notices.ts";
 import { send } from "../../state/socket.ts";
 import type { FrameHooks, Of } from "../socket-messages.ts";
-import { canvasOnScreen } from "../../tabs/tabs.ts";
+import { canvasOnScreen, openTab } from "../../tabs/tabs.ts";
 
 /**
  * Keep a view for an agent that is not the one on screen, from its `decks view …`: here, or on the
@@ -46,6 +46,19 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 			const on = typeof args?.stage === "string" ? args.stage : stageOf(message.call.agentId)?.name;
 			if (on && on === screen) return;
 		}
+	}
+	/*
+	 * An agent opening something whole as a tab of this window (`view.open`): from the chat on screen
+	 * the tab opens, in front; from another, the person is offered a button, since nothing an agent
+	 * does in the background changes what is on screen.
+	 */
+	if (message.call.op === "open") {
+		const { kind, target, title } = message.call.args as { kind: string; target: string; title?: string };
+		const onScreen = message.call.agentId === state.focused;
+		if (onScreen) openTab(kind, target);
+		else offer(`${nameOf(message.call.agentId)} wants to show you ${title ?? target}`, { label: "Open", run: () => openTab(kind, target) }, "agent-view");
+		send({ type: "view.answered", id: message.call.id, value: onScreen ? { opened: true } : { offered: "another chat is on the person's screen, so they were offered a button that opens it" } });
+		return;
 	}
 	/*
 	 * A picture of a card as this browser has it, for an agent's screenshot: the canvas frame writes

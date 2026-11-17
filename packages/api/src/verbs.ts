@@ -494,6 +494,15 @@ export const VERBS: readonly Verb[] = [
 		params: [{ ...p("target", union(str(), arr(str()))), variadic: true }, onCanvas({ highlight: opt(str()), animate: opt(bool()) })],
 		result: obj({ canvas: str(), target: union(str(), arr(str())), deferred: opt(str()) }),
 	},
+	{
+		name: "view.open",
+		group: "view",
+		...screenChange,
+		summary:
+			"Open a canvas, a card, a document or an app whole, as a tab in the person's window: nobody moves, and your home canvas stays yours. `what` is a canvas's name, a card's path, a document's path in the deck, or an app's name; `kind` says which when a name could be two. From the chat on screen the tab comes forward; from the background the person is offered a button that opens it.",
+		params: [p("what", str()), o("options", obj({ kind: opt(lit("canvas", "card", "document", "app")) }))],
+		result: obj({ kind: lit("canvas", "card", "document", "app"), target: str(), opened: bool(), note: opt(str()) }),
+	},
 	{ name: "view.camera", card: "frame", group: "view", ...screenRead, summary: "Where the person's screen is looking, and its zoom.", params: [], result: Camera },
 	{
 		name: "view.move",

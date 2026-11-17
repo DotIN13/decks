@@ -817,6 +817,45 @@ test("view.focus takes a drawn item's id and sends the browser its box", async (
 	}
 });
 
+test("view.open opens what the name is, as a tab, and says when the page did not open it by itself", async () => {
+	const { tool, service, deck, hold, calls, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	service.pens = new CanvasPens(deck.path, () => {});
+	try {
+		hold(PLAN);
+		mkdirSync(join(deck.path, "docs"), { recursive: true });
+		writeFileSync(join(deck.path, "docs", "notes.md"), "# Notes\n");
+		const sent = () => calls.at(-1) as { op: string; agentId: string; args: { kind: string; target: string; title: string } };
+
+		const card = await runCode(tool, `return await stage.view.open("${PLAN}")`);
+		assert.equal(card.isError, false, card.text);
+		assert.deepEqual([sent().op, sent().agentId, sent().args.kind, sent().args.target], ["open", "a1", "card", PLAN]);
+		// The page here answers without saying it opened: the agent is told, not left to think it did.
+		assert.match(card.text, /did not open by itself/);
+
+		const doc = await runCode(tool, `return await stage.view.open("docs/notes.md")`);
+		assert.equal(doc.isError, false, doc.text);
+		assert.deepEqual([sent().args.kind, sent().args.target, sent().args.title], ["document", "docs/notes.md", "notes.md"]);
+
+		const canvas = await runCode(tool, `return await stage.view.open("ada")`);
+		assert.equal(canvas.isError, false, canvas.text);
+		assert.deepEqual([sent().args.kind, sent().args.target], ["canvas", "ada"]);
+
+		const before = calls.length;
+		const missing = await runCode(tool, `return await stage.view.open("nothing-by-that-name")`);
+		assert.equal(missing.isError, true);
+		assert.match(missing.text, /Nothing to open is called nothing-by-that-name/);
+		const wrong = await runCode(tool, `return await stage.view.open("ada", { kind: "app" })`);
+		assert.equal(wrong.isError, true);
+		assert.match(wrong.text, /There is no app called ada/);
+		const records = await runCode(tool, `return await stage.view.open(".decks/tokens.json")`);
+		assert.equal(records.isError, true, "the app's own records are never a document");
+		assert.equal(calls.length, before, "nothing is asked of the page for what cannot be opened");
+	} finally {
+		service.pens.close();
+		cleanup();
+	}
+});
+
 test("canvas.screenshot hands the picture to the model with the run's result, and names the file", async () => {
 	const { tool, service, withPens, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	withPens();

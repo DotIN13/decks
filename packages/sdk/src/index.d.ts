@@ -387,6 +387,13 @@ export interface Verbs {
 		 * button.
 		 */
 		focus(target: string | string[], options?: { canvas?: string; highlight?: string; animate?: boolean }): Promise<{ canvas: string; target: string | string[]; deferred?: string }>;
+		/**
+		 * Open a canvas, a card, a document or an app whole, as a tab in the person's window: nobody moves,
+		 * and your home canvas stays yours. `what` is a canvas's name, a card's path, a document's path in
+		 * the deck, or an app's name; `kind` says which when a name could be two. From the chat on screen
+		 * the tab comes forward; from the background the person is offered a button that opens it.
+		 */
+		open(what: string, options?: { kind?: "canvas" | "card" | "document" | "app" }): Promise<{ kind: "canvas" | "card" | "document" | "app"; target: string; opened: boolean; note?: string }>;
 		/** Where the person's screen is looking, and its zoom. */
 		camera(): Promise<Camera>;
 		/** Move the person's camera outright: { x, y, zoom }, zoom 1 is life size. */

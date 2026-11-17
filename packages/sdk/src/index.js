@@ -92,6 +92,7 @@ export const VERBS = [
 	["agent.create",["spec"]],
 	["view.goto",["canvas"]],
 	["view.focus",["target...","options?"]],
+	["view.open",["what","options?"]],
 	["view.camera",[]],
 	["view.move",["camera"]],
 	["view.viewport",[]],

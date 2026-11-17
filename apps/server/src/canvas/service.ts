@@ -225,8 +225,9 @@ export class CanvasService {
 		return readFileSync(this.deck.fileOf(path), "utf8");
 	}
 
+	/** Where the deck's files may be read from: the deck, and the roots it declares (`deck/roots.ts`). */
 	roots() {
-		return this.deck.roots.roots;
+		return this.deck.roots;
 	}
 
 	/** A path on disk -> the URL a board should embed. Refuses what the route would. */
@@ -494,7 +495,8 @@ export class CanvasService {
 		return { how: "none", why: value?.why ?? value?.skipped ?? "the person's browser did not answer" };
 	}
 
-	private async ask(agentId: string, call: Omit<StageCall, "id" | "agentId">, timeoutMs?: number): Promise<unknown> {
+	/** One thing asked of the person's page for an agent (`view.called`), answered by the first page to say; `skipped` when no page is there. */
+	async ask(agentId: string, call: Omit<StageCall, "id" | "agentId">, timeoutMs?: number): Promise<unknown> {
 		if (!this.host.connected()) {
 			// Not an error: an agent can do useful work with nobody watching, and it
 			// should be told rather than blocked.

@@ -1,7 +1,7 @@
 import { titleCanvas } from "./canvas/admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
 import { closeOldShapes } from "./deck/old-shapes.ts";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
 import type { Page, DeckState, RuntimeInfo, ServerMessage } from "@decks/protocol";
@@ -40,7 +40,7 @@ import { compileTex } from "./docs/compile.ts";
 import { gitSync } from "./docs/git.ts";
 import { GoogleDocs } from "./google/docs.ts";
 import { NativeShots } from "./canvas/native-shots.ts";
-import { resolveDoc } from "./docs/resolve.ts";
+import { documentKeyOf, resolveDoc } from "./docs/resolve.ts";
 import { documentsOnCanvas } from "./docs/on-canvas.ts";
 import { canvasListMessage } from "./canvas/canvas-list.ts";
 import { Writers } from "./docs/writers.ts";
@@ -600,12 +600,7 @@ export class App {
 	 * there: in the deck or a root it declares, never the app's own records. What a document pass names.
 	 */
 	documentKey(path: string): string | undefined {
-		try {
-			const found = resolveDoc(this.deck.roots, path);
-			return statSync(found.file).isFile() ? found.key : undefined;
-		} catch {
-			return undefined;
-		}
+		return documentKeyOf(this.deck.roots, path);
 	}
 
 	/**

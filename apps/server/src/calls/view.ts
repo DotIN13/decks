@@ -2,6 +2,7 @@ import { walk } from "@decks/pen";
 import { boardOf } from "../canvas/pens.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
+import { documentKeyOf } from "../docs/resolve.ts";
 import { canvasOfPath, moveHome } from "./move-home.ts";
 
 /**
@@ -87,6 +88,19 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 				if (deferred) notes.push(`The view did not move: ${deferred}.`);
 				return { canvas: name, target, ...(deferred ? { deferred } : {}) };
 			},
+			/*
+			 * Something whole, as a tab in the person's window: no conversation moves. What it is comes from
+			 * `kind`, or from what the name is: a card's path, a canvas, an app, a document's path.
+			 */
+			open: async (what: string, options?: { kind?: "canvas" | "card" | "document" | "app" }) => {
+				const found = tabFor(ctx, what, options?.kind);
+				// The page opens it, in front when this chat is the one on its screen, or offers a button when it is not.
+				const answer = ((await service.ask(agent.id, { op: "open", args: found }, 1500)) ?? {}) as { opened?: unknown; offered?: unknown; skipped?: unknown };
+				const opened = answer.opened === true;
+				const note = opened ? undefined : typeof answer.offered === "string" ? answer.offered : typeof answer.skipped === "string" ? answer.skipped : "the person's window did not open it: it may be one that has no tabs";
+				if (note) notes.push(`The tab did not open by itself: ${note}.`);
+				return { kind: found.kind, target: found.target, opened, ...(note ? { note } : {}) };
+			},
 			camera: async () => asCamera(agent.camera()),
 			move: async (camera: { x: number; y: number; zoom: number; animate?: boolean }) => {
 				const { animate, ...at } = camera;
@@ -105,4 +119,52 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 			},
 		},
 	};
+}
+
+type TabKindName = "canvas" | "card" | "document" | "app";
+
+/**
+ * What `view.open` is asked to open: the kind named, checked, or the one kind the name fits. A card is
+ * its path in the deck (its folder is enough), a canvas its name or title, an app its name, a document
+ * its path in the deck or a root it declares.
+ */
+function tabFor(ctx: VerbContext, what: string, kind?: TabKindName): { kind: TabKindName; target: string; title: string } {
+	const { service } = ctx;
+	const asked = String(what ?? "").trim();
+	if (!asked) throw new Error("open names what to open: a canvas, a card's path, a document's path or an app.");
+	const fits: Record<TabKindName, () => { target: string; title: string } | undefined> = {
+		card: () => {
+			const path = /\.html?$/.test(asked) ? asked : `${asked.replace(/\/+$/, "")}/index.html`;
+			const card = service.fileBoard(path);
+			return card ? { target: card.path, title: card.title || card.path } : undefined;
+		},
+		canvas: () => {
+			try {
+				const name = ctx.canvasOf(asked);
+				return { target: name, title: ctx.needPens().titleOf(name) };
+			} catch {
+				return undefined;
+			}
+		},
+		app: () => (service.apps?.exists(asked) ? { target: asked, title: asked } : undefined),
+		document: () => {
+			const key = documentKeyOf(service.roots(), asked);
+			return key ? { target: key, title: key.split("/").pop() ?? key } : undefined;
+		},
+	};
+	if (kind) {
+		const found = fits[kind]?.();
+		if (!found) throw new Error(`There is no ${kind} called ${asked}.`);
+		return { kind, ...found };
+	}
+	// A card's page is also a file a document could be: its path means the card.
+	const found = (["card", "canvas", "app", "document"] as const).flatMap((one) => {
+		const fit = fits[one]();
+		return fit ? [{ kind: one, ...fit }] : [];
+	});
+	const first = found[0];
+	if (!first) throw new Error(`Nothing to open is called ${asked}: name a canvas (decks canvas list), a card's path (decks card list), an app (decks apps list) or a document's path in the deck.`);
+	const others = found.filter((one) => one.kind !== "document" || first.kind !== "card");
+	if (others.length > 1) throw new Error(`${asked} is both ${others.map((one) => (one.kind === "app" ? "an app" : `a ${one.kind}`)).join(" and ")}: say which with --kind.`);
+	return first;
 }
