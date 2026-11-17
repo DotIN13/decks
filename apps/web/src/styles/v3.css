@@ -316,6 +316,41 @@ body {
 		background: var(--v3-bg3);
 		color: var(--v3-fg);
 	}
+	/* The row folded into one chip (`tabs/TabStrip.tsx`, `TabFold`): how many tabs are open, in a small square, as a phone's browser shows it. */
+	.tab-fold {
+		flex: none;
+		padding: 0 7px;
+		border: 0;
+		background: transparent;
+		cursor: pointer;
+		font: inherit;
+	}
+	.tab-fold-count {
+		display: grid;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 3px;
+		border: 1.5px solid currentcolor;
+		border-radius: 5px;
+		font-size: 11px;
+		font-weight: 600;
+		line-height: 1;
+		place-items: center;
+	}
+	/* A tab in the folded row's list: its row, and its ✕ beside it. */
+	.tab-row-line {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.tab-row-line > .tab-row {
+		min-width: 0;
+		flex: 1;
+	}
+	.tab-row[data-current="true"] {
+		background: var(--v3-tab-on);
+		color: var(--v3-tab-on-fg);
+	}
 	/* A card whole in its tab (`tabs/kinds/card.tsx`): in the canvas's column, beside the side panel and under the top bars. */
 	.surface[data-surface="card"],
 	.surface[data-surface="document"],

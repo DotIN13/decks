@@ -149,7 +149,7 @@ export function TopBar(props: {
 					)}
 				</Show>
 				{/* The other tabs and the + that opens one (`tabs/TabStrip.tsx`), where the + that made a canvas stood. */}
-				<Show when={!props.phone}>{props.tabs}</Show>
+				{props.tabs}
 			</Show>
 		</div>
 	);

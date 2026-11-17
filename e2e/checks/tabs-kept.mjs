@@ -33,7 +33,8 @@ writeFileSync(join(deck, "docs", "kept.md"), "# Kept\n\nA document on no canvas.
 const plan = card("plan");
 await call("apps.create", ["kept-app", { title: "Kept app", starter: "static" }]);
 
-const { browser, page, errors } = await open({ width: 1400, height: 900 });
+// Wide enough for a chip per tab: with less room the row folds into one chip (`tabs-phone`).
+const { browser, page, errors } = await open({ width: 2000, height: 900 });
 await rest(page, { start: 0 });
 const hash = (on = page) => on.evaluate(() => location.hash);
 const chips = (on = page) => on.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));

@@ -18,9 +18,12 @@ const [opened, setOpened] = createSignal<Tab[]>([HOME]);
 const [frontId, setFrontId] = createSignal(HOME.id);
 /** The canvas tab that was in front last: what the canvas's frame goes on holding while a tab of another kind is in front. */
 const [lastCanvasId, setLastCanvasId] = createSignal(HOME.id);
+/** The tabs in the order they were last in front, the latest first: what a kind that keeps tabs alive behind the front one goes by (`alive`). */
+const [shown, setShown] = createSignal<readonly string[]>([HOME.id]);
 /** Bring a tab forward, by its name in the row. */
 const bring = (id: string): void => {
 	setFrontId(id);
+	setShown((was) => [id, ...was.filter((one) => one !== id)].slice(0, 64));
 	if (opened().find((tab) => tab.id === id)?.kind === "canvas") setLastCanvasId(id);
 };
 
@@ -54,6 +57,21 @@ export const homeCanvas = (): StageRow | undefined => canvasOf(HOME);
 
 /** The canvas on screen: the one the canvas tab on screen shows (`canvasTab`). */
 export const canvasOnScreen = (): StageRow | undefined => canvasOf(canvasTab());
+
+/**
+ * The tabs of a kind that are alive now: the one in front, and the `behind` that were in front most
+ * lately. A kind whose tabs go on running behind the front one (an app) keeps these and puts the
+ * rest away, so a device holds only as many as it has memory for (`budget.ts`). A tab put back by
+ * `restoreTabs` and not shown since is not among them: a row of apps does not all start at once.
+ */
+export function alive(kind: string, behind: number): Tab[] {
+	const order = shown();
+	const of = tabs().filter((tab) => tab.kind === kind && order.includes(tab.id));
+	const rank = (tab: Tab) => (tab.id === front().id ? -1 : order.indexOf(tab.id));
+	const kept = [...of].sort((a, b) => rank(a) - rank(b)).slice(0, (front().kind === kind ? 1 : 0) + behind);
+	// In the row's order, so a tab's place among them does not change as others come and go.
+	return of.filter((tab) => kept.includes(tab));
+}
 
 /**
  * Open a tab on a target and bring it forward, or bring forward the one already open on it. A canvas

@@ -20,6 +20,8 @@ export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEdit
 export { CardFrame, type CardFrameProps } from "./frame/card/host.tsx";
 // A document whole, the same way: the document kind (`frame/document/`).
 export { DocumentFrame, type DocumentFrameProps } from "./frame/document/host.tsx";
+// What kind of device this is, by its operating system (`render/device.ts`): what a page's own budgets go by.
+export { DEVICE } from "./render/device.ts";
 // An app whole, the same way: the app kind (`frame/app/`).
 export { AppFrame, type AppFramePass, type AppFrameProps } from "./frame/app/host.tsx";
 export type { CardShown } from "./frame/card/protocol.ts";

@@ -6,13 +6,14 @@ import { appFramePass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { act } from "../../state/decks.ts";
 import type { TabKind } from "../kind.ts";
-import { tabs } from "../tabs.ts";
+import { APPS_BEHIND } from "../budget.ts";
+import { alive } from "../tabs.ts";
 
 /**
  * An app, as a kind of tab: the app whole, in a frame of its own (`@decks/canvas`, `AppFrame`: the
  * frame every kind runs in, with the app kind inside), at an address with its app pass in the path. It
- * keeps running while it is not in front: an app is a program, and one put away would start again
- * from nothing each time it came forward. An app that cannot load in a frame (one told its base path)
+ * keeps running while it is not in front, within the device's budget (`budget.ts`): an app is a
+ * program, and one put away starts again from nothing. An app that cannot load in a frame (one told its base path)
  * says so, with a button that opens it in the browser's tab.
  */
 export const appKind: TabKind = {
@@ -27,7 +28,7 @@ export const appKind: TabKind = {
 	},
 	icon: (props) => <Icon of={AppWindow} size={props.size ?? 16} />,
 	view: (tab, parts) => (
-		<For each={tabs().flatMap((one) => (one.kind === "app" && one.target ? [one.target] : []))}>
+		<For each={alive("app", APPS_BEHIND).flatMap((one) => (one.target ? [one.target] : []))}>
 			{(name) => <AppTab app={name} shown={tab()?.target === name} foot={parts.dock.dockCover()} />}
 		</For>
 	),
