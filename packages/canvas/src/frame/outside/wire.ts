@@ -67,9 +67,8 @@ export function createWire(d: WireNeeds) {
 		});
 		page.on("open-app", (data) => d.options.frame.openApp?.(data.name));
 		page.on("open-tab", (data) => d.options.frame.openTab?.(data));
-		page.on("open-at", (data) => d.options.frame.openAt?.(data));
 		// The words every frame shares (`@decks/frame`): a press or Escape in the frame puts this page's menus away, a link opens in a tab, a shortcut the canvas did not take is played here, and a card's agent call is this page's to answer.
-		hearShared(page as never, { dismiss: dismissMenus, agent: d.options.frame.agent, refuse: (message) => new CallRefused(message, "refused") });
+		hearShared(page as never, { dismiss: dismissMenus, agent: d.options.frame.agent, openAt: d.options.frame.openAt, refuse: (message) => new CallRefused(message, "refused") });
 		page.on("goto", (data) => d.options.frame.moveTo?.(data.agent, data.canvas));
 		page.on("camera", (data) => {
 			if (data.agent) return d.options.frame.viewFor?.(data.agent, data.camera, data.selected);

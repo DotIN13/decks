@@ -1,3 +1,4 @@
+import { isDeckLink } from "@decks/pen";
 import { canvasHost, freshAddress, openInTab } from "../base/host.ts";
 import type { CardSurfaceProps } from "./card-surface-props.ts";
 
@@ -13,7 +14,8 @@ export function createCardLinks(d: CardLinksNeeds) {
 	 * A link in a card never takes the app's own page away. Its address is read against the card's own
 	 * (`../../files/plan.html` is a file of the card's canvas), never against the page the card is drawn
 	 * in. A link to another card (`cards/<name>/index.html`) or a board opens it beside this one, as on a
-	 * board (`card.js`); a link with `download` saves the file, under the name it gives; any other link,
+	 * board (`card.js`); a link to something in the deck by its address in the window (`#canvas/<name>`,
+	 * `#app/<name>`) opens it as a tab, where the host has tabs; a link with `download` saves the file, under the name it gives; any other link,
 	 * a file of the deck's among them, opens in a tab of its own.
 	 */
 	const followLink = (event: MouseEvent) => {
@@ -21,6 +23,11 @@ export function createCardLinks(d: CardLinksNeeds) {
 		const origin = event.composedPath()[0];
 		const link = origin instanceof Element ? origin.closest("a[href]") : null;
 		const href = link?.getAttribute("href");
+		// A link to something in the deck, by its address in the window (`#canvas/…`, `@decks/pen`, `link.ts`): the host's to open, as a tab; ⌘ or Ctrl asks for the browser's.
+		if (link && href && isDeckLink(href)) {
+			event.preventDefault();
+			return void canvasHost().openAddress?.(href.trim(), event.metaKey || event.ctrlKey);
+		}
 		if (!link || !href || href.startsWith("#")) return;
 		event.preventDefault();
 		let url: URL;

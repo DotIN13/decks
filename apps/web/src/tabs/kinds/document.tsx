@@ -6,6 +6,7 @@ import { cardAgentCall, documentPass } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
+import { openAt } from "../open.ts";
 
 /** What a document is called in the row: its file's name. */
 const nameOf = (path: string | undefined) => path?.split("/").pop() ?? "Document";
@@ -64,6 +65,7 @@ function DocumentTab(props: { tab: Tab; foot: number }) {
 							dark={scheme() === "dark"}
 							foot={props.foot}
 							agent={cardAgentCall}
+							openAt={openAt}
 						/>
 					)}
 				</Match>

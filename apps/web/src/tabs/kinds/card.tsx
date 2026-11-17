@@ -7,6 +7,7 @@ import { scheme } from "../../lib/theme.ts";
 import { state } from "../../state/deck.ts";
 import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
+import { openAt } from "../open.ts";
 
 /** The canvas a card is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
 function canvasOfPath(path: string): string | undefined {
@@ -54,7 +55,7 @@ function CardTab(props: { tab: Tab; foot: number }) {
 					pass={canvasPass}
 					dark={scheme() === "dark"}
 					foot={props.foot}
-					agent={cardAgentCall}
+					agent={cardAgentCall} openAt={openAt}
 				/>
 			</Show>
 		</div>

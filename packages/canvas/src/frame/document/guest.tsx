@@ -43,6 +43,8 @@ export async function runDocument(root: HTMLElement, start: DocumentStart, end: 
 		fileUrl: (path) => path,
 		canWrite: () => true,
 		openLink: (href) => end.emit("open-link", { href }),
+		// A link to something in the deck is the page's to read and open, as a tab.
+		openAddress: (address, browser) => end.emit("open-at", { address, ...(browser ? { browser: true as const } : {}) }),
 		documents: {
 			send: (message: unknown) => void backend.post("doc", { frame: backend.frame, message }).then((answer) => answer.ok === false && console.warn(answer.error)),
 			listen: (listener: (message: unknown) => void) => {

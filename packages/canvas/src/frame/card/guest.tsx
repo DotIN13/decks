@@ -54,6 +54,8 @@ export async function runCard(root: HTMLElement, start: CardStart, end: CardEnd)
 		fileUrl: (path, rev) => `${address(inFolder(path))}${rev === undefined ? "" : `?rev=${rev}`}`,
 		canWrite: () => true,
 		openLink: (href) => end.emit("open-link", { href }),
+		// A link to something in the deck is the page's to read and open, as a tab.
+		openAddress: (address, browser) => end.emit("open-at", { address, ...(browser ? { browser: true as const } : {}) }),
 		cardCall: cardCalls({
 			canvas: start.canvas,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),

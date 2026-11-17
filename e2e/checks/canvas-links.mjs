@@ -11,10 +11,11 @@
  * its own (`decks canvas insert --type link --to …`): a click opens it and leaves nothing selected,
  * Shift-click selects it and opens nothing, and a drag moves it and opens nothing. One is added by
  * hand from the card tool's menu (Link to…, the finder the row of tabs' + has) or by pasting an address.
+ * A link in a card's own HTML (`<a href="#app/budget">`) opens the tab too.
  * And a chip follows the canvas it points at: renamed, it says the new name; deleted, it is dimmed
  * and a click says so.
  */
-import { API, CANVAS, asPerson, canvasFrame, card, open, resetStage, rest, say, settle } from "../harness.mjs";
+import { API, CANVAS, asPerson, canvasFrame, card, flyToCard, open, resetStage, rest, say, settle } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -213,6 +214,41 @@ const cursor = () => canvasFrame(page).then((frame) => frame.evaluate(() => getC
 say("over a chip the pointer is a link's", (await until(async () => ((await cursor()) === "pointer" ? true : undefined), 2000)) === true, await cursor());
 await page.mouse.click(at.x, at.y);
 say("a chip to a canvas takes the camera there", (await until(async () => ((await cameraName()) === "Tab two" ? true : undefined))) === true, await cameraName());
+
+// --- a link in a card's own HTML ---------------------------------------------------------------------------------------
+await page.locator(".v3-topbar .tab-chip[data-tab]").first().locator(".tab-chip-name").click();
+await until(async () => ((await cameraName()) === firstTitle ? true : undefined));
+// Two links, each half of the card, so a press can find one by where it is: the card's root is closed.
+const half = (href, text, i) => `<a href="${href}" style="position:absolute;left:0;right:0;top:${i * 50}%;height:50%;display:flex;align-items:center;font-size:28px">${text}</a>`;
+const htmlCard = (await call("canvas.insert", [{ type: "card", title: "Links out", html: `<div style="position:relative;height:300px">${half("#app/budget", "The budget", 0)}${half(`#canvas/${second}`, "Tab two", 1)}</div>`, width: 500, height: 300 }, { canvas: CANVAS, at: { x1: 0, y1: -900 } }])).value?.card;
+await flyToCard(page, htmlCard);
+const pressIn = async (n) => {
+	await settle(page, 500);
+	const r = await (await canvasFrame(page)).evaluate((wanted) => (window.__decksProbes?.cards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, htmlCard);
+	await page.mouse.click(r.x + r.width * 0.3, r.y + r.height * (n * 0.5 + 0.25));
+};
+await pressIn(0);
+say("a link in a card's own HTML to an app opens the app's tab", (await until(async () => ((await row()).includes("app*") ? true : undefined))) === true && (await page.evaluate(() => location.hash)) === "#app/budget", JSON.stringify(await row()));
+await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
+await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined));
+await pressIn(1);
+say("…and one to a canvas takes the camera there", (await until(async () => ((await cameraName()) === "Tab two" ? true : undefined))) === true, await cameraName());
+
+// The same card whole, in a tab of its own: its link opens the app's tab from there too.
+await call("view.open", [htmlCard]);
+const cardFrame = page.locator('.surface[data-surface="card"] iframe.card-frame');
+const inTab = await until(async () => {
+	const outer = await cardFrame.boundingBox();
+	if (!outer) return undefined;
+	for (const one of page.frames()) {
+		const inner = await one.evaluate(() => document.querySelector(".card-tab .card-surface")?.getBoundingClientRect().toJSON()).catch(() => undefined);
+		if (inner && inner.width > 100 && inner.height > 100) return { x: outer.x + inner.x, y: outer.y + inner.y, width: inner.width, height: inner.height };
+	}
+	return undefined;
+});
+if (inTab) await page.mouse.click(inTab.x + inTab.width * 0.3, inTab.y + inTab.height * 0.25);
+say("in the card's own tab its link opens the app's tab as well", !!inTab && (await until(async () => ((await page.evaluate(() => location.hash)) === "#app/budget" ? true : undefined))) === true, JSON.stringify([inTab, await page.evaluate(() => location.hash)]));
+await page.locator('.tab-chip[data-kind="card"]').last().locator(".tab-chip-close").click().catch(() => {});
 
 // --- kept in step with the canvas it points at ------------------------------------------------------------------------
 await page.locator(".v3-topbar .tab-chip[data-tab]").first().locator(".tab-chip-name").click();

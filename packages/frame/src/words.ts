@@ -17,6 +17,8 @@ export interface SharedToFrame {
 export interface SharedToPage {
 	/** Open an address in a tab: the page's to open, an http(s) one alone, since the sandbox has no popups. */
 	"open-link": { href: string };
+	/** Follow a link to something in the deck, by its address in the page's window (`#canvas/…`, `#card/…`, `#doc/…`, `#app/…`): the page reads it and opens the tab, where it has tabs; with `browser`, the browser's own. */
+	"open-at": { address: string; browser?: true };
 	/** A shortcut nothing in the frame took, played on the page as if typed there. */
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
 	/** A press or Escape in the frame: the page's menus go. */
@@ -33,11 +35,12 @@ type NoCalls = Record<never, { data: unknown; value: unknown }>;
 
 /**
  * The page's side of the shared words, the same for every frame: a link is opened in a tab that
- * cannot reach back, a key is played on this page as if typed here, the page's menus go at a press in
+ * cannot reach back, one to something in the deck is the page's to open as a tab of its own (`openAt`), a key is played on this page as if typed here, the page's menus go at a press in
  * the frame, and a call that is the page's to make is answered by `agent`, or refused when it has none.
  */
-export function hearShared(page: Peer<SharedToFrame, NoCalls, SharedToPage, SharedCalls>, d: { dismiss(): void; agent?: ((call: SharedCalls["agent"]["data"]) => unknown) | undefined; refuse(message: string): Error }): void {
+export function hearShared(page: Peer<SharedToFrame, NoCalls, SharedToPage, SharedCalls>, d: { dismiss(): void; agent?: ((call: SharedCalls["agent"]["data"]) => unknown) | undefined; /** A link to something in the deck, followed in the frame: a page with tabs opens it. Without it such a link goes nowhere. */ openAt?: ((link: SharedToPage["open-at"]) => void) | undefined; refuse(message: string): Error }): void {
 	page.on("away", () => d.dismiss());
+	page.on("open-at", (data) => d.openAt?.(data));
 	page.on("open-link", (data) => {
 		try {
 			const url = new URL(data.href);
