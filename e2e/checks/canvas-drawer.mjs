@@ -34,6 +34,8 @@ for (const scheme of OUT ? ["light", "dark"] : ["light"]) {
 	const view = page.viewportSize();
 	const shot = async (name) => {
 		if (!OUT) return;
+		// With the canvas's own picture in its row, which the server takes on first ask.
+		await until(() => page.locator(".stage-shot[data-loaded]").count());
 		await settle(page, 450);
 		await page.screenshot({ path: `${OUT}/${scheme}-${name}.png` });
 	};
