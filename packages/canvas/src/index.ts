@@ -18,6 +18,8 @@ export { CallRefused, type FrameCalls } from "./frame/protocol.ts";
 export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEditorOptions, type FramedHandle, type FrameHostOptions } from "./frame/outside/host.tsx";
 // A card whole, in a frame of its own: the card kind of the same frame (`frame/card/`).
 export { CardFrame, type CardFrameProps } from "./frame/card/host.tsx";
+// A document whole, the same way: the document kind (`frame/document/`).
+export { DocumentFrame, type DocumentFrameProps } from "./frame/document/host.tsx";
 export type { CardShown } from "./frame/card/protocol.ts";
 // The tools on the page (`FramedEditorOptions.pageTools`): the zoom as the frame's camera has it at each step, for the page's zoom reading.
 export { frameZoom } from "./frame/tools-mirror.ts";

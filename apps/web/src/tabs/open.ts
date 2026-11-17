@@ -1,5 +1,4 @@
-import { canvasPass } from "../canvases/pass.ts";
-import { openTab } from "./tabs.ts";
+import { canvasOnScreen, openTab } from "./tabs.ts";
 
 /** The canvas a file of the deck is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
 export function canvasOfPath(path: string): string | undefined {
@@ -10,13 +9,12 @@ export function canvasOfPath(path: string): string | undefined {
 }
 
 /**
- * Open a card, a document or an app whole, from its pill on a canvas (New tab): a card in a tab of
- * this window, by its kind (`kinds/card.tsx`). A document and an app have no kind yet, and open as
- * they did, in the browser's tab: the document's file on its canvas's pass, the app's own page.
+ * Open a card, a document or an app whole, from its pill on a canvas (New tab): a card and a document
+ * in a tab of this window, each by its kind (`kinds/`), the document on the canvas it was opened from.
+ * An app has no kind yet, and opens as it did, in the browser's tab, on its own page.
  */
 export function openItem(item: { kind: "card" | "document" | "app"; target: string }): void {
 	if (item.kind === "card") return openTab("card", item.target);
-	if (item.kind === "app") return void window.open(`/app/${encodeURIComponent(item.target)}/`, "_blank", "noopener");
-	const canvas = canvasOfPath(item.target);
-	if (canvas) void canvasPass(canvas).then((pass) => window.open(`${pass.files}${item.target.split("/").map(encodeURIComponent).join("/")}`, "_blank", "noopener"));
+	if (item.kind === "document") return openTab("document", item.target, canvasOnScreen()?.name ?? canvasOfPath(item.target));
+	window.open(`/app/${encodeURIComponent(item.target)}/`, "_blank", "noopener");
 }

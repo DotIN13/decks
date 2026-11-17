@@ -17,6 +17,8 @@ export interface Tab {
 	 * whose canvas is not fixed: it is the canvas of the conversation on screen, whichever that is now.
 	 */
 	target?: string;
+	/** The canvas it was opened from, for a kind whose target does not say which canvas it is on (a document of the deck's own, placed on a canvas). */
+	from?: string;
 }
 
 /** A kind of tab: what the row and the window ask of it, the same questions for every kind. */

@@ -30,7 +30,7 @@ import { createCalloutMenu } from "./callout-menu.ts";
 function newTab(board: Page, browser: boolean): void {
 	const host = canvasHost();
 	const app = board.item === "app" && board.app ? board.app : undefined;
-	if (host.openItem && !browser) return host.openItem(app ? { kind: "app", target: app } : { kind: board.item === "document" ? "document" : "card", target: board.path });
+	if (host.openItem && !browser) return host.openItem(app ? { kind: "app", target: app } : board.item === "document" ? { kind: "document", target: board.file ?? board.path } : { kind: "card", target: board.path });
 	if (app) host.apps?.open(app);
 	else openInTab(host.fileUrl(board.path));
 }
