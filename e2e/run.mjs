@@ -187,6 +187,7 @@ const CHECKS = [
 	{ file: "tabs-kept.mjs", needsAgent: false },
 	{ file: "tab-about.mjs", needsAgent: false },
 	{ file: "tab-row.mjs", needsAgent: false },
+	{ file: "canvas-links.mjs", needsAgent: false },
 	{ file: "tabs-phone.mjs", needsAgent: false },
 	{ file: "canvas-drawer.mjs", needsAgent: false },
 	{ file: "tabs-cameras.mjs", needsAgent: false },

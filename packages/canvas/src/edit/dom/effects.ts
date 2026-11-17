@@ -6,6 +6,7 @@
  */
 import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
 import { canvasHost, openInTab, type CanvasHost } from "../../base/host.ts";
+import { isDeckLink } from "../../model/deck-link.ts";
 import { shortLabel } from "@decks/ui";
 import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";
@@ -118,11 +119,14 @@ export function createEffects(host: EffectHost) {
 	});
 
 	/**
-	 * A card's link. A link to a board of this deck opens that board on the canvas, exactly as
-	 * the host opens one (`onOpenLink`, `types.ts`); anything else is a new tab. A
-	 * relative link is read against the stage's own folder.
+	 * A link followed. One to something in the deck by its address in the window (`#canvas/…`,
+	 * `model/deck-link.ts`) is the host's to open, as a tab of its own, or with `browser` the browser's.
+	 * A link to a board of this deck opens that board on the canvas, exactly as the host opens one
+	 * (`onOpenLink`, `types.ts`); anything else is a new tab. A relative link is read against the
+	 * stage's own folder.
 	 */
-	const openLink = (href: string) => {
+	const openLink = (href: string, browser = false) => {
+		if (isDeckLink(href)) return void canvasHost().openAddress?.(href.trim(), browser);
 		const base = host.pen()?.base ?? "";
 		const board = canvasHost().cardLink(href, base);
 		if (board && host.onOpenPage?.(board, "")) return;
@@ -151,7 +155,7 @@ export function createEffects(host: EffectHost) {
 			case "refer":
 				return host.onRefer?.(referPills(effect.ids, effect.boards));
 			case "open-link":
-				return openLink(effect.href);
+				return openLink(effect.href, effect.browser === true);
 			case "media":
 				return host.toggleMedia(effect.id, effect.media);
 			case "move-boards":

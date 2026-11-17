@@ -33,6 +33,7 @@ export const cardKind: TabKind = {
 		label: "Cards",
 		list: async () => ((await act<Array<{ path: string; title: string }>>("card.list", [])) ?? []).map((card) => ({ target: card.path, title: card.title || card.path, note: canvasOfPath(card.path) })),
 	},
+	has: (target) => cardAt(target) !== undefined,
 	icon: (props) => <Icon of={FileText} size={props.size ?? 16} />,
 	view: (tab, parts) => (
 		<Show when={tab()} keyed>

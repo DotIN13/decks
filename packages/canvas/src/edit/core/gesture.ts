@@ -37,8 +37,8 @@ const HANDLE_TAP_MS = 400;
 /** Where the pointer is and how: in stage coordinates and on the screen, the keys held, its kind, and when. */
 export type PointerInput = { at: Pt; client: Pt; mods: Mods; pointer: PointerKind; time: number };
 
-/** What a click that does not move does, besides selecting: follow a card's link, or play a film or a sound. */
-export type Tap = { do: "open-link"; href: string } | { do: "media"; id: string; media: MediaItem };
+/** What a click that does not move does, besides selecting: follow a link (`browser`: with ⌘ or Ctrl held, which asks for the browser's own tab where the host has tabs of its own), or play a film or a sound. */
+export type Tap = { do: "open-link"; href: string; browser?: true } | { do: "media"; id: string; media: MediaItem };
 
 /** Carrying the selection: items and boards together. `press` until it has moved, `move` after. */
 type Carry = {
@@ -238,7 +238,7 @@ function pressCanvas(state: EditorState, p: PointerInput, scene: SceneQuery, ctx
 		// A film or a sound: a click that does not move plays it, or pauses it.
 		const playable = inner && mediaOf(inner.node) ? inner : mediaOf(hit.node) ? hit : undefined;
 		const media = playable ? mediaOf(playable.node) : undefined;
-		const tap: Tap | undefined = follows ? { do: "open-link", href } : playable && media && !p.mods.shift ? { do: "media", id: playable.id, media } : undefined;
+		const tap: Tap | undefined = follows ? { do: "open-link", href, ...(isFree(p.mods) ? { browser: true as const } : {}) } : playable && media && !p.mods.shift ? { do: "media", id: playable.id, media } : undefined;
 		const started = carry(next, scene, ctx, p, moving, boards, tap);
 		return done(started.state, [...effects, started.effect]);
 	}
