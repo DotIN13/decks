@@ -66,24 +66,17 @@ export function CardEditor(props: CardEditorProps) {
 	};
 	const { onInput } = createCardTyping({ sel, topOf, get ed() { return ed; }, get changed() { return changed; } });
 	const cardHistory = createCardHistory({
+		serialise, props, build, sel,
 		get done() { return done; },
-		serialise,
-		props,
 		get showBar() { return showBar; },
-		build,
 		get ed() { return ed; },
 		get caretInto() { return caretInto; },
-		sel,
 	});
 	const { changed, travel, past } = cardHistory;
 	const { onPaste } = createCardPaste({
-		sel,
+		sel, build, topOf, words, changed,
 		get ed() { return ed; },
 		set ed(next) { ed = next; },
-		build,
-		topOf,
-		words,
-		changed,
 	});
 
 	const cardBar = createCardBar({
@@ -98,42 +91,28 @@ export function CardEditor(props: CardEditorProps) {
 	});
 	const { showBar, toggleMenu, closeMenus, placeBar } = cardBar;
 	const { blockKind, restyle, style } = createCardBlocks({
-		sel,
-		topOf,
+		sel, topOf, toggleMenu, closeMenus, travel, changed,
 		get ed() { return ed; },
 		get caretInto() { return caretInto; },
-		toggleMenu,
-		closeMenus,
-		travel,
-		changed,
 	});
 
 	const { onClick, onDblClick } = createCardPresses({ changed, get ed() { return ed; } });
 
 	const cardDrag = createCardDrag({
+		props, closeMenus, sel, changed,
 		get wrap() { return wrap; },
-		props,
 		get caret() { return caret; },
 		get line() { return line; },
 		get ed() { return ed; },
-		closeMenus,
-		sel,
-		changed,
 	});
 	const { endDrag, onPointerMove, onPointerDown } = cardDrag;
 
 	const { caretInto, onKeyDown, onFocusOut, appendWords, commit } = createCardKeys({
-		sel,
+		sel, props, serialise, changed, travel, restyle, endDrag,
 		get done() { return done; },
 		set done(next) { done = next; },
-		props,
-		serialise,
 		get ed() { return ed; },
-		changed,
-		travel,
-		restyle,
 		get dragging() { return cardDrag.dragging; },
-		endDrag,
 		get wrap() { return wrap; },
 	});
 

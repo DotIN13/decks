@@ -122,26 +122,12 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		host,
 	});
 
-	const { followEditor, fingerIn, follow } = createFollow({
-		host,
-		cameraWatchers,
-		editor,
-		worldAt,
-	});
+	const { followEditor, fingerIn, follow } = createFollow({ host, cameraWatchers, editor, worldAt });
 
-	const { penPress } = createPenPress({
-		worldAt,
-		host,
-		editor,
-		followEditor,
-	});
+	const { penPress } = createPenPress({ worldAt, host, editor, followEditor });
 
 	const { dragPage, selectPage, dragBlock, resizeFrom, radiusFrom, resizePage, dragArrowEnd, dragArrowBend } = createStarts({
-		editor,
-		worldAt,
-		followEditor,
-		host,
-		fingerIn,
+		editor, worldAt, followEditor, host, fingerIn,
 	});
 
 	/**
@@ -150,75 +136,31 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 */
 	const blockUnder = (at: Pt): string | undefined => blockAt(host.scene, at, host.typing());
 
-	const { onHover, onLeave } = createHover({
-		editor,
-		host,
-		worldAt,
-		blockUnder,
-		pictureUnder,
-		pickAtHere,
-	});
+	const { onHover, onLeave } = createHover({ editor, host, worldAt, blockUnder, pictureUnder, pickAtHere });
 
 	const { tapToDeselect } = createTapToDeselect({
-		host,
-		worldAt,
-		editor,
-		get lastBareTap() {
-			return pressMemory.lastBareTap;
-		},
-		set lastBareTap(next) {
-			pressMemory.lastBareTap = next;
-		},
+		host, worldAt, editor,
+		get lastBareTap() { return pressMemory.lastBareTap; },
+		set lastBareTap(next) { pressMemory.lastBareTap = next; },
 	});
 
 	const { touchOnDrawing } = createTouchOnDrawing({
-		worldAt,
-		pickAtHere,
-		editor,
-		host,
-		get lastTap() {
-			return pressMemory.lastTap;
-		},
-		set lastTap(next) {
-			pressMemory.lastTap = next;
-		},
+		worldAt, pickAtHere, editor, host,
+		get lastTap() { return pressMemory.lastTap; },
+		set lastTap(next) { pressMemory.lastTap = next; },
 	});
 
 	const { onDblClick } = createDoubleClick({
-		get pressedOn() {
-			return pressMemory.pressedOn;
-		},
-		host,
-		pickAtHere,
-		worldAt,
-		onDrawn,
-		onCanvas,
-		editor,
-		pictureUnder,
-		get pannedAt() {
-			return pressMemory.pannedAt;
-		},
+		host, pickAtHere, worldAt, onDrawn, onCanvas, editor, pictureUnder,
+		get pressedOn() { return pressMemory.pressedOn; },
+		get pannedAt() { return pressMemory.pannedAt; },
 	});
 
 	const { onPointerDown } = createPress({
-		host,
-		onCanvas,
-		pickAtHere,
-		worldAt,
-		pictureUnder,
-		penPress,
-		dragPage,
-		selectPage,
-		touchOnDrawing,
-		tapToDeselect,
+		host, onCanvas, pickAtHere, worldAt, pictureUnder, penPress, dragPage, selectPage, touchOnDrawing, tapToDeselect,
 	});
 
-	const { pageView } = createPageViews({
-		host,
-		editor,
-		dragPage,
-		selectPage,
-	});
+	const { pageView } = createPageViews({ host, editor, dragPage, selectPage });
 
 	return {
 		follow,

@@ -101,29 +101,8 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	// The card the page had selected on this canvas when the frame was made again (an agent switch and back).
 	selectCard(start.selected, true);
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
-	const { viewCall } = createViewCalls({
-		pages,
-		agent,
-		start,
-		moveTo,
-		ctx,
-		selectCard,
-		end,
-		handle,
-		backend,
-	});
-	followLine({
-		studio,
-		handle,
-		changed,
-		first,
-		ctx,
-		backend,
-		viewCall,
-		pages,
-		setPages,
-		follower,
-	});
+	const { viewCall } = createViewCalls({ pages, agent, start, moveTo, ctx, selectCard, end, handle, backend });
+	followLine({ studio, handle, changed, first, ctx, backend, viewCall, pages, setPages, follower });
 	end.on("reload", (data) => handle.reloadCard(data.path));
 	end.on("look", (data) => {
 		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);

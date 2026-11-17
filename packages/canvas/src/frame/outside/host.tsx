@@ -178,82 +178,32 @@ export function createFramedEditor(options: Options): FramedEditor {
 	});
 
 	const { startFrame } = createStart({
-		options,
-		state,
-		storage,
-		storeKey,
-		get darkNow() {
-			return darkNow;
-		},
-		get modeNow() {
-			return modeNow;
-		},
-		get localCamera() {
-			return localCamera;
-		},
-		appStoredNow,
-		get fromFrame() {
-			return fromFrame;
-		},
-		set fromFrame(next) {
-			fromFrame = next;
-		},
-		get wire() {
-			return wire;
-		},
-		setEnd,
+		options, state, storage, storeKey, appStoredNow, setEnd,
+		get darkNow() { return darkNow; },
+		get modeNow() { return modeNow; },
+		get localCamera() { return localCamera; },
+		get fromFrame() { return fromFrame; },
+		set fromFrame(next) { fromFrame = next; },
+		get wire() { return wire; },
 	});
 
 	const { wire } = createWire({
-		get fromFrame() {
-			return fromFrame;
-		},
-		state,
-		options,
-		frameInUse,
-		get localCamera() {
-			return localCamera;
-		},
-		set localCamera(next) {
-			localCamera = next;
-		},
-		onPage,
-		storage,
-		storeKey,
-		frameAt,
+		state, options, frameInUse, onPage, storage, storeKey, frameAt,
+		get fromFrame() { return fromFrame; },
+		get localCamera() { return localCamera; },
+		set localCamera(next) { localCamera = next; },
 	});
 
 	const { keepInStep } = createSync({
-		state,
-		end,
-		options,
-		get localCamera() {
-			return localCamera;
-		},
-		set localCamera(next) {
-			localCamera = next;
-		},
-		get fromFrame() {
-			return fromFrame;
-		},
-		get modeNow() {
-			return modeNow;
-		},
-		set modeNow(next) {
-			modeNow = next;
-		},
-		frameAt,
+		state, end, options, frameAt,
+		get localCamera() { return localCamera; },
+		set localCamera(next) { localCamera = next; },
+		get fromFrame() { return fromFrame; },
+		get modeNow() { return modeNow; },
+		set modeNow(next) { modeNow = next; },
 	});
 
-	const { surface } = createSurface({
-		keepInStep,
-		startFrame,
-		end,
-		setEnd,
-		options,
-		frameAt,
-		setFrameAt,
-	});
+	const { surface } = createSurface({ keepInStep, startFrame, end, setEnd, options, frameAt, setFrameAt });
 
 	// The frame follows the drawing itself, from the harness or Studio: nothing of it is passed on from here.
 	const handle: FramedHandle = {

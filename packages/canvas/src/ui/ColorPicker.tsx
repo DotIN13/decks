@@ -42,9 +42,7 @@ export function ColorPicker(props: ColorPickerProps) {
 
 	createColorPlace({
 		props,
-		get card() {
-			return card;
-		},
+		get card() { return card; },
 		setPlace,
 	});
 	const commit = (value = hex()) => {
@@ -53,12 +51,7 @@ export function ColorPicker(props: ColorPickerProps) {
 		else props.onLive?.();
 	};
 
-	const { dragOver, dropper, pickFromScreen } = createColorDrag({
-		props,
-		hex,
-		commit,
-		setHsv,
-	});
+	const { dragOver, dropper, pickFromScreen } = createColorDrag({ props, hex, commit, setHsv });
 
 	return (
 		<Portal mount={portalLayer()}>

@@ -143,24 +143,9 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	});
 
 	createCovering({
-		COVER,
-		moving,
-		panning,
-		scaling,
-		gliding,
-		liveCards,
-		cardPictures,
-		appStates,
-		editor,
-		penLayer,
-		get pageIndex() {
-			return pageIndex;
-		},
-		props,
-		resolveColour,
-		get isLive() {
-			return isLive;
-		},
+		COVER, moving, panning, scaling, gliding, liveCards, cardPictures, appStates, editor, penLayer, props, resolveColour,
+		get pageIndex() { return pageIndex; },
+		get isLive() { return isLive; },
 	});
 	// The boards a drag carries go with it on the engine's carried layer (`editor/dom/controller.ts`).
 	/** The items whose carried picture is on screen: their slots hide where they were picked up (`item-slot.tsx`). */
@@ -201,75 +186,25 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	};
 	probes.cards = cardsOnScreen;
 
-	const { playingBox } = createPlayingBox({
-		penDrawn,
-		playing,
-		penLayer,
-		editor,
-		setPlaying,
-	});
+	const { playingBox } = createPlayingBox({ penDrawn, playing, penLayer, editor, setPlaying });
 
 	const { pageIndex, isLive, pageSlot, livePaths, keptPaths, leavingPaths, isVisible, isKept, isLeaving, isPictured, isNear, liveNow } = createAwakeCards({
-		ctl,
-		view,
-		props,
-		BUDGET,
-		editor,
-		liveCards,
-		picturedNow,
+		ctl, view, props, BUDGET, editor, liveCards, picturedNow,
 	});
 	const { renderedPaths, restCamera, isRendered, layered } = createRendered({
-		props,
-		view,
-		moving,
-		panning,
-		scaling,
-		gliding,
-		pageSlot,
-		editor,
-		liveCards,
-		livePaths,
-		keptPaths,
-		leavingPaths,
-		penLayer,
-		cardsHidden,
-		isVisible,
-		LAYER_BUDGET,
+		props, view, moving, panning, scaling, gliding, pageSlot, editor, liveCards, livePaths, keptPaths, leavingPaths, penLayer,
+		cardsHidden, isVisible, LAYER_BUDGET,
 	});
 
 	const { liveFiles, liveBox, openLiveFile } = createLiveFiles({
-		penDrawn,
-		restCamera,
-		props,
-		view,
-		penLayer,
-		LIVE_FILES,
-		scaling,
-		get holesAsked() {
-			return holesAsked;
-		},
-		set holesAsked(next) {
-			holesAsked = next;
-		},
-		editor,
+		penDrawn, restCamera, props, view, penLayer, LIVE_FILES, scaling, editor,
+		get holesAsked() { return holesAsked; },
+		set holesAsked(next) { holesAsked = next; },
 	});
 
 	const { pageNode } = createPageNode({
-		props,
-		Frame,
-		ctl,
-		isLive,
-		isKept,
-		isLeaving,
-		isPictured,
-		isNear,
-		markLive,
-		carriedPages,
-		draggedAsPicture,
-		gestures,
-		editor,
-		pushCamera,
-		frame,
+		props, Frame, ctl, isLive, isKept, isLeaving, isPictured, isNear, markLive, carriedPages, draggedAsPicture, gestures, editor,
+		pushCamera, frame,
 	});
 
 	const { sizingPaths } = createCardSizing({
@@ -278,29 +213,11 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	});
 
 	const { presented, slots, fileNodes, player } = createItemNodes({
-		get holesAsked() {
-			return holesAsked;
-		},
-		set holesAsked(next) {
-			holesAsked = next;
-		},
-		penLayer,
-		setHolesShown,
-		props,
-		isRendered,
-		pageNode,
-		liveFiles,
-		liveBox,
-		holesShown,
-		playingBox,
-		playedTo,
-		get playingElement() {
-			return media.playingElement;
-		},
-		set playingElement(next) {
-			media.playingElement = next;
-		},
-		setPlaying,
+		penLayer, setHolesShown, props, isRendered, pageNode, liveFiles, liveBox, holesShown, playingBox, playedTo, setPlaying,
+		get holesAsked() { return holesAsked; },
+		set holesAsked(next) { holesAsked = next; },
+		get playingElement() { return media.playingElement; },
+		set playingElement(next) { media.playingElement = next; },
 	});
 
 	return { isLive, renderedPaths, pageIndex, liveNow, layered, cardsHidden, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };

@@ -130,56 +130,16 @@ export function createSelection(deps: SelectionDeps) {
 		for (const one of walk([node])) if (typeof one.content === "string" && one.content.trim()) said.push(one.content.trim());
 		return said.join(" ").replace(/\s+/g, " ").slice(0, 120);
 	};
-	const { penDuplicate, penDeleteSelected } = createPenActions({
-		editor,
-		scene,
-		penLayer,
-		penEdit,
-		freshIds,
-		selectMade,
-	});
+	const { penDuplicate, penDeleteSelected } = createPenActions({ editor, scene, penLayer, penEdit, freshIds, selectMade });
 
 	const { calloutItems, canvasPenPath, lassoItems, radiusHandle, arrowEnds, overlay } = createOverlayModel({
-		editor,
-		scene,
-		penHandles,
-		props,
-		penLayer,
-		groupPicked,
-		penOutlines,
-		quoteOf,
-		penDrawn,
-		shownDrag,
-		panning,
-		penAnchors,
+		editor, scene, penHandles, props, penLayer, groupPicked, penOutlines, quoteOf, penDrawn, shownDrag, panning, penAnchors,
 		pageHandles,
 	});
 
 	const { pills } = createPills({
-		props,
-		calloutPath,
-		calloutPage,
-		pillObstacles,
-		moving,
-		panning,
-		scaling,
-		gliding,
-		editor,
-		ctl,
-		view,
-		pushCamera,
-		frame,
-		calloutItems,
-		penAnchors,
-		pressHeld,
-		canvasPenPath,
-		penNode,
-		penDuplicate,
-		penDeleteSelected,
-		lassoItems,
-		scene,
-		freshIds,
-		penEdit,
+		props, calloutPath, calloutPage, pillObstacles, moving, panning, scaling, gliding, editor, ctl, view, pushCamera, frame,
+		calloutItems, penAnchors, pressHeld, canvasPenPath, penNode, penDuplicate, penDeleteSelected, lassoItems, scene, freshIds, penEdit,
 	});
 
 	return { penHandles, pageHandles, radiusHandle, arrowEnds, penDeleteSelected, penDuplicate, overlay, pills };

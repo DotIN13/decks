@@ -88,25 +88,13 @@ export function CanvasInk(props: CanvasInkProps) {
 	/** Where the live paths go, and each one drawn, with the path text it last had. */
 	let inkLayer: SVGGElement | undefined;
 	const paint = createInkPaint({
-		get reshape() {
-			return reshape;
-		},
-		set reshape(next) {
-			reshape = next;
-		},
-		get live() {
-			return live;
-		},
-		set live(next) {
-			live = next;
-		},
-		get liveOf() {
-			return liveOf;
-		},
+		get reshape() { return reshape; },
+		set reshape(next) { reshape = next; },
+		get live() { return live; },
+		set live(next) { live = next; },
+		get liveOf() { return liveOf; },
 		props,
-		get inkLayer() {
-			return inkLayer;
-		},
+		get inkLayer() { return inkLayer; },
 	});
 	const { sendInk, hold, waiting, settle } = paint;
 
@@ -140,131 +128,53 @@ export function CanvasInk(props: CanvasInkProps) {
 	});
 
 	const { liveOf, cancel, erase, rest, paintLive, clearLive } = createLiveStroke({
-		get live() {
-			return live;
-		},
-		set live(next) {
-			live = next;
-		},
-		get reshape() {
-			return reshape;
-		},
-		set reshape(next) {
-			reshape = next;
-		},
-		sendInk,
-		get loop() {
-			return loop;
-		},
-		props,
-		zoom,
-		get gesture() {
-			return gesture;
-		},
-		set gesture(next) {
-			gesture = next;
-		},
-		setResizing,
+		sendInk, props, zoom, setResizing,
+		get live() { return live; },
+		set live(next) { live = next; },
+		get reshape() { return reshape; },
+		set reshape(next) { reshape = next; },
+		get loop() { return loop; },
+		get gesture() { return gesture; },
+		set gesture(next) { gesture = next; },
 	});
 
 	const { fingerDown } = createInkFingers({
-		get palms() {
-			return palms;
-		},
+		get palms() { return palms; },
 		props,
 	});
 
 	const { scaled, startScale } = createInkScale({
-		selection,
-		get gesture() {
-			return gesture;
-		},
-		set gesture(next) {
-			gesture = next;
-		},
-		held,
-		props,
+		selection, held, props,
+		get gesture() { return gesture; },
+		set gesture(next) { gesture = next; },
 	});
 
 	const pen = createPenDown({
-		fingerDown,
-		get gesture() {
-			return gesture;
-		},
-		set gesture(next) {
-			gesture = next;
-		},
-		cancel,
-		props,
-		erase,
-		selection,
-		held,
-		pressureOf,
-		rest,
-		paintLive,
+		fingerDown, cancel, props, erase, selection, held, pressureOf, rest, paintLive,
+		get gesture() { return gesture; },
+		set gesture(next) { gesture = next; },
 	});
 	const { palms, palm, onDown } = pen;
 
 	const { onMove } = createPenMove({
-		palms,
-		get gesture() {
-			return gesture;
-		},
-		props,
-		paintLive,
-		pressureOf,
-		zoom,
-		rest,
-		scaled,
-		setResizing,
-		erase,
-		get loop() {
-			return loop;
-		},
+		palms, props, paintLive, pressureOf, zoom, rest, scaled, setResizing, erase,
+		get gesture() { return gesture; },
+		get loop() { return loop; },
 	});
 
 	const { onUp } = createPenUp({
-		get penDown() {
-			return pen.penDown;
-		},
-		set penDown(next) {
-			pen.penDown = next;
-		},
-		get penUpAt() {
-			return pen.penUpAt;
-		},
-		set penUpAt(next) {
-			pen.penUpAt = next;
-		},
-		palms,
-		get gesture() {
-			return gesture;
-		},
-		set gesture(next) {
-			gesture = next;
-		},
-		setResizing,
-		props,
-		hold,
-		clearLive,
-		scaled,
-		zoom,
+		palms, setResizing, props, hold, clearLive, scaled, zoom,
+		get penDown() { return pen.penDown; },
+		set penDown(next) { pen.penDown = next; },
+		get penUpAt() { return pen.penUpAt; },
+		set penUpAt(next) { pen.penUpAt = next; },
+		get gesture() { return gesture; },
+		set gesture(next) { gesture = next; },
 	});
 
 	const inkSheet = mountInkSheet({
-		palm,
-		palms,
-		fingerDown,
-		onDown,
-		onMove,
-		onUp,
-		cancel,
-		waiting,
-		settle,
-		get frame() {
-			return paint.frame;
-		},
-		props,
+		palm, palms, fingerDown, onDown, onMove, onUp, cancel, waiting, settle, props,
+		get frame() { return paint.frame; },
 	});
 
 	return (

@@ -187,18 +187,10 @@ export function CanvasView(props: CanvasViewProps) {
 	const cameraChanged = () => editor.cameraMoved();
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
 	const { ctl, scrolled, panning, scaling, moving, gliding, worldOrigin, worldPlaced } = createWorld({
-		props,
-		get worldEl() {
-			return worldEl;
-		},
-		get element() {
-			return element;
-		},
-		view,
-		get penLayer() {
-			return penLayer;
-		},
-		cameraChanged,
+		props, view, cameraChanged,
+		get worldEl() { return worldEl; },
+		get element() { return element; },
+		get penLayer() { return penLayer; },
 	});
 
 	/*
@@ -247,34 +239,12 @@ export function CanvasView(props: CanvasViewProps) {
 		view,
 	});
 	const { editor } = wireEditor({
-		scene,
-		penLayer,
-		props,
-		ctl,
-		view,
-		freshIds,
-		penEdit,
-		get element() {
-			return element;
-		},
-		get items() {
-			return items;
-		},
-		worldAt,
-		grabbing,
-		input,
-		setHoldMenu,
-		get selection() {
-			return selection;
-		},
-		get armPenTool() {
-			return armPenTool;
-		},
-		get worldEl() {
-			return worldEl;
-		},
-		penDrawn,
-		freshId,
+		scene, penLayer, props, ctl, view, freshIds, penEdit, worldAt, grabbing, input, setHoldMenu, penDrawn, freshId,
+		get element() { return element; },
+		get items() { return items; },
+		get selection() { return selection; },
+		get armPenTool() { return armPenTool; },
+		get worldEl() { return worldEl; },
 	});
 	const { resolveColour } = createResolvedColours({
 		props,
@@ -283,16 +253,8 @@ export function CanvasView(props: CanvasViewProps) {
 
 	/* The placed items (`items-layer.tsx`): which are near, have a slot and are awake, and the one playing. */
 	const items = createItemsLayer({
-		props,
-		Frame,
+		props, Frame, ctl, view, editor, penLayer, penDrawn, resolveColour, frame,
 		element: () => element,
-		ctl,
-		view,
-		editor,
-		penLayer,
-		penDrawn,
-		resolveColour,
-		frame,
 		gestures: input.gestures,
 	});
 
@@ -301,19 +263,9 @@ export function CanvasView(props: CanvasViewProps) {
 
 	});
 	feedEngine({
-		get element() {
-			return element;
-		},
-		coloursFor,
-		get selection() {
-			return selection;
-		},
-		ctl,
-		setEngineOverlays,
-		penLayer,
-		editor,
-		props,
-		setPenDrawn,
+		coloursFor, ctl, setEngineOverlays, penLayer, editor, props, setPenDrawn,
+		get element() { return element; },
+		get selection() { return selection; },
 	});
 
 	/* What is drawn over the selection and under the pointer, and the pills (`selection.tsx`). */
@@ -349,21 +301,10 @@ export function CanvasView(props: CanvasViewProps) {
 		};
 	}
 	setViewProbes({
-		penLayer,
-		get element() {
-			return element;
-		},
-		ctl,
-		view,
-		worldAt,
-		get frameUnder() {
-			return frameUnder;
-		},
-		editor,
-		penNode,
-		get dropSlot() {
-			return dropSlot;
-		},
+		penLayer, ctl, view, worldAt, editor, penNode,
+		get element() { return element; },
+		get frameUnder() { return frameUnder; },
+		get dropSlot() { return dropSlot; },
 	});
 	/** The ink on the stage, each stroke in stage pixels, for the eraser and the lasso. */
 	const inkStrokes = createMemo(() => {

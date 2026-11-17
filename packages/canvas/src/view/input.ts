@@ -51,9 +51,7 @@ export function createViewInput(deps: ViewInputDeps) {
 	const held = createHand({
 		spaceHeld,
 		el,
-		get panFrom() {
-			return panFrom;
-		},
+		get panFrom() { return panFrom; },
 	});
 	const { COAST_MS, grabbing, pressHeld } = held;
 	onMount(() => {
@@ -66,33 +64,17 @@ export function createViewInput(deps: ViewInputDeps) {
 		});
 		holdBrowserScroll({
 			element,
-			get lastScroll() {
-				return held.lastScroll;
-			},
-			set lastScroll(next) {
-				held.lastScroll = next;
-			},
+			get lastScroll() { return held.lastScroll; },
+			set lastScroll(next) { held.lastScroll = next; },
 			deps,
-			get keptTouches() {
-				return keptTouches;
-			},
+			get keptTouches() { return keptTouches; },
 		});
 		listenSafariPinch({
-			get touches() {
-				return touches;
-			},
-			get wheeling() {
-				return wheeling;
-			},
-			element,
-			get pushCamera() {
-				return pushCamera;
-			},
-			ctl,
-			view,
-			get stoppedMoving() {
-				return stoppedMoving;
-			},
+			element, ctl, view,
+			get touches() { return touches; },
+			get wheeling() { return wheeling; },
+			get pushCamera() { return pushCamera; },
+			get stoppedMoving() { return stoppedMoving; },
 		});
 		const measure = () => deps.measured({ width: element.clientWidth, height: element.clientHeight });
 		const observer = new ResizeObserver(measure);
@@ -103,21 +85,10 @@ export function createViewInput(deps: ViewInputDeps) {
 		onCleanup(() => observer.disconnect());
 
 		listenKeys({
-			get pushCamera() {
-				return pushCamera;
-			},
-			frame,
-			props,
-			ctl,
-			view,
-			get centre() {
-				return centre;
-			},
-			editor,
-			setSpaceHeld,
-			get shortcut() {
-				return shortcut;
-			},
+			frame, props, ctl, view, editor, setSpaceHeld,
+			get pushCamera() { return pushCamera; },
+			get centre() { return centre; },
+			get shortcut() { return shortcut; },
 		});
 	});
 
@@ -126,23 +97,9 @@ export function createViewInput(deps: ViewInputDeps) {
 	// Moving the camera: the controller's (`camera/controller.ts`).
 	const { push: pushCamera, cancelCoast, stopped: stoppedMoving } = ctl;
 
-	const { shortcut } = createShortcut({
-		props,
-		pushCamera,
-		frame,
-		ctl,
-		view,
-		centre,
-	});
+	const { shortcut } = createShortcut({ props, pushCamera, frame, ctl, view, centre });
 
-	const wheeling = createWheel({
-		ctl,
-		props,
-		deps,
-		worldAt,
-		view,
-		el,
-	});
+	const wheeling = createWheel({ ctl, props, deps, worldAt, view, el });
 	const { onWheel } = wheeling;
 
 	/**
@@ -154,35 +111,12 @@ export function createViewInput(deps: ViewInputDeps) {
 	const onCanvas = (target: EventTarget | null) => target === el() || onDrawn(target);
 
 	const fingers = createFingers({
-		cancelCoast,
-		setPanning,
-		ctl,
-		stoppedMoving,
-		pushCamera,
-		view,
-		deps,
-		onCanvas,
-		props,
-		get lastScroll() {
-			return held.lastScroll;
-		},
-		COAST_MS,
-		el,
+		cancelCoast, setPanning, ctl, stoppedMoving, pushCamera, view, deps, onCanvas, props, COAST_MS, el,
+		get lastScroll() { return held.lastScroll; },
 	});
 	const { keptTouches, touches, claimed, beginTouch } = fingers;
 
-	const { panFrom, gestures } = createPresses({
-		claimed,
-		keptTouches,
-		touches,
-		fingers,
-		el,
-		props,
-		setPanning,
-		pushCamera,
-		ctl,
-		deps,
-	});
+	const { panFrom, gestures } = createPresses({ claimed, keptTouches, touches, fingers, el, props, setPanning, pushCamera, ctl, deps });
 
 	return { grabbing, pressHeld, onWheel, touches, claimed, keptTouches, beginTouch, panFrom, gestures, caught: () => fingers.caught };
 }

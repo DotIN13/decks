@@ -57,12 +57,8 @@ export function wireEditor(d: WireEditorNeeds) {
 			cutFromCarried: (rect) => d.penLayer.cardLayer.cutFromCarried(rect),
 			showCarriedLayer: (on) => d.penLayer.cardLayer.showCarriedLayer(on),
 			pen: () => d.props.pen,
-			get onRefer() {
-				return d.props.onRefer;
-			},
-			get onOpenPage() {
-				return d.props.onOpenPage;
-			},
+			get onRefer() { return d.props.onRefer; },
+			get onOpenPage() { return d.props.onOpenPage; },
 			onSelect: (path) => d.props.onSelect(path),
 			onMove: (path, x, y) => d.props.onMove(path, x, y),
 			onResize: (path, size) => d.props.onResize?.(path, size),

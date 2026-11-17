@@ -332,78 +332,24 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	};
 	const wait = (id: string, ms: number) => setTimeout(() => drop(id), ms);
 	const { flush, receive } = createDrawingSync({
-		host,
-		get inFlight() {
-			return inFlight;
-		},
-		set inFlight(next) {
-			inFlight = next;
-		},
-		get pending() {
-			return pending;
-		},
-		set pending(next) {
-			pending = next;
-		},
-		get stepsAfter() {
-			return stepsAfter;
-		},
-		set stepsAfter(next) {
-			stepsAfter = next;
-		},
-		sent,
-		wait,
-		get inFlightTimer() {
-			return inFlightTimer;
-		},
-		set inFlightTimer(next) {
-			inFlightTimer = next;
-		},
-		drop,
-		given,
-		get scope() {
-			return scope;
-		},
-		set scope(next) {
-			scope = next;
-		},
-		setWaiting,
-		forgetHistory,
-		setGiven,
-		doc,
-		history,
-		depth,
-		show,
-		showOver,
-		onTop,
+		host, sent, wait, drop, given, setWaiting, forgetHistory, setGiven, doc, history, depth, show, showOver, onTop,
+		get inFlight() { return inFlight; },
+		set inFlight(next) { inFlight = next; },
+		get pending() { return pending; },
+		set pending(next) { pending = next; },
+		get stepsAfter() { return stepsAfter; },
+		set stepsAfter(next) { stepsAfter = next; },
+		get inFlightTimer() { return inFlightTimer; },
+		set inFlightTimer(next) { inFlightTimer = next; },
+		get scope() { return scope; },
+		set scope(next) { scope = next; },
 	});
 
 	const { edit, step } = createDrawingEdits({
-		options,
-		doc,
-		host,
-		applied,
-		nameOne,
-		get pending() {
-			return pending;
-		},
-		setWaiting,
-		show,
-		flush,
-		commit,
-		undoStack,
-		depth,
-		redoStack,
-		given,
-		history,
-		wait,
-		showOver,
-		get inFlight() {
-			return inFlight;
-		},
-		get stepsAfter() {
-			return stepsAfter;
-		},
+		options, doc, host, applied, nameOne, setWaiting, show, flush, commit, undoStack, depth, redoStack, given, history, wait, showOver,
+		get pending() { return pending; },
+		get inFlight() { return inFlight; },
+		get stepsAfter() { return stepsAfter; },
 	});
 
 	const pageId = (path: string) => untrack(doc).children?.find((node) => isPage(node) && pagePath(node) === path)?.id;

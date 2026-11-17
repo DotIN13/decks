@@ -61,15 +61,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 	/** How wide a card's words are: its width less its padding. */
 	const cardInner = (card: PenNode) => cardInnerOf(card, host.scene.item(card.id)?.box.w, CARD_PAD);
 
-	const { openPenText, openShapeWords, openCardAt, openFileOf } = createTextOpen({
-		doc,
-		host,
-		editor,
-		cardOf,
-		setOpen,
-		textLookOf,
-		cardLook,
-	});
+	const { openPenText, openShapeWords, openCardAt, openFileOf } = createTextOpen({ doc, host, editor, cardOf, setOpen, textLookOf, cardLook });
 	// While a card is typed into its toolbar is the panel, so the properties stand aside.
 	createEffect(() => setPenTyping(!!open() && !!open()!.card));
 	onCleanup(() => setPenTyping(false));
@@ -81,12 +73,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 	});
 
 	const { pictureSize, measurePictures } = createPictureSizes({ host });
-	const typedPreview = createTypedPreview({
-		doc,
-		cardInner,
-		pictureSize,
-		host,
-	});
+	const typedPreview = createTypedPreview({ doc, cardInner, pictureSize, host });
 	const { dropTyped, showTyped, previewTyped } = typedPreview;
 	onCleanup(() => {
 		if (typedPreview.typedFrame !== undefined) cancelAnimationFrame(typedPreview.typedFrame);
@@ -107,18 +94,9 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 	const { leaveGhost, dropGhost } = textGhost;
 
 	const { commitPenText } = createTextCommit({
-		open,
-		leaveGhost,
-		setOpen,
-		host,
-		unmuteNow,
-		dropTyped,
+		open, leaveGhost, setOpen, host, unmuteNow, dropTyped, showTyped, measurePictures, cardInner, pictureSize,
 		get typedValue() { return typedPreview.typedValue; },
 		set typedValue(next) { typedPreview.typedValue = next; },
-		showTyped,
-		measurePictures,
-		cardInner,
-		pictureSize,
 	});
 	/**
 	 * Escape: the words go back as they were, and a fresh text never typed into goes. An item a tool
