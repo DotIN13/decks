@@ -41,7 +41,7 @@ export interface Start {
 	pictures: string;
 	/** The deck's import map, given once for every card on the canvas: names to another site's addresses, or to paths under `assets/`, read beside the canvas's cards. Left out, each card looks for the deck's own. */
 	imports?: Record<string, string>;
-	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }>; /** The page draws the comment box (`onComment`), so its Send now is a press of yours the page can send on; the frame only says where. */ pageComments?: boolean; /** The page draws the tools (the tool column, the pen tray, the properties, the zoom): the frame draws none, and keeps the tools' state in step with the page's (`tools-mirror.ts`). */ pageTools?: boolean; /** The bare keys the page's tools take (a letter each): pressed on the canvas and not taken there, they are passed on to the page (`keys`). */ pageKeys?: readonly string[]; /** Keys the page's tools take ahead of the canvas's own: heard first on the canvas, passed on and acted on nowhere else. Each a key (`"v"`), or a code with its Shift (`"shift+Digit1"`). */ pageKeysFirst?: readonly string[] };
+	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }>; /** The page draws the comment box (`onComment`), so its Send now is a press of yours the page can send on; the frame only says where. */ pageComments?: boolean; /** The page draws the tools (the tool column, the pen tray, the properties, the zoom): the frame draws none, and keeps the tools' state in step with the page's (`tools-mirror.ts`). */ pageTools?: boolean; /** The bare keys the page's tools take (a letter each): pressed on the canvas and not taken there, they are passed on to the page (`keys`). */ pageKeys?: readonly string[]; /** Keys the page's tools take ahead of the canvas's own: heard first on the canvas, passed on and acted on nowhere else. Each a key (`"v"`), or a code with its Shift (`"shift+Digit1"`). */ pageKeysFirst?: readonly string[]; /** The page has tabs of its own: the pill's New tab says what it opens (`open-tab`). */ pageTabs?: boolean };
 	camera?: Camera;
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
@@ -110,6 +110,8 @@ interface FrameToPage {
 	composer: ComposerPart;
 	/** Open an app in a tab of its own: the page's, outside the canvas's sandbox (`decks.app`). */
 	"open-app": { name: string };
+	/** Open a card, a document or an app whole in a tab of the page's (the pill's New tab), where the page has them (`look.pageTabs`). */
+	"open-tab": { kind: "card" | "document" | "app"; target: string };
 	/** A drag is over the page's composer, or no longer: it is marked as where what is dragged would be mentioned. */
 	refer: { over: boolean };
 	/** Open an address in a tab: the page's to open, an http(s) one alone, since the sandbox has no popups. */

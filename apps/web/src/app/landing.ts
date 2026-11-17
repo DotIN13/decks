@@ -8,7 +8,7 @@ import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
 import { stages } from "../state/canvases.ts";
-import { canvasOnScreen, homeInFront } from "../tabs/tabs.ts";
+import { canvasOnScreen, homeHeld } from "../tabs/tabs.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
 /** What the landing reads of the page. */
@@ -31,10 +31,10 @@ interface LandingInputs {
 /**
  * Whose view the camera on screen is: the conversation's while its canvas, the home tab, is in front,
  * as it always was; and the person's own, under one name, while a canvas in a tab of its own is
- * (`tabs/tabs.ts`), so picking another agent there moves nothing.
+ * (`tabs/tabs.ts`), so picking another agent there moves nothing. A tab that is no canvas changes neither: the canvas behind it is held as it was.
  */
 export const LOOKING = "looking";
-const ownerNow = (): string | undefined => (homeInFront() ? state.focused : LOOKING);
+const ownerNow = (): string | undefined => (homeHeld() ? state.focused : LOOKING);
 
 export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: LandingInputs) {
 	/**
@@ -120,13 +120,13 @@ export function reportCameraOnArrival() {
 		if (!id || reportedOpening) return;
 		reportedOpening = true;
 		const timer = window.setTimeout(() => {
-			if (state.focused === id && homeInFront()) reportCamera(camera(), id);
+			if (state.focused === id && homeHeld()) reportCamera(camera(), id);
 		}, 400);
 		onCleanup(() => clearTimeout(timer));
 	});
 	onMount(() => {
 		const again = () => {
-			if (document.visibilityState === "visible" && state.focused && homeInFront()) reportCamera(camera(), state.focused);
+			if (document.visibilityState === "visible" && state.focused && homeHeld()) reportCamera(camera(), state.focused);
 		};
 		window.addEventListener("focus", again);
 		document.addEventListener("visibilitychange", again);

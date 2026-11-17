@@ -316,6 +316,19 @@ body {
 		background: var(--v3-bg3);
 		color: var(--v3-fg);
 	}
+	/* A card whole in its tab (`tabs/kinds/card.tsx`): in the canvas's column, beside the side panel and under the top bars. */
+	.surface[data-surface="card"] {
+		inset: var(--inset-top, 0px) var(--inset-right, 0px) 0 var(--inset-left, 0px);
+	}
+	/* A tab whose card is gone from the deck (`tabs/kinds/card.tsx`): said in the middle of the window. */
+	.tab-missing {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		margin: 0;
+		color: var(--v3-fg2);
+		place-items: center;
+	}
 	.v3-viewonly {
 		height: 28px;
 		padding: 0 8px;

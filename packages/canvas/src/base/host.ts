@@ -72,6 +72,11 @@ export interface CanvasHost {
 	/** Open an address in a tab of its own, for a canvas that may not open one (the frame's sandbox has no popups). Absent: `window.open`. */
 	openLink?(href: string): void;
 	/**
+	 * Open a card, a document or an app whole, in a tab of the host's own (the pill's New tab): by what
+	 * it is, where `openLink` is given only an address. Absent, the pill opens the browser's tab.
+	 */
+	openItem?(item: { kind: "card" | "document" | "app"; target: string }): void;
+	/**
 	 * An address read on the canvas's pass (`/api/t/<pass>/…`) with the pass in it now: a card loaded
 	 * on an older pass reads its files on the current one (`card.file`). Absent: the address as it is.
 	 */

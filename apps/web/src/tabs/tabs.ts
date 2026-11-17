@@ -16,6 +16,13 @@ const HOME: Tab = { id: "home", kind: "canvas" };
 
 const [opened, setOpened] = createSignal<Tab[]>([HOME]);
 const [frontId, setFrontId] = createSignal(HOME.id);
+/** The canvas tab that was in front last: what the canvas's frame goes on holding while a tab of another kind is in front. */
+const [lastCanvasId, setLastCanvasId] = createSignal(HOME.id);
+/** Bring a tab forward, by its name in the row. */
+const bring = (id: string): void => {
+	setFrontId(id);
+	if (opened().find((tab) => tab.id === id)?.kind === "canvas") setLastCanvasId(id);
+};
 
 /** The canvas a tab shows, when it is a canvas tab: the conversation's for home, its own otherwise. */
 function canvasOf(tab: Tab): StageRow | undefined {
@@ -29,28 +36,38 @@ export const tabs = (): Tab[] => opened().filter((tab) => tab.kind !== "canvas" 
 /** The tab in front: what the window shows. */
 export const front = (): Tab => tabs().find((tab) => tab.id === frontId()) ?? HOME;
 
-/** Whether home is the tab in front: the conversation's own canvas is what the window shows. */
+/** Whether home is the tab in front: the home chip is the one washed, and a press on it opens the canvas list. */
 export const homeInFront = (): boolean => front().id === HOME.id;
+
+/**
+ * The canvas tab on screen: the one in front, or, while a tab of another kind is in front, the canvas
+ * tab that was in front last. Its canvas is still held behind the tab in front, as it was, and it is
+ * what the side panel lists and the composer talks about until another canvas comes forward.
+ */
+const canvasTab = (): Tab => (front().kind === "canvas" ? front() : (tabs().find((tab) => tab.id === lastCanvasId()) ?? HOME));
+
+/** Whether that canvas tab is home: the canvas on screen is the conversation's own, and its camera the conversation's. */
+export const homeHeld = (): boolean => canvasTab().id === HOME.id;
 
 /** The canvas of the conversation on screen, which the home tab shows whether or not it is in front. */
 export const homeCanvas = (): StageRow | undefined => canvasOf(HOME);
 
-/** The canvas on screen: the one the tab in front shows, or none while a tab of another kind is in front. */
-export const canvasOnScreen = (): StageRow | undefined => canvasOf(front());
+/** The canvas on screen: the one the canvas tab on screen shows (`canvasTab`). */
+export const canvasOnScreen = (): StageRow | undefined => canvasOf(canvasTab());
 
 /**
  * Open a tab on a target and bring it forward, or bring forward the one already open on it. A canvas
  * the home tab is showing is home: one canvas is not in the row twice by accident. No agent moves.
  */
 export function openTab(kind: string, target: string): void {
-	if (kind === "canvas" && homeCanvas()?.name === target) return void setFrontId(HOME.id);
+	if (kind === "canvas" && homeCanvas()?.name === target) return bring(HOME.id);
 	const id = `${kind}:${target}`;
 	if (!opened().some((tab) => tab.id === id)) setOpened((all) => [...all, { id, kind, target }]);
-	setFrontId(id);
+	bring(id);
 }
 
 /** Bring a tab forward. */
-export const showTab = (id: string): void => void setFrontId(id);
+export const showTab = (id: string): void => bring(id);
 
 /** Close a tab; the one before it comes forward when it was in front. Home is never closed. */
 export function closeTab(id: string): void {
@@ -59,5 +76,5 @@ export function closeTab(id: string): void {
 	const at = all.findIndex((tab) => tab.id === id);
 	if (at < 0) return;
 	setOpened((was) => was.filter((tab) => tab.id !== id));
-	if (frontId() === id) setFrontId((all[at - 1] ?? HOME).id);
+	if (frontId() === id) bring((all[at - 1] ?? HOME).id);
 }

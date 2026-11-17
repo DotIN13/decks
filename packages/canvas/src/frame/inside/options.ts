@@ -150,6 +150,8 @@ export function installHost(ctx: FrameContext): void {
 		},
 		// So is any other tab a link opens: this sandbox may not open one.
 		openLink: (href) => end.emit("open-link", { href }),
+		// The page has tabs of its own (`look.pageTabs`): the pill's New tab says what it opens, and the page opens it.
+		...(start.look.pageTabs ? { openItem: (item: { kind: "card" | "document" | "app"; target: string }) => end.emit("open-tab", item) } : {}),
 		// The composer is the page's, where the page said it is: a drag let go over it is a mention, sent as a draft.
 		composer: {
 			at: (x, y) => {

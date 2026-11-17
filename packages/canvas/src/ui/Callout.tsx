@@ -18,9 +18,22 @@ import ImageDown from "lucide-solid/icons/image-down";
 import FileDown from "lucide-solid/icons/file-down";
 import Link from "lucide-solid/icons/link";
 import { createCalloutSide } from "./callout-side.ts";
+import type { Page } from "@decks/protocol";
 import type { PageCalloutProps } from "./callout-props.ts";
 import { createCalloutMenu } from "./callout-menu.ts";
 
+
+/**
+ * The pill's New tab. The host opens the item whole in a tab of its own when it has them (`CanvasHost.openItem`),
+ * told what it is; with ⌘ or ⌃ held, or with no such host, it is the browser's tab, as it always was.
+ */
+function newTab(board: Page, browser: boolean): void {
+	const host = canvasHost();
+	const app = board.item === "app" && board.app ? board.app : undefined;
+	if (host.openItem && !browser) return host.openItem(app ? { kind: "app", target: app } : { kind: board.item === "document" ? "document" : "card", target: board.path });
+	if (app) host.apps?.open(app);
+	else openInTab(host.fileUrl(board.path));
+}
 
 /**
  * A board's title bar, now that boards have none: a small pill over the selected board, as a phone
@@ -97,7 +110,7 @@ export function PageCallout(props: PageCalloutProps) {
 			</button>
 			<Show when={props.board}>
 				{(board) => (
-				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); if (board().item === "app" && board().app) canvasHost().apps?.open(board().app!); else openInTab(canvasHost().fileUrl(board().path)); }}>
+				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); newTab(board(), event.metaKey || event.ctrlKey); }}>
 					<Icon of={ExternalLink} size={16} />
 				</a>
 				)}

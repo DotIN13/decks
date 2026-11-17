@@ -27,9 +27,9 @@ export interface TabKind {
 	/** Its mark in the row. */
 	icon: Component<{ size?: number }>;
 	/**
-	 * What fills the window while a tab of this kind is in front. Made once for the kind and told which
-	 * tab it is showing (`tab`), so going from one tab to another of the same kind keeps what was made:
-	 * a canvas's frame moves to the other canvas in place.
+	 * What fills the window while a tab of this kind is in front. Made once, the first time one is, and
+	 * told which tab of its kind is in front now, or none while another kind is: the canvas keeps its
+	 * frame and hides it, and moves it from one canvas to the next in place; a card is put away.
 	 */
-	view(tab: () => Tab, parts: Parts): JSX.Element;
+	view(tab: () => Tab | undefined, parts: Parts): JSX.Element;
 }

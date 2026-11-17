@@ -9,6 +9,8 @@ import { createOthersLayer } from "./others-layer.tsx";
 import { editorOptions, installHost } from "./options.ts";
 import { wireFrame } from "./events.ts";
 import { bootGuest } from "@decks/frame";
+import { runCard } from "../card/guest.tsx";
+import type { CardEnd, CardStart } from "../card/protocol.ts";
 import { peer, type FrameEnd, type Start } from "../protocol.ts";
 import { forgetMissing } from "../../base/missing.ts";
 
@@ -34,8 +36,9 @@ export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView
 	 * frame says hello again for the next one, keeping what it loaded (its code, the engine's compiled
 	 * module). The page decides when, and makes a new frame for a friend's canvas.
 	 */
-	bootGuest<Start>({
-		run: (start, port) => run(root, start, peer(port) as FrameEnd, options.chrome),
+	bootGuest<Start | CardStart>({
+		// Which kind the page started (`start.kind`): a card whole (`card/guest.tsx`), or a canvas, whose start names none.
+		run: (start, port) => ("kind" in start ? runCard(root, start, peer(port) as CardEnd) : run(root, start, peer(port) as FrameEnd, options.chrome)),
 		cleared: () => {
 			forgetMissing();
 			root.replaceChildren();

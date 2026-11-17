@@ -18,6 +18,7 @@ import type { createFileDrops } from "../../app/files/drops.ts";
 import { rememberView } from "../../app/heard/view.ts";
 import { openLinkedPage } from "../../app/links.ts";
 import { canvasOnScreen } from "../tabs.ts";
+import { openItem } from "../open.ts";
 
 /** What the canvas host needs of the page around it. */
 export interface CanvasHostInputs {
@@ -113,6 +114,8 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			composer: composerBox,
 			sheet: underSheet,
 			openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"),
+			// The pill's New tab, by what it opens (`tabs/open.ts`).
+			openTab: openItem,
 			upload: ({ files: dropped, at, card }) => files.dropAt(at, dropped, card),
 			focused: () => state.focused,
 			agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])),

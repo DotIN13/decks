@@ -7,7 +7,7 @@ import { state } from "../state/deck.ts";
 import { pens } from "../state/pens.ts";
 import { agentViews } from "../state/views.ts";
 import { focusedCanvas } from "./person.ts";
-import { canvasOnScreen, homeInFront } from "../tabs/tabs.ts";
+import { canvasOnScreen, homeHeld } from "../tabs/tabs.ts";
 import { LOOKING } from "./landing.ts";
 
 /** The cards a drawing places, by their path in the deck, each with its box on the canvas. */
@@ -101,7 +101,7 @@ export function createOnScreen() {
 		// A copy of its own: the merge below writes into this store's objects, never into the deck's.
 		const copy = (board: Page) => JSON.parse(JSON.stringify(board)) as Page;
 		let list: Page[];
-		if (homeInFront()) {
+		if (homeHeld()) {
 			const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
 			list = state.pages.filter((board) => playing.has(board.path)).map(copy);
 		} else {
