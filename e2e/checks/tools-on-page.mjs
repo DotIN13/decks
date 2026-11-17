@@ -2,7 +2,7 @@
  * The canvas's tools are the page's, drawn over the canvas frame, and the two stay in step.
  *
  * The tool column, the properties panel and the zoom stood inside the frame, beside the canvas, where
- * a float went no further than the frame's edge. The page draws them now (`app/canvas-tools.tsx`),
+ * a float went no further than the frame's edge. The page draws them now (`tabs/kinds/canvas-tools.tsx`),
  * and the tools' state is the same at both ends (`@decks/canvas`, `frame/tools-mirror.ts`). Here:
  * they are on the page and not in the frame; a tool pressed on the page arms the canvas and leaves it
  * the keyboard; the canvas puts the tool down again and the page's column shows it; the column's own

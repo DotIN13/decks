@@ -2,21 +2,21 @@ import type { Camera } from "@decks/protocol";
 import { createSignal, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { createFramedEditor, type FramedEditorOptions, type FramedHandle } from "@decks/canvas";
 import { drawing } from "@decks/canvas/tools";
-import { canvasPass, cardAgentCall } from "../canvases/pass.ts";
-import { scheme } from "../lib/theme.ts";
-import { camera, glide } from "../state/camera.ts";
-import { state } from "../state/deck.ts";
-import { stageOf, stages } from "../state/canvases.ts";
-import { setDrawingEditor } from "../state/decks.ts";
-import { mode, selected, setMode, setSelected } from "../state/selection.ts";
-import { reportCameraSoon } from "./camera-report.ts";
-import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "./frame-handoffs.ts";
-import { CommentPopup } from "../markup/CommentPopup.tsx";
-import { TOOL_KEYS } from "../frame/ToolColumn.tsx";
+import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
+import { scheme } from "../../lib/theme.ts";
+import { camera, glide } from "../../state/camera.ts";
+import { state } from "../../state/deck.ts";
+import { stageOf, stages } from "../../state/canvases.ts";
+import { setDrawingEditor } from "../../state/decks.ts";
+import { mode, selected, setMode, setSelected } from "../../state/selection.ts";
+import { reportCameraSoon } from "../../app/camera-report.ts";
+import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "../../app/frame-handoffs.ts";
+import { CommentPopup } from "../../markup/CommentPopup.tsx";
+import { TOOL_KEYS } from "../../frame/ToolColumn.tsx";
 import type { CanvasComment } from "@decks/canvas";
-import type { createFileDrops } from "./files/drops.ts";
-import { rememberView } from "./heard/view.ts";
-import { openLinkedPage } from "./links.ts";
+import type { createFileDrops } from "../../app/files/drops.ts";
+import { rememberView } from "../../app/heard/view.ts";
+import { openLinkedPage } from "../../app/links.ts";
 
 /** What the canvas host needs of the page around it. */
 export interface CanvasHostInputs {
@@ -74,7 +74,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
 		dark: untrack(scheme) === "dark",
 		toolbar: false,
-		// The tools are this page's own, over the frame (`app/canvas-tools.tsx`).
+		// The tools are this page's own, over the frame (`tabs/kinds/canvas-tools.tsx`).
 		pageTools: true,
 		pageKeys: TOOL_KEYS,
 		onSelection: (ids) => setPenSelected([...ids]),

@@ -7,7 +7,7 @@ import { CommentPopup } from "../markup/CommentPopup.tsx";
 /**
  * What the Decks app draws inside the canvas frame, beside the canvas (`@decks/canvas`, `frame/chrome.ts`):
  * an agent's offer to move the view, and the comment popover on words selected in a card. Both answer
- * something the frame alone knows at once. The tools are the page's (`app/canvas-tools.tsx`): the tool
+ * something the frame alone knows at once. The tools are the page's (`tabs/kinds/canvas-tools.tsx`): the tool
  * column, the pen tray, the properties and the zoom, drawn over the frame, where a float can go anywhere.
  */
 export function DecksFrameChrome(chrome: FrameChrome) {

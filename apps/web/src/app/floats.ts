@@ -2,7 +2,7 @@ import { makeFloat } from "@decks/ui/float";
 import { insets, insetsMoving } from "@decks/canvas/camera";
 
 /*
- * The floats: the composer, the conversation, and the canvas's tools (`tools-float.ts`).
+ * The floats: the composer, the conversation, and the canvas's tools (`tabs/kinds/canvas-tools-float.ts`).
  *
  * All are the app's own chrome, kept where they are by default. Taken by the grip or
  * the header they go where they are put, clamped to the surface, snapping home within

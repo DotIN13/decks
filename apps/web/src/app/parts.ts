@@ -17,7 +17,7 @@ import { setPicking } from "../state/ui.ts";
 import { createAlerts } from "./alerts.ts";
 import { createAppsPanel } from "./apps-panel.ts";
 import { createBar } from "./bar.ts";
-import type { CanvasHostInputs } from "./canvas-host.tsx";
+import type { CanvasHostInputs } from "../tabs/kinds/canvas-host.tsx";
 import { createChatLayout, createPresenting } from "./chat-layout.ts";
 import { parkOnLeaving, watchPencil } from "./device.ts";
 import { createDock } from "./dock.ts";
@@ -181,7 +181,7 @@ export function createParts() {
 		untrack(editorHandle)?.setDark(dark);
 	});
 
-	/** What the canvas host (`app/canvas-host.tsx`) needs of this page. */
+	/** What the canvas host (`tabs/kinds/canvas-host.tsx`) needs of this page. */
 	const canvasHost: CanvasHostInputs = {
 		stagePen,
 		personMoved,

@@ -1,7 +1,7 @@
 import { insets, insetsMoving } from "@decks/canvas/camera";
 import { setPenToolsAt } from "@decks/canvas/tools";
 import { createEffect, onCleanup } from "solid-js";
-import type { Floats } from "./floats.ts";
+import type { Floats } from "../../app/floats.ts";
 
 /**
  * The canvas's tools as floats, beside the composer and the conversation (`floats.ts`): the tool

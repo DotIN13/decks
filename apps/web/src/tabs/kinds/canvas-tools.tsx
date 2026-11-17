@@ -2,15 +2,15 @@ import { PenBar } from "@decks/canvas/host";
 import { frameZoom } from "@decks/canvas";
 import { drawing, Insert, insertPanel, penPicked, setDrawing, setInsertPanel, setPenTool } from "@decks/canvas/tools";
 import { createEffect, onCleanup, onMount, Show, type JSX } from "solid-js";
-import { createToolsFloat } from "./tools-float.ts";
-import { PenTray } from "../frame/PenTray.tsx";
-import { ToolColumn } from "../frame/ToolColumn.tsx";
-import { ZoomBar } from "../frame/ZoomBar.tsx";
-import { camera } from "../state/camera.ts";
-import { mode, setMode, setSelected } from "../state/selection.ts";
-import { exportPicture } from "./frame-handoffs.ts";
-import type { Parts } from "./parts.ts";
-import { viewOnlyStage } from "./person.ts";
+import { createToolsFloat } from "./canvas-tools-float.ts";
+import { PenTray } from "../../frame/PenTray.tsx";
+import { ToolColumn } from "../../frame/ToolColumn.tsx";
+import { ZoomBar } from "../../frame/ZoomBar.tsx";
+import { camera } from "../../state/camera.ts";
+import { mode, setMode, setSelected } from "../../state/selection.ts";
+import { exportPicture } from "../../app/frame-handoffs.ts";
+import type { Parts } from "../../app/parts.ts";
+import { viewOnlyStage } from "../../app/person.ts";
 
 /**
  * The canvas's tools, drawn on this page over the canvas frame: the tool column, the pen tray, the
@@ -18,7 +18,7 @@ import { viewOnlyStage } from "./person.ts";
  *
  * They stood inside the frame, beside the canvas, where a float could go no further than the frame's
  * own edge. Here each is the page's, as the top bars, the side panel and the composer are: the tool
- * column and the pen tray are floats beside the composer and the conversation (`tools-float.ts`). They read and set the same signals as before
+ * column and the pen tray are floats beside the composer and the conversation (`canvas-tools-float.ts`). They read and set the same signals as before
  * (`@decks/canvas/tools`), which the canvas package keeps the same on this page and in the frame
  * (`frame/tools-mirror.ts`), with what is selected as the canvas has it now (`penPicked`), your own edits
  * in it before the server confirms them; what they ask of the canvas itself (an edit, undo, a fit, the camera) goes
