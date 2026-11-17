@@ -83,6 +83,7 @@ export function createEditorView(d: EditorViewNeeds) {
 			{...(d.options.onInk ? { onInk: d.options.onInk } : {})}
 			inkAgent={d.options.inkAgent?.()}
 			{...(d.options.world ? { world: d.options.world } : {})}
+			{...(d.options.worldUnder ? { worldUnder: d.options.worldUnder } : {})}
 			onEngine={(made) => (d.engine = made)}
 		/>
 	);

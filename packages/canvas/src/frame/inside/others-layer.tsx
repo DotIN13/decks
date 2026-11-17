@@ -2,11 +2,17 @@ import { For, Show, createMemo, type JSX } from "solid-js";
 import { AgentCursor } from "../../ui/AgentCursor.tsx";
 import type { FrameContext } from "./boot.ts";
 
+/** How far a ring round someone else's selection stands off its item, and how wide it is, on the screen: the person's own outline is the 1.5 px next to the item. */
+const RING_GAP = 2;
+const RING = 1.5;
+
 /**
- * Everyone else on this canvas, drawn in the stage's world (`CanvasOptions.world`): the agent's cursor,
- * the others' pointers and selections (`presence.ts`), and what agents just drew (`marks.ts`).
+ * Everyone else on this canvas, drawn in the stage's world, in two layers: over everything, the agent's
+ * cursor, the others' pointers (`presence.ts`) and what agents just drew (`marks.ts`), as
+ * `CanvasOptions.world`; and under what the stage itself paints over the drawing, the others'
+ * selections as rings (`CanvasOptions.worldUnder`).
  */
-export function createOthersLayer(ctx: FrameContext): () => JSX.Element {
+export function createOthersLayer(ctx: FrameContext): { cursors: () => JSX.Element; rings: () => JSX.Element } {
 	const { camera, pages, cursor } = ctx;
 	/*
 	 * The agent's cursor, in the stage's world (`CanvasOptions.world`): the card's place plus the point on
@@ -30,10 +36,14 @@ export function createOthersLayer(ctx: FrameContext): () => JSX.Element {
 		const one = ctx.presence?.present().get(key);
 		return one?.pointer ? { x: one.pointer.x, y: one.pointer.y, label: labelOf(one.by), color: one.by.color } : null;
 	};
-	/** Everyone else's selection: the boxes of the top-level items they hold, outlined in their colour with their name. */
+	/**
+	 * Everyone else's selection: the boxes of the top-level items they hold, ringed in their colour with
+	 * their name. A ring stands clear of the item, outside the person's own outline (which hugs it), with
+	 * the item's own corners: a card's are round.
+	 */
 	const outlines = () => {
-		const list: Array<{ key: string; x: number; y: number; w: number; h: number; color: string; label: string }> = [];
-		let items: Array<{ id?: string; x?: number; y?: number; width?: number; height?: number }>;
+		const list: Array<{ key: string; x: number; y: number; w: number; h: number; r: number; color: string; label: string }> = [];
+		let items: Array<{ id?: string; type?: string; x?: number; y?: number; width?: number; height?: number }>;
 		try {
 			items = (ctx.handle().drawn().children ?? []) as unknown as typeof items;
 		} catch {
@@ -43,22 +53,37 @@ export function createOthersLayer(ctx: FrameContext): () => JSX.Element {
 			for (const id of one.selection ?? []) {
 				const item = items.find((candidate) => candidate.id === id);
 				if (!item || typeof item.x !== "number" || typeof item.y !== "number") continue;
-				list.push({ key: `${key}/${id}`, x: item.x, y: item.y, w: item.width ?? 0, h: item.height ?? 0, color: one.by.color, label: one.by.name ?? (one.by.kind === "agent" ? "An agent" : "Another window") });
+				list.push({ key: `${key}/${id}`, x: item.x, y: item.y, w: item.width ?? 0, h: item.height ?? 0, r: item.type === "browser" ? 12 : 4, color: one.by.color, label: one.by.name ?? (one.by.kind === "agent" ? "An agent" : "Another window") });
 			}
 		}
 		return list;
 	};
-	/* Only while a cursor or an outline is out: nothing to see, nothing in the world. Placed in canvas units; the world's own transform scrolls and scales it. */
-	const cursors = () => (
-		<Show when={cursorAt() || pointerKeys().length || outlines().length || ctx.marks.list().length}>
-			<div class="frame-cursors" style={{ position: "absolute", left: "0", top: "0", "pointer-events": "none", "z-index": "5" }}>
-					<For each={outlines()}>
-						{(box) => (
-							<div class="frame-presence-outline" style={{ position: "absolute", left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, border: `${1.5 / camera().zoom}px solid ${box.color}`, "border-radius": `${4 / camera().zoom}px`, "box-sizing": "border-box" }}>
+	/*
+	 * Others' selections, under what the stage paints over the drawing (`worldUnder`): the person's own
+	 * outline, its handles and its guides are always the ones on top, where a ring drawn over them, in
+	 * another colour, read as the selection being someone else's. Placed in canvas units; the world's own
+	 * transform scrolls and scales it.
+	 */
+	const rings = () => (
+		<Show when={outlines().length}>
+			<div class="frame-presence" style={{ position: "absolute", left: "0", top: "0", "pointer-events": "none" }}>
+				<For each={outlines()}>
+					{(box) => {
+						const out = () => (RING_GAP + RING) / camera().zoom;
+						return (
+							<div class="frame-presence-outline" style={{ position: "absolute", left: `${box.x - out()}px`, top: `${box.y - out()}px`, width: `${box.w + 2 * out()}px`, height: `${box.h + 2 * out()}px`, border: `${RING / camera().zoom}px solid ${box.color}`, "border-radius": `${box.r + out()}px`, "box-sizing": "border-box" }}>
 								<span style={{ position: "absolute", left: "0", bottom: "100%", transform: `scale(${1 / camera().zoom})`, "transform-origin": "0 100%", "will-change": "transform", background: box.color, color: "#fff", font: "600 11px/1.4 system-ui, sans-serif", padding: "1px 6px", "border-radius": "4px 4px 4px 0", "white-space": "nowrap" }}>{box.label}</span>
 							</div>
-						)}
-					</For>
+						);
+					}}
+				</For>
+			</div>
+		</Show>
+	);
+	/* Only while a cursor is out, or something an agent just drew: nothing to see, nothing in the world. Over everything else in it. */
+	const cursors = () => (
+		<Show when={cursorAt() || pointerKeys().length || ctx.marks.list().length}>
+			<div class="frame-cursors" style={{ position: "absolute", left: "0", top: "0", "pointer-events": "none", "z-index": "5" }}>
 					<Show when={cursorAt()}>
 						<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
 					</Show>
@@ -70,5 +95,5 @@ export function createOthersLayer(ctx: FrameContext): () => JSX.Element {
 			</div>
 		</Show>
 	);
-	return cursors;
+	return { cursors, rings };
 }

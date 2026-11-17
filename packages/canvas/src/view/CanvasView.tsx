@@ -138,6 +138,8 @@ export type CanvasViewProps = {
 	inkAgent?: string;
 	/** The host's own layer in the world, in canvas units (`CanvasOptions.world`). */
 	world?: () => JSX.Element;
+	/** The host's layer under the stage's own outlines and handles (`CanvasOptions.worldUnder`). */
+	worldUnder?: () => JSX.Element;
 	/** The stage's engine, once made: for what the editor's handle answers from its layout (`itemBox`). */
 	onEngine?: (engine: CanvasEngine) => void;
 	/** A picture of a card to download, from the card pill's ⋯ menu (absent: no Export there). */
@@ -369,6 +371,30 @@ export function CanvasView(props: CanvasViewProps) {
 		props.setCamera(props.opening.camera ?? frame(props.boards.map(boxOf)));
 	});
 
+	/**
+	 * A layer of the host's in the world, in canvas units: a pan carries it, placed as the world's children
+	 * are, from the origin at the world's own origin and at the zoom. In canvas units whatever the world's
+	 * transform says: the world is written for an origin and a zoom (`placeWorld`), and while a zoom is held
+	 * still it keeps an older pair, so a child in canvas units goes through the difference. Nothing when they agree.
+	 */
+	const hostLayer = (layer: () => (() => JSX.Element) | undefined, name: string) => (
+		<Show when={layer()}>
+			{(drawn) => {
+				const transform = () => {
+					const z = ctl.zoom();
+					const o = worldOrigin();
+					const w = worldPlaced();
+					const s = z / w.zoom;
+					return `translate(${w.x - o.x * s}px, ${w.y - o.y * s}px) scale(${s})`;
+				};
+				return (
+					<div class={name} style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", transform: transform() }}>
+						{drawn()()}
+					</div>
+				);
+			}}
+		</Show>
+	);
 	return (
 		<div
 			class="stage"
@@ -430,6 +456,8 @@ export function CanvasView(props: CanvasViewProps) {
 				 * `render/engine.ts`.
 				 */}
 				{items.fileNodes()}
+				{/* The host's layer for what is someone else's (their selection's outline): before the engine's canvas, so under every outline and handle it paints. */}
+				{hostLayer(() => props.worldUnder, "world-host world-host-under")}
 				{/* The engine's canvas over the slots (`stage/engine.ts`): the pictures of boards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}
 				<canvas
 					class="stage-engine stage-engine-over"
@@ -456,31 +484,8 @@ export function CanvasView(props: CanvasViewProps) {
 					{items.player()}
 				</OverlayLayer>
 				<TextEditor text={editor.textEditing} zoom={ctl.zoom()} />
-				{/*
-				 * The host's layer (others' cursors, outlines), in canvas units: in the world, so a pan carries it,
-				 * placed as the world's children are, from the origin at the world's own origin and at the zoom.
-				 */}
-				<Show when={props.world}>
-					{(world) => {
-						/*
-						 * In canvas units whatever the world's transform says: the world is written for an origin
-						 * and a zoom (`placeWorld`), and while a zoom is held still it keeps an older pair, so a
-						 * child in canvas units goes through the difference. Nothing when they agree.
-						 */
-						const transform = () => {
-							const z = ctl.zoom();
-							const o = worldOrigin();
-							const w = worldPlaced();
-							const s = z / w.zoom;
-							return `translate(${w.x - o.x * s}px, ${w.y - o.y * s}px) scale(${s})`;
-						};
-						return (
-							<div class="world-host" style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", transform: transform() }}>
-								{world()()}
-							</div>
-						);
-					}}
-				</Show>
+				{/* The host's layer over everything in the world (others' cursors, what agents just drew). */}
+				{hostLayer(() => props.world, "world-host")}
 			</div>
 			<div class="stage-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
 			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}

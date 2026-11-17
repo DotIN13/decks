@@ -71,9 +71,9 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const { camera, pages, cursor } = ctx;
 	installHost(ctx);
 
-	const cursors = createOthersLayer(ctx);
+	const { cursors, rings } = createOthersLayer(ctx);
 	let reread = () => {};
-	const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors));
+	const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors, rings));
 	const { handle } = editor;
 	ctx.setMade(editor);
 	ctx.changed();

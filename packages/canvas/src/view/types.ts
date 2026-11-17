@@ -152,6 +152,12 @@ export interface CanvasOptions {
 	 * stay one size on the screen by the zoom.
 	 */
 	world?: () => JSX.Element;
+	/**
+	 * The same, under what the stage itself draws over the drawing: its outlines, handles and guides.
+	 * For what belongs to someone else (their selection's outline), so the person's own is always the
+	 * one on top.
+	 */
+	worldUnder?: () => JSX.Element;
 }
 
 /** The editor's handle, inside the canvas frame (and to an app's chrome there, `frame/chrome.ts`). */
