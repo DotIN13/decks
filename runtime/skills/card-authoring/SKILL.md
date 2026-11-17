@@ -156,8 +156,10 @@ Everything that used to be a board is a card. A board file left in a deck from b
 
 - **A card link opens a card, anything else opens a tab.** Link to another card by its `index.html`,
   relative to this one: `<a href="../risks/index.html">the risks card</a>`. Clicking it puts that card
-  on the canvas beside this one. Every other link opens in a new tab of its own, never in place of the
-  app, so a claim can cite its source with `href="https://…"`.
+  on the canvas beside this one. A link to something in the deck by its address in the window opens
+  it as a tab of the Decks window: `<a href="#canvas/launch-plan">`, `#card/<path>` for a card whole,
+  `#doc/<path>` for a document, `#app/<name>` for an app. Every other link opens in a new browser
+  tab of its own, never in place of the app, so a claim can cite its source with `href="https://…"`.
 - **A button acts through `card.decks`, wired in the card's module.** The calls are the `decks`
   command's, by group and name, answering a promise: a decision is a button whose listener calls
   `await card.decks.agent.send("<your name>", { task: "Option A", cards: [card.path] })`. The view,

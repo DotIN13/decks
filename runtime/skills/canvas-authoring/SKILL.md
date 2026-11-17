@@ -25,6 +25,16 @@ as it is, and every type and field here is pen's, untranslated. It holds two kin
   there yet is made empty in the canvas's `files/` when the item is placed, so the person can type into
   it at once. Place them with `decks.canvas.insert` like a card; they read back as `browser` items
   tagged `decks.app` and `decks.document`.
+- **A link** points at something in the deck without showing it: `{ type: "link", to }` is a small
+  chip, the kind's mark and the target's name, that opens what it points at as a tab when the person
+  presses it. `to` is what `decks view open` takes: a canvas's name or title, a card's or a
+  document's path, an app's name. Use one where the thing itself would be too much: a canvas of
+  canvases, "the numbers are in this app", a way back to the plan. It reads back as
+  `{ type: "link", to: "#canvas/<name>", title }`, its address in the window (`#canvas/<name>`,
+  `#card/<path>`, `#doc/<path>`, `#app/<name>`), and `title` gives it words of your own. The same
+  address works as a link in words: `[the plan](#card/canvases/launch/cards/plan/index.html)` in a
+  note, a text or a markdown card opens the tab too. A chip follows a canvas that is renamed, and is
+  dimmed when its canvas is deleted; change where one points with `canvas.replace`.
 - **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
   cards — a note beside one, an arrow from one to the next, an outline round a group. Put an
   answer on a card; put the arrangement around it here.
@@ -176,6 +186,7 @@ no field for: `{ type: "…", … }`).
 | `ref` | a copy of a `reusable: true` item | `ref` (the item's id), `descendants`, and any field to lay over the copy |
 | `icon` | an icon from a library | `library` (`"lucide"`, `"feather"`, `"phosphor"`, `"Material Symbols Outlined"` / `"Rounded"` / `"Sharp"`), `icon` (its name there, e.g. `"rocket"`), `fill` (its colour), `weight` 100–700; 24 by 24 unless sized |
 | `browser` | a card (see above), an app or a document | `url`, `metadata: { type: "decks.card", path }` — read and written as `{ type: "card", card }` through the canvas calls; an app `metadata: { type: "decks.app", name }` and a document `metadata: { type: "decks.document", path }`, inserted as `{ type: "app", app }` and `{ type: "document", path }`; its frame is pen's own `cornerRadius`, `stroke`, `strokeWidth`, `strokeAlignment`, `strokeDash` and `effect` (12 px corner and the canvas's 1 px outline when left out) |
+| `frame` + `metadata: { type: "decks.link", to }` | a **link chip** (see above): a pill that opens a canvas, a card, a document or an app as a tab | read and written as `{ type: "link", to, title }` through the canvas calls; in the file a mark, a `text` and an arrow |
 | `frame` + `metadata: { type: "decks.shape", kind }` | a **shape** from the library, with words in it (see Shapes) | its outline is its first `path` child, its words a `text` child |
 
 Any item with a line can draw it in dashes or dots: `strokeDash: "dashed"` or `"dotted"` (ours;
@@ -193,7 +204,7 @@ headings `#` to `######`, lists (nested, numbered, `- [ ]` / `- [x]` tasks), `>`
 fenced code with its language coloured (` ```ts `), tables with `:--:` alignment, `---` rules,
 footnotes (`[^1]` and `[^1]: …`), and inside a line `**bold**`, `*italic*`, `~~struck~~`,
 `` `code` ``, `==highlighted==` (or in a colour: `==🔴…==` `==🟠…==` `==🟡…==` `==🟢…==` `==🔵…==`
-`==🟣…==`), `[words](url)`, `[[a note]]`, bare `https://` links and `:emoji:` shortcodes. A picture is
+`==🟣…==`), `[words](url)` (a web address, or something in the deck by its address: `[the budget](#app/budget)`), `[[a note]]`, bare `https://` links and `:emoji:` shortcodes. A picture is
 `![alt](url)` or `![alt|240](url)` for its width (a path beside the stage file or a web address); a
 file shown where it sits is `![[name.pdf]]` on its own line. `%%hidden%%` is a comment nobody sees
 on the canvas.
