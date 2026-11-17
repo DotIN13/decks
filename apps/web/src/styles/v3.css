@@ -263,6 +263,59 @@ body {
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	/*
+	 * The tabs after home in the top bar (`tabs/TabStrip.tsx`): each a chip like the canvas chip, which is
+	 * the home tab, with a ✕. The one in front is washed, home among them once there is another to tell
+	 * it from; alone, the canvas chip looks as it always did.
+	 */
+	.tab-chip {
+		display: flex;
+		min-width: 0;
+		height: 32px;
+		flex: 0 1 auto;
+		align-items: center;
+		border-radius: 8px;
+		color: var(--v3-fg2);
+	}
+	.tab-chip:hover {
+		background: var(--v3-bg3);
+	}
+	.tab-chip[data-front="true"],
+	.v3-topbar:has(.tab-chip) .v3-canvas-chip[data-front="true"] {
+		background: var(--v3-tab-on);
+		color: var(--v3-tab-on-fg);
+	}
+	.tab-chip-name {
+		display: flex;
+		min-width: 0;
+		height: 100%;
+		align-items: center;
+		gap: 6px;
+		padding: 0 2px 0 8px;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+	}
+	.tab-chip-close {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		margin-right: 4px;
+		padding: 0;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--v3-fg2);
+		cursor: pointer;
+		place-items: center;
+	}
+	.tab-chip-close:hover {
+		background: var(--v3-bg3);
+		color: var(--v3-fg);
+	}
 	.v3-viewonly {
 		height: 28px;
 		padding: 0 8px;

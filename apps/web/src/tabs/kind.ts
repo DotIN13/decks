@@ -1,4 +1,4 @@
-import type { JSX } from "solid-js";
+import type { Component, JSX } from "solid-js";
 import type { Parts } from "../app/parts.ts";
 
 /**
@@ -24,6 +24,8 @@ export interface TabKind {
 	name: string;
 	/** What a tab of this kind is called in the row. */
 	title(tab: Tab): string | undefined;
+	/** Its mark in the row. */
+	icon: Component<{ size?: number }>;
 	/**
 	 * What fills the window while a tab of this kind is in front. Made once for the kind and told which
 	 * tab it is showing (`tab`), so going from one tab to another of the same kind keeps what was made:

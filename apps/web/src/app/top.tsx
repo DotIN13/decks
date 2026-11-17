@@ -11,8 +11,9 @@ import { openUsage, panelOpen, unread } from "../state/ui.ts";
 import { canvasMenu, type CanvasMenuTrigger } from "./canvas-menu.tsx";
 import { moreItems } from "./more-menu.ts";
 import type { Parts } from "./parts.ts";
-import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, newCanvas, openAgentsPanel, openCanvas, setStagesOpen, showPanel, stagesOpen, viewOnlyStage } from "./person.ts";
-import { canvasOnScreen } from "../tabs/tabs.ts";
+import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, openAgentsPanel, openCanvas, setStagesOpen, showPanel, stagesOpen, viewOnlyStage } from "./person.ts";
+import { TabStrip } from "../tabs/TabStrip.tsx";
+import { canvasOnScreen, homeCanvas, homeInFront, showTab } from "../tabs/tabs.ts";
 
 /**
  * The top of the page: the bar on the left (the panel's button, the agents, the canvas), the corner on
@@ -52,8 +53,10 @@ export function Top(props: { parts: Parts }) {
 				onClose={closeAgent}
 				onMoreAgents={openAgentsPanel}
 				phone={phone()}
-				onNewCanvas={newCanvas}
-				{...(canvasOnScreen() ? { stage: canvasOnScreen()!.title } : {})}
+				/* The chip is the home tab: the conversation's canvas, whichever tab is in front. */
+				{...(homeCanvas() ? { stage: homeCanvas()!.title } : {})}
+				home={{ front: homeInFront(), show: () => showTab("home") }}
+				tabs={<TabStrip />}
 				{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
 				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
 				{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}

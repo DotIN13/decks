@@ -5,6 +5,7 @@ import { state } from "../state/deck.ts";
 import { call } from "../state/socket.ts";
 import { deviceId } from "../state/device.ts";
 import { stageOf } from "../state/canvases.ts";
+import { homeInFront } from "../tabs/tabs.ts";
 
 /**
  * Telling the server where the user is looking — which is not every frame.
@@ -52,6 +53,8 @@ export function reportCamera(now: Camera, agentId: string | undefined = state.fo
  */
 export function reportCameraSoon(now: Camera): void {
 	if (timer) clearTimeout(timer);
+	// The camera over a canvas in a tab of its own is not the conversation's view of its canvas: nothing to say of it.
+	if (!homeInFront()) return;
 	const agentId = state.focused;
 	timer = window.setTimeout(() => reportCamera(now, agentId), 250);
 }

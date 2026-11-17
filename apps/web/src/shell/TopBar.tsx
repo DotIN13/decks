@@ -2,7 +2,6 @@ import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Layers from "lucide-solid/icons/layers";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
-import Plus from "lucide-solid/icons/plus";
 import { Show, untrack, type JSX } from "solid-js";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
 import { Switcher } from "../connections/Switcher.tsx";
@@ -31,7 +30,10 @@ export function TopBar(props: {
 	stage?: string;
 	onStages?: () => void;
 	stagesOpen?: boolean;
-	onNewCanvas?: () => void;
+	/** The canvas chip is the home tab: whether it is the tab in front, and how to bring it forward. In front, a press opens the canvas list. */
+	home?: { front: boolean; show: () => void };
+	/** The tabs after home and the + that opens one (`tabs/TabStrip.tsx`). */
+	tabs?: JSX.Element;
 	viewOnly?: string;
 	onCopy?: () => void;
 	/** The phone's bar: full width, the canvas at the right end. */
@@ -118,7 +120,8 @@ export function TopBar(props: {
 							aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
 							data-tip="Canvases"
 							aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
-							onClick={() => (popover ? popover.toggle() : props.onStages?.())}
+							data-front={props.home && !props.home.front ? undefined : "true"}
+							onClick={() => (props.home && !props.home.front ? props.home.show() : popover ? popover.toggle() : props.onStages?.())}
 						>
 							<Icon of={Layers} size={16} />
 							<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
@@ -145,11 +148,8 @@ export function TopBar(props: {
 						</button>
 					)}
 				</Show>
-				<Show when={props.onNewCanvas && !props.phone}>
-					<button type="button" class="v3-icon" data-tip="New canvas" aria-label="New canvas" onClick={() => props.onNewCanvas?.()}>
-						<Icon of={Plus} size={16} />
-					</button>
-				</Show>
+				{/* The other tabs and the + that opens one (`tabs/TabStrip.tsx`), where the + that made a canvas stood. */}
+				<Show when={!props.phone}>{props.tabs}</Show>
 			</Show>
 		</div>
 	);

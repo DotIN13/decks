@@ -1,5 +1,8 @@
 import type { TabKind } from "../kind.ts";
-import { canvasOnScreen } from "../tabs.ts";
+import Layers from "lucide-solid/icons/layers";
+import { Icon } from "@decks/ui";
+import { stages } from "../../state/canvases.ts";
+import { homeCanvas } from "../tabs.ts";
 import { CanvasHost } from "./canvas-host.tsx";
 import { CanvasTools } from "./canvas-tools.tsx";
 
@@ -11,7 +14,8 @@ import { CanvasTools } from "./canvas-tools.tsx";
  */
 export const canvasKind: TabKind = {
 	name: "canvas",
-	title: () => canvasOnScreen()?.title,
+	title: (tab) => (tab.target === undefined ? homeCanvas() : stages().find((one) => one.name === tab.target))?.title,
+	icon: (props) => <Icon of={Layers} size={props.size ?? 16} />,
 	view: (_tab, parts) => (
 		<>
 			<div class="surface" data-surface="stage">

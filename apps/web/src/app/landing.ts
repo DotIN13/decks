@@ -7,7 +7,8 @@ import { scheme } from "../lib/theme.ts";
 import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
-import { stageOf, stages } from "../state/canvases.ts";
+import { stages } from "../state/canvases.ts";
+import { canvasOnScreen, homeInFront } from "../tabs/tabs.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
 /** What the landing reads of the page. */
@@ -27,6 +28,14 @@ interface LandingInputs {
  * drawing is on screen. An agent with no canvas waits for a deck frame sent after it began, since
  * its boards are the deck's.
  */
+/**
+ * Whose view the camera on screen is: the conversation's while its canvas, the home tab, is in front,
+ * as it always was; and the person's own, under one name, while a canvas in a tab of its own is
+ * (`tabs/tabs.ts`), so picking another agent there moves nothing.
+ */
+export const LOOKING = "looking";
+const ownerNow = (): string | undefined => (homeInFront() ? state.focused : LOOKING);
+
 export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: LandingInputs) {
 	/**
 	 * Everything on the canvas in view, for framing it: its boards and every item drawn round them
@@ -51,7 +60,7 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		boxes: () => untrack(canvasBoxes),
 		viewport: () => ({ width: window.innerWidth, height: window.innerHeight }),
 		region: canvasBox,
-		current: (to) => state.focused === to.scope && stageOf(to.scope)?.name === to.canvas,
+		current: (to) => to.scope === ownerNow() && canvasOnScreen()?.name === to.canvas,
 		onScreen: (to) => !to.canvas || untrack(stagePen)?.scope === to.canvas,
 		waitFor: (to, first) => {
 			/*
@@ -65,7 +74,8 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		},
 		land: (next, to) => {
 			moveCamera(next);
-			reportCamera(next, to.scope);
+			// An agent is told where its canvas is looked at; a canvas in a tab of its own is nobody's to be told of.
+			if (to.scope !== LOOKING) reportCamera(next, to.scope);
 		},
 		select: (path) => setSelected(path),
 	});
@@ -76,11 +86,13 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 	};
 	createEffect(() => {
 		const agent = state.focused;
-		const canvas = stageOf(agent)?.name;
+		const scope = ownerNow();
+		const on = canvasOnScreen();
+		const canvas = on?.name;
 		// Not before the canvases are known: an agent's canvas read as none would land once for no canvas, then again.
-		if (!agent || (!canvas && stages().length === 0)) return;
-		const to: CameraOwner = { scope: agent, ...(canvas ? { canvas } : {}) };
-		untrack(() => landing.arrive(to, stageOf(agent)?.formerly));
+		if (!agent || !scope || (!canvas && stages().length === 0)) return;
+		const to: CameraOwner = { scope, ...(canvas ? { canvas } : {}) };
+		untrack(() => landing.arrive(to, on?.formerly));
 	});
 	return { park: landing.park, personMoved };
 }
@@ -108,13 +120,13 @@ export function reportCameraOnArrival() {
 		if (!id || reportedOpening) return;
 		reportedOpening = true;
 		const timer = window.setTimeout(() => {
-			if (state.focused === id) reportCamera(camera(), id);
+			if (state.focused === id && homeInFront()) reportCamera(camera(), id);
 		}, 400);
 		onCleanup(() => clearTimeout(timer));
 	});
 	onMount(() => {
 		const again = () => {
-			if (document.visibilityState === "visible" && state.focused) reportCamera(camera(), state.focused);
+			if (document.visibilityState === "visible" && state.focused && homeInFront()) reportCamera(camera(), state.focused);
 		};
 		window.addEventListener("focus", again);
 		document.addEventListener("visibilitychange", again);
