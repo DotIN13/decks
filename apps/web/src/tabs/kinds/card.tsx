@@ -5,6 +5,7 @@ import { Show } from "solid-js";
 import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { state } from "../../state/deck.ts";
+import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
 
 /** The canvas a card is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
@@ -28,6 +29,10 @@ export const cardKind: TabKind = {
 	address: "card",
 	title: (tab) => cardAt(tab.target)?.title,
 	says: (tab) => (tab.target ? `the card "${cardAt(tab.target)?.title ?? tab.target}" (@${tab.target})` : undefined),
+	offers: {
+		label: "Cards",
+		list: async () => ((await act<Array<{ path: string; title: string }>>("card.list", [])) ?? []).map((card) => ({ target: card.path, title: card.title || card.path, note: canvasOfPath(card.path) })),
+	},
 	icon: (props) => <Icon of={FileText} size={props.size ?? 16} />,
 	view: (tab, parts) => (
 		<Show when={tab()} keyed>

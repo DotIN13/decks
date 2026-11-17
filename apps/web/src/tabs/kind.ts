@@ -19,6 +19,14 @@ export interface Tab {
 	target?: string;
 }
 
+/** Something that can be opened as a tab: what the + lists (`OpenMore.tsx`). */
+export interface Offer {
+	target: string;
+	title: string;
+	/** A few quiet words after the title: where it is. */
+	note?: string;
+}
+
 /** A kind of tab: what the row and the window ask of it, the same questions for every kind. */
 export interface TabKind {
 	name: string;
@@ -31,6 +39,12 @@ export interface TabKind {
 	 * the agent reads it: what it is, by the name an agent can act on (`about.ts`).
 	 */
 	says(tab: Tab): string | undefined;
+	/**
+	 * What can be opened as a tab of this kind, for the + (`OpenMore.tsx`): asked for when the + is
+	 * opened. `label` heads them; `always` lists the first few before anything is typed (a deck's apps
+	 * are few), where the others are found by typing. The canvas has none: the + lists canvases itself.
+	 */
+	offers?: { label: string; always?: boolean; list(): Promise<Offer[]> };
 	/** Its mark in the row. */
 	icon: Component<{ size?: number }>;
 	/**

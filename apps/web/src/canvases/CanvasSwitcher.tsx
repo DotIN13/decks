@@ -27,6 +27,10 @@ export function CanvasSwitcher(props: {
 	onAll: () => void;
 	trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 	placement?: "bottom-start" | "bottom-end";
+	/** What else it lists after the canvases, given the words typed and how a pick shuts it: the + of the tabs lists what the other kinds offer (`tabs/OpenMore.tsx`). */
+	more?: (find: () => string, pick: (run: () => void) => void) => JSX.Element;
+	/** What the find field asks for, when it finds more than canvases. */
+	findLabel?: string;
 }) {
 	const [find, setFind] = createSignal("");
 	let dismiss: (() => void) | undefined;
@@ -55,7 +59,7 @@ export function CanvasSwitcher(props: {
 		>
 			<label class="field menu-find">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
-				<input type="text" placeholder="Find a canvas" aria-label="Find a canvas" value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
+				<input type="text" placeholder={props.findLabel ?? "Find a canvas"} aria-label={props.findLabel ?? "Find a canvas"} value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
 			</label>
 			<div class="menu-label">{find().trim() ? "Canvases" : "Recent"}</div>
 			<Show when={listed().length > 0} fallback={<p class="m-0 px-2 py-2 text-note text-faint">No canvas matches that</p>}>
@@ -76,6 +80,7 @@ export function CanvasSwitcher(props: {
 					)}
 				</For>
 			</Show>
+			{props.more?.(find, pick)}
 			<div class="rule" aria-hidden="true" />
 			<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(props.onNew)}>
 				<Icon of={Plus} size={15} class="row-icon" />

@@ -7,7 +7,8 @@
  * deck opened again in another page finds the tabs as they were left, the same one in front. An
  * address with a tab after `#` opens that tab in front, and so does the address changed by hand. An
  * agent's `decks view open` opens a tab, in front, when its chat is the one on screen, and from
- * another chat only offers a button.
+ * another chat only offers a button. And the + lists what every kind offers: the apps at once, cards
+ * and documents by typing.
  */
 import { API, CANVAS, asPerson, canvasFrame, card, deckState, open, resetStage, rest, say, socket } from "../harness.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -30,12 +31,27 @@ const second = (await call("canvas.create", ["Tab two"])).value?.name;
 mkdirSync(join(deck, "docs"), { recursive: true });
 writeFileSync(join(deck, "docs", "kept.md"), "# Kept\n\nA document on no canvas.\n");
 const plan = card("plan");
+await call("apps.create", ["kept-app", { title: "Kept app", starter: "static" }]);
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const hash = (on = page) => on.evaluate(() => location.hash);
 const chips = (on = page) => on.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
 say("on home the address names no tab", (await hash()) === "");
+
+// --- the + lists what every kind offers ---------------------------------------------------------------------------
+await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
+const offers = (kind) => page.locator(`.open-offer[data-kind="${kind}"]`);
+say("the + lists the deck's apps after the canvases, before anything is typed", (await until(() => offers("app").count())) === 1 && (await offers("app").innerText()).includes("Kept app") && (await offers("card").count()) === 0 && (await offers("document").count()) === 0, await page.locator('[role="menu"], .popover').first().innerText().catch(() => ""));
+await page.locator('input[aria-label="Find a canvas, an app, a card or a document"]').fill("kept");
+say("typed words find a document by its name, wherever it is in the deck", (await until(() => offers("document").count())) === 1 && (await offers("document").innerText()).includes("kept.md"), await offers("document").allInnerTexts().then((all) => all.join(" | ")));
+await page.locator('input[aria-label="Find a canvas, an app, a card or a document"]').fill("plan");
+say("…and a card by its title or its path", (await until(() => offers("card").count())) >= 1 && (await offers("card").first().getAttribute("data-kind")) === "card", await offers("card").allInnerTexts().then((all) => all.join(" | ")));
+await page.locator('input[aria-label="Find a canvas, an app, a card or a document"]').fill("kept.md");
+await offers("document").first().click();
+say("a pick opens it as a tab, in front, and shuts the list", JSON.stringify(await until(async () => ((await chips()).length ? chips() : undefined))) === '["document*"]' && (await hash()) === "#doc/docs/kept.md" && (await page.locator(".open-offer").count()) === 0, JSON.stringify([await chips(), await hash()]));
+await page.locator('.tab-chip[data-kind="document"] .tab-chip-close').click();
+await until(async () => ((await chips()).length === 0 ? true : undefined));
 
 // --- an agent's view open, from the chat on screen: the tab opens, in front -----------------------------------
 const opened = await call("view.open", [plan]);
@@ -57,7 +73,6 @@ say("something that is nothing is refused with a sentence", none.ok === false &&
 const link = await socket();
 const other = await call("agent.create", [{ name: "Backstage", kind: "pi" }]);
 const otherId = other.value?.id ?? (await until(() => link.last("agent.list")?.agents?.find((one) => one.name === "Backstage")?.id));
-await call("apps.create", ["kept-app", { title: "Kept app", starter: "static" }]);
 // The new agent's chat comes on screen when it is made (`new-agent-opens`): the first one is the one in the background now.
 const focused = await until(() => link.last("agent.list")?.focused);
 const background = (link.last("agent.list")?.agents ?? []).map((one) => one.id).find((id) => id !== focused) ?? otherId;

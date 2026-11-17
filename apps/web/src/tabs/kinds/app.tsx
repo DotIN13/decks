@@ -4,6 +4,7 @@ import { Icon } from "@decks/ui";
 import { createResource, For, Match, Switch } from "solid-js";
 import { appFramePass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
+import { act } from "../../state/decks.ts";
 import type { TabKind } from "../kind.ts";
 import { tabs } from "../tabs.ts";
 
@@ -19,6 +20,11 @@ export const appKind: TabKind = {
 	address: "app",
 	title: (tab) => tab.target,
 	says: (tab) => (tab.target ? `the app ${tab.target}` : undefined),
+	offers: {
+		label: "Apps",
+		always: true,
+		list: async () => ((await act<Array<{ name: string; title?: string; status: string }>>("apps.list", [])) ?? []).map((app) => ({ target: app.name, title: app.title || app.name, note: app.status })),
+	},
 	icon: (props) => <Icon of={AppWindow} size={props.size ?? 16} />,
 	view: (tab, parts) => (
 		<For each={tabs().flatMap((one) => (one.kind === "app" && one.target ? [one.target] : []))}>

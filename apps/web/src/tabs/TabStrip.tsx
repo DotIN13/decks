@@ -8,6 +8,7 @@ import { scheme } from "../lib/theme.ts";
 import { newCanvas, setStagesOpen } from "../app/person.ts";
 import { stages } from "../state/canvases.ts";
 import { kindOf } from "./kinds.ts";
+import { OpenMore } from "./OpenMore.tsx";
 import { canvasOnScreen, closeTab, front, openTab, showTab, tabs } from "./tabs.ts";
 
 /**
@@ -36,7 +37,7 @@ export function TabStrip(): JSX.Element {
 					);
 				}}
 			</For>
-			{/* The +: the canvases, to open one as a tab of its own, where the home tab's list moves the conversation to one. */}
+			{/* The +: the canvases, to open one as a tab of its own, where the home tab's list moves the conversation to one; and after them what the other kinds offer (`OpenMore.tsx`). */}
 			<CanvasSwitcher
 				stages={stages()}
 				here={canvasOnScreen()?.name}
@@ -44,6 +45,8 @@ export function TabStrip(): JSX.Element {
 				onPick={(name) => openTab("canvas", name)}
 				onNew={() => newCanvas()}
 				onAll={() => void setStagesOpen(true)}
+				findLabel="Find a canvas, an app, a card or a document"
+				more={(find, pick) => <OpenMore find={find()} pick={pick} />}
 				trigger={(popover) => (
 					<button type="button" class="v3-icon tab-open" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip="Open a tab" aria-label="Open a tab" onClick={popover.toggle}>
 						<Icon of={Plus} size={16} />

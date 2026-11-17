@@ -4,6 +4,7 @@ import { Icon } from "@decks/ui";
 import { Show } from "solid-js";
 import { cardAgentCall, documentPass } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
+import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
 
 /** What a document is called in the row: its file's name. */
@@ -20,6 +21,14 @@ export const documentKind: TabKind = {
 	address: "doc",
 	title: (tab) => nameOf(tab.target),
 	says: (tab) => (tab.target ? `the document @${tab.target}` : undefined),
+	offers: {
+		label: "Documents",
+		// The files a document can be, by their endings, wherever they are in the deck.
+		list: async () => {
+			const found = await Promise.all(["*.md", "*.tex", "*.docx"].map((pattern) => act<Array<{ path: string; dir?: true }>>("file.find", [pattern, { limit: 500 }])));
+			return found.flatMap((files) => (files ?? []).filter((file) => !file.dir).map((file) => ({ target: file.path, title: nameOf(file.path), note: file.path.split("/").slice(0, -1).join("/") })));
+		},
+	},
 	icon: (props) => <Icon of={SquarePen} size={props.size ?? 16} />,
 	view: (tab, parts) => (
 		<Show when={tab()} keyed>

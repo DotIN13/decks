@@ -11,3 +11,6 @@ export const kindOf = (name: string): TabKind | undefined => KINDS[name];
 
 /** The kind that goes by a word in the window's address (`TabKind.address`). */
 export const kindAt = (address: string): TabKind | undefined => Object.values(KINDS).find((kind) => kind.address === address);
+
+/** Every kind, in the order the + lists what each offers. */
+export const allKinds = (): TabKind[] => Object.values(KINDS);
