@@ -9,7 +9,7 @@
  * home chip brings home back with a press and opens the canvas list with the next; each tab keeps its
  * own camera; and the ✕ closes the tab, home coming forward.
  */
-import { API, CANVAS, asPerson, canvasFrame, focusCanvas, onCanvasAt, open, resetStage, rest, say, settle } from "../harness.mjs";
+import { API, CANVAS, card, asPerson, canvasFrame, focusCanvas, onCanvasAt, open, resetStage, rest, say, settle } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -96,6 +96,25 @@ await chip.locator(".tab-chip-name").click();
 await until(async () => ((await drawnIn()).some((path) => String(path).includes("second-card")) ? true : undefined));
 await settle(page, 900);
 say("the tab comes back at the zoom it was left at, which is not home's", Math.abs((await reading()) - zoomTwo) <= 1 && Math.abs(zoomTwo - zoomHome) > 1, JSON.stringify({ zoomTwo, zoomHome, now: await reading() }));
+
+// --- the agent on screen shows a card of its own canvas while this tab is in front: a button, not a move ----
+const plan = card("plan");
+const focus = await call("view.focus", [plan]);
+const show = page.locator(".notice .notice-action", { hasText: "Show" });
+say("view focus from the chat on screen, with another canvas's tab in front, offers a button and moves nothing", /offered a button/.test(focus.value?.deferred ?? "") && (await until(() => show.count())) === 1 && (await chip.getAttribute("data-front")) === "true", JSON.stringify(focus).slice(0, 240));
+await show.click();
+const there = await until(async () => {
+	if ((await page.locator(".v3-topbar .v3-canvas-chip").getAttribute("data-front")) !== "true") return undefined;
+	const box = await (await canvasFrame(page)).evaluate((path) => {
+		const one = globalThis.__decksProbes?.cards?.().find((each) => each.path === path)?.rect;
+		return one ? { x: one.x, y: one.y, w: one.width, h: one.height, vw: innerWidth, vh: innerHeight } : undefined;
+	}, plan);
+	// Framed: the card whole on the screen, and filling a good part of it.
+	return box && box.x >= 0 && box.y >= 0 && box.x + box.w <= box.vw && box.y + box.h <= box.vh && box.h > box.vh * 0.4 ? true : undefined;
+}, 8000);
+say("…pressed, home comes forward and the card is framed", !!there);
+await chip.locator(".tab-chip-name").click();
+await until(async () => ((await drawnIn()).some((path) => String(path).includes("second-card")) ? true : undefined));
 
 // --- the ✕ closes it ---------------------------------------------------------------------------------------
 await chip.locator(".tab-chip-close").click();

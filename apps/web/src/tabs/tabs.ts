@@ -80,6 +80,9 @@ export function restoreTabs(row: ReadonlyArray<{ kind: string; target: string }>
 /** Bring a tab forward. */
 export const showTab = (id: string): void => bring(id);
 
+/** Bring home forward: the canvas of the conversation on screen. */
+export const showHome = (): void => bring(HOME.id);
+
 /** Close a tab; the one before it comes forward when it was in front. Home is never closed. */
 export function closeTab(id: string): void {
 	if (id === HOME.id) return;
