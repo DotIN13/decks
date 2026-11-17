@@ -1,0 +1,18 @@
+{
+  "name": "@decks/frame",
+  "version": "0.1.0",
+  "description": "The one sandboxed frame every kind of thing that is not the page's to trust runs in (a canvas, a card, a document, an app): its port, the words every kind shares, the page's host for it and the guest inside it",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3"
+  }
+}

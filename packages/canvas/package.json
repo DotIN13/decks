@@ -24,6 +24,7 @@
 	},
 	"dependencies": {
 		"@decks/api": "*",
+		"@decks/frame": "*",
 		"@decks/ink": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
