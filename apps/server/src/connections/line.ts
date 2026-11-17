@@ -55,6 +55,18 @@ interface LineState {
  * and calls only what a canvas frame may (`refusedForCanvas`); the person's and a paired site's token
  * may watch any canvas, or everything (`all`).
  */
+/**
+ * How much may wait for one line before it is let go.
+ *
+ * What is said to a line waits in this process until the line takes it. A page that is not reading
+ * (a tab put to sleep with its connection left open, a slow link, a burst said faster than a socket
+ * drains) would have everything said since kept for it, every reply streamed and every change, until
+ * the harness ran out of memory: its whole heap, in seconds, when a few thousand files changed at
+ * once. So a line with this much waiting is dropped, with what waited; the page connects again by
+ * itself and reads what it missed, as after any lost connection.
+ */
+const BACKLOG = 32 * 1024 * 1024;
+
 export class Line {
 	private readonly server: WebSocketServer;
 	private readonly sockets = new Map<WebSocket, LineState>();
@@ -67,7 +79,7 @@ export class Line {
 	/** What others on each canvas said, from elsewhere (Studio's harnesses and browsers), by their key: shown to a line that starts watching. */
 	private readonly elsewhere = new Map<string, Map<string, Extract<ServerMessage, { type: "presence.changed" }>>>();
 
-	constructor(private readonly app: App) {
+	constructor(private readonly app: App, private readonly backlog = BACKLOG) {
 		this.server = new WebSocketServer({ noServer: true, perMessageDeflate: { threshold: 1024, serverNoContextTakeover: true, clientNoContextTakeover: true } });
 		this.server.on("connection", (socket, request) => this.accept(socket, request as IncomingMessage));
 		app.pages.listen((message) => this.hear(message));
@@ -277,7 +289,7 @@ export class Line {
 	/** A presence said: to every other line watching that canvas, and to whoever listens for the harness (`onPresence`). */
 	private said(message: Extract<ServerMessage, { type: "presence.changed" }>, from?: WebSocket): void {
 		const text = JSON.stringify(message);
-		for (const [socket, state] of this.sockets) if (socket !== from && state.principal && state.watched.has(message.canvas) && socket.readyState === socket.OPEN) socket.send(text);
+		for (const [socket, state] of this.sockets) if (socket !== from && state.principal && state.watched.has(message.canvas) && this.takes(socket)) socket.send(text);
 		if (from) this.onPresence?.(message);
 	}
 
@@ -303,11 +315,21 @@ export class Line {
 			if (!state.principal) continue;
 			const wanted = state.all || (message.type === "canvas.changed" ? state.watched.has(message.canvas) : [...state.watched].some((canvas) => onCanvas(this.app, message, canvas)));
 			if (!wanted) continue;
-			if (socket.readyState !== socket.OPEN) continue;
+			if (!this.takes(socket)) continue;
 			// A page's line is told what its own screen should see (`forView`): the deck as its agent's canvas has it.
 			if (state.view) socket.send(JSON.stringify(this.app.pages.forView(message, state.view)));
 			else socket.send((text ??= JSON.stringify(message)));
 		}
+	}
+
+	/** Whether a line can be said more: open, and not behind by more than `backlog`, at which it is let go (`BACKLOG`). */
+	private takes(socket: WebSocket): boolean {
+		if (socket.readyState !== socket.OPEN) return false;
+		if (socket.bufferedAmount <= this.backlog) return true;
+		console.log(`[decks] a page's line was let go with ${(socket.bufferedAmount / 1048576).toFixed(1)} MB waiting for it: it connects again and reads what it missed`);
+		// Not `close`: its own frame would wait behind everything else.
+		socket.terminate();
+		return false;
 	}
 
 	get connections(): number {

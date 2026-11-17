@@ -13,12 +13,12 @@ import { createHttpApp } from "./http.ts";
 import { Line } from "./line.ts";
 
 /** A deck, its server with the line on `/api/v1/socket`, and a way to open one. */
-async function open() {
+async function open(backlog?: number) {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-line-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "canvases"), { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
-	const line = new Line(app);
+	const line = new Line(app, backlog);
 	const server = createServer(createHttpApp(app));
 	server.on("upgrade", (request, socket, head) => {
 		if (new URL(request.url ?? "/", "http://decks").pathname === "/api/v1/socket") line.handleUpgrade(request, socket, head);
@@ -58,7 +58,7 @@ async function open() {
 		await new Promise((done) => server.close(() => done(undefined)));
 		rmSync(dataDir, { recursive: true, force: true });
 	};
-	return { app, connect, stop };
+	return { app, line, connect, stop };
 }
 
 test("the line takes its token in hello, answers calls once each, and says a canvas's changes once with the edits that made them", async () => {
@@ -253,6 +253,49 @@ test("a page's hello is greeted with the whole truth, hears a watched canvas who
 		assert.match(refused.error ?? "", /person's to call/);
 		page.ws.close();
 		other.ws.close();
+	} finally {
+		await stop();
+	}
+});
+
+test("a line that stops reading is let go once enough waits for it, and one that comes back is heard again", async () => {
+	// A megabyte may wait here, where 32 may in use.
+	const { app, line, connect, stop } = await open(1024 * 1024);
+	try {
+		const canvas = app.pens.claim("Behind");
+		const person = app.tokens.issue({ kind: "person" }, { label: "line test" }).token;
+		const me = connect();
+		await me.opened;
+		me.send({ type: "line.hello", token: person, watch: [{ canvas }] });
+		await me.next((m) => m.type === "line.hello");
+		assert.equal(line.connections, 1);
+
+		// The page stops reading, its connection still open: a tab put to sleep.
+		(me.ws as unknown as { _socket: { pause(): void } })._socket.pause();
+		// Said to it meanwhile: 64 KB at a time that does not compress, up to 64 MB. Without the limit all of it waits in this process.
+		const { randomBytes } = await import("node:crypto");
+		let said = 0;
+		let gone = false;
+		void me.closed.then(() => (gone = true));
+		for (; said < 1000 && line.connections > 0; said += 1) {
+			app.pages.send({ type: "canvas.changed", canvas, rev: 1000 + said, note: randomBytes(48 * 1024).toString("base64") } as unknown as ServerMessage);
+			if (said % 20 === 19) await new Promise((done) => setTimeout(done, 5));
+		}
+		assert.equal(line.connections, 0, `still held after ${said} messages`);
+		assert.equal(said < 1000, true);
+		// The page's end hears the connection drop once it reads again.
+		(me.ws as unknown as { _socket: { resume(): void } })._socket.resume();
+		await me.closed;
+		assert.equal(gone, true);
+
+		// And it connects again, as a page does by itself, and is heard and answered.
+		const again = connect();
+		await again.opened;
+		again.send({ type: "line.hello", token: person, watch: [{ canvas }] });
+		await again.next((m) => m.type === "line.hello");
+		app.pages.send({ type: "canvas.changed", canvas, rev: 5000 } as unknown as ServerMessage);
+		await again.next((m) => m.type === "canvas.changed" && m.rev === 5000);
+		again.ws.close();
 	} finally {
 		await stop();
 	}

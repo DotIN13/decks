@@ -6,6 +6,9 @@ import { cardRefusedFor, DOC_CALLS, onCanvas } from "../../calls/canvas-frame.ts
 import { runVerb } from "../../calls/run.ts";
 import type { RouteDeps } from "./shared.ts";
 
+/** How much may wait for one reader of the event stream before it is let go, as for a line (`connections/line.ts`). */
+const STREAM_BACKLOG = 32 * 1024 * 1024;
+
 /**
  * `/api/v1`: every verb in the table (`@decks/api`) as a route, and the one way in for the SDK in
  * all three of its forms: the TypeScript client, the `decks` command and the MCP relay.
@@ -51,6 +54,11 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 		const stop = app.pages.listen((message) => {
 			if (!still()) {
 				res.end();
+				return;
+			}
+			// A reader too far behind is let go, as a line is (`connections/line.ts`, `BACKLOG`): it asks again.
+			if (res.writableLength > STREAM_BACKLOG) {
+				res.destroy();
 				return;
 			}
 			const to = (message as { frameTo?: string }).frameTo;
