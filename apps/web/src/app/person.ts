@@ -7,7 +7,7 @@ import { ensureHistory } from "../state/history.ts";
 import { notice } from "../state/notices.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { setDraft, setPanelOpen, setUnread } from "../state/ui.ts";
-import { canvasOnScreen } from "../tabs/tabs.ts";
+import { canvasOnScreen, setCameraMover } from "../tabs/tabs.ts";
 
 /**
  * What the person does to agents and canvases from the page's chrome.
@@ -86,7 +86,7 @@ const [stagesOpen, setStagesOpen] = createSignal(false);
 export { setStagesOpen, stagesOpen };
 
 /**
- * Move a conversation to a canvas, as the person: the stage manager's pick and the panel's Open move the one on screen,
+ * Move a conversation's camera to a canvas, as the person: the stage manager's pick, the panel's Open and a canvas tab move the one on screen,
  * and an agent's move the person said Go to (`view.goto` offered) moves that agent's. The camera follows when the server
  * says the agent is there (the landing, `app/landing.ts`).
  */
@@ -98,6 +98,8 @@ export const moveConversation = (agentId: string | undefined, name: string) => {
 	}).catch(() => undefined);
 };
 export const openCanvas = (name: string) => moveConversation(state.focused, name);
+// A canvas tab picked moves the camera of the chat on screen the same way (`tabs/tabs.ts`).
+setCameraMover(moveConversation);
 
 /** A new canvas, and the conversation on screen moved onto it. */
 export const createCanvas = (title: string) => {

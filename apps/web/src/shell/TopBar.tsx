@@ -28,11 +28,13 @@ export function TopBar(props: {
 	onClose: (id: string) => void;
 	onMoreAgents?: () => void;
 	stage?: string;
+	/** The mark before the name: a touch bar's chip names the tab in front, by its kind's own. Left out, the canvas's. */
+	mark?: () => JSX.Element;
 	onStages?: () => void;
 	stagesOpen?: boolean;
-	/** The canvas chip is the home tab: whether it is the tab in front, and how to bring it forward. In front, a press opens the canvas list. */
-	home?: { front: boolean; show: () => void };
-	/** The tabs after home and the + that opens one (`tabs/TabStrip.tsx`). */
+	/** The canvas chip is the tab of the canvas the chat's camera is on: whether it is in front, and how to bring it forward from behind another tab. In front, a press opens the canvas list. */
+	canvas?: { front: boolean; show: () => void };
+	/** The other tabs and the + that opens one (`tabs/TabStrip.tsx`). */
 	tabs?: JSX.Element;
 	viewOnly?: string;
 	onCopy?: () => void;
@@ -120,10 +122,12 @@ export function TopBar(props: {
 							aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
 							data-tip="Canvases"
 							aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
-							data-front={props.home && !props.home.front ? undefined : "true"}
-							onClick={() => (props.home && !props.home.front ? props.home.show() : popover ? popover.toggle() : props.onStages?.())}
+							data-front={props.canvas && !props.canvas.front ? undefined : "true"}
+							onClick={() => (props.canvas && !props.canvas.front ? props.canvas.show() : popover ? popover.toggle() : props.onStages?.())}
 						>
-							<Icon of={Layers} size={16} />
+							<Show when={props.mark} fallback={<Icon of={Layers} size={16} />}>
+								{props.mark!()}
+							</Show>
 							<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
 							<Icon of={ChevronDown} size={13} class="v3-chev" />
 						</button>

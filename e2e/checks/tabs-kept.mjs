@@ -2,8 +2,8 @@
  * The row kept, the window's address, and an agent's `view open` (`apps/web/src/tabs/remember.ts`,
  * `server/src/calls/view.ts`).
  *
- * The tab in front is named after `#` in the window's address (`#card/<path>`, `#canvas/<name>`,
- * `#doc/<path>`, `#app/<name>`; home has none). The row is remembered for the deck on this device: the
+ * A card, a document or an app in front is named after `#` in the window's address (`#card/<path>`,
+ * `#doc/<path>`, `#app/<name>`); with a canvas in front the address is plain. The row is remembered for the deck on this device: the
  * deck opened again in another page finds the tabs as they were left, the same one in front. An
  * address with a tab after `#` opens that tab in front, and so does the address changed by hand. An
  * agent's `decks view open` opens a tab, in front, when its chat is the one on screen, and from
@@ -38,7 +38,8 @@ const { browser, page, errors } = await open({ width: 2000, height: 900 });
 await rest(page, { start: 0 });
 const hash = (on = page) => on.evaluate(() => location.hash);
 const chips = (on = page) => on.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
-say("on home the address names no tab", (await hash()) === "");
+say("with a canvas in front the address is plain", (await hash()) === "");
+const canvasChip = (on = page) => on.locator(".v3-topbar .v3-canvas-chip");
 
 // --- the + lists what every kind offers ---------------------------------------------------------------------------
 await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
@@ -59,14 +60,19 @@ const opened = await call("view.open", [plan]);
 say("view open on a card's path opens it as a tab, in front, and says so", opened.ok === true && opened.value?.kind === "card" && opened.value?.opened === true && JSON.stringify(await until(async () => ((await chips()).length ? chips() : undefined))) === '["card*"]', JSON.stringify([opened, await chips()]).slice(0, 300));
 say("the address names the tab in front", (await hash()) === `#card/${plan}`, await hash());
 const canvasTab = await call("view.open", [second]);
-say("…on a canvas's name, a canvas tab; nobody moved", canvasTab.value?.kind === "canvas" && JSON.stringify(await until(async () => ((await chips()).length === 2 ? chips() : undefined))) === '["card","canvas*"]' && (await hash()) === `#canvas/${second}` && ((await call("canvas.list", [])).value ?? []).find((one) => one.name === second)?.open.length === 0, JSON.stringify([canvasTab.value, await chips(), await hash()]));
+say("…on a canvas's name, the chat's camera goes to that canvas: the chip names it, and the one it left stays in the row", canvasTab.value?.kind === "canvas" && canvasTab.value?.opened === true && (await until(async () => ((await canvasChip().innerText()).includes("Tab two") ? true : undefined))) === true && JSON.stringify(await until(async () => ((await chips()).length === 2 ? chips() : undefined))) === '["card","canvas"]' && (await hash()) === "" && ((await call("canvas.list", [])).value ?? []).find((one) => one.name === second)?.open.length === 1, JSON.stringify([canvasTab.value, await chips(), await hash()]));
 const doc = await call("view.open", ["docs/kept.md"]);
+// (Checked below, after the document is in front: view open on the canvas the camera is already on brings it forward.)
 say("…on a document's path, the document, though no canvas places it", doc.value?.kind === "document" && JSON.stringify(await until(async () => ((await chips()).length === 3 ? chips() : undefined))) === '["card","canvas","document*"]' && (await hash()) === "#doc/docs/kept.md", JSON.stringify([doc.value, await chips(), await hash()]));
 const words = await until(async () => {
 	for (const one of page.frames()) if (await one.evaluate(() => document.querySelector(".document-tab .document-surface")?.innerText.includes("A document on no canvas")).catch(() => false)) return true;
 	return undefined;
 });
 say("…and its words show: it opened on a pass of its own", !!words);
+const sameCanvas = await call("view.open", [second]);
+say("view open on the canvas the camera is already on brings it forward from behind the document", sameCanvas.value?.opened === true && (await until(async () => (!(await chips()).includes("document*") ? true : undefined))) === true && (await hash()) === "", JSON.stringify([sameCanvas.value, await chips(), await hash()]));
+await page.locator('.tab-chip[data-kind="document"] .tab-chip-name').click();
+await until(async () => ((await chips()).includes("document*") ? true : undefined));
 const none = await call("view.open", ["nothing-by-that-name"]);
 say("something that is nothing is refused with a sentence", none.ok === false && /Nothing to open is called/.test(none.error ?? ""), JSON.stringify(none).slice(0, 160));
 
@@ -79,25 +85,25 @@ const focused = await until(() => link.last("agent.list")?.focused);
 const background = (link.last("agent.list")?.chats ?? []).map((one) => one.id).find((id) => id !== focused) ?? otherId;
 const offered = await call("view.open", ["kept-app"], { "x-decks-agent": background });
 const offer = page.locator(".notice .notice-action", { hasText: "Open" });
-say("from a chat that is not on screen, view open offers a button and puts the tab in the row, not in front", offered.value?.opened === false && /offered a button/.test(offered.value?.note ?? "") && (await until(() => offer.count())) === 1 && JSON.stringify(await until(async () => ((await chips()).length === 4 ? chips() : undefined))) === '["card","canvas","document*","app"]', JSON.stringify([offered.value, await chips(), focused, background]).slice(0, 300));
+say("from a chat that is not on screen, view open offers a button and puts the tab in the row, not in front", offered.value?.opened === false && /offered a button/.test(offered.value?.note ?? "") && (await until(() => offer.count())) === 1 && (await until(async () => ((await chips()).includes("app") ? true : undefined))) === true && !(await chips()).includes("app*"), JSON.stringify([offered.value, await chips(), focused, background]).slice(0, 300));
 await offer.click();
-say("…pressed, the app's tab comes forward", JSON.stringify(await until(async () => ((await chips()).some((one) => one === "app*") ? chips() : undefined))) === '["card","canvas","document","app*"]' && (await hash()) === "#app/kept-app", JSON.stringify([await chips(), await hash()]));
+say("…pressed, the app's tab comes forward", (await until(async () => ((await chips()).includes("app*") ? true : undefined))) === true && (await hash()) === "#app/kept-app", JSON.stringify([await chips(), await hash()]));
 
 // --- the row is kept: the deck opened again in another page of this browser ------------------------------------
 // (The checks' first page clears its storage at every load; a second page of the same browser reads what the first kept.)
-await page.locator('.tab-chip[data-kind="canvas"] .tab-chip-name').click();
-await until(async () => ((await hash()) === `#canvas/${second}` ? true : undefined));
+const left = await chips();
+const leftCanvas = (await canvasChip().innerText()).trim();
 const base = page.url().split("#")[0];
 const again = await page.context().newPage();
 await again.goto(base);
 await canvasFrame(again);
-say("opened again, the row is as it was left, the same tab in front", JSON.stringify(await until(async () => ((await chips(again)).length === 4 ? chips(again) : undefined))) === '["card","canvas*","document","app"]' && (await hash(again)) === `#canvas/${second}`, JSON.stringify([await chips(again), await hash(again)]));
+say("opened again, the row is as it was left: the same tabs, the same one in front, the camera on the same canvas", left.length === 4 && JSON.stringify(await until(async () => ((await chips(again)).length === left.length ? chips(again) : undefined))) === JSON.stringify(left) && (await canvasChip(again).innerText()).trim() === leftCanvas && (await hash(again)) === (await hash()), JSON.stringify([left, await chips(again), await hash(again)]));
 await again.close();
 
 // --- an address with a tab after # opens that tab, in front ---------------------------------------------------
 const addressed = await page.context().newPage();
 await addressed.goto(`${base}#doc/docs/kept.md`);
-say("an address that names a document opens it in front, beside the row kept", JSON.stringify(await until(async () => ((await chips(addressed)).some((one) => one === "document*") ? chips(addressed) : undefined))) === '["card","canvas","document*","app"]', JSON.stringify(await chips(addressed)));
+say("an address that names a document opens it in front, beside the row kept", (await until(async () => ((await chips(addressed)).some((one) => one === "document*") ? true : undefined))) === true && (await chips(addressed)).length === left.length, JSON.stringify(await chips(addressed)));
 // Changed by hand: the tab it names comes forward.
 await addressed.evaluate((path) => (location.hash = `#card/${path}`), plan);
 say("the address changed by hand brings the tab it names forward", (await until(async () => ((await chips(addressed)).some((one) => one === "card*") ? true : undefined))) === true, JSON.stringify(await chips(addressed)));
@@ -112,11 +118,12 @@ await gone.close();
 
 // --- closed, a tab leaves the row kept ---------------------------------------------------------------------------
 for (const kind of ["app", "document", "card"]) await page.locator(`.tab-chip[data-kind="${kind}"] .tab-chip-close`).click();
-await until(async () => ((await chips()).length === 1 ? true : undefined));
+await until(async () => (!(await chips()).some((one) => !one.startsWith("canvas")) ? true : undefined));
+const kept = await chips();
 const last = await page.context().newPage();
 await last.goto(base);
 await canvasFrame(last);
-say("tabs closed are gone from the row kept", JSON.stringify(await until(async () => ((await chips(last)).length ? chips(last) : undefined))) === '["canvas*"]', JSON.stringify(await chips(last)));
+say("tabs closed are gone from the row kept, and the canvases opened as tabs are still there", kept.length >= 1 && kept.every((one) => one.startsWith("canvas")) && JSON.stringify(await until(async () => ((await chips(last)).length === kept.length ? chips(last) : undefined))) === JSON.stringify(kept), JSON.stringify([kept, await chips(last)]));
 await last.close();
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));

@@ -1,5 +1,5 @@
 import { stageOf } from "../../state/canvases.ts";
-import type { Camera, Page } from "@decks/protocol";
+import type { Camera } from "@decks/protocol";
 import { viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "../../state/views.ts";
 import { runViewCall } from "@decks/canvas/host";
@@ -8,8 +8,7 @@ import { nameOf, state } from "../../state/deck.ts";
 import { offer } from "../../state/notices.ts";
 import { send } from "../../state/socket.ts";
 import type { FrameHooks, Of } from "../socket-messages.ts";
-import { aim, aimHome, canvasOnScreen, homeCanvas, homeHeld, homeInFront, openTab, showHome } from "../../tabs/tabs.ts";
-import { flyToPages } from "../links.ts";
+import { aim, aimCanvas, canvasOnScreen, keepCanvas, onCanvas, openTab, showCanvas } from "../../tabs/tabs.ts";
 
 /**
  * Keep a view for an agent that is not the one on screen, from its `decks view …`: here, or on the
@@ -20,8 +19,8 @@ import { flyToPages } from "../links.ts";
  */
 export function rememberView(agentId: string, camera: Camera, selected?: string): void {
 	agentViews(state.deck?.path ?? "").keep(agentId, stageOf(agentId)?.name, viewToPark(camera, selected));
-	// Its camera is on its own canvas now, whichever tab it was on: opening its chat shows this view.
-	aimHome(agentId);
+	// Its camera is on its canvas now, with no card, document or app over it: opening its chat shows this view.
+	aimCanvas(agentId);
 	// So `decks.view.camera()` answers for that agent's stage rather than falling back to wherever the last person to look at anything was.
 	reportCamera(camera, agentId);
 }
@@ -37,37 +36,26 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 	 * (`@decks/canvas`, `frame/frame.tsx`): this page leaves those to it, and answers the rest.
 	 */
 	/*
-	 * The chat on screen showing something on its own canvas (`view.focus`) while another tab is in
-	 * front: the person is offered the way back, since what they are looking at is theirs to leave.
-	 * With another canvas's tab in front nothing else answers, so this page does, and the button also
-	 * flies there; behind a card, a document or an app the home canvas is still held, its frame moves
-	 * the view there unseen and answers, and the button only brings it forward.
+	 * The chat on screen showing something on its canvas (`view.focus`) while a card, a document or an
+	 * app is in front: the canvas is held behind that tab, its frame moves the view there unseen and
+	 * answers, and the person is offered the way back, since the tab they are reading is theirs to leave.
 	 */
-	if (message.call.op === "show" && message.call.agentId === state.focused && !homeInFront()) {
-		const args = (message.call.args ?? {}) as { stage?: unknown; paths?: unknown; items?: unknown };
-		if (args.stage === homeCanvas()?.name) {
-			const held = homeHeld();
+	if (message.call.op === "show" && message.call.agentId === state.focused && !onCanvas()) {
+		const args = (message.call.args ?? {}) as { stage?: unknown; paths?: unknown };
+		if (args.stage === canvasOnScreen()?.name) {
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
-			const boxes = (Array.isArray(args.items) ? args.items : []) as Array<{ id: string; box: { x: number; y: number; w: number; h: number } }>;
-			const targets = (): Page[] => [...state.pages.filter((page) => paths.includes(page.path)), ...boxes.map((item) => ({ path: `item:${item.id}`, ...item.box }) as Page)];
-			const what = state.pages.find((page) => page.path === paths[0])?.title ?? "something on its canvas";
-			offer(
-				`${nameOf(message.call.agentId)} wants to show you ${what}`,
-				{
-					label: "Show",
-					run: () => {
-						showHome();
-						// The frame moves to the home canvas in place, which takes a moment: flown to once it has, and again in case it had not.
-						if (!held) for (const ms of [350, 1000]) setTimeout(() => homeInFront() && flyToPages(targets(), { animate: true }), ms);
-					},
-				},
-				"agent-view",
-			);
-			if (!held) {
-				send({ type: "view.answered", id: message.call.id, value: { shown: [], deferred: "the person is looking at another tab, so they were offered a button that brings your canvas forward and shows it" } });
-				return;
-			}
+			const what = state.pages.find((page) => page.path === paths[0])?.title ?? "something on the canvas";
+			offer(`${nameOf(message.call.agentId)} wants to show you ${what}`, { label: "Show", run: () => showCanvas() }, "agent-view");
 		}
+	}
+	// A chat going to the canvas its camera is already on, from behind a card, a document or an app: nothing moves at the harness, so it is brought forward here.
+	if (message.call.op === "goto" && message.call.agentId && (message.call.args as { stage?: unknown } | undefined)?.stage === stageOf(message.call.agentId)?.name) aimCanvas(message.call.agentId);
+	// The chat on screen opening a canvas as a tab (`view.open`): that canvas and the one its camera leaves stay in the row, whoever answers whether it may move.
+	if (message.call.op === "goto" && message.call.agentId === state.focused && (message.call.args as { keep?: unknown } | undefined)?.keep === true) {
+		const to = (message.call.args as { stage?: unknown }).stage;
+		const from = canvasOnScreen()?.name;
+		if (from) keepCanvas(from);
+		if (typeof to === "string") keepCanvas(to);
 	}
 	// An agent moving to another canvas while its own is on screen: the frame answers, which knows whether the person is using the canvas.
 	// The person's own move asks nobody, so this page answers it, whether or not that frame is up yet.

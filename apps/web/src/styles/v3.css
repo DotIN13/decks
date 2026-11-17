@@ -264,9 +264,9 @@ body {
 		white-space: nowrap;
 	}
 	/*
-	 * The tabs after home in the top bar (`tabs/TabStrip.tsx`): each a chip like the canvas chip, which is
-	 * the home tab, with a ✕. The one in front is washed, home among them once there is another to tell
-	 * it from; alone, the canvas chip looks as it always did.
+	 * The other tabs in the top bar (`tabs/TabStrip.tsx`): each a chip like the canvas chip, which is the
+	 * canvas the chat's camera is on, with a ✕. The one in front is washed, the canvas chip among them once
+	 * there is another to tell it from; alone, the canvas chip looks as it always did.
 	 */
 	.tab-chip {
 		display: flex;
@@ -346,9 +346,15 @@ body {
 		align-items: center;
 		gap: 2px;
 	}
-	.tab-row-line > .tab-row {
+	/* Over the menu's rule that a row is as wide as its menu, so the ✕ beside it stays inside. */
+	.tab-row-line > .tab-row[data-row] {
+		width: auto;
 		min-width: 0;
-		flex: 1;
+		flex: 1 1 0;
+	}
+	.tab-row-line > .tab-chip-close {
+		width: 30px;
+		height: 30px;
 	}
 	.tab-row[data-current="true"] {
 		background: var(--v3-tab-on);
@@ -1322,6 +1328,19 @@ body {
 	.dock .dock-to[data-compact="true"] .dock-to-chip[aria-expanded="true"] {
 		background: var(--v3-bg3);
 	}
+	/* The tab a message says it was written on (`tabs/about.ts`), beside the recipient in the composer's row. */
+	.dock .dock-row .dock-about {
+		height: 30px;
+		padding: 0 10px;
+		border: 1px solid var(--v3-line);
+		border-radius: 15px;
+		background: transparent;
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	.dock .dock-row .dock-about:hover {
+		background: var(--v3-bg3);
+	}
 	.dock .dock-to[data-compact="true"] .dock-to-name {
 		max-width: 140px;
 		font-size: 14px;
@@ -1791,6 +1810,62 @@ body {
 		left: calc(var(--inset-left, 0px) + 8px);
 		width: calc(100vw - 16px);
 		transition: left 200ms ease;
+	}
+	/*
+	 * A touch bar (`data-touch-top`: a phone's, a tablet's; `tabs/budget.ts`). A finger cannot use a bar
+	 * crushed to "A…": so it says less and says it whole. The agent is its face; the chip names what is
+	 * in front, at length, with no arrow; the tabs are one count; and the + is in ⋯ where there is no
+	 * room for it (a phone, a tablet's tight bar). The + stays in the bar's flow at no width, so the list
+	 * it opens still has a place to open from.
+	 */
+	.app[data-touch-top] .v3-topbar :is(.v3-agent-chip, .v3-canvas-chip) > .v3-chev,
+	.app[data-touch-top] .v3-topbar .v3-agent-kind {
+		display: none;
+	}
+	.app[data-touch-top] .v3-topbar .v3-canvas-chip,
+	.app[data-touch-top] .v3-topbar:has(.tab-chip) .v3-canvas-chip[data-front="true"] {
+		background: transparent;
+		color: var(--v3-fg);
+	}
+	.app[data-touch-top] .v3-topbar .v3-canvas-name {
+		max-width: 340px;
+		font-size: 15px;
+	}
+	.app[data-touch-top] .v3-topbar .tab-fold[data-front="true"] {
+		background: transparent;
+		color: var(--v3-fg2);
+	}
+	.app[data-phone="true"] .v3-topbar .v3-agent-name,
+	.app[data-touch-top][data-tight-top] .v3-topbar .v3-agent-name,
+	.app[data-phone="true"] .v3-topbar > .flex-1 {
+		display: none;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-agent-chip,
+	.app[data-touch-top][data-tight-top] .v3-topbar .v3-agent-chip {
+		padding: 0 4px;
+		background: transparent;
+	}
+	.app[data-phone="true"] .v3-topbar.float.pill > .v3-canvas-chip {
+		flex: 1 1 auto;
+		justify-content: flex-start;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-canvas-name {
+		max-width: none;
+		flex: 1 1 auto;
+		text-align: left;
+	}
+	.app[data-phone="true"] .v3-topbar .tab-open,
+	.app[data-touch-top][data-tight-top] .v3-topbar .tab-open {
+		width: 0;
+		min-width: 0;
+		padding: 0;
+		margin: 0;
+		overflow: hidden;
+		visibility: hidden;
+	}
+	/* A phone's composer row is short: the tab's chip gives way before the model's name does. */
+	.app[data-phone="true"] .dock .dock-row .dock-about {
+		max-width: 132px;
 	}
 	/* The canvas's tool row goes with them: it stood where it was, over the open panel. */
 	.app[data-phone="true"] .frame-tool-row {

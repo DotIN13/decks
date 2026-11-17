@@ -472,8 +472,9 @@ export class CanvasService {
 	 * screen it may and the screen goes with it, unless the person is using the canvas, who is offered a
 	 * button instead (`offered`), which moves it when pressed. The move itself is the caller's to make.
 	 */
-	async mayMove(agentId: string, stage: string, person = false): Promise<{ apply: boolean; onScreen: boolean; offered?: string }> {
-		const answer = (await this.ask(agentId, { op: "goto", args: { stage, ...(person ? { person: true } : {}) } })) as { apply?: unknown; onScreen?: unknown; offered?: unknown } | undefined;
+	async mayMove(agentId: string, stage: string, person = false, keep = false): Promise<{ apply: boolean; onScreen: boolean; offered?: string }> {
+		// `keep`: the canvas is opened as a tab (`view.open`), so the page keeps it and the one the camera leaves in its row.
+		const answer = (await this.ask(agentId, { op: "goto", args: { stage, ...(person ? { person: true } : {}), ...(keep ? { keep: true } : {}) } })) as { apply?: unknown; onScreen?: unknown; offered?: unknown } | undefined;
 		if (typeof answer?.offered === "string") return { apply: false, onScreen: true, offered: answer.offered };
 		return { apply: true, onScreen: answer?.onScreen === true };
 	}

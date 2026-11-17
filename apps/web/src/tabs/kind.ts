@@ -13,8 +13,8 @@ export interface Tab {
 	/** Which kind answers for it (`kinds.ts`). */
 	kind: string;
 	/**
-	 * What it shows, as its kind names it: a canvas's folder, a card's or a document's path in the deck. Left out by the home tab, a canvas tab
-	 * whose canvas is not fixed: it is the canvas of the conversation on screen, whichever that is now.
+	 * What it shows, as its kind names it: a canvas's folder, a card's or a document's path in the deck,
+	 * an app's name. Left out only by the canvas tab of a chat that is on no canvas yet.
 	 */
 	target?: string;
 }

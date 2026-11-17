@@ -10,36 +10,51 @@ import { stages } from "../state/canvases.ts";
 import { kindOf } from "./kinds.ts";
 import { OpenMore } from "./OpenMore.tsx";
 import type { Tab } from "./kind.ts";
-import { canvasOnScreen, closeTab, front, homeCanvas, homeInFront, openTab, showHome, showTab, tabs } from "./tabs.ts";
+import { cameraCanvasTab, canvasOnScreen, closeTab, front, onCanvas, openTab, showTab, tabs } from "./tabs.ts";
+
+/*
+ * The list of what can be opened (the +) and the list of the tabs open (the count) are also opened
+ * from where a touch bar has put them: the + from the bar's ⋯ menu, the tabs from the bar's title
+ * while a card, a document or an app is in front.
+ */
+let togglePlus: (() => void) | undefined;
+let toggleList: (() => void) | undefined;
+/** Open the list of what can be opened as a tab, as the + does. A moment later, so the menu it is picked from has shut. */
+export const openPlus = (): void => void setTimeout(() => togglePlus?.(), 0);
+/** Open the list of the tabs open, as the count does. */
+export const openTabsList = (): void => void setTimeout(() => toggleList?.(), 0);
 
 /**
- * The row folded: one chip with how many tabs are open beside home, washed while one of them is in
- * front and, off a phone, naming that one, that opens them as a list: home first, then each with its
- * ✕. What a phone's bar shows, and any bar with more tabs than it has room for.
+ * The row folded: one chip with how many tabs are open beside the camera's canvas, washed while one
+ * of them is in front and, off a phone, naming that one, that opens them all as a list, each of the
+ * others with its ✕. What a phone's bar shows, and any bar with more tabs than it has room for.
  */
-function TabFold(props: { /** Room to name the tab in front beside the count: not on a phone. */ named: boolean }): JSX.Element {
-	const others = () => tabs().filter((tab) => tab.target !== undefined);
+function TabFold(props: { /** Name the tab in front beside the count: where the bar's own chip does not (a desktop's folded row). */ named: boolean; /** Count the canvas chip's tab too: every tab open, as a touch bar says it. */ all: boolean }): JSX.Element {
+	const others = () => tabs().filter((tab) => tab !== cameraCanvasTab());
 	const titleOf = (tab: Tab) => kindOf(tab.kind)?.title(tab) ?? tab.target ?? "";
 	return (
 		<Popover
 			placement="bottom-start"
 			label="Tabs"
 			class="w-[300px]"
-			trigger={(popover) => (
-				<button type="button" class="tab-chip tab-fold" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-front={homeInFront() ? undefined : "true"} data-tip="Tabs" aria-label={`${others().length} ${others().length === 1 ? "tab" : "tabs"} open beside home`} onClick={popover.toggle}>
-					<span class="tab-fold-count">{others().length}</span>
+			trigger={(popover) => {
+				toggleList = popover.toggle;
+				return (
+				<button type="button" class="tab-chip tab-fold" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-front={onCanvas() ? undefined : "true"} data-tip="Tabs" aria-label={`${others().length + 1} tabs open`} onClick={popover.toggle}>
+					<span class="tab-fold-count">{others().length + (props.all ? 1 : 0)}</span>
 					{/* Which of them is in front, where the bar has room to say: its mark and its name. */}
-					<Show when={props.named && !homeInFront()}>
+					<Show when={props.named && !onCanvas()}>
 						<Show when={kindOf(front().kind)}>{(kind) => <Dynamic component={kind().icon} size={16} />}</Show>
 						<span class="v3-canvas-name">{titleOf(front())}</span>
 					</Show>
 				</button>
-			)}
+				);
+			}}
 		>
-			<button type="button" role="menuitem" data-row data-flat="true" class="tab-row" data-current={homeInFront() ? "true" : undefined} onClick={() => showHome()}>
+			{/* The canvas the chat's camera is on, first: where the others are opened from. */}
+			<button type="button" role="menuitem" data-row data-flat="true" class="tab-row" data-kind="canvas" data-current={onCanvas() ? "true" : undefined} onClick={() => showTab(cameraCanvasTab().id)}>
 				<Dynamic component={kindOf("canvas")!.icon} size={15} />
-				<span class="row-label min-w-0 flex-1 truncate">{homeCanvas()?.title ?? "Home"}</span>
-				<span class="menu-note">Home</span>
+				<span class="row-label min-w-0 flex-1 truncate">{canvasOnScreen()?.title ?? "No canvas"}</span>
 			</button>
 			<For each={others()}>
 				{(tab) => (
@@ -59,17 +74,19 @@ function TabFold(props: { /** Room to name the tab in front beside the count: no
 }
 
 /**
- * The row of tabs in the top bar, after the home tab (the canvas chip, which the bar draws: it is the
- * conversation's canvas and opens the canvas list): each other tab with its kind's mark, its name and
- * a ✕, and the + that opens one. A press brings a tab forward; nothing here moves an agent.
+ * The row of tabs in the top bar, after the canvas chip (which the bar draws: the canvas the camera
+ * of the chat on screen is on, which opens the canvas list): each other tab with its kind's mark, its
+ * name and a ✕, and the + that opens one. A press puts that chat's camera on the tab; a canvas tab
+ * moves it to that canvas. Nothing here changes where an agent's calls act.
  */
-export function TabStrip(props: { /** How many chips the bar has room for: with more tabs than that, the row folds into one chip that lists them. None on a phone. */ room: number; /** A phone: the folded chip is the count alone. */ phone: boolean }): JSX.Element {
-	const others = () => tabs().filter((tab) => tab.target !== undefined);
-	const folded = () => others().length > props.room;
+export function TabStrip(props: { /** How many chips the bar has room for: with more tabs than that, the row folds into one chip that lists them. */ room: number; /** A phone's or a tablet's bar: the tabs are always the one count, and the bar's own chip names the tab in front. */ touch: boolean }): JSX.Element {
+	// The canvas the chat's camera is on is the bar's own chip (`shell/TopBar.tsx`); these are the others.
+	const others = () => tabs().filter((tab) => tab !== cameraCanvasTab());
+	const folded = () => props.touch || others().length > props.room;
 	return (
 		<>
 			<Show when={folded() && others().length > 0}>
-				<TabFold named={!props.phone} />
+				<TabFold named={!props.touch} all={props.touch} />
 			</Show>
 			<For each={folded() ? [] : others()}>
 				{(tab) => {
@@ -88,7 +105,7 @@ export function TabStrip(props: { /** How many chips the bar has room for: with 
 					);
 				}}
 			</For>
-			{/* The +: the canvases, to open one as a tab of its own, where the home tab's list moves the conversation to one; and after them what the other kinds offer (`OpenMore.tsx`). */}
+			{/* The +: the canvases, to open one as a tab and keep the one the camera leaves, where the canvas chip's list only goes to one; and after them what the other kinds offer (`OpenMore.tsx`). */}
 			<CanvasSwitcher
 				stages={stages()}
 				here={canvasOnScreen()?.name}
@@ -98,11 +115,14 @@ export function TabStrip(props: { /** How many chips the bar has room for: with 
 				onAll={() => void setStagesOpen(true)}
 				findLabel="Find a canvas, an app, a card or a document"
 				more={(find, pick) => <OpenMore find={find()} pick={pick} />}
-				trigger={(popover) => (
-					<button type="button" class="v3-icon tab-open" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip="Open a tab" aria-label="Open a tab" onClick={popover.toggle}>
-						<Icon of={Plus} size={16} />
-					</button>
-				)}
+				trigger={(popover) => {
+					togglePlus = popover.toggle;
+					return (
+						<button type="button" class="v3-icon tab-open" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip="Open a tab" aria-label="Open a tab" onClick={popover.toggle}>
+							<Icon of={Plus} size={16} />
+						</button>
+					);
+				}}
 			/>
 		</>
 	);

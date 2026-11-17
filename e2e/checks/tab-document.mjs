@@ -12,7 +12,8 @@ import { CANVAS, API, asPerson, canvasFrame, deckState, focusCanvas, open, press
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const until = async (test, ms = 8000) => {
+// Long waits: a document's frame starts a page, a line and an editor, and other checks run beside this one.
+const until = async (test, ms = 20000) => {
 	const deadline = Date.now() + ms;
 	for (;;) {
 		const value = await test();

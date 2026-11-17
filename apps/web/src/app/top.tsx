@@ -12,8 +12,12 @@ import { canvasMenu, type CanvasMenuTrigger } from "./canvas-menu.tsx";
 import { moreItems } from "./more-menu.ts";
 import type { Parts } from "./parts.ts";
 import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, openAgentsPanel, openCanvas, setStagesOpen, showPanel, stagesOpen, viewOnlyStage } from "./person.ts";
-import { TabStrip } from "../tabs/TabStrip.tsx";
-import { canvasOnScreen, homeCanvas, homeInFront, showTab } from "../tabs/tabs.ts";
+import { openPlus, openTabsList, TabStrip } from "../tabs/TabStrip.tsx";
+import Plus from "lucide-solid/icons/plus";
+import { Dynamic } from "solid-js/web";
+import { touchTop } from "../tabs/budget.ts";
+import { kindOf } from "../tabs/kinds.ts";
+import { canvasOnScreen, front, onCanvas, showCanvas } from "../tabs/tabs.ts";
 
 /**
  * The top of the page: the bar on the left (the panel's button, the agents, the canvas), the corner on
@@ -22,6 +26,12 @@ import { canvasOnScreen, homeCanvas, homeInFront, showTab } from "../tabs/tabs.t
 export function Top(props: { parts: Parts }) {
 	const { layout, present, stagePages } = props.parts;
 	const phone = layout.phone;
+	/** A phone's or a tablet's bar (`tabs/budget.ts`): the chip names the tab in front, the tabs are one count, and the + is in ⋯. */
+	const touch = () => touchTop(phone());
+	/** What the bar's chip says: the canvas the chat's camera is on; on a touch bar, the tab in front, whatever its kind. */
+	const shownTitle = () => (touch() && !onCanvas() ? (kindOf(front().kind)?.title(front()) ?? front().target) : canvasOnScreen()?.title);
+	/** The ⋯ menu: on a touch bar it also opens a tab, which the bar has no + for. */
+	const more = () => [...(touch() ? [{ label: "Open a tab", icon: Plus, onPick: openPlus }] : []), ...moreItems(stagePages)];
 	/** The agents whose canvas is the one on screen: the faces in the top-right bar. */
 	const hereAgents = createMemo(() => {
 		const stage = canvasOnScreen()?.name;
@@ -53,11 +63,13 @@ export function Top(props: { parts: Parts }) {
 				onClose={closeAgent}
 				onMoreAgents={openAgentsPanel}
 				phone={phone()}
-				/* The chip is the home tab: the conversation's canvas, whichever tab is in front. */
-				{...(homeCanvas() ? { stage: homeCanvas()!.title } : {})}
-				home={{ front: homeInFront(), show: () => showTab("home") }}
+				/* The chip is the canvas the camera of the chat on screen is on, in front or held behind a card, a document or an app. */
+				{...(shownTitle() ? { stage: shownTitle()! } : {})}
+				{...(touch() && !onCanvas() && kindOf(front().kind) ? { mark: () => <Dynamic component={kindOf(front().kind)!.icon} size={16} /> } : {})}
+				/* A desktop's chip brings the canvas forward from behind another tab; a touch bar's names that tab, and opens the tabs. */
+				canvas={{ front: onCanvas(), show: touch() ? openTabsList : showCanvas }}
 				/* A chip is about 150 px: the row folds into one chip when the bar, beside the side panel, has room for fewer than there are; always on a phone. */
-				tabs={<TabStrip phone={phone()} room={phone() ? 0 : Math.max(0, Math.floor((layout.viewWidth() - (panelOpen() ? 360 : 0) - 600) / 150))} />}
+				tabs={<TabStrip touch={touch()} room={Math.max(0, Math.floor((layout.viewWidth() - (panelOpen() ? 360 : 0) - 600) / 150))} />}
 				{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
 				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
 				{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}
@@ -96,7 +108,7 @@ export function Top(props: { parts: Parts }) {
 							onPresent={present}
 							usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 							onContext={() => openUsage(state.focused)}
-							more={moreItems(stagePages)}
+							more={more()}
 						/>
 					</span>
 				}
@@ -110,7 +122,7 @@ export function Top(props: { parts: Parts }) {
 					onPresent={present}
 					usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 					onContext={() => openUsage(state.focused)}
-					more={moreItems(stagePages)}
+					more={more()}
 				/>
 <Show when={showFps()}>
 <FpsMeter />

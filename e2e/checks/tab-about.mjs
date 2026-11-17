@@ -1,14 +1,15 @@
 /**
  * A message says which tab it was written on (`apps/web/src/tabs/about.ts`).
  *
- * The composer talks to the agent of the conversation on screen whichever tab is in front. On home
- * the message goes as written. On another tab the composer shows a chip with the tab's name, and the
- * agent's text carries one line in front of the words saying what the person was looking at, while
- * the message kept in the conversation is the words alone. A press on the chip leaves the line out.
+ * The composer talks to the agent of the conversation on screen whichever tab is in front, and an agent
+ * has no home canvas to take "here" for. So the composer shows a chip with the name of the tab in
+ * front, a canvas, a card, a document or an app, and the agent's text carries one line in front of
+ * the words saying what the person was looking at, a canvas by the name a call can use, while the
+ * message kept in the conversation is the words alone. A press on the chip leaves the line out.
  *
  * No agent runs here: the page's line is routed, and what it would send an agent is held back and read.
  */
-import { API, asPerson, open, resetStage, rest, say } from "../harness.mjs";
+import { API, CANVAS, asPerson, card, open, resetStage, rest, say } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -60,31 +61,33 @@ const write = async (words) => {
 	return sent.at(-1);
 };
 
-// --- on home: as written ---------------------------------------------------------------------------------
-say("on home the composer names no tab", (await page.locator(".dock-about").count()) === 0);
-const home = await write("hello from home");
-say("…and the message goes as it was written", home?.text === "hello from home" && home?.parts === undefined, JSON.stringify(home));
+// --- on the chat's canvas: the composer names it, and the agent is told where the person is ----------------
+const chip = page.locator(".dock-about");
+say("the composer names the canvas the chat's camera is on", (await until(() => chip.count())) === 1 && (await chip.getAttribute("aria-pressed")) === "true" && (await chip.innerText()).includes("Auth refresh"), await chip.innerText().catch(() => ""));
+const first = await write("hello from the first canvas");
+say("the agent's text says which canvas the person was looking at, by the name a call can use", first?.text === `[The person wrote this while looking at the canvas "Auth refresh" (--canvas ${CANVAS}).]\n\nhello from the first canvas`, JSON.stringify(first?.text));
+say("…and the message kept is the words alone", JSON.stringify(first?.parts) === JSON.stringify([{ type: "text", text: "hello from the first canvas" }]), JSON.stringify(first?.parts));
 
-// --- on another canvas's tab: the composer names it, and the agent's text says so --------------------------
+// --- the camera on another canvas: the chip and the line follow ----------------------------------------------
 await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
 await page.locator('.switcher-canvas:has-text("Tab two")').click();
-const chip = page.locator(".dock-about");
-say("on another tab the composer names it", (await until(() => chip.count())) === 1 && (await chip.getAttribute("aria-pressed")) === "true" && (await chip.innerText()).includes("Tab two"), await chip.innerText().catch(() => ""));
+say("with the camera on another canvas the composer names that one", (await until(async () => ((await chip.innerText()).includes("Tab two") ? true : undefined))) === true && (await chip.getAttribute("aria-pressed")) === "true", await chip.innerText().catch(() => ""));
 const there = await write("hello from the tab");
-say("the agent's text says what the person was looking at, in front of the words", there?.text === `[The person wrote this while looking at the canvas "Tab two" (${second}), open in a tab of their window.]\n\nhello from the tab`, JSON.stringify(there?.text));
-say("…and the message kept is the words alone", JSON.stringify(there?.parts) === JSON.stringify([{ type: "text", text: "hello from the tab" }]), JSON.stringify(there?.parts));
+say("…and so does the agent's text", there?.text === `[The person wrote this while looking at the canvas "Tab two" (--canvas ${second}).]\n\nhello from the tab`, JSON.stringify(there?.text));
 
 // --- left out with a press ----------------------------------------------------------------------------------
 await chip.click();
 say("a press on the chip leaves the tab out", (await chip.getAttribute("aria-pressed")) === "false");
 const without = await write("hello, no tab");
-say("…and the message goes as written again", without?.text === "hello, no tab" && without?.parts === undefined, JSON.stringify(without));
+say("…and the message goes as written", without?.text === "hello, no tab" && without?.parts === undefined, JSON.stringify(without));
 await chip.click();
 say("a second press puts it back", (await chip.getAttribute("aria-pressed")) === "true" && /looking at the canvas/.test((await write("back on")).text ?? ""));
 
-// --- home again: no chip --------------------------------------------------------------------------------------
-await page.locator(".v3-topbar .v3-canvas-chip").click();
-say("back on home the chip is gone", (await until(async () => ((await chip.count()) === 0 ? true : undefined))) === true);
+// --- a card in front: the line names the card ------------------------------------------------------------------
+await call("view.open", [card("plan")]);
+say("with a card in front the composer names the card", (await until(async () => (/plan/i.test(await chip.innerText()) ? true : undefined))) === true, await chip.innerText().catch(() => ""));
+const onCard = await write("about this card");
+say("…and the agent's text names it by its path", (onCard?.text ?? "").startsWith(`[The person wrote this while looking at the card "`) && (onCard?.text ?? "").includes(`(@${card("plan")})`), JSON.stringify(onCard?.text));
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();

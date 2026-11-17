@@ -3,7 +3,8 @@ import { storageKey } from "../connections/connection.ts";
 import { state } from "../state/deck.ts";
 import type { Tab } from "./kind.ts";
 import { kindAt, kindOf } from "./kinds.ts";
-import { camerasNow, front, openTab, restoreTabs, tabs } from "./tabs.ts";
+import { stages } from "../state/canvases.ts";
+import { aimCanvas, front, openTab, restoreTabs, rowNow } from "./tabs.ts";
 
 /**
  * The row kept, and the window's address in step with it.
@@ -13,13 +14,15 @@ import { camerasNow, front, openTab, restoreTabs, tabs } from "./tabs.ts";
  * places on a canvas are): a reload, or the deck opened again tomorrow, finds the row as it was left
  * and each agent's chat on the tab it was on. Another deck has its own row.
  *
- * **The address**: the tab in front is named after `#`, as `#canvas/<name>`, `#card/<path>`,
- * `#doc/<path>` or `#app/<name>`; home has none. An address opened with one opens that tab, in front,
- * which is how a tab is opened in the browser's own tab, sent to someone on this deck, or bookmarked.
+ * **The address**: a card, a document or an app in front is named after `#`, as `#card/<path>`,
+ * `#doc/<path>` or `#app/<name>`; with a canvas in front the address is plain, since which canvas a
+ * chat's camera is on is the harness's to keep. An address opened with a tab after `#`
+ * (`#canvas/<name>` too) puts the camera of the chat on screen on that tab, which is how a tab is
+ * opened in the browser's own tab, sent to someone on this deck, or bookmarked.
  */
 const KEY = "decks.tabs:";
 
-/** A tab's address in the window's, after `#`: its kind's word and its target, each part of a path its own. Home has none. */
+/** A tab's address in the window's, after `#`: its kind's word and its target, each part of a path its own. None for a chat with no canvas. */
 export function addressOf(tab: Pick<Tab, "kind" | "target">): string {
 	const word = kindOf(tab.kind)?.address;
 	return tab.target === undefined || !word ? "" : `#${word}/${tab.target.split("/").map(encodeURIComponent).join("/")}`;
@@ -91,16 +94,31 @@ export function rememberTabs(): void {
 	createEffect(() => {
 		const key = loaded();
 		if (!key) return;
-		const row = tabs().flatMap((tab) => (tab.target === undefined ? [] : [{ kind: tab.kind, target: tab.target }]));
 		try {
-			localStorage.setItem(key, JSON.stringify({ tabs: row, cameras: camerasNow() } satisfies Kept));
+			localStorage.setItem(key, JSON.stringify(rowNow() satisfies Kept));
 		} catch {
 			/* a browser that keeps nothing: the row lasts as long as the page */
 		}
 		// Not before the tab the address came with has been opened: it would be written over.
 		if (!addressed()) return;
-		const address = addressOf(front());
+		// A canvas in front is where the chat's camera is, which the harness keeps: the address stays plain, as it always was.
+		const address = front().kind === "canvas" ? "" : addressOf(front());
 		if (location.hash !== address) history.replaceState(history.state, "", `${location.pathname}${location.search}${address}`);
+	});
+	/*
+	 * A conversation's camera moved to another canvas (its agent's own `view goto` or `view focus`,
+	 * the person on another device): it is on that canvas, with no card, document or app left over it.
+	 * Not at the first sight of where each one is, which is no move.
+	 */
+	const seen = new Map<string, string>();
+	createEffect(() => {
+		for (const stage of stages()) {
+			for (const agent of stage.agents) {
+				const was = seen.get(agent.id);
+				seen.set(agent.id, stage.name);
+				if (was !== undefined && was !== stage.name) aimCanvas(agent.id);
+			}
+		}
 	});
 	// The address changed by hand, or by a link to this page: the tab it names comes forward.
 	addEventListener("hashchange", openAddressed);

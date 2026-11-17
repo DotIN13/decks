@@ -4,6 +4,7 @@ import { Modals, Pickers } from "./app/overlays.tsx";
 import { createParts } from "./app/parts.ts";
 import { SidePanel } from "./app/side-panel.tsx";
 import { Top } from "./app/top.tsx";
+import { touchTop } from "./tabs/budget.ts";
 import { rememberTabs } from "./tabs/remember.ts";
 import { TabView } from "./tabs/TabView.tsx";
 import { NoticeStrip } from "./shell/NoticeStrip.tsx";
@@ -29,7 +30,7 @@ export function App() {
 	const { presenting, layout } = parts;
 	rememberTabs();
 	return (
-		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={layout.phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
+		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={layout.phone() ? "true" : undefined} data-touch-top={touchTop(layout.phone()) ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
 			<div class="work">
 				<TabView parts={parts} />
 				<Top parts={parts} />

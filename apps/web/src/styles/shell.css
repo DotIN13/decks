@@ -210,11 +210,26 @@
 			background-color 120ms ease,
 			border-color 120ms ease;
 	}
-	/* The tab a message says it was written on (`tabs/about.ts`): the recipient's chip, quieter, struck out when left out. */
+	/* The tab a message says it was written on (`tabs/about.ts`): a chip like the recipient's, quieter, struck out when left out. */
 	.dock-about {
+		display: inline-flex;
+		min-width: 0;
 		max-width: 220px;
+		height: 22px;
+		flex: 0 1 auto;
+		align-items: center;
 		gap: 4px;
 		padding: 0 6px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-item);
+		background: var(--panel);
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-label);
+	}
+	.dock-about:hover {
+		background: var(--hover, var(--panel));
 	}
 	.dock-about-word {
 		color: var(--faint);

@@ -1,15 +1,16 @@
 /**
- * Each agent's camera is on a tab, and has a place on each canvas (`apps/web/src/tabs/tabs.ts`,
- * `app/landing.ts`).
+ * Each agent's chat has a camera, on one tab, with its own place on each canvas
+ * (`apps/web/src/tabs/tabs.ts`, `app/landing.ts`).
  *
- * The row of tabs is the window's; which one is in front is the conversation's. Opening an agent's
- * chat brings forward the tab its camera was on: a card left open with one agent is not in front for
- * another, and is again when the first is come back to. On a canvas in a tab each agent has its own
- * place, kept, and comes back to it. An agent's `view open` from the background puts its camera on
- * that tab without moving the screen: the tab is in front when its chat is opened. And a reload finds
- * each agent's tab again.
+ * There is no home canvas. The row of tabs is the window's; what is in front is the conversation's.
+ * Opening an agent's chat shows the tab its camera is on: a card left open with one agent is not in
+ * front for another, and is again when the first is come back to. A canvas tab picked moves that
+ * chat's camera to the canvas, where each agent has its own place, kept. An agent's `view open` from
+ * the background puts its camera on that tab without moving the screen; a view it sets on its canvas
+ * takes the tab off it again; its `view goto` moves the camera, and the screen with it when its chat
+ * is the one on screen. And a reload finds each agent's tab again.
  */
-import { API, asPerson, canvasFrame, card, newAgent, open, openAgents, resetStage, rest, say, settle, socket } from "../harness.mjs";
+import { API, CANVAS as firstCanvasName, asPerson, card, newAgent, open, openAgents, resetStage, rest, say, settle, socket } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -40,7 +41,7 @@ const before = new Set(agentsNow().map((one) => one.id));
 const nameOnChip = async () => (await page.locator(".v3-topbar .v3-agent-name").first().innerText()).trim();
 const firstName = await nameOnChip();
 const chips = () => page.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
-const homeFront = async () => (await page.locator(".v3-topbar .v3-canvas-chip").getAttribute("data-front")) === "true";
+const canvasFront = async () => (await page.locator(".v3-topbar .v3-canvas-chip").getAttribute("data-front")) === "true";
 const reading = async () => Number((await page.locator(".v3-zoom-value").first().textContent()).replace(/[^0-9.]/g, ""));
 /** Open an agent's chat from the agent list, by the name the page shows for it. */
 const openChat = async (name) => {
@@ -50,11 +51,15 @@ const openChat = async (name) => {
 	await settle(page, 400);
 };
 
+const canvasChip = page.locator(".v3-topbar .v3-canvas-chip");
+const chipName = async () => (await canvasChip.innerText()).trim();
+const firstCanvas = await chipName();
+
 // --- the first agent's camera goes to a card's tab ----------------------------------------------------------------
 await call("view.open", [plan]);
 say("with the first agent, a card opened is the tab in front", JSON.stringify(await until(async () => ((await chips()).length ? chips() : undefined))) === '["card*"]');
 
-// --- another agent: its camera is on its own canvas; the card's tab stays in the row --------------------------------
+// --- another agent: its camera is on a canvas; the card's tab stays in the row --------------------------------------
 await newAgent(page, "pi");
 const other = await until(() => agentsNow().map((one) => one.id).find((id) => !before.has(id)));
 // The page opens the new agent's chat, and its chip says its name.
@@ -63,14 +68,14 @@ const otherName = await until(async () => {
 	return name && name !== firstName ? name : undefined;
 }, 15000);
 say("two agents to tell apart, by the names the page shows", !!other && !!otherName, JSON.stringify({ firstName, otherName }));
-say("a second agent opens on its own canvas: home in front, the card's tab still in the row", (await until(async () => ((await homeFront()) && JSON.stringify(await chips()) === '["card"]' ? true : undefined))) === true, JSON.stringify([await chips(), await homeFront()]));
+say("a second agent's camera is on a canvas, in front; the card's tab is still in the row, not in front", (await until(async () => ((await canvasFront()) && JSON.stringify(await chips()) === '["card"]' ? true : undefined))) === true, JSON.stringify([await chips(), await canvasFront()]));
 await openChat(firstName);
 say("the first agent opened again: its camera is on the card, which is in front", (await until(async () => (JSON.stringify(await chips()) === '["card*"]' ? true : undefined))) === true, JSON.stringify(await chips()));
 
 // --- a place on each canvas, per agent -------------------------------------------------------------------------------
 await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
 await page.locator('.switcher-canvas:has-text("Tab two")').click();
-await until(async () => (JSON.stringify(await chips()) === '["card","canvas*"]' ? true : undefined));
+say("the first agent's camera goes to the canvas opened: the chip names it, and the one it left is a tab", (await until(async () => ((await chipName()).includes("Tab two") && JSON.stringify(await chips()) === '["card","canvas"]' ? true : undefined))) === true, JSON.stringify([await chipName(), await chips()]));
 await settle(page, 900);
 const arrived = await reading();
 await page.locator('.v3-zoom [aria-label="Zoom in"]').click();
@@ -78,36 +83,42 @@ await page.locator('.v3-zoom [aria-label="Zoom in"]').click();
 await settle(page, 800);
 const firstZoom = await reading();
 await openChat(otherName);
-say("the second agent is still on home", (await until(async () => ((await homeFront()) ? true : undefined))) === true);
-await page.locator('.tab-chip[data-kind="canvas"] .tab-chip-name').click();
+say("the second agent's camera is where it was: not on that canvas", (await until(async () => ((await canvasFront()) && !(await chipName()).includes("Tab two") ? true : undefined))) === true, await chipName());
+await page.locator('.tab-chip[data-kind="canvas"]', { hasText: "Tab two" }).locator(".tab-chip-name").click();
+await until(async () => ((await chipName()).includes("Tab two") ? true : undefined));
 await settle(page, 1200);
 const otherZoom = await reading();
-say("on the same canvas's tab the second agent has its own place, not the first's", Math.abs(otherZoom - firstZoom) > 1 && Math.abs(otherZoom - arrived) <= 1, JSON.stringify({ arrived, firstZoom, otherZoom }));
+say("put on the same canvas, the second agent has its own place there, not the first's", Math.abs(otherZoom - firstZoom) > 1 && Math.abs(otherZoom - arrived) <= 1, JSON.stringify({ arrived, firstZoom, otherZoom }));
 await openChat(firstName);
 await settle(page, 1200);
-say("the first agent opened again is on that canvas's tab, at the place it left", JSON.stringify(await chips()) === '["card","canvas*"]' && Math.abs((await reading()) - firstZoom) <= 1, JSON.stringify([await chips(), await reading(), firstZoom]));
+say("the first agent opened again is on that canvas, at the place it left", (await chipName()).includes("Tab two") && (await canvasFront()) && Math.abs((await reading()) - firstZoom) <= 1, JSON.stringify([await chipName(), await reading(), firstZoom]));
 
 // --- an agent's view open from the background: its camera moves, the screen does not ---------------------------------
 const offered = await call("view.open", ["cam-app"], { "x-decks-agent": other });
-say("view open from the agent that is not on screen opens the tab behind, and says it waits in its chat", offered.value?.opened === false && /waits in your chat/.test(offered.value?.note ?? "") && JSON.stringify(await until(async () => ((await chips()).length === 3 ? chips() : undefined))) === '["card","canvas*","app"]', JSON.stringify([offered.value, await chips()]).slice(0, 300));
+say("view open from the agent that is not on screen opens the tab behind, and says it waits in its chat", offered.value?.opened === false && /waits in your chat/.test(offered.value?.note ?? "") && (await until(async () => ((await chips()).includes("app") ? true : undefined))) === true && (await canvasFront()), JSON.stringify([offered.value, await chips()]).slice(0, 300));
 await openChat(otherName);
-say("that agent's chat opened: the app's tab is in front", (await until(async () => (JSON.stringify(await chips()) === '["card","canvas","app*"]' ? true : undefined))) === true, JSON.stringify(await chips()));
+say("that agent's chat opened: the app's tab is in front", (await until(async () => ((await chips()).includes("app*") ? true : undefined))) === true, JSON.stringify(await chips()));
 
-// --- an agent pointing its view at its own canvas: its camera is home again -------------------------------------------
+// --- an agent pointing its view at its canvas: nothing is over it any more ------------------------------------------
 await openChat(firstName);
-await until(async () => (JSON.stringify(await chips()) === '["card","canvas*","app"]' ? true : undefined));
+await until(async () => ((await canvasFront()) ? true : undefined));
 await call("view.move", [{ x: 0, y: 0, zoom: 0.5 }], { "x-decks-agent": other });
 await openChat(otherName);
-say("an agent that moved its view on its own canvas, from the background, is on home when its chat is opened", (await until(async () => ((await homeFront()) && JSON.stringify(await chips()) === '["card","canvas","app"]' ? true : undefined))) === true, JSON.stringify([await chips(), await homeFront()]));
+say("an agent that moved its view on its canvas, from the background, is on that canvas when its chat is opened", (await until(async () => ((await canvasFront()) && !(await chips()).includes("app*") ? true : undefined))) === true, JSON.stringify([await chips(), await canvasFront()]));
+
+// --- the agent's own view goto: its camera, and the screen with it when its chat is the one on screen ------------------
+const went = await call("view.goto", [firstCanvasName], { "x-decks-agent": other });
+say("view goto from the chat on screen puts its camera on that canvas, and the screen goes there", went.ok === true && (await until(async () => ((await chipName()).includes(firstCanvas) ? true : undefined))) === true, JSON.stringify([went, await chipName()]).slice(0, 240));
 
 // --- kept: the deck opened again finds each agent's tab ----------------------------------------------------------------
 await openChat(firstName);
-await until(async () => (JSON.stringify(await chips()) === '["card","canvas*","app"]' ? true : undefined));
+await call("view.open", [plan]);
+await until(async () => ((await chips()).includes("card*") ? true : undefined));
+const left = await chips();
 const again = await page.context().newPage();
 await again.goto(page.url().split("#")[0]);
-await canvasFrame(again);
 const chipsAgain = () => again.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
-say("opened again, the first agent's chat is on the tab its camera was on", JSON.stringify(await until(async () => ((await chipsAgain()).length === 3 ? chipsAgain() : undefined))) === '["card","canvas*","app"]', JSON.stringify(await chipsAgain()));
+say("opened again, the first agent's chat is on the tab its camera was on", JSON.stringify(await until(async () => ((await chipsAgain()).includes("card*") ? chipsAgain() : undefined))) === JSON.stringify(left), JSON.stringify([left, await chipsAgain()]));
 await again.close();
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));

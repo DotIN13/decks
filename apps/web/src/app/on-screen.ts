@@ -1,4 +1,3 @@
-import { baseTheme, placements, type PenDocument, type PenNode } from "@decks/pen";
 import type { Page } from "@decks/protocol";
 import { createComputed, createEffect, createMemo, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
@@ -7,24 +6,7 @@ import { state } from "../state/deck.ts";
 import { pens } from "../state/pens.ts";
 import { agentViews } from "../state/views.ts";
 import { focusedCanvas } from "./person.ts";
-import { canvasOnScreen, homeHeld } from "../tabs/tabs.ts";
-
-/** The cards a drawing places, by their path in the deck, each with its box on the canvas. */
-function cardsOn(doc: PenDocument, canvas: string | undefined): Array<{ path: string; box: { x: number; y: number; w: number; h: number } }> {
-	const placed = placements(doc, { theme: baseTheme(doc, "light") });
-	const out: Array<{ path: string; box: { x: number; y: number; w: number; h: number } }> = [];
-	const walk = (nodes: readonly PenNode[] | undefined) => {
-		for (const node of nodes ?? []) {
-			const path = node.type === "browser" ? (node.metadata as { path?: unknown } | undefined)?.path : undefined;
-			const box = placed.get(node.id)?.box;
-			// A card's path is its canvas's own (`cards/<name>/index.html`); an older one is the deck's already.
-			if (typeof path === "string" && box) out.push({ path: canvas && !path.startsWith("canvases/") && !path.startsWith("shared/") ? `canvases/${canvas}/${path}` : path, box: { x: box.x, y: box.y, w: box.w, h: box.h } });
-			walk(node.children as PenNode[] | undefined);
-		}
-	};
-	walk(doc.children);
-	return out;
-}
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
  * What is on screen: the conversation in focus, its canvas's drawing and cards, and the views this
@@ -98,21 +80,9 @@ export function createOnScreen() {
 	createComputed(() => {
 		// A copy of its own: the merge below writes into this store's objects, never into the deck's.
 		const copy = (board: Page) => JSON.parse(JSON.stringify(board)) as Page;
-		let list: Page[];
-		if (homeHeld()) {
-			const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
-			list = state.pages.filter((board) => playing.has(board.path)).map(copy);
-		} else {
-			/*
-			 * A canvas in front that is not the conversation's (`tabs/tabs.ts`): no agent's set says what is on
-			 * it, its drawing does. Each card the drawing places, where and at the size the drawing has it.
-			 */
-			const pen = stagePen();
-			list = pen ? cardsOn(pen.doc, pen.scope).flatMap(({ path, box }) => {
-				const board = state.pages.find((one) => one.path === path);
-				return board ? [{ ...copy(board), x: box.x, y: box.y, w: box.w, h: box.h }] : [];
-			}) : [];
-		}
+		// The canvas on screen is the conversation's, whichever tab its camera is on: its cards are the ones in play there.
+		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
+		const list = state.pages.filter((board) => playing.has(board.path)).map(copy);
 		setShownPages(reconcile(list, { key: "path", merge: true }));
 	});
 	const stagePages = (): Page[] => shownPages;

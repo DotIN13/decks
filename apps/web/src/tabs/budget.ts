@@ -12,3 +12,10 @@ import { DEVICE } from "@decks/canvas";
  * with what it saved in its browser storage.
  */
 export const APPS_BEHIND: number = { computer: 3, mobile: 0 }[DEVICE];
+
+/**
+ * Whether the top bar is a touch bar: a phone's, or a tablet's. A finger needs larger things than a
+ * chip per tab leaves room for, so the bar shows what is in front by name, how many tabs are open,
+ * and puts the rest behind a press (`TabStrip.tsx`, `app/top.tsx`).
+ */
+export const touchTop = (phone: boolean): boolean => phone || DEVICE === "mobile";

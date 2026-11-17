@@ -777,7 +777,7 @@ export function Composer(props: {
 					</Show>
 					<Show when={props.about}>
 						{(about) => (
-							<button type="button" class="dock-to-chip dock-about" aria-pressed={about().on} data-tip={about().on ? "Your message says you wrote it on this tab. Press to leave that out." : "Your message does not say which tab you are on. Press to say it."} onClick={() => about().toggle()}>
+							<button type="button" class="dock-about" aria-pressed={about().on} data-tip={about().on ? "Your message says you wrote it on this tab. Press to leave that out." : "Your message does not say which tab you are on. Press to say it."} onClick={() => about().toggle()}>
 								<span class="dock-about-word">{about().on ? "On" : "Not on"}</span>
 								<span class="dock-about-name">{about().name}</span>
 							</button>

@@ -7,8 +7,8 @@ import { scheme } from "../lib/theme.ts";
 import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
-import { stageOf, stages } from "../state/canvases.ts";
-import { canvasOnScreen, homeHeld } from "../tabs/tabs.ts";
+import { stages } from "../state/canvases.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
 /** What the landing reads of the page. */
@@ -29,10 +29,9 @@ interface LandingInputs {
  * its boards are the deck's.
  */
 /**
- * Whose view the camera on screen is: the conversation's, on whichever canvas its camera is on, its
- * own or one in a tab (`tabs/tabs.ts`). Each agent has a place on each canvas it has looked at, kept
- * on this device, and comes back to it. A tab that is no canvas changes nothing: the canvas behind
- * it is held as it was.
+ * Whose view the camera on screen is: the conversation's, on whichever canvas its camera is on
+ * (`tabs/tabs.ts`). Each chat has a place on each canvas it has looked at, kept on this device, and
+ * comes back to it. A tab that is no canvas changes nothing: the canvas behind it is held as it was.
  */
 const ownerNow = (): string | undefined => state.focused;
 
@@ -74,8 +73,7 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		},
 		land: (next, to) => {
 			moveCamera(next);
-			// An agent is told where its own canvas is looked at; its camera on another canvas, in a tab, says nothing of that one.
-			if (to.canvas === stageOf(to.scope)?.name) reportCamera(next, to.scope);
+			reportCamera(next, to.scope);
 		},
 		select: (path) => setSelected(path),
 	});
@@ -120,13 +118,13 @@ export function reportCameraOnArrival() {
 		if (!id || reportedOpening) return;
 		reportedOpening = true;
 		const timer = window.setTimeout(() => {
-			if (state.focused === id && homeHeld()) reportCamera(camera(), id);
+			if (state.focused === id) reportCamera(camera(), id);
 		}, 400);
 		onCleanup(() => clearTimeout(timer));
 	});
 	onMount(() => {
 		const again = () => {
-			if (document.visibilityState === "visible" && state.focused && homeHeld()) reportCamera(camera(), state.focused);
+			if (document.visibilityState === "visible" && state.focused) reportCamera(camera(), state.focused);
 		};
 		window.addEventListener("focus", again);
 		document.addEventListener("visibilitychange", again);

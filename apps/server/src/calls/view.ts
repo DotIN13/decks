@@ -94,6 +94,13 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 			 */
 			open: async (what: string, options?: { kind?: "canvas" | "card" | "document" | "app" }) => {
 				const found = tabFor(ctx, what, options?.kind);
+				// A canvas: the camera goes there, by goto's rule, and the row of tabs follows the camera.
+				if (found.kind === "canvas" && agent.setHome && !agent.app) {
+					const moved = await moveHome(ctx, found.target, true);
+					const said = moved.offered ?? (moved.onScreen ? undefined : "your chat is not the one on screen: its camera is on that canvas, and the person sees it when they open your chat");
+					if (said) notes.push(`The tab did not open by itself: ${said}.`);
+					return { kind: found.kind, target: found.target, opened: moved.onScreen && !moved.offered, ...(said ? { note: said } : {}) };
+				}
 				// The page opens it, in front when this chat is the one on its screen, or offers a button when it is not.
 				const answer = ((await service.ask(agent.id, { op: "open", args: found }, 1500)) ?? {}) as { opened?: unknown; offered?: unknown; skipped?: unknown };
 				const opened = answer.opened === true;
