@@ -1,6 +1,6 @@
 import { PenBar } from "@decks/canvas/host";
 import { frameZoom } from "@decks/canvas";
-import { drawing, Insert, insertPanel, setDrawing, setInsertPanel, setPenTool } from "@decks/canvas/tools";
+import { drawing, Insert, insertPanel, penPicked, setDrawing, setInsertPanel, setPenTool } from "@decks/canvas/tools";
 import { createEffect, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createToolsFloat } from "./tools-float.ts";
 import { PenTray } from "../frame/PenTray.tsx";
@@ -20,12 +20,13 @@ import { viewOnlyStage } from "./person.ts";
  * own edge. Here each is the page's, as the top bars, the side panel and the composer are: the tool
  * column is dragged anywhere on the window. They read and set the same signals as before
  * (`@decks/canvas/tools`), which the canvas package keeps the same on this page and in the frame
- * (`frame/tools-mirror.ts`); what they ask of the canvas itself (an edit, undo, a fit, the camera) goes
+ * (`frame/tools-mirror.ts`), with what is selected as the canvas has it now (`penPicked`), your own edits
+ * in it before the server confirms them; what they ask of the canvas itself (an edit, undo, a fit, the camera) goes
  * through the page's handle on the frame (`FramedHandle`). What is attached to the drawing stays in
  * the frame: the selection's pill, its outlines and handles, the menu at a point, a card's style bar.
  *
- * A press on a tool leaves the keyboard with the canvas: a tool armed here, its key and the canvas's
- * other keys go on working without a click on the canvas first. A field that is typed into takes the
+ * A press on a tool gives the keyboard to the canvas, or leaves it there: a tool armed here, its key and
+ * the canvas's other keys go on working without a click on the canvas first. A field that is typed into takes the
  * keyboard, and gives it back when it is left.
  */
 export function CanvasTools(props: { parts: Parts }): JSX.Element {
@@ -66,9 +67,11 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 
 	/** Something that is typed into or chosen from with the keyboard: it may take it. */
 	const typedInto = (target: EventTarget | null) => target instanceof Element && !!target.closest("input, textarea, select, [contenteditable]");
-	/** A press on a tool leaves the keyboard where it was, with the canvas. */
+	/** A press on a tool gives the keyboard to the canvas, or leaves it there: its keys act next, as when the tools stood in its frame. */
 	const keepKeys = (event: MouseEvent) => {
-		if (!typedInto(event.target)) event.preventDefault();
+		if (typedInto(event.target)) return;
+		event.preventDefault();
+		if (document.activeElement?.tagName !== "IFRAME") handle()?.focus();
 	};
 	/** A field left for nothing else on this page: the keyboard goes back to the canvas. */
 	const giveKeysBack = (event: FocusEvent) => {
@@ -92,7 +95,7 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 			<Show when={!(drawing() && mode() === "browse")}>
 				{/* The dock's height as a variable, for the properties sheet on a phone to sit above the composer (`properties.css`). */}
 				<div style={{ display: "contents", "--dock": `${dock.dockCover()}px` }}>
-					<PenBar tools={false} doc={stagePen()?.doc} onEdit={(ops) => handle()?.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => exportPicture(ids)} />
+					<PenBar tools={false} doc={penPicked() ?? stagePen()?.doc} onEdit={(ops) => handle()?.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => exportPicture(ids)} />
 				</div>
 			</Show>
 			{/* A column at the left; on a phone, a row just above the dock. */}

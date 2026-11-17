@@ -95,6 +95,13 @@ const SAMPLER = () => {
 		arm() {
 			as.commitAt = Infinity;
 			as.armed = true;
+			// A commit made on the page (its properties panel) is the edit arriving here, in the frame: the page's press is not heard in this document.
+			if (globalThis.__decksProbes)
+				globalThis.__decksProbes.pageEdited = () => {
+					if (!as.armed) return;
+					as.armed = false;
+					as.commitAt = performance.now();
+				};
 		},
 		now() {
 			as.commitAt = performance.now();

@@ -73,7 +73,7 @@ export function createStart(d: StartNeeds) {
 				files: { base: pass.files, expires: pass.expires },
 				pictures: pass.pictures,
 				...(pass.imports ? { imports: pass.imports } : {}),
-				look: { dark: d.darkNow, mode: d.modeNow, readOnly: d.options.readOnly === true, toolbar: d.options.toolbar !== false, insets: untrack(insets), ...(d.options.onComment ? { pageComments: true } : {}), ...(d.options.pageTools ? { pageTools: true, ...(d.options.pageKeys ? { pageKeys: [...d.options.pageKeys] } : {}) } : {}), ...(untrack(() => d.options.frame.agents?.()) ? { agents: untrack(() => d.options.frame.agents!())! } : {}), ...(untrack(() => d.options.frame.focused?.()) ? { agent: untrack(() => d.options.frame.focused!())! } : {}) },
+				look: { dark: d.darkNow, mode: d.modeNow, readOnly: d.options.readOnly === true, toolbar: d.options.toolbar !== false, insets: untrack(insets), ...(d.options.onComment ? { pageComments: true } : {}), ...(d.options.pageTools ? { pageTools: true, ...(d.options.pageKeys ? { pageKeys: [...d.options.pageKeys] } : {}), ...(d.options.pageKeysFirst ? { pageKeysFirst: [...d.options.pageKeysFirst] } : {}) } : {}), ...(untrack(() => d.options.frame.agents?.()) ? { agents: untrack(() => d.options.frame.agents!())! } : {}), ...(untrack(() => d.options.frame.focused?.()) ? { agent: untrack(() => d.options.frame.focused!())! } : {}) },
 				camera: d.localCamera,
 				...(pen?.writer ? { writer: pen.writer } : {}),
 				stored,

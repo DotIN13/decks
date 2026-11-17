@@ -96,6 +96,14 @@ export interface FramedEditorOptions {
 	 * page as a key with a modifier already is. Only with `pageTools`.
 	 */
 	pageKeys?: readonly string[];
+	/**
+	 * Keys the page's tools take ahead of the canvas's own, where an app's tools mean something else by a
+	 * letter than the canvas does (Studio's V, H, P and C, its + and −, ⇧1 and ⇧0): pressed with the
+	 * keyboard on the canvas, not typed into anything and not in a card, they are heard first, played on
+	 * the page, and the canvas does nothing with them. Each is a key as typed, in lower case (`"v"`, `"+"`),
+	 * or a key's code with its Shift (`"shift+Digit1"`). Only with `pageTools`.
+	 */
+	pageKeysFirst?: readonly string[];
 	/** Where the camera starts, unless `state.camera` says. */
 	camera?: Camera;
 	/** The page's own camera, selection, mode and ink (and its copy of the drawing), kept in step with the frame. */

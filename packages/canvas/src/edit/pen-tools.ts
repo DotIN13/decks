@@ -1,4 +1,5 @@
 import { createSignal, untrack, type Accessor } from "solid-js";
+import type { PenDocument } from "@decks/pen";
 import type { PenTool } from "./core/model.ts";
 
 /**
@@ -74,6 +75,23 @@ export { penOutline, setPenOutline };
  */
 const [penToolsAt, setPenToolsAt] = createSignal<{ left: number; top: number; right: number; bottom: number } | undefined>();
 export { penToolsAt, setPenToolsAt };
+/**
+ * Everything of the app's own tools that stands over the canvas, as boxes on the canvas's screen, when
+ * the app draws them on its page: the column, the properties panel, a tray. For what the canvas does
+ * about being covered (Studio glides a selection clear of them); unset where the tools share the
+ * canvas's document and can be measured there.
+ */
+const [penCovers, setPenCovers] = createSignal<readonly { left: number; top: number; right: number; bottom: number }[] | undefined>();
+export { penCovers, setPenCovers };
+/**
+ * What is selected, as the canvas has it now, for a properties panel that is not where the canvas is:
+ * a small drawing holding the selected items whole, what its arrows join, and the drawing's variables,
+ * with the person's own edits in it before the server has confirmed them. An app that draws its tools
+ * on its page is told it by the canvas frame (`frame/tools-mirror.ts`): its own copy of the drawing
+ * runs a round trip behind, and on a slow line an item just made would have no properties until then.
+ */
+const [penPicked, setPenPicked] = createSignal<PenDocument | undefined>();
+export { penPicked, setPenPicked };
 /** On a touch screen the properties drawer opens only when asked, from the pill or the hold menu (`Properties.tsx`, `Callout.tsx`); elsewhere the panel shows with the selection. */
 const [propsOpen, setPropsOpen] = createSignal(false);
 

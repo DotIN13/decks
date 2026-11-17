@@ -9,6 +9,7 @@ import { drawing, inkSelection } from "../../ink/ink.ts";
 export interface ListenToPageNeeds {
 	readonly end: FrameEnd;
 	readonly pageKeys?: readonly string[] | undefined;
+	readonly pageKeysFirst?: readonly string[] | undefined;
 	/** The page draws the tools, the pen tray among them. */
 	readonly pageTools?: boolean | undefined;
 }
@@ -39,6 +40,22 @@ export function listenToPage(d: ListenToPageNeeds) {
 			d.end.call("upload", { files: read, at, ...(card ? { card } : {}) }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
 		);
 	}, { signal: life() });
+
+	/*
+	 * The keys the page's tools take ahead of the canvas's own (`pageKeysFirst`): heard first, passed on,
+	 * and stopped here. Not held down, not with ⌘, ⌃ or ⌥, not typed into a field or words being edited,
+	 * and not inside a card, whose keys are its own.
+	 */
+	addEventListener("keydown", (event) => {
+		if (!d.pageKeysFirst?.length || event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+		if (!d.pageKeysFirst.includes(event.key.toLowerCase()) && !d.pageKeysFirst.includes(`${event.shiftKey ? "shift+" : ""}${event.code}`)) return;
+		const target = event.composedPath()[0];
+		if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true'], [contenteditable=''], [role=dialog], .card-host")) return;
+		if (event.composedPath().some((one) => one instanceof Element && one.matches(".card-host, .card-surface"))) return;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		d.end.emit("keys", { key: event.key, code: event.code, meta: false, ctrl: false, alt: false, shift: event.shiftKey });
+	}, { capture: true, signal: life() });
 
 	/*
 	 * While the pen is out and the page draws its tray, the tray's keys are the page's: Escape (let the

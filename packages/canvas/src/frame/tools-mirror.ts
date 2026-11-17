@@ -4,9 +4,11 @@ import {
 	insertPanel,
 	penArrowStyle,
 	penBoxes,
+	penCovers,
 	penIcon,
 	penLive,
 	penOutline,
+	penPicked,
 	penSelection,
 	penShape,
 	penTool,
@@ -17,9 +19,11 @@ import {
 	setInsertPanel,
 	setPenArrowStyle,
 	setPenBoxes,
+	setPenCovers,
 	setPenIcon,
 	setPenLive,
 	setPenOutline,
+	setPenPicked,
 	setPenSelection,
 	setPenShape,
 	setPenTool,
@@ -27,6 +31,7 @@ import {
 	setPenTyping,
 	setPropsOpen,
 } from "../edit/pen-tools.ts";
+import { arrowEndItem, indexOf, isArrow, isCard, isShape, type PenDocument, type PenNode } from "@decks/pen";
 import { probes } from "../base/debug.ts";
 import { drawing, inkColor, inkSelection, inkTool, inkWidth, penSeen, setDrawing, setInkColor, setInkSelection, setInkTool, setInkWidth, setPenSeen } from "../ink/ink.ts";
 
@@ -77,6 +82,7 @@ const MIRRORED: Record<string, Mirrored> = {
 	inkWidth: { read: inkWidth, write: setInkWidth, owner: "page" },
 	live: { read: penLive, write: setPenLive, owner: "page" },
 	toolsAt: { read: penToolsAt, write: setPenToolsAt, owner: "page" },
+	covers: { read: penCovers, write: setPenCovers, owner: "page" },
 	selection: { read: penSelection, write: setPenSelection, owner: "frame" },
 	boxes: { read: penBoxes, write: setPenBoxes, owner: "frame", out: (boxes: ReadonlyMap<string, Box>) => [...boxes], back: (entries: Array<[string, Box]>) => new Map(entries) },
 	typing: { read: penTyping, write: setPenTyping, owner: "frame" },
@@ -84,6 +90,7 @@ const MIRRORED: Record<string, Mirrored> = {
 	// The page remembers that a pencil has touched this device (the frame has no storage of its own), and the frame sees the next one.
 	penSeen: { read: penSeen, write: setPenSeen, owner: "page" },
 	outline: { read: penOutline, write: setPenOutline, owner: "frame" },
+	picked: { read: penPicked, write: setPenPicked, owner: "frame" },
 	zoom: { read: frameZoom, write: setFrameZoom, owner: "frame" },
 };
 
@@ -93,9 +100,10 @@ interface MirrorEnd {
 	on(name: "tools", handler: (data: Record<string, unknown>) => void): void;
 }
 
-/** What only the frame can say: its camera's zoom at each step, and where the selection's outline is on its screen. */
+/** What only the frame can say: its camera's zoom at each step, and the drawing as it has it now (read again at each change). */
 export interface FrameSide {
 	zoom: () => number;
+	drawn: () => PenDocument;
 }
 
 /**
@@ -180,6 +188,20 @@ function sayFrameSide(frame: FrameSide): void {
 		penBoxes();
 		queueMicrotask(measure);
 	});
+	/*
+	 * What is selected, whole, as this frame's drawing has it: at each change of the selection or of the
+	 * drawing, once a frame. A frame or a group that is neither a shape nor a card goes without what it
+	 * holds, which no property of it reads.
+	 */
+	let picking = 0;
+	createEffect(() => {
+		const ids = penSelection();
+		const doc = ids.length ? frame.drawn() : undefined;
+		cancelAnimationFrame(picking);
+		if (!doc) return void setPenPicked(undefined);
+		picking = requestAnimationFrame(() => setPenPicked(pickedOf(doc, ids)));
+	});
+	onCleanup(() => cancelAnimationFrame(picking));
 	const settle = () => setTimeout(measure, 0);
 	addEventListener("resize", measure);
 	addEventListener("pointerup", settle, true);
@@ -189,4 +211,25 @@ function sayFrameSide(frame: FrameSide): void {
 		removeEventListener("pointerup", settle, true);
 		removeEventListener("touchend", settle, true);
 	});
+}
+
+/** The selected items of a drawing as a drawing of their own: each whole, what its arrows join beside it, and the drawing's own variables and themes. */
+function pickedOf(doc: PenDocument, ids: readonly string[]): PenDocument {
+	const index = indexOf(doc);
+	const light = (node: PenNode): PenNode => (isShape(node) || isCard(node) || node.type === "text" || !node.children?.length ? node : ({ ...node, children: [] } as PenNode));
+	const taken = new Map<string, PenNode>();
+	for (const id of ids) {
+		const node = index.get(id)?.node as PenNode | undefined;
+		if (node) taken.set(id, light(node));
+	}
+	for (const node of [...taken.values()]) {
+		if (!isArrow(node)) continue;
+		for (const end of [node.metadata?.from, node.metadata?.to]) {
+			const item = arrowEndItem(end);
+			const joined = item && !taken.has(item) ? (index.get(item)?.node as PenNode | undefined) : undefined;
+			if (item && joined) taken.set(item, light(joined));
+		}
+	}
+	const { children: _children, ...rest } = doc;
+	return { ...rest, children: [...taken.values()] } as PenDocument;
 }

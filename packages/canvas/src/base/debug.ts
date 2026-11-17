@@ -79,6 +79,8 @@ export interface Probes {
 	frameNews?: (() => unknown) | undefined;
 	/** The tools' state as the frame has it from the page that draws them (`frame/tools-mirror.ts`): the tool, the shape, where the page's column stands. */
 	frameTools?: (() => unknown) | undefined;
+	/** Called as an edit made on the page (its properties panel, its pen tray) arrives in the frame, before it is applied: for a check that times a commit made there. */
+	pageEdited?: (() => void) | undefined;
 	frameSelect?: ((ids: string[]) => void) | undefined;
 	frameCamera?: (() => unknown) | undefined;
 	frameState?: (() => unknown) | undefined;
