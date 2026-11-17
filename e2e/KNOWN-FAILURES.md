@@ -117,3 +117,16 @@ small pan drawing), both passing alone. Named: nudge, arrows-steady and text-sho
   is copied as it is, and the perf cards are copies of its cards when it has any); render-perf presses the pen in the
   canvas frame, and pan-heavy waits for the cards there. stage-api (needs a model, not run) reads the Canvas tab's
   card rows by title. card-fit checks that `decks canvas fit` measures a card alike with and without a canvas open.
+
+## After the refactor (2026-11-16)
+
+Full runs at the end of the canvas package's refactor (f8e03110, 3 workers): 1,156 of 1,158 assertions.
+`card-frame`'s framed corner is the picture renderer this clone lacks; `tiers`' hide button fails beside
+two other workers and passes alone, as above. `nudge` and `arrows-steady` pass when named.
+
+- edits-wait (named) never reaches its WebKit half. Its Chromium half hides a card from its pill, and
+  `resetStage` (`harness.mjs`) between the two engines only moves each fixture card back (`card.move`):
+  a card taken off the canvas is not put back, so it waits 25 s and throws "4 of 5 cards reached the
+  stage". The same throw at the branch's base (f7f0d20f) and before the canvas refactor (30830792): a
+  check bug that predates both, not fixed. The Chromium half's "a board hidden from its pill" failed
+  there (1 or 2 of ~150 frames) and passed at f8e03110, which a frame or two of timing explains.
