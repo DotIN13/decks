@@ -17,7 +17,7 @@ import Plus from "lucide-solid/icons/plus";
 import { Dynamic } from "solid-js/web";
 import { touchTop } from "../tabs/budget.ts";
 import { kindOf } from "../tabs/kinds.ts";
-import { canvasOnScreen, front, onCanvas, showCanvas } from "../tabs/tabs.ts";
+import { canvasOnScreen, front, onCanvas } from "../tabs/tabs.ts";
 
 /**
  * The top of the page: the bar on the left (the panel's button, the agents, the canvas), the corner on
@@ -28,7 +28,7 @@ export function Top(props: { parts: Parts }) {
 	const phone = layout.phone;
 	/** A phone's or a tablet's bar (`tabs/budget.ts`): the chip names the tab in front, the tabs are one count, and the + is in ⋯. */
 	const touch = () => touchTop(phone());
-	/** What the bar's chip says: the canvas the chat's camera is on; on a touch bar, the tab in front, whatever its kind. */
+	/** What a touch bar's chip says: the tab in front, whatever its kind. (A desktop's bar has a row of tabs and no chip of its own.) */
 	const shownTitle = () => (touch() && !onCanvas() ? (kindOf(front().kind)?.title(front()) ?? front().target) : canvasOnScreen()?.title);
 	/** The ⋯ menu: on a touch bar it also opens a tab, which the bar has no + for. */
 	const more = () => [...(touch() ? [{ label: "Open a tab", icon: Plus, onPick: openPlus }] : []), ...moreItems(stagePages)];
@@ -63,12 +63,12 @@ export function Top(props: { parts: Parts }) {
 				onClose={closeAgent}
 				onMoreAgents={openAgentsPanel}
 				phone={phone()}
-				/* The chip is the canvas the camera of the chat on screen is on, in front or held behind a card, a document or an app. */
+				/* A desktop's bar is a row of tabs, the canvas among them. A touch bar has one chip, which names the tab in front and, while that is no canvas, opens the tabs. */
+				row={!touch()}
 				{...(shownTitle() ? { stage: shownTitle()! } : {})}
 				{...(touch() && !onCanvas() && kindOf(front().kind) ? { mark: () => <Dynamic component={kindOf(front().kind)!.icon} size={16} /> } : {})}
-				/* A desktop's chip brings the canvas forward from behind another tab; a touch bar's names that tab, and opens the tabs. */
-				canvas={{ front: onCanvas(), show: touch() ? openTabsList : showCanvas }}
-				/* A chip is about 150 px: the row folds into one chip when the bar, beside the side panel, has room for fewer than there are; always on a phone. */
+				canvas={{ front: onCanvas(), show: openTabsList }}
+				/* A tab is about 150 px: with more tabs than the bar, beside the side panel, has room for, the row shows the first of them and a count lists them all; a touch bar always shows the count. */
 				tabs={<TabStrip touch={touch()} room={Math.max(0, Math.floor((layout.viewWidth() - (panelOpen() ? 360 : 0) - 600) / 150))} />}
 				{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
 				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}

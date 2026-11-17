@@ -444,7 +444,7 @@ say("…including by a tag you put on yourself", JSON.stringify(await page.evalu
  * two lists differ — which is exactly the case here and was not the case there.
  */
 // Boards is the Canvas tab now, and its field searches the canvas by name (`panel/LeftPanel.tsx`).
-await page.getByRole("tab", { name: "Canvas" }).click();
+await page.getByRole("tab", { name: "Canvas", exact: true }).click();
 await settle(page, 400);
 say("switching tabs clears the query", (await page.locator(".panel-shell .v3-search input").inputValue()) === "", await page.locator(".panel-shell .v3-search input").inputValue());
 const canvasPlaceholder = (await page.locator(".panel-shell .v3-search input").getAttribute("placeholder")) ?? "";
@@ -723,7 +723,7 @@ await settle(page, 200);
 // --- the square beside the search is the agents' alone ----------------------------------
 
 /* The canvas list has one look, a line per item, so on Canvas (once Boards) the square is not there. */
-await page.getByRole("tab", { name: "Canvas" }).click();
+await page.getByRole("tab", { name: "Canvas", exact: true }).click();
 await settle(page, 300);
 const onBoards = await page.evaluate(() => ({ square: document.querySelectorAll(".panel-view").length, density: document.querySelector(".panel-list")?.getAttribute("data-density") ?? null }));
 say("the canvas tab has no grid switch, and the list no density", onBoards.square === 0 && onBoards.density === null, JSON.stringify(onBoards));
@@ -769,7 +769,7 @@ await feed({
 	chats: Array.from({ length: 16 }, (_, index) => chat(`m${index}`, `Many ${index}`, "claude", "idle", undefined, 60_000 * (index + 1))),
 });
 await settle(page, 500);
-await page.getByRole("tab", { name: "Canvas" }).click();
+await page.getByRole("tab", { name: "Canvas", exact: true }).click();
 await settle(page, 300);
 await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover .agent-menu-more", { timeout: 4000 });

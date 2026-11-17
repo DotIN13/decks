@@ -9,7 +9,7 @@ import { canvasOnScreen } from "../tabs/tabs.ts";
 /** What a canvas menu is opened from: the button its owner draws. */
 export type CanvasMenuTrigger = (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 
-/** The canvas switcher around a trigger: the panel head's title and the top bar's canvas chip both use it. A pick moves the camera of the chat on screen there, so the one washed is where that camera is. */
+/** The canvas switcher around a trigger: the panel head's title, a canvas's tab in the top bar and a touch bar's chip use it. A pick moves the camera of the chat on screen there, so the one washed is where that camera is. */
 export const canvasMenu = (trigger: CanvasMenuTrigger, placement: "bottom-start" | "bottom-end" = "bottom-start") => (
 	<CanvasSwitcher
 		stages={stages()}

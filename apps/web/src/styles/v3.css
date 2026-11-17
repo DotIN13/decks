@@ -242,7 +242,7 @@ body {
 	.v3-canvas-chip > svg:first-child {
 		color: var(--v3-fg2);
 	}
-	/* Squeezed, the canvas chip gives way and its name ends in an ellipsis; the agent and the icons keep their size. */
+	/* Squeezed, a touch bar's chip gives way and its name ends in an ellipsis; the agent and the icons keep their size. */
 	.v3-topbar.float.pill > * {
 		flex: none;
 	}
@@ -264,9 +264,9 @@ body {
 		white-space: nowrap;
 	}
 	/*
-	 * The other tabs in the top bar (`tabs/TabStrip.tsx`): each a chip like the canvas chip, which is the
-	 * canvas the chat's camera is on, with a ✕. The one in front is washed, the canvas chip among them once
-	 * there is another to tell it from; alone, the canvas chip looks as it always did.
+	 * The row of tabs in the top bar (`tabs/TabStrip.tsx`): every tab the same chip, its kind's mark,
+	 * its name and its ✕, the canvas the chat's camera is on among them. The one in front is washed
+	 * once there is another to tell it from; a tab alone is the bar's plain title.
 	 */
 	.tab-chip {
 		display: flex;
@@ -277,13 +277,19 @@ body {
 		border-radius: 8px;
 		color: var(--v3-fg2);
 	}
+	/* Squeezed, the tabs give way and their names end in an ellipsis; the agent and the icons keep their size. */
+	.v3-topbar.float.pill > .tab-chip {
+		min-width: 0;
+		flex: 0 1 auto;
+	}
 	.tab-chip:hover {
 		background: var(--v3-bg3);
 	}
-	.tab-chip[data-front="true"],
-	.v3-topbar:has(.tab-chip) .v3-canvas-chip[data-front="true"] {
-		background: var(--v3-tab-on);
+	.tab-chip[data-front="true"] {
 		color: var(--v3-tab-on-fg);
+	}
+	.v3-topbar:has(.tab-chip ~ .tab-chip) .tab-chip[data-front="true"] {
+		background: var(--v3-tab-on);
 	}
 	.tab-chip-name {
 		display: flex;
@@ -297,6 +303,13 @@ body {
 		color: inherit;
 		cursor: pointer;
 		font: inherit;
+	}
+	/* A tab with no ✕ (the row's only canvas) ends as it begins. */
+	.tab-chip-name:last-child {
+		padding-right: 8px;
+	}
+	.tab-chip-name > svg {
+		flex: none;
 	}
 	.tab-chip-close {
 		display: grid;
@@ -316,16 +329,17 @@ body {
 		background: var(--v3-bg3);
 		color: var(--v3-fg);
 	}
-	/* The row folded into one chip (`tabs/TabStrip.tsx`, `TabFold`): how many tabs are open, in a small square, as a phone's browser shows it. */
+	/* How many tabs are open, in a small square, as a phone's browser shows it: it opens them as a list (`tabs/TabStrip.tsx`, `TabFold`). */
 	.tab-fold {
-		min-width: 0;
-		flex: 0 1 auto;
-		gap: 6px;
+		flex: none;
 		padding: 0 7px;
 		border: 0;
 		background: transparent;
 		cursor: pointer;
 		font: inherit;
+	}
+	.tab-fold[data-open="true"] {
+		background: var(--v3-bg3);
 	}
 	.tab-fold-count {
 		display: grid;
@@ -340,25 +354,10 @@ body {
 		line-height: 1;
 		place-items: center;
 	}
-	/* A tab in the folded row's list: its row, and its ✕ beside it. */
-	.tab-row-line {
-		display: flex;
-		align-items: center;
-		gap: 2px;
-	}
-	/* Over the menu's rule that a row is as wide as its menu, so the ✕ beside it stays inside. */
-	.tab-row-line > .tab-row[data-row] {
-		width: auto;
-		min-width: 0;
-		flex: 1 1 0;
-	}
-	.tab-row-line > .tab-chip-close {
-		width: 30px;
-		height: 30px;
-	}
-	.tab-row[data-current="true"] {
-		background: var(--v3-tab-on);
-		color: var(--v3-tab-on-fg);
+	/* A tab in that list: its row and its ✕ in one box, which has the wash (`.row-act`, `kit/chrome.css`). */
+	.tab-row > svg {
+		flex: none;
+		color: var(--v3-fg2);
 	}
 	/* A card whole in its tab (`tabs/kinds/card.tsx`): in the canvas's column, beside the side panel and under the top bars. */
 	.surface[data-surface="card"],
@@ -1822,18 +1821,13 @@ body {
 	.app[data-touch-top] .v3-topbar .v3-agent-kind {
 		display: none;
 	}
-	.app[data-touch-top] .v3-topbar .v3-canvas-chip,
-	.app[data-touch-top] .v3-topbar:has(.tab-chip) .v3-canvas-chip[data-front="true"] {
+	.app[data-touch-top] .v3-topbar .v3-canvas-chip {
 		background: transparent;
 		color: var(--v3-fg);
 	}
 	.app[data-touch-top] .v3-topbar .v3-canvas-name {
 		max-width: 340px;
 		font-size: 15px;
-	}
-	.app[data-touch-top] .v3-topbar .tab-fold[data-front="true"] {
-		background: transparent;
-		color: var(--v3-fg2);
 	}
 	.app[data-phone="true"] .v3-topbar .v3-agent-name,
 	.app[data-touch-top][data-tight-top] .v3-topbar .v3-agent-name,

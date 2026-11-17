@@ -98,7 +98,7 @@ if (deck) {
 
 // --- closed, the canvas is as it was -------------------------------------------------------------------------
 await chip.locator(".tab-chip-close").click();
-say("the ✕ closes it, and the canvas is back with its tools", (await until(async () => ((await page.locator(".tab-chip").count()) === 0 && (await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
+say("the ✕ closes it, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="card"]').count()) === 0 && (await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
 const canvas = await canvasFrame(page);
 say("…the same canvas frame, not one made anew", (await canvas.evaluate(() => (globalThis.__decksProbes?.frameDrawn?.().children ?? []).length)) > 0);
 
@@ -110,7 +110,7 @@ await page.keyboard.down("Meta");
 await pressCardAction(page, "New tab");
 await page.keyboard.up("Meta");
 const opened = await popup;
-say("with ⌘ held, New tab opens the browser's tab, and no tab here", !!opened && (await page.locator(".tab-chip").count()) === 0);
+say("with ⌘ held, New tab opens the browser's tab, and no tab here", !!opened && (await page.locator('.tab-chip[data-kind="card"]').count()) === 0);
 // The browser's tab is this window's address with the card's after #: Decks there, with the card's tab in front.
 say("…at this window's address with the card's after #, where the card's tab is in front", !!opened && opened.url().endsWith(`#card/${path}`) && (await until(() => opened.locator('.tab-chip[data-kind="card"][data-front="true"]').count())) === 1, opened?.url());
 await opened?.close().catch(() => {});

@@ -22,7 +22,8 @@ import type { Tab } from "./kind.ts";
  *   stays held behind it, as it was.
  *
  * So the canvas of the chat on screen always has a tab, whether it was opened as one or not, and a
- * canvas the camera leaves stays in the row only when it was opened as a tab.
+ * canvas the camera leaves stays in the row only when it was opened as a tab. In the row it is a tab
+ * like the others (`TabStrip.tsx`): in its place, washed when in front, closed with its ✕.
  */
 const [opened, setOpened] = createSignal<Tab[]>([]);
 /** The card, document or app each conversation's camera is on, by agent id; one with none is on its canvas. */
@@ -95,13 +96,17 @@ export function alive(kind: string, behind: number): Tab[] {
 	return of.filter((tab) => live.includes(tab));
 }
 
-/** Put a tab in the row if it is not there: after the others. */
+/**
+ * Put a tab in the row if it is not there: after the others. The canvas the camera of the chat on
+ * screen is on already shows, first, so kept in the row it stays first: a tab keeps its place.
+ */
 function ensure(kind: string, target: string): Tab {
 	const id = idOf(kind, target);
 	const found = opened().find((tab) => tab.id === id);
 	if (found) return found;
 	const tab = kind === "canvas" ? canvasTab(target) : { id, kind, target };
-	setOpened((all) => [...all, tab]);
+	const first = tab === cameraCanvasTab();
+	setOpened((all) => (first ? [tab, ...all] : [...all, tab]));
 	return tab;
 }
 
@@ -137,12 +142,27 @@ export function openTab(kind: string, target: string): void {
 	showTab(idOf(kind, target));
 }
 
+/** The canvas tab the camera of the chat on screen would go to if its own were closed: the next canvas in the row, else the one before. */
+function canvasBeside(): Tab | undefined {
+	const canvases = tabs().filter((tab) => tab.kind === "canvas");
+	const at = canvases.indexOf(cameraCanvasTab());
+	return canvases[at + 1] ?? canvases[at - 1];
+}
+
+/** Whether a tab can be closed: any but the canvas the chat on screen is on while it is the row's only canvas, since a chat is always on one. */
+export const canClose = (tab: Tab): boolean => tab !== cameraCanvasTab() || canvasBeside() !== undefined;
+
 /**
- * Close a tab. The canvas the camera of the chat on screen is on is always in the row: closed, it is
- * only no longer kept there once the camera leaves. A conversation whose camera was on the tab is on
- * its canvas again.
+ * Close a tab. A conversation whose camera was on it is on its canvas again. The canvas the camera of
+ * the chat on screen is on closes like any other when the row has another canvas: the camera goes to
+ * the one beside it. The row's only canvas stays (`canClose`).
  */
 export function closeTab(id: string): void {
+	if (id === cameraCanvasTab().id) {
+		const beside = canvasBeside();
+		if (!beside?.target) return;
+		moveCamera(who(), beside.target);
+	}
 	setOpened((was) => was.filter((tab) => tab.id !== id));
 	setCameraTabs((was) => Object.fromEntries(Object.entries(was).filter(([, tab]) => tab !== id)));
 }

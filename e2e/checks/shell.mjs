@@ -32,12 +32,12 @@ say("the app opens on the stage, at the plain root, and writes nothing into the 
 /* The v3 top-left bar: whose canvas this is and which canvas, and a new one. With the side panel open its head has the deck's mark and the fold, so the bar has no unfold button. */
 const pill = await page.evaluate(() => ({
 	agent: document.querySelectorAll(".v3-topbar .v3-agent-chip").length,
-	canvas: document.querySelectorAll(".v3-topbar .v3-canvas-chip").length,
+	canvas: document.querySelectorAll('.v3-topbar [role="tab"][data-kind="canvas"]').length,
 	tabs: document.querySelectorAll('.v3-topbar [role="tab"]').length,
 	unfold: document.querySelectorAll('.v3-topbar button[aria-label="Show the side panel"]').length,
 	fold: document.querySelectorAll('.panel-shell button[aria-label="Hide the side panel"]').length,
 }));
-say("the top-left bar has the agent and the canvas, no tabs, and the panel folds from its own head", pill.agent === 1 && pill.canvas === 1 && pill.tabs === 0 && pill.unfold === 0 && pill.fold === 1, JSON.stringify(pill));
+say("the top-left bar has the agent and the canvas as its one tab, and the panel folds from its own head", pill.agent === 1 && pill.canvas === 1 && pill.tabs === 1 && pill.unfold === 0 && pill.fold === 1, JSON.stringify(pill));
 
 /*
  * The left panel's Canvas tab (once Boards) lists what is on the canvas as rows of an icon and a

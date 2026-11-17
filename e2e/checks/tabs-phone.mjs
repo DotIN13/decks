@@ -121,7 +121,7 @@ say("picked again it loads anew, with what it saved", !!back);
 
 // --- closed from the list ------------------------------------------------------------------------------------------
 await fold.tap();
-await page.locator('.tab-row-line:has(.tab-row[data-kind="card"]) .tab-chip-close').tap();
+await page.locator('.row-act:has(.tab-row[data-kind="card"]) .close').tap();
 say("a tab's ✕ in the list closes it", (await until(async () => ((await fold.innerText()).trim() === "2" ? true : undefined))) === true);
 await page.keyboard.press("Escape");
 await settle(page, 200);

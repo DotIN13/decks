@@ -32,15 +32,17 @@ export function TopBar(props: {
 	mark?: () => JSX.Element;
 	onStages?: () => void;
 	stagesOpen?: boolean;
-	/** The canvas chip is the tab of the canvas the chat's camera is on: whether it is in front, and how to bring it forward from behind another tab. In front, a press opens the canvas list. */
+	/** A touch bar's chip: whether a canvas is in front, and what a press does while a card, a document or an app is. With a canvas in front a press opens the canvas list. */
 	canvas?: { front: boolean; show: () => void };
-	/** The other tabs and the + that opens one (`tabs/TabStrip.tsx`). */
+	/** The tabs and the + that opens one (`tabs/TabStrip.tsx`). */
 	tabs?: JSX.Element;
+	/** A desktop's bar: the tabs are a row, the canvas among them, so the bar draws no chip of its own. A touch bar's chip names the tab in front. */
+	row?: boolean;
 	viewOnly?: string;
 	onCopy?: () => void;
 	/** The phone's bar: full width, the canvas at the right end. */
 	phone?: boolean;
-	/** The canvas switcher around the canvas chip; left out, the chip opens the canvas manager. */
+	/** The canvas switcher around a touch bar's chip; left out, the chip opens the canvas manager. */
 	canvasMenu?: (trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element) => JSX.Element;
 	/** On a desktop the deck lives in the panel's head, so folded the bar brings back only the panel. */
 	desktop?: boolean;
@@ -111,40 +113,17 @@ export function TopBar(props: {
 				<Show when={props.phone}>
 					<span class="flex-1" />
 				</Show>
-				{(() => {
-					const chip = (popover?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
-						<button
-							type="button"
-							class="v3-canvas-chip"
-							ref={popover?.ref}
-							data-open={(popover ? popover.open : props.stagesOpen) ? "true" : undefined}
-							aria-haspopup={popover ? "menu" : "dialog"}
-							aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
-							data-tip="Canvases"
-							aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
-							data-front={props.canvas && !props.canvas.front ? undefined : "true"}
-							onClick={() => (props.canvas && !props.canvas.front ? props.canvas.show() : popover ? popover.toggle() : props.onStages?.())}
-						>
-							<Show when={props.mark} fallback={<Icon of={Layers} size={16} />}>
-								{props.mark!()}
-							</Show>
-							<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
-							<Icon of={ChevronDown} size={13} class="v3-chev" />
-						</button>
-					);
-					/*
-					 * The switcher where it is given (a desktop); the canvas manager straight away otherwise.
-					 * `canvasMenu` comes as a fresh function each time the canvas list changes, so only
-					 * whether it is given may rebuild the chip: built again on every canvases frame, the
-					 * chip and its open menu would vanish under the pointer. The switcher reads the list
-					 * itself, so the first one keeps up.
-					 */
-					return (
-						<Show when={props.canvasMenu !== undefined} fallback={chip()}>
-							{untrack(() => props.canvasMenu!((popover) => chip(popover)))}
-						</Show>
-					);
-				})()}
+				{/* A desktop's bar draws no chip of its own: the canvas is a tab in the row like the others (`tabs/TabStrip.tsx`). */}
+				<Show when={!props.row}>
+					<TouchChip stage={props.stage} mark={props.mark} canvas={props.canvas} stagesOpen={props.stagesOpen} onStages={props.onStages} canvasMenu={props.canvasMenu} />
+				</Show>
+				{/*
+				 * The tabs and the + that opens one (`tabs/TabStrip.tsx`). Read once: this bar's props are
+				 * merged from parts that follow the canvas list, so read where it is tracked the row would
+				 * be built again on every canvases frame, and a tab's open menu would vanish under the pointer.
+				 * The row reads what changes itself.
+				 */}
+				{untrack(() => props.tabs)}
 				<Show when={props.viewOnly}>
 					{(owner) => (
 						<button type="button" class="v3-viewonly" title={`Shared with you to view by ${owner()}: it follows their copy. Make your own copy to change it.`} onClick={() => props.onCopy?.()}>
@@ -152,9 +131,48 @@ export function TopBar(props: {
 						</button>
 					)}
 				</Show>
-				{/* The other tabs and the + that opens one (`tabs/TabStrip.tsx`), where the + that made a canvas stood. */}
-				{props.tabs}
 			</Show>
 		</div>
+	);
+}
+
+/** What a canvas menu is opened from, as the menu's owner hands it to the button. */
+type MenuTrigger = { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void };
+
+/**
+ * A touch bar's one chip: the name of what is in front, with its kind's mark. With a canvas in front
+ * a press opens the canvas list (the switcher where it is given, the canvas manager otherwise); with
+ * a card, a document or an app in front it does what `canvas.show` says, which opens the tabs.
+ */
+function TouchChip(props: { stage: string | undefined; mark: (() => JSX.Element) | undefined; canvas: { front: boolean; show: () => void } | undefined; stagesOpen: boolean | undefined; onStages: (() => void) | undefined; canvasMenu: ((trigger: (api: MenuTrigger) => JSX.Element) => JSX.Element) | undefined }): JSX.Element {
+	const chip = (popover?: MenuTrigger) => (
+		<button
+			type="button"
+			class="v3-canvas-chip"
+			ref={popover?.ref}
+			data-open={(popover ? popover.open : props.stagesOpen) ? "true" : undefined}
+			aria-haspopup={popover ? "menu" : "dialog"}
+			aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
+			data-tip="Canvases"
+			aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
+			data-front={props.canvas && !props.canvas.front ? undefined : "true"}
+			onClick={() => (props.canvas && !props.canvas.front ? props.canvas.show() : popover ? popover.toggle() : props.onStages?.())}
+		>
+			<Show when={props.mark} fallback={<Icon of={Layers} size={16} />}>
+				{props.mark!()}
+			</Show>
+			<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
+			<Icon of={ChevronDown} size={13} class="v3-chev" />
+		</button>
+	);
+	/*
+	 * `canvasMenu` comes as a fresh function each time the canvas list changes, so only whether it
+	 * is given may rebuild the chip: built again on every canvases frame, the chip and its open menu
+	 * would vanish under the pointer. The switcher reads the list itself, so the first one keeps up.
+	 */
+	return (
+		<Show when={props.canvasMenu !== undefined} fallback={chip()}>
+			{untrack(() => props.canvasMenu!((popover) => chip(popover)))}
+		</Show>
 	);
 }

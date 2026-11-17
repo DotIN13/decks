@@ -57,16 +57,16 @@ say("the server tells the browser what stages exist", !!listed && listed.length 
 
 // --- the pill names it, and opens the manager -------------------------------------------------
 
-const pillStage = () => page.evaluate(() => document.querySelector(".pill [aria-label^='Canvases']")?.textContent?.trim() ?? null);
+const pillStage = () => page.evaluate(() => document.querySelector(".v3-topbar .tab-chip[data-camera='true']")?.textContent?.trim() ?? null);
 const mine = await until(async () => (await pillStage()) || undefined);
 say("the pill names the stage this conversation is on", !!mine, String(mine));
 
 /*
- * On a desktop the chip opens the canvas switcher, a menu of the recent few, and its last row, All
+ * On a desktop the tab of the canvas in front opens the canvas switcher, a menu of the recent few, and its last row, All
  * canvases, opens the manager (`canvas/CanvasSwitcher.tsx`); on a phone the chip opens it at once.
  */
 const openManager = async () => {
-	const chip = page.locator(".pill button[aria-label^='Canvases']").first();
+	const chip = page.locator(".v3-topbar .tab-chip[data-camera='true'] .tab-chip-name").first();
 	const all = page.locator(".popover [role=menuitem]", { hasText: /^\s*All canvases\s*$/ }).first();
 	await chip.click({ timeout: 3000 });
 	const up = await Promise.race([all.waitFor({ timeout: 4000 }).then(() => "menu"), page.waitForSelector(".stage-manager", { timeout: 4000 }).then(() => "manager")]).catch(() => undefined);

@@ -76,7 +76,7 @@ const kept = await until(async () => (await page.evaluate(() => localStorage.get
 say("a press saves through localStorage, which the page keeps under the app's name", !!kept, String(await page.evaluate(() => localStorage.getItem("decks.app:tab-counter:count"))));
 
 // --- behind another tab it goes on running --------------------------------------------------------------------
-await page.locator(".v3-canvas-chip").first().click();
+await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
 say("the home chip brings the canvas forward, the app's tab still in the row", (await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await chip.getAttribute("data-front")) !== "true" ? true : undefined))) === true);
 const behind = await (await appFrame())?.evaluate(() => {
 	document.getElementById("press").click();
@@ -88,7 +88,7 @@ say("brought forward again, it is the same page, not loaded anew", !!(await unti
 
 // --- closed ------------------------------------------------------------------------------------------------------
 await chip.locator(".tab-chip-close").click();
-say("the ✕ closes it: its frame is gone, and the canvas is back with its tools", (await until(async () => ((await page.locator(".tab-chip").count()) === 0 && (await frameEl.count()) === 0 && (await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
+say("the ✕ closes it: its frame is gone, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="app"]').count()) === 0 && (await frameEl.count()) === 0 && (await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
 await settle(page, 200);
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));

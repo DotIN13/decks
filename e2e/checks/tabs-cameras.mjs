@@ -40,8 +40,9 @@ const before = new Set(agentsNow().map((one) => one.id));
 // The agent whose chat the page opens on, by the name on its chip.
 const nameOnChip = async () => (await page.locator(".v3-topbar .v3-agent-name").first().innerText()).trim();
 const firstName = await nameOnChip();
-const chips = () => page.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
-const canvasFront = async () => (await page.locator(".v3-topbar .v3-canvas-chip").getAttribute("data-front")) === "true";
+// The tabs beside the one of the canvas the chat's camera is on, in the row's order, the one in front starred.
+const chips = () => page.locator(".tab-chip[data-tab]:not([data-camera])").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
+const canvasFront = async () => (await page.locator('.v3-topbar .tab-chip[data-camera="true"]').getAttribute("data-front")) === "true";
 const reading = async () => Number((await page.locator(".v3-zoom-value").first().textContent()).replace(/[^0-9.]/g, ""));
 /** Open an agent's chat from the agent list, by the name the page shows for it. */
 const openChat = async (name) => {
@@ -51,7 +52,7 @@ const openChat = async (name) => {
 	await settle(page, 400);
 };
 
-const canvasChip = page.locator(".v3-topbar .v3-canvas-chip");
+const canvasChip = page.locator('.v3-topbar .tab-chip[data-camera="true"]');
 const chipName = async () => (await canvasChip.innerText()).trim();
 const firstCanvas = await chipName();
 
@@ -75,7 +76,7 @@ say("the first agent opened again: its camera is on the card, which is in front"
 // --- a place on each canvas, per agent -------------------------------------------------------------------------------
 await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
 await page.locator('.switcher-canvas:has-text("Tab two")').click();
-say("the first agent's camera goes to the canvas opened: the chip names it, and the one it left is a tab", (await until(async () => ((await chipName()).includes("Tab two") && JSON.stringify(await chips()) === '["card","canvas"]' ? true : undefined))) === true, JSON.stringify([await chipName(), await chips()]));
+say("the first agent's camera goes to the canvas opened: its tab names it, and the one it left is a tab, in its place", (await until(async () => ((await chipName()).includes("Tab two") && JSON.stringify(await chips()) === '["canvas","card"]' ? true : undefined))) === true, JSON.stringify([await chipName(), await chips()]));
 await settle(page, 900);
 const arrived = await reading();
 await page.locator('.v3-zoom [aria-label="Zoom in"]').click();
@@ -117,7 +118,7 @@ await until(async () => ((await chips()).includes("card*") ? true : undefined));
 const left = await chips();
 const again = await page.context().newPage();
 await again.goto(page.url().split("#")[0]);
-const chipsAgain = () => again.locator(".tab-chip").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
+const chipsAgain = () => again.locator(".tab-chip[data-tab]:not([data-camera])").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
 say("opened again, the first agent's chat is on the tab its camera was on", JSON.stringify(await until(async () => ((await chipsAgain()).includes("card*") ? chipsAgain() : undefined))) === JSON.stringify(left), JSON.stringify([left, await chipsAgain()]));
 await again.close();
 

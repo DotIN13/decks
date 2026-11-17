@@ -5,12 +5,13 @@ import { Dynamic } from "solid-js/web";
 import { Icon, Popover } from "@decks/ui";
 import { CanvasSwitcher } from "../canvases/CanvasSwitcher.tsx";
 import { scheme } from "../lib/theme.ts";
+import { canvasMenu } from "../app/canvas-menu.tsx";
 import { newCanvas, setStagesOpen } from "../app/person.ts";
 import { stages } from "../state/canvases.ts";
 import { kindOf } from "./kinds.ts";
 import { OpenMore } from "./OpenMore.tsx";
 import type { Tab } from "./kind.ts";
-import { cameraCanvasTab, canvasOnScreen, closeTab, front, onCanvas, openTab, showTab, tabs } from "./tabs.ts";
+import { cameraCanvasTab, canClose, canvasOnScreen, closeTab, front, openTab, showTab, tabs } from "./tabs.ts";
 
 /*
  * The list of what can be opened (the +) and the list of the tabs open (the count) are also opened
@@ -24,14 +25,68 @@ export const openPlus = (): void => void setTimeout(() => togglePlus?.(), 0);
 /** Open the list of the tabs open, as the count does. */
 export const openTabsList = (): void => void setTimeout(() => toggleList?.(), 0);
 
+/** What a tab is called: its kind's name for it, and a chat on no canvas says so. */
+const titleOf = (tab: Tab): string => kindOf(tab.kind)?.title(tab) ?? tab.target ?? "No canvas";
+
+/** A tab's ✕: in the row's chip, or at the end of its row in the list. The press is its own, not also a press on what it sits in. */
+function CloseTab(props: { tab: Tab; in: "chip" | "list" }): JSX.Element {
+	return (
+		<button
+			type="button"
+			class={props.in === "chip" ? "tab-chip-close" : "close"}
+			aria-label={`Close ${titleOf(props.tab)}`}
+			data-tip={props.in === "chip" ? "Close the tab" : undefined}
+			on:click={(event) => {
+				event.stopPropagation();
+				closeTab(props.tab.id);
+			}}
+		>
+			<Icon of={X} size={13} />
+		</button>
+	);
+}
+
 /**
- * The row folded: one chip with how many tabs are open beside the camera's canvas, washed while one
- * of them is in front and, off a phone, naming that one, that opens them all as a list, each of the
- * others with its ✕. What a phone's bar shows, and any bar with more tabs than it has room for.
+ * One tab in the row: its kind's mark, its name and its ✕, washed when it is in front. Every tab is
+ * drawn the same, the canvas the chat's camera is on among them, in its place. A press puts the
+ * camera of the chat on screen on it; a press on a canvas tab that is already in front opens the
+ * canvas list, to take that tab to another canvas.
  */
-function TabFold(props: { /** Name the tab in front beside the count: where the bar's own chip does not (a desktop's folded row). */ named: boolean; /** Count the canvas chip's tab too: every tab open, as a touch bar says it. */ all: boolean }): JSX.Element {
-	const others = () => tabs().filter((tab) => tab !== cameraCanvasTab());
-	const titleOf = (tab: Tab) => kindOf(tab.kind)?.title(tab) ?? tab.target ?? "";
+function TabChip(props: { tab: Tab }): JSX.Element {
+	const tab = props.tab;
+	const inFront = () => front().id === tab.id;
+	const name = (list?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
+		<button
+			type="button"
+			class="tab-chip-name"
+			ref={list?.ref}
+			aria-haspopup={list ? "menu" : undefined}
+			aria-expanded={list ? list.open : undefined}
+			data-open={list?.open ? "true" : undefined}
+			data-tip={list && inFront() ? "Canvases" : titleOf(tab)}
+			aria-label={`${titleOf(tab)}, a tab`}
+			onClick={() => (list && inFront() ? list.toggle() : showTab(tab.id))}
+		>
+			<Show when={kindOf(tab.kind)}>{(kind) => <Dynamic component={kind().icon} size={16} />}</Show>
+			<span class="v3-canvas-name">{titleOf(tab)}</span>
+		</button>
+	);
+	return (
+		<span class="tab-chip" role="tab" data-tab={tab.id} data-kind={tab.kind} aria-selected={inFront()} data-front={inFront() ? "true" : undefined} data-camera={tab === cameraCanvasTab() ? "true" : undefined}>
+			{tab.kind === "canvas" ? canvasMenu((list) => name(list)) : name()}
+			<Show when={canClose(tab)}>
+				<CloseTab tab={tab} in="chip" />
+			</Show>
+		</span>
+	);
+}
+
+/**
+ * The tabs as a list, opened from a small square with how many are open, as a phone's browser shows
+ * it: every tab a row, with its ✕ at the row's end. What a touch bar has in place of the row, and what a
+ * desktop's bar adds when there are more tabs than it has room for.
+ */
+function TabFold(): JSX.Element {
 	return (
 		<Popover
 			placement="bottom-start"
@@ -40,32 +95,23 @@ function TabFold(props: { /** Name the tab in front beside the count: where the 
 			trigger={(popover) => {
 				toggleList = popover.toggle;
 				return (
-				<button type="button" class="tab-chip tab-fold" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-front={onCanvas() ? undefined : "true"} data-tip="Tabs" aria-label={`${others().length + 1} tabs open`} onClick={popover.toggle}>
-					<span class="tab-fold-count">{others().length + (props.all ? 1 : 0)}</span>
-					{/* Which of them is in front, where the bar has room to say: its mark and its name. */}
-					<Show when={props.named && !onCanvas()}>
-						<Show when={kindOf(front().kind)}>{(kind) => <Dynamic component={kind().icon} size={16} />}</Show>
-						<span class="v3-canvas-name">{titleOf(front())}</span>
-					</Show>
-				</button>
+					<button type="button" class="tab-chip tab-fold" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip="All tabs" aria-label={`${tabs().length} tabs open`} onClick={popover.toggle}>
+						<span class="tab-fold-count">{tabs().length}</span>
+					</button>
 				);
 			}}
 		>
-			{/* The canvas the chat's camera is on, first: where the others are opened from. */}
-			<button type="button" role="menuitem" data-row data-flat="true" class="tab-row" data-kind="canvas" data-current={onCanvas() ? "true" : undefined} onClick={() => showTab(cameraCanvasTab().id)}>
-				<Dynamic component={kindOf("canvas")!.icon} size={15} />
-				<span class="row-label min-w-0 flex-1 truncate">{canvasOnScreen()?.title ?? "No canvas"}</span>
-			</button>
-			<For each={others()}>
+			<For each={tabs()}>
 				{(tab) => (
-					<div class="tab-row-line">
-						<button type="button" role="menuitem" data-row data-flat="true" class="tab-row" data-tab={tab.id} data-kind={tab.kind} data-current={front().id === tab.id ? "true" : undefined} onClick={() => showTab(tab.id)}>
+					/* The row and its ✕ in one box (`.row-act`, `kit/chrome.css`): the wash is the box's, so it is under both. */
+					<div class="row-act">
+						<button type="button" role="menuitem" data-row data-flat="true" class="tab-row min-w-0 flex-1" data-tab={tab.id} data-kind={tab.kind} data-current={front().id === tab.id ? "true" : undefined} onClick={() => showTab(tab.id)}>
 							<Show when={kindOf(tab.kind)}>{(kind) => <Dynamic component={kind().icon} size={15} />}</Show>
 							<span class="row-label min-w-0 flex-1 truncate">{titleOf(tab)}</span>
 						</button>
-						<button type="button" class="tab-chip-close" aria-label={`Close ${titleOf(tab)}`} onClick={() => closeTab(tab.id)}>
-							<Icon of={X} size={13} />
-						</button>
+						<Show when={canClose(tab)}>
+							<CloseTab tab={tab} in="list" />
+						</Show>
 					</div>
 				)}
 			</For>
@@ -74,38 +120,29 @@ function TabFold(props: { /** Name the tab in front beside the count: where the 
 }
 
 /**
- * The row of tabs in the top bar, after the canvas chip (which the bar draws: the canvas the camera
- * of the chat on screen is on, which opens the canvas list): each other tab with its kind's mark, its
- * name and a ✕, and the + that opens one. A press puts that chat's camera on the tab; a canvas tab
- * moves it to that canvas. Nothing here changes where an agent's calls act.
+ * The row of tabs in the top bar: every tab the same, in the order they were opened, the one in
+ * front washed, then the + that opens one. With more tabs than the bar has room for, the row shows
+ * the first of them, the one in front always among them, and a count lists them all. A touch bar
+ * shows no row: its own chip names the tab in front (`shell/TopBar.tsx`), and the count lists them.
+ * A press puts the camera of the chat on screen on the tab; a canvas tab moves it to that canvas.
+ * Nothing here changes where an agent's calls act.
  */
-export function TabStrip(props: { /** How many chips the bar has room for: with more tabs than that, the row folds into one chip that lists them. */ room: number; /** A phone's or a tablet's bar: the tabs are always the one count, and the bar's own chip names the tab in front. */ touch: boolean }): JSX.Element {
-	// The canvas the chat's camera is on is the bar's own chip (`shell/TopBar.tsx`); these are the others.
-	const others = () => tabs().filter((tab) => tab !== cameraCanvasTab());
-	const folded = () => props.touch || others().length > props.room;
+export function TabStrip(props: { /** How many tabs the bar has room for beside the first. */ room: number; /** A phone's or a tablet's bar: the tabs are the one count, and the bar's own chip names the tab in front. */ touch: boolean }): JSX.Element {
+	const over = () => tabs().length > props.room + 1;
+	const shown = (): Tab[] => {
+		if (props.touch) return [];
+		if (!over()) return tabs();
+		// The count takes a tab's room. The tab in front is always in the row: in the last place when it is not among the first.
+		const first = tabs().slice(0, Math.max(1, props.room));
+		return first.includes(front()) ? first : [...first.slice(0, -1), front()];
+	};
 	return (
 		<>
-			<Show when={folded() && others().length > 0}>
-				<TabFold named={!props.touch} all={props.touch} />
+			<For each={shown()}>{(tab) => <TabChip tab={tab} />}</For>
+			<Show when={props.touch ? tabs().length > 1 : over()}>
+				<TabFold />
 			</Show>
-			<For each={folded() ? [] : others()}>
-				{(tab) => {
-					const kind = () => kindOf(tab.kind);
-					const title = () => kind()?.title(tab) ?? tab.target ?? "";
-					return (
-						<span class="tab-chip" role="tab" data-tab={tab.id} data-kind={tab.kind} aria-selected={front().id === tab.id} data-front={front().id === tab.id ? "true" : undefined}>
-							<button type="button" class="tab-chip-name" data-tip={title()} aria-label={`${title()}, a tab`} onClick={() => showTab(tab.id)}>
-								<Show when={kind()}>{(shown) => <Dynamic component={shown().icon} size={16} />}</Show>
-								<span class="v3-canvas-name">{title()}</span>
-							</button>
-							<button type="button" class="tab-chip-close" aria-label={`Close ${title()}`} data-tip="Close the tab" onClick={() => closeTab(tab.id)}>
-								<Icon of={X} size={13} />
-							</button>
-						</span>
-					);
-				}}
-			</For>
-			{/* The +: the canvases, to open one as a tab and keep the one the camera leaves, where the canvas chip's list only goes to one; and after them what the other kinds offer (`OpenMore.tsx`). */}
+			{/* The +: the canvases, to open one as a tab and keep the one the camera leaves, where the list a canvas tab in front opens only takes that tab to one; and after them what the other kinds offer (`OpenMore.tsx`). */}
 			<CanvasSwitcher
 				stages={stages()}
 				here={canvasOnScreen()?.name}
