@@ -3,12 +3,10 @@ import type { Camera } from "@decks/protocol";
 import { untrack } from "solid-js";
 import type { EditorState } from "../../view/types.ts";
 import { insets } from "../../camera/insets.ts";
+import { awaitHello, renewPass, sendStart } from "@decks/frame";
 import { PROTOCOL, peer, type PageEnd, type Start } from "../protocol.ts";
 import { type CanvasPass, type FramedEditorOptions, } from "./host.tsx";
 import { FRAME_VIEWS } from "./stores.ts";
-
-/** How long after a failed renewal it is asked for again. */
-const RETRY_MS = 30_000;
 
 /** What `createStart` reads of `createFramedEditor` (`host.tsx`), each read when it is used. */
 export interface StartNeeds {
@@ -32,25 +30,7 @@ export function createStart(d: StartNeeds) {
 	 * gets everything it begins with. Answers how to stop waiting, for a canvas left before it started.
 	 */
 	const startFrame = (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean): (() => void) => {
-		let said = false;
-		let pass: CanvasPass | undefined;
-		const onHello = (event: MessageEvent) => {
-			if (event.source !== frame.contentWindow || event.data?.t !== "hello") return;
-			removeEventListener("message", onHello);
-			said = true;
-			if (pass) begin(pass);
-		};
-		addEventListener("message", onHello);
-		void d.options.frame.pass(canvas).then(
-			(got) => {
-				if (cancelled()) return;
-				pass = got;
-				if (said) begin(got);
-			},
-			(error: unknown) => console.error(error),
-		);
 		const begin = (pass: CanvasPass) => {
-			if (cancelled()) return;
 			const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
 			const pen = untrack(() => d.state?.pen?.());
 			const stored: Record<string, string> = {};
@@ -86,57 +66,13 @@ export function createStart(d: StartNeeds) {
 			d.fromFrame = selected ? { selected } : {};
 			d.wire(page, canvas);
 			d.setEnd(page);
-			renew(page, canvas, pass.expires, cancelled);
-			// To this frame's window alone: a sandboxed page has no origin to name, so "*", and the port beside it.
-			// A plain copy: the pages come from the host's store, whose proxies the structured clone refuses.
+			// The canvas pass, kept current for as long as the frame is there (`renewPass`): the frame takes the new one for its calls, and the new addresses for its files and pictures.
+			renewPass({ pass: () => d.options.frame.pass(canvas), expires: pass.expires, cancelled, renewed: (next) => page.emit("token", { token: next.token, files: { base: next.files, expires: next.expires }, pictures: next.pictures }) });
 			// The camera as it is now: the page may have landed while the frame was loading.
-			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify({ ...start, camera: d.localCamera, ...(selected ? { selected } : {}) })) as Start }, "*", [channel.port2]);
+			sendStart<Start>(frame, { ...start, camera: d.localCamera, ...(selected ? { selected } : {}) } as Start, channel.port2);
 		};
-		return () => removeEventListener("message", onHello);
-	};
-
-	/**
-	 * The canvas pass, asked for again unseen at half its life, for as long as the frame is there; and
-	 * at once when the tab is shown again past that, since a hidden tab's timers are held back. One
-	 * that fails is asked for again in thirty seconds. The frame takes the new pass for its calls and
-	 * the new addresses for its files and pictures (`token`); what it already loaded stays loaded.
-	 */
-	const renew = (page: PageEnd, canvas: string, firstExpires: number, cancelled: () => boolean) => {
-		let expires = firstExpires;
-		let since = Date.now();
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		let asking = false;
-		const due = () => since + (expires - since) / 2;
-		const schedule = (ms: number) => {
-			clearTimeout(timer);
-			timer = setTimeout(ask, Math.max(1000, ms));
-		};
-		const stop = () => {
-			clearTimeout(timer);
-			if (typeof document !== "undefined") document.removeEventListener("visibilitychange", shown);
-		};
-		const ask = () => {
-			if (cancelled()) return stop();
-			if (asking) return;
-			asking = true;
-			d.options.frame
-				.pass(canvas)
-				.then((next) => {
-					if (cancelled()) return stop();
-					since = Date.now();
-					expires = next.expires;
-					page.emit("token", { token: next.token, files: { base: next.files, expires: next.expires }, pictures: next.pictures });
-					schedule(due() - Date.now());
-				})
-				.catch(() => schedule(RETRY_MS))
-				.finally(() => (asking = false));
-		};
-		schedule(due() - Date.now());
-		function shown() {
-			if (cancelled()) return stop();
-			if (typeof document !== "undefined" && document.visibilityState === "visible" && Date.now() >= due()) ask();
-		}
-		if (typeof document !== "undefined") document.addEventListener("visibilitychange", shown);
+		// The frame's hello and its pass, as for every frame (`@decks/frame`); then what a canvas starts from.
+		return awaitHello(frame, { pass: () => d.options.frame.pass(canvas), cancelled, begin });
 	};
 
 	return {

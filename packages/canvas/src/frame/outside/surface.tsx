@@ -1,3 +1,4 @@
+import { ALLOW, SANDBOX } from "@decks/frame";
 import type { Accessor, Setter } from "solid-js";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { type PageEnd } from "../protocol.ts";
@@ -86,14 +87,9 @@ export function createSurface(d: SurfaceNeeds) {
 							}}
 							class="canvas-frame"
 							title="Canvas"
-							/*
-							 * For the apps inside it (`AppSurface`), which can have no more than this frame has: what asks for no prompt and
-							 * reaches nothing of Decks's (a popup stays sandboxed; autoplay lets a film play with sound after a click on the page).
-							 * Never allow-same-origin, allow-popups-to-escape-sandbox, allow-top-navigation or payment and passkeys: an app is
-							 * served from Decks's own address, so each would hand it Decks's page or your login.
-							 */
-							sandbox="allow-scripts allow-downloads allow-forms allow-modals allow-popups allow-pointer-lock allow-top-navigation-to-custom-protocols"
-							allow="clipboard-read; clipboard-write; fullscreen; autoplay; picture-in-picture; screen-wake-lock; web-share; gamepad; encrypted-media; accelerometer; gyroscope; xr-spatial-tracking"
+							/* What every frame may do, and why no more (`@decks/frame`, `sandbox.ts`): the apps inside this one can have no more than it has. */
+							sandbox={SANDBOX}
+							allow={ALLOW}
 							src={frameAddress()}
 							style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }}
 						/>

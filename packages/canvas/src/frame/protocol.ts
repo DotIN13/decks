@@ -1,10 +1,10 @@
 import type { Page, Camera } from "@decks/protocol";
 import type { PenTool } from "../edit/pen-tools.ts";
 import type { Insets } from "../camera/insets.ts";
-import type { Peer } from "@decks/frame";
+import type { Peer, StartMessage as FrameStartMessage } from "@decks/frame";
 
-// The port the two talk on, and a call's refusal, are every frame's (`@decks/frame`); what is said on it here is the canvas's.
-export { CallRefused, peer } from "@decks/frame";
+// The first words, the port the two talk on and a call's refusal are every frame's (`@decks/frame`); what is said on the port here is the canvas's.
+export { CallRefused, peer, PROTOCOL, type Hello } from "@decks/frame";
 
 /**
  * The canvas frame: the canvas, its engine and every card on it, in one sandboxed page of its own,
@@ -21,19 +21,9 @@ export { CallRefused, peer } from "@decks/frame";
  * The two talk on one `MessagePort`. The frame says `hello` to its parent once; the page answers on
  * that window alone with `start` and the port, and after that no window message is read again.
  */
-export const PROTOCOL = 1;
 
-/** The frame's first word to its parent, the only window message it sends. */
-export interface Hello {
-	t: "hello";
-	protocol: number;
-}
-
-/** The page's answer, with the port transferred beside it. */
-export interface StartMessage {
-	t: "start";
-	start: Start;
-}
+/** The page's answer to the frame's hello (`@decks/frame`), with what a canvas starts from. */
+export type StartMessage = FrameStartMessage<Start>;
 
 /** Everything the frame starts from: what was a host's options, as data. */
 export interface Start {

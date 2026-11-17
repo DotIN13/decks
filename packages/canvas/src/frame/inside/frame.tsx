@@ -6,10 +6,10 @@ import type { Editor } from "../../view/types.ts";
 import type { FrameChromeView } from "../chrome.ts";
 import { openFrame } from "./boot.ts";
 import { createOthersLayer } from "./others-layer.tsx";
-import { endLife } from "./life.ts";
 import { editorOptions, installHost } from "./options.ts";
 import { wireFrame } from "./events.ts";
-import { PROTOCOL, peer, type FrameEnd, type Hello, type Start, type StartMessage } from "../protocol.ts";
+import { bootGuest } from "@decks/frame";
+import { peer, type FrameEnd, type Start } from "../protocol.ts";
 import { forgetMissing } from "../../base/missing.ts";
 
 /**
@@ -25,43 +25,22 @@ import { forgetMissing } from "../../base/missing.ts";
  * (`options.ts`), and what the frame hears from the harness, the page and the window (`events.ts`).
  */
 export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView } = {}): void {
-	const parent = window.parent;
-	if (parent === window) throw new Error("The canvas frame runs inside the app's page.");
 	// The canvas's own styles are scoped to it (`canvas.css`, `.decks-canvas`), as the editor's root is.
 	root.classList.add("decks-canvas");
-	/** The canvas running now, as the way to stop it once it has started. */
-	let running: Promise<(() => void) | undefined> = Promise.resolve(undefined);
-	const onStart = (event: MessageEvent<StartMessage>) => {
-		// Only the parent's answer, with its port: nothing else is read, then or later.
-		if (event.source !== parent || event.data?.t !== "start" || !event.ports[0]) return;
-		removeEventListener("message", onStart);
-		running = run(root, event.data.start, peer(event.ports[0]) as FrameEnd, options.chrome).catch((error: unknown) => {
-			console.error(error);
-			return undefined;
-		});
-	};
 	/*
-	 * The page moves this frame to another of your canvases in place (`reset`), rather than making a new
-	 * frame: what this canvas started goes (its editor and engine, its cards, its line, its listeners,
-	 * `life.ts`), and the frame says hello again for the next one, keeping what it loaded (its code, the
-	 * engine's compiled module). Once the canvas running now has started, so nothing of it is left half
-	 * made. Only from the parent; the page decides when, and makes a new frame for a friend's canvas.
+	 * Begun as every frame is (`@decks/frame`, `bootGuest`): hello, the page's start and the port. The page
+	 * moves this frame to another of your canvases in place (`reset`), rather than making a new frame:
+	 * what this canvas started goes (its editor and engine, its cards, its line, its listeners), and the
+	 * frame says hello again for the next one, keeping what it loaded (its code, the engine's compiled
+	 * module). The page decides when, and makes a new frame for a friend's canvas.
 	 */
-	addEventListener("message", (event) => {
-		if (event.source !== parent || (event.data as { t?: string } | null)?.t !== "reset") return;
-		removeEventListener("message", onStart);
-		running = running.then((stop) => {
-			stop?.();
-			endLife();
+	bootGuest<Start>({
+		run: (start, port) => run(root, start, peer(port) as FrameEnd, options.chrome),
+		cleared: () => {
 			forgetMissing();
 			root.replaceChildren();
-			addEventListener("message", onStart);
-			parent.postMessage({ t: "hello", protocol: PROTOCOL } satisfies Hello, "*");
-			return undefined;
-		});
+		},
 	});
-	addEventListener("message", onStart);
-	parent.postMessage({ t: "hello", protocol: PROTOCOL } satisfies Hello, "*");
 }
 
 /** Run one canvas in the frame, and answer how to stop it: its editor, its views and what they made. */
