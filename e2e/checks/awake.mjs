@@ -275,7 +275,7 @@ const under = await canvas.evaluate(({ x, y }) => {
 	return { at: { x, y }, under: `${el?.tagName}.${el?.className?.toString().slice(0, 40)}`, node: node && { path: node.dataset.path, inert: node.dataset.inert, rect: [r.x, r.y, r.width, r.height].map(Math.round) }, selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path) };
 }, clickAt);
 say("…selected, its window takes the pointer", !!after && after.includes("auto"), `${JSON.stringify(after ?? (await takes()))} ${JSON.stringify(under)} box ${JSON.stringify(box)} after move ${JSON.stringify(moved)}`);
-// --- the pill's New tab opens the item in a tab, through the page: the frame's sandbox allows no popup ---------
+// --- the pill's New tab opens the item in a tab, through the page: the frame says what it opens -----------------
 at("pill new tab");
 {
 	// Centred on the card first: it is off the screen after the app's section.
@@ -296,13 +296,16 @@ at("pill new tab");
 	const pill = await until(async () => ((await canvas.locator('.card-callout a[aria-label="New tab"]').count()) > 0 ? true : undefined), 5000);
 	say("a press on a card shows its pill with New tab", !!pill);
 	if (pill) {
-		const opened = context.waitForEvent("page", { timeout: 6000 }).catch(() => undefined);
 		// Pressed as an element: the pill moves with the camera's settling, and Playwright waits for it to hold still.
 		const pressed = await canvas.locator('.card-callout a[aria-label="New tab"]').first().evaluate((el) => (el.click(), true), undefined, { timeout: 5000 }).catch((error) => String(error.message).slice(0, 80));
 		say("…its New tab is pressed", pressed === true, String(pressed));
-		const tab = await opened;
-		say("…and New tab opens the card in a tab of its own", !!tab && /awake-000/.test(tab.url()), tab ? tab.url().slice(0, 100) : "no page opened");
-		await tab?.close().catch(() => {});
+		// The page has tabs of its own (`tabs/`): the card opens whole in one, in a frame of its own (`tab-card.mjs` has the rest).
+		const chip = page.locator('.tab-chip[data-kind="card"]');
+		const tab = await until(async () => ((await chip.count()) === 1 && (await page.locator('.surface[data-surface="card"] iframe.card-frame').count()) === 1 ? true : undefined), 6000);
+		say("…and New tab opens the card in a tab of its own", !!tab, tab ? "" : "no tab opened");
+		// Closed again: the canvas is back as it was, for what follows.
+		await chip.locator(".tab-chip-close").click().catch(() => {});
+		await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined), 4000);
 	}
 }
 
