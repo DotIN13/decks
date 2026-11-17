@@ -4,16 +4,15 @@ import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
 import { touchedBy } from "./marks.ts";
 import { dismissMenus } from "@decks/ui";
-import type { Page, Camera, StageCall } from "@decks/protocol";
+import type { Camera } from "@decks/protocol";
 import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
-import { runViewCall } from "../../camera/view-ops.ts";
-import { cardShot } from "../../items/card-surface.tsx";
-import { handsOn } from "../../camera/touched.ts";
 import { drawingFollower } from "./backend.ts";
 import { installClipboard, sayer } from "./clipboard.ts";
 import type { FrameContext } from "./boot.ts";
 import type { CardSlot } from "../protocol.ts";
+import { followLine } from "./follow-line.ts";
+import { createViewCalls } from "./view-calls.ts";
 
 /**
  * What the frame hears, once its editor is made: the clipboard, the drawing as the harness or Studio
@@ -104,128 +103,29 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	// The card the page had selected on this canvas when the frame was made again (an agent switch and back).
 	selectCard(start.selected, true);
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
-	/*
-	 * An agent's `decks view …` on this canvas, from the stream: carried out as the page carries it out
-	 * for a canvas it holds (`view-ops.ts`), and answered to the harness.
-	 */
-	const viewCall = (call: StageCall) => {
-		if (call.op === "shot") return void shootCard(call);
-		let value: unknown;
-		try {
-			value = runViewCall(call, {
-				boards: () => untrack(pages) as Page[],
-				viewport: () => ({ width: innerWidth, height: innerHeight }),
-				focused: () => untrack(agent),
-				canvasOnScreen: () => start.canvas.name,
-				setCamera: (to, options) => moveTo(to, options?.animate),
-				handsOn,
-				offerView: (from, to, selected, what) => ctx.setOffer({ agent: from, what, go: () => {
-					moveTo(to, true);
-					selectCard(selected);
-					ctx.setOffer(undefined);
-				} }),
-				// An agent on screen moving to another canvas while the person is using this one: the page moves it when they press Go.
-				offerGoto: (from, canvas) => ctx.setOffer({ agent: from, what: "canvas", go: () => {
-					end.emit("goto", { agent: from, canvas });
-					ctx.setOffer(undefined);
-				} }),
-				// Kept by the page with the views it parks (`camera/landing.ts`): it arrives when that chat opens.
-				rememberView: (id, to, selected) => end.emit("camera", { camera: to, agent: id, ...(selected ? { selected } : {}) }),
-				select: selectCard,
-				reload: (path) => handle.reloadCard(path),
-				cursor: (at) => {
-					if (!at) {
-						ctx.setCursor(null);
-						return true;
-					}
-					// The card by its path as the canvas has it, or by its end (a path given from the canvas's own folder).
-					const page = untrack(pages).find((one) => one.path === at.path) ?? untrack(pages).find((one) => at.path.endsWith(one.path) || one.path.endsWith(at.path));
-					if (!page) return false;
-					ctx.setCursor({ ...at, path: page.path });
-					return true;
-				},
-			});
-		} catch (error) {
-			value = { error: error instanceof Error ? error.message : String(error) };
-		}
-		backend.answer(call.id, value);
-	};
-	/*
-	 * A card as the person has it now, for an agent's `decks canvas screenshot` of it (`stage.call` op
-	 * `shot`): its live root written out (`card-snapshot.ts`) and drawn by the harness's Chrome, so the
-	 * picture has what they typed, scrolled and drew in it. `none` when the card is not mounted here, and
-	 * the harness takes its own picture from the file.
-	 */
-	const NONE_AFTER = 1500;
-	const shootCard = async (call: StageCall) => {
-		const path = (call.args as { path?: unknown } | undefined)?.path;
-		let value: unknown;
-		try {
-			const shot = typeof path === "string" ? cardShot(path) : undefined;
-			if (typeof path !== "string" || !shot) {
-				/*
-				 * Said a moment later: the first answer is the one taken, and another tab showing this canvas
-				 * may have the card awake.
-				 */
-				await new Promise((done) => setTimeout(done, NONE_AFTER));
-				value = { how: "none", why: "the card is not awake on the person's canvas" };
-			} else {
-				const drawn = await backend.snapshot(path, shot);
-				value = "data" in drawn ? { how: "snapshot", ...drawn } : { how: "none", why: drawn.why };
-			}
-		} catch (error) {
-			value = { how: "none", why: error instanceof Error ? error.message : String(error) };
-		}
-		backend.answer(call.id, value);
-	};
-	// On Studio: the drawing as Studio's revisions change it, kept in step as Studio's own page keeps it.
-	if (studio)
-		studio.follow(
-			(doc) => {
-				handle.setDocument(serialize(doc));
-				changed();
-			},
-			() => handle.document(),
-			first.rev,
-			(message) => void ctx.presence?.hear(message),
-		);
-	else backend.follow((message) => {
-		if (message.type === "view.called") return viewCall(message.call);
-		if (message.type === "presence.changed") return void ctx.presence?.hear(message);
-		// An agent at work on a card: its cursor and outline, from the card's place on the drawing. What it
-		// draws on the canvas is marked from the drawing's own change instead (`edits` above).
-		if (message.type === "agent.act") {
-			if (message.what === "draw") return;
-			const page = untrack(pages).find((one) => one.path === message.path) ?? untrack(pages).find((one) => message.path.endsWith(one.path) || one.path.endsWith(message.path));
-			let id: string | undefined;
-			try {
-				id = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path && page?.path.endsWith(one.metadata.path))?.id;
-			} catch {
-				id = undefined;
-			}
-			ctx.presence?.act(message, page ? { id, x: page.x, y: page.y } : undefined);
-			return;
-		}
-		if (message.type.startsWith("doc.")) return ctx.hearDoc(message);
-		// An app's state changed: its windows hear it (`apps.watch`), and nothing asks the harness again.
-		if (message.type === "app.changed") {
-			for (const listener of ctx.appWatchers.get(message.name) ?? []) listener({ ...(message.title ? { title: message.title } : {}), status: message.status });
-			return;
-		}
-		// A card's file changed: its record taken, its place kept, as the drawing says it.
-		if (message.type === "card.changed") {
-			if (message.removed || !message.card) return;
-			const record = message.card;
-			/*
-			 * A change of its size alone keeps the surface showing it: the record says so (`sized`), and a later
-			 * change of its words clears it. The same revision said again (the file watcher's word after the
-			 * writer's) is no new change, so what the first message said of it stands.
-			 */
-			setPages(untrack(pages).map((page) => (page.path === record.path ? { ...record, x: page.x, y: page.y, w: page.w, h: page.h, trust: page.trust, ...(message.sized || (page.sized && page.rev === record.rev) ? { sized: true as const } : {}) } : page)));
-			return;
-		}
-		follower.hear(message);
-	}, () => follower.rev());
+	const { viewCall } = createViewCalls({
+		pages,
+		agent,
+		start,
+		moveTo,
+		ctx,
+		selectCard,
+		end,
+		handle,
+		backend,
+	});
+	followLine({
+		studio,
+		handle,
+		changed,
+		first,
+		ctx,
+		backend,
+		viewCall,
+		pages,
+		setPages,
+		follower,
+	});
 	end.on("reload", (data) => handle.reloadCard(data.path));
 	end.on("look", (data) => {
 		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);

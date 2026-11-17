@@ -1,25 +1,14 @@
 import type { Camera } from "@decks/protocol";
-import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
-import { dismissMenus } from "@decks/ui";
+import { createSignal, onCleanup, untrack, type JSX } from "solid-js";
 import type { EditorState, CanvasComment } from "../../view/types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
 import type { InkTool } from "../../ink/ink.ts";
-import { insets } from "../../camera/insets.ts";
-import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../protocol.ts";
+import { type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect } from "../protocol.ts";
+import { createSurface } from "./surface.tsx";
+import { createSync } from "./sync.ts";
+import { createWire } from "./wire.ts";
+import { createStart } from "./start.ts";
 
-/**
- * The frame's address, with the page's measuring parameters passed on: the frame probe (`?probe=<collector>`,
- * the app's `perf/probe.ts`) and its companions, and the device, engine, picture and card-picture overrides (`render/device.ts`,
- * `stage/items-layer.tsx`), run in the frame, where the stage is.
- */
-const PASSED_ON = ["probe", "handlers", "autopilot", "pictures-per-frame", "picture-mb", "skip-levels", "device", "pictures", "card-pictures", "engine", "tiles"];
-const frameAddress = (): string => {
-	const page = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
-	const passed = new URLSearchParams();
-	for (const name of PASSED_ON) if (page.has(name)) passed.set(name, page.get(name)!);
-	const query = passed.toString();
-	return query ? `/canvas-frame.html?${query}` : "/canvas-frame.html";
-};
 
 /** What the page answers for its frame beyond the editor's own options. */
 export interface FrameHostOptions {
@@ -80,8 +69,6 @@ export interface CanvasPass {
 	imports?: Record<string, string>;
 }
 
-/** How long after a failed renewal it is asked for again. */
-const RETRY_MS = 30_000;
 
 /** What a page gives `createFramedEditor`: how the canvas looks, the page's state kept in step with it, and what it hears from it. */
 export interface FramedEditorOptions {
@@ -243,389 +230,85 @@ export function createFramedEditor(options: Options): FramedEditor {
 		});
 	}
 
-	/**
-	 * Start the frame on a canvas: its hello is listened for at once (a frame moved in place says it
-	 * again soon after its `reset`), and the pass is asked for beside it; once both are here, the frame
-	 * gets everything it begins with. Answers how to stop waiting, for a canvas left before it started.
-	 */
-	const startFrame = (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean): (() => void) => {
-		let said = false;
-		let pass: CanvasPass | undefined;
-		const onHello = (event: MessageEvent) => {
-			if (event.source !== frame.contentWindow || event.data?.t !== "hello") return;
-			removeEventListener("message", onHello);
-			said = true;
-			if (pass) begin(pass);
-		};
-		addEventListener("message", onHello);
-		void options.frame.pass(canvas).then(
-			(got) => {
-				if (cancelled()) return;
-				pass = got;
-				if (said) begin(got);
-			},
-			(error: unknown) => console.error(error),
-		);
-		const begin = (pass: CanvasPass) => {
-			if (cancelled()) return;
-			const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
-			const pen = untrack(() => state?.pen?.());
-			const stored: Record<string, string> = {};
-			if (storage) {
-				const prefix = storeKey(canvas);
-				for (let i = 0; i < (storage as Storage).length; i++) {
-					const key = (storage as Storage).key(i);
-					if (key?.startsWith(prefix)) stored[key.slice(prefix.length)] = storage.getItem(key) ?? "";
-				}
-				// A harness's frame keeps no view of its own any more (the page keeps one per agent and canvas): what one kept is dropped.
-				if (backend.kind !== "studio" && FRAME_VIEWS in stored) {
-					delete stored[FRAME_VIEWS];
-					storage.removeItem(prefix + FRAME_VIEWS);
-				}
-			}
-			const start: Start = {
-				protocol: PROTOCOL,
-				canvas: { name: canvas, role: options.frame.role?.(canvas) ?? "owner" },
-				backend,
-				files: { base: pass.files, expires: pass.expires },
-				pictures: pass.pictures,
-				...(pass.imports ? { imports: pass.imports } : {}),
-				look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(options.onComment ? { pageComments: true } : {}), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
-				camera: localCamera,
-				...(pen?.writer ? { writer: pen.writer } : {}),
-				stored,
-				appStored: appStoredNow(),
-			};
-			const channel = new MessageChannel();
-			const page = peer(channel.port1) as PageEnd;
-			// A new frame has said nothing yet, and starts with the page's selection (`start.selected`), so it is not sent again.
-			const selected = untrack(() => state?.selected?.[0]());
-			fromFrame = selected ? { selected } : {};
-			wire(page, canvas);
-			setEnd(page);
-			renew(page, canvas, pass.expires, cancelled);
-			// To this frame's window alone: a sandboxed page has no origin to name, so "*", and the port beside it.
-			// A plain copy: the pages come from the host's store, whose proxies the structured clone refuses.
-			// The camera as it is now: the page may have landed while the frame was loading.
-			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify({ ...start, camera: localCamera, ...(selected ? { selected } : {}) })) as Start }, "*", [channel.port2]);
-		};
-		return () => removeEventListener("message", onHello);
-	};
+	const { startFrame } = createStart({
+		options,
+		state,
+		storage,
+		storeKey,
+		FRAME_VIEWS,
+		get darkNow() {
+			return darkNow;
+		},
+		get modeNow() {
+			return modeNow;
+		},
+		get localCamera() {
+			return localCamera;
+		},
+		appStoredNow,
+		get fromFrame() {
+			return fromFrame;
+		},
+		set fromFrame(next) {
+			fromFrame = next;
+		},
+		get wire() {
+			return wire;
+		},
+		setEnd,
+	});
 
-	/**
-	 * The canvas pass, asked for again unseen at half its life, for as long as the frame is there; and
-	 * at once when the tab is shown again past that, since a hidden tab's timers are held back. One
-	 * that fails is asked for again in thirty seconds. The frame takes the new pass for its calls and
-	 * the new addresses for its files and pictures (`token`); what it already loaded stays loaded.
-	 */
-	const renew = (page: PageEnd, canvas: string, firstExpires: number, cancelled: () => boolean) => {
-		let expires = firstExpires;
-		let since = Date.now();
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		let asking = false;
-		const due = () => since + (expires - since) / 2;
-		const schedule = (ms: number) => {
-			clearTimeout(timer);
-			timer = setTimeout(ask, Math.max(1000, ms));
-		};
-		const stop = () => {
-			clearTimeout(timer);
-			if (typeof document !== "undefined") document.removeEventListener("visibilitychange", shown);
-		};
-		const ask = () => {
-			if (cancelled()) return stop();
-			if (asking) return;
-			asking = true;
-			options.frame
-				.pass(canvas)
-				.then((next) => {
-					if (cancelled()) return stop();
-					since = Date.now();
-					expires = next.expires;
-					page.emit("token", { token: next.token, files: { base: next.files, expires: next.expires }, pictures: next.pictures });
-					schedule(due() - Date.now());
-				})
-				.catch(() => schedule(RETRY_MS))
-				.finally(() => (asking = false));
-		};
-		schedule(due() - Date.now());
-		function shown() {
-			if (cancelled()) return stop();
-			if (typeof document !== "undefined" && document.visibilityState === "visible" && Date.now() >= due()) ask();
-		}
-		if (typeof document !== "undefined") document.addEventListener("visibilitychange", shown);
-	};
+	const { wire } = createWire({
+		get fromFrame() {
+			return fromFrame;
+		},
+		state,
+		options,
+		frameInUse,
+		get localCamera() {
+			return localCamera;
+		},
+		set localCamera(next) {
+			localCamera = next;
+		},
+		onPage,
+		storage,
+		APP_STORE,
+		storeKey,
+		frameAt,
+	});
 
-	/** What the frame says, as the host's own callbacks and state. */
-	const wire = (page: PageEnd, canvas: string) => {
-		/*
-		 * Drafts for the composer: shown there, never sent from here. Anything in the frame can say these,
-		 * a card's script too, so what reaches an agent is only what you send yourself.
-		 */
-		page.on("composer", (data) => {
-			const selection = data.selection;
-			if (selection) {
-				if (selection.page !== undefined || selection.ids.length === 0) {
-					fromFrame.selected = selection.page;
-					state?.selected?.[1](selection.page);
-					options.onSelect?.(selection.page);
-				}
-				if (selection.page === undefined) options.onSelection?.(selection.ids);
-			}
-			if (!data.pills && !data.comment && !data.ink) return;
-			// Drafts only while you are using the canvas: it has focus, and you just pressed or typed.
-			if (!frameInUse()) {
-				console.warn("[decks] a draft from the canvas frame was dropped: the canvas was not in use (no focus, or no press or key just now)", Object.keys(data));
-				return;
-			}
-			if (data.pills) options.onRefer?.(data.pills);
-			if (data.comment) options.frame.comment?.(data.comment);
-			if (data.ink) options.frame.ink?.(data.ink);
-		});
-		page.on("panel", (data) => options.frame.panel?.(data.name));
-		page.on("sheet", (data) => options.frame.sheet?.(data.open));
-		page.on("refer", (data) => {
-			const composer = options.frame.composer?.();
-			if (!composer) return;
-			if (data.over) composer.dataset.refer = "true";
-			else delete composer.dataset.refer;
-		});
-		page.on("open-app", (data) => options.frame.openApp?.(data.name));
-		// A press or Escape in the frame: this page's menus go, as on a press here (`@decks/ui` dismiss).
-		page.on("away", () => dismissMenus());
-		// A link the frame may not open: an http(s) address alone, in a tab that cannot reach back to this page.
-		page.on("open-link", (data) => {
-			try {
-				const url = new URL(data.href);
-				if (url.protocol === "http:" || url.protocol === "https:") window.open(url.href, "_blank", "noopener");
-			} catch {
-				/* not an address */
-			}
-		});
-		page.on("goto", (data) => options.frame.moveTo?.(data.agent, data.canvas));
-		page.on("camera", (data) => {
-			if (data.agent) return options.frame.viewFor?.(data.agent, data.camera, data.selected);
-			fromFrame.camera = data.camera;
-			localCamera = data.camera;
-			state?.camera?.[1](data.camera);
-			options.onCamera?.(data.camera);
-		});
-		page.on("viewport", (data) => options.onViewport?.(data));
-		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), ...(data.open ? { open: true } : {}), anchor: () => onPage(data.at) }));
-		page.on("export", (data) => options.onExport?.(data.ids, data.format));
-		page.on("app-store", (data) => {
-			if (!storage || !data.app || data.app.includes(":")) return;
-			const key = `${APP_STORE}${data.app}:${data.key}`;
-			if (data.value === null) storage.removeItem(key);
-			else storage.setItem(key, data.value);
-		});
-		page.on("store", (data) => {
-			if (!storage) return;
-			if (data.value === null) storage.removeItem(storeKey(canvas) + data.key);
-			else storage.setItem(storeKey(canvas) + data.key, data.value);
-		});
-		// A shortcut the canvas did not take, played on this page as if typed here.
-		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
-		page.answer("open", (data) => options.pages?.onOpenLink?.(data.path, data.from) ?? false);
-		page.answer("agent", (data) => {
-			if (!options.frame.agent) throw new CallRefused("This page answers no card's agent calls.", "refused");
-			return options.frame.agent(data);
-		});
-		page.answer("upload", (data) => {
-			if (!options.frame.upload) throw new CallRefused("Files cannot be dropped on this canvas here.", "refused");
-			// The point on this page: where the frame sits, plus where in it they landed.
-			const box = frameAt()?.getBoundingClientRect();
-			const at = { x: (box?.x ?? 0) + data.at.x, y: (box?.y ?? 0) + data.at.y };
-			options.frame.upload({ files: data.files.map((one) => new File([one.bytes], one.name, { type: one.type })), at, ...(data.card ? { card: data.card } : {}) });
-			return true;
-		});
-	};
+	const { keepInStep } = createSync({
+		state,
+		end,
+		options,
+		get localCamera() {
+			return localCamera;
+		},
+		set localCamera(next) {
+			localCamera = next;
+		},
+		get fromFrame() {
+			return fromFrame;
+		},
+		get modeNow() {
+			return modeNow;
+		},
+		set modeNow(next) {
+			modeNow = next;
+		},
+		frameAt,
+	});
 
-	/*
-	 * The host's state, kept in step: the cards and boards, the camera an agent or the app moved, the
-	 * selected board, the mode, the scheme, ink, and what is going on around the canvas.
-	 */
-	const keepInStep = () => {
-		createEffect(
-			on(
-				() => state?.pen?.(),
-				(pen) => {
-					// The drawing is the frame's own to read (`backend.ts`); this page's copy is only for its panels.
-					if (!pen) return;
-					const page = end();
-					if (page && pen.writer) page.emit("busy", { writer: pen.writer });
-				},
-				{ defer: true },
-			),
-		);
-		// The conversation on screen: an agent's view calls move this canvas only for it.
-		createEffect(() => {
-			const page = end();
-			const agent = options.frame.focused?.();
-			if (page && agent) page.emit("look", { agent });
-		});
-		// What of the frame the page's own chrome covers, so the frame's tools sit clear of it and a fit frames into the rest.
-		createEffect(() => {
-			const page = end();
-			const covered = insets();
-			if (page) page.emit("look", { insets: covered });
-		});
-		createEffect(
-			on(
-				() => [state?.camera?.[0](), state?.glide?.()] as const,
-				([camera, glide]) => {
-					if (!camera) return;
-					// Kept with no frame yet too: a frame starting for another canvas opens on the camera it landed on.
-					localCamera = camera;
-					const page = end();
-					if (!page || camera === fromFrame.camera) return;
-					page.emit("camera", { camera, ...(glide ? { glide: glide.ms } : {}) });
-				},
-			),
-		);
-		createEffect(() => {
-			const page = end();
-			const selected = state?.selected?.[0]();
-			if (!page || selected === fromFrame.selected) return;
-			page.emit("select", { ids: [], ...(selected ? { page: selected } : {}) });
-		});
-		createEffect(() => {
-			const page = end();
-			const mode = state?.mode?.[0]();
-			if (!page || !mode || mode === modeNow) return;
-			modeNow = mode;
-			page.emit("look", { mode });
-		});
-		createEffect(() => {
-			const page = end();
-			const inking = state?.inking?.();
-			if (page && inking !== undefined) page.emit("tool", { ink: { on: inking } });
-		});
-		createEffect(() => {
-			const page = end();
-			const dock = options.frame.dock?.();
-			if (page && dock !== undefined) page.emit("look", { dock });
-		});
-		/*
-		 * A press or Escape on this page, which the frame does not hear: its open menus go. A press in the
-		 * frame lands in the frame's document, so every press heard here is outside it.
-		 */
-		createEffect(() => {
-			const page = end();
-			if (!page) return;
-			const press = () => page.emit("away", {});
-			const key = (event: KeyboardEvent) => event.key === "Escape" && page.emit("away", {});
-			window.addEventListener("pointerdown", press, true);
-			window.addEventListener("keydown", key, true);
-			onCleanup(() => {
-				window.removeEventListener("pointerdown", press, true);
-				window.removeEventListener("keydown", key, true);
-			});
-		});
-		/*
-		 * Where the composer is, on the frame's screen: said as the frame starts, as the composer or the
-		 * frame changes size, and each time the pointer comes into the frame, since the composer is moved
-		 * only from the page, by a hand that has to come back to the canvas to drag anything onto it.
-		 */
-		createEffect(() => {
-			const page = end();
-			const frame = frameAt();
-			const composer = page && frame ? options.frame.composer?.() : undefined;
-			if (!page || !frame || !composer) return;
-			const say = () => {
-				const at = frame.getBoundingClientRect();
-				const box = composer.getBoundingClientRect();
-				page.emit("look", { composer: box.width && box.height ? { x: box.x - at.x, y: box.y - at.y, w: box.width, h: box.height } : null });
-			};
-			const sized = new ResizeObserver(say);
-			sized.observe(composer);
-			sized.observe(frame);
-			frame.addEventListener("pointerenter", say);
-			onCleanup(() => {
-				sized.disconnect();
-				frame.removeEventListener("pointerenter", say);
-			});
-		});
-		// Each agent's name and colour, when they change: the frame works out what is new itself.
-		createEffect(() => {
-			const page = end();
-			const agents = options.frame.agents?.();
-			if (page && agents) page.emit("look", { agents });
-		});
-	};
-
-	/**
-	 * The frame for the canvas on screen. Moving to another canvas ends the one it showed (its port, its
-	 * pass's renewals) and either moves the same frame in place (`reset`, both canvases yours alone,
-	 * `inPlace`), which keeps the code and the engine's module it loaded, or makes a new frame.
-	 */
-	const surface = (): JSX.Element => {
-		keepInStep();
-		/** Which frame is made: a new one each time this changes. */
-		const [made, setMade] = createSignal<{ n: number } | undefined>();
-		/** The canvas the frame shows, or is being started on. */
-		let holds: string | undefined;
-		/** Stops the canvas the frame shows now: its start, its port, its renewals. */
-		let leave: (() => void) | undefined;
-		const show = (frame: HTMLIFrameElement, canvas: string) => {
-			leave?.();
-			let cancelled = false;
-			const stopWaiting = startFrame(frame, canvas, () => cancelled);
-			leave = () => {
-				cancelled = true;
-				stopWaiting();
-				end()?.close();
-				setEnd(undefined);
-			};
-		};
-		createEffect(
-			on(
-				() => options.canvasName?.(),
-				(canvas) => {
-					if (canvas === holds) return;
-					const was = holds;
-					holds = canvas;
-					const frame = untrack(frameAt);
-					if (canvas && was && frame && untrack(end) && options.frame.inPlace?.(was, canvas)) {
-						show(frame, canvas);
-						frame.contentWindow?.postMessage({ t: "reset" }, "*");
-						return;
-					}
-					leave?.();
-					leave = undefined;
-					setMade(canvas ? { n: (untrack(made)?.n ?? 0) + 1 } : undefined);
-				},
-			),
-		);
-		onCleanup(() => leave?.());
-		return (
-			<Show when={made()} keyed>
-				{(_made) => {
-					onCleanup(() => setFrameAt(undefined));
-					return (
-						<iframe
-							ref={(frame) => {
-								setFrameAt(frame);
-								if (holds) show(frame, holds);
-							}}
-							class="canvas-frame"
-							title="Canvas"
-							/*
-							 * For the apps inside it (`AppSurface`), which can have no more than this frame has: what asks for no prompt and
-							 * reaches nothing of Decks's (a popup stays sandboxed; autoplay lets a film play with sound after a click on the page).
-							 * Never allow-same-origin, allow-popups-to-escape-sandbox, allow-top-navigation or payment and passkeys: an app is
-							 * served from Decks's own address, so each would hand it Decks's page or your login.
-							 */
-							sandbox="allow-scripts allow-downloads allow-forms allow-modals allow-popups allow-pointer-lock allow-top-navigation-to-custom-protocols"
-							allow="clipboard-read; clipboard-write; fullscreen; autoplay; picture-in-picture; screen-wake-lock; web-share; gamepad; encrypted-media; accelerometer; gyroscope; xr-spatial-tracking"
-							src={frameAddress()}
-							style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }}
-						/>
-					);
-				}}
-			</Show>
-		);
-	};
+	const { surface } = createSurface({
+		keepInStep,
+		startFrame,
+		end,
+		setEnd,
+		options,
+		frameAt,
+		setFrameAt,
+	});
 
 	// The frame follows the drawing itself, from the harness or Studio: nothing of it is passed on from here.
 	const handle: FramedHandle = {
