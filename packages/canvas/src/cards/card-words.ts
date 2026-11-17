@@ -474,3 +474,15 @@ export function writeCard(ed: HTMLElement, lead: string, trail: string): string 
 	});
 	return s.replace(/\s+$/, "") + trail;
 }
+
+/** A block that changes is written from what it now holds; one that does not keeps its source (`writeCard`). */
+export function watchBlocks(ed: HTMLElement, topOf: (n: Node | null) => HTMLElement | undefined): MutationObserver {
+	const watch = new MutationObserver((records) => {
+		for (const record of records) {
+			const top = topOf(record.target === ed ? null : record.target);
+			if (top) top.dataset.dirty = "1";
+		}
+	});
+	watch.observe(ed, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["data-on"] });
+	return watch;
+}

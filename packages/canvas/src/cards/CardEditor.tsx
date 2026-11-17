@@ -1,6 +1,6 @@
 import { onMount } from "solid-js";
 import { ScribbleCatch } from "@decks/ui";
-import { readCard, writeCard, type WordsHost } from "./card-words.ts";
+import { readCard, watchBlocks, writeCard, type WordsHost } from "./card-words.ts";
 import { pictureAddress } from "../base/host.ts";
 import type { CardEditorProps } from "./card-editor-props.ts";
 import { CardBarView } from "./card-bar-view.tsx";
@@ -64,12 +64,7 @@ export function CardEditor(props: CardEditorProps) {
 		while (n && n.parentNode !== ed) n = n.parentNode;
 		return n instanceof HTMLElement ? n : undefined;
 	};
-	const { onInput } = createCardTyping({
-		sel,
-		get ed() { return ed; },
-		topOf,
-		get changed() { return changed; },
-	});
+	const { onInput } = createCardTyping({ sel, topOf, get ed() { return ed; }, get changed() { return changed; } });
 	const cardHistory = createCardHistory({
 		get done() { return done; },
 		serialise,
@@ -113,10 +108,7 @@ export function CardEditor(props: CardEditorProps) {
 		changed,
 	});
 
-	const { onClick, onDblClick } = createCardPresses({
-		changed,
-		get ed() { return ed; },
-	});
+	const { onClick, onDblClick } = createCardPresses({ changed, get ed() { return ed; } });
 
 	const cardDrag = createCardDrag({
 		get wrap() { return wrap; },
@@ -148,14 +140,7 @@ export function CardEditor(props: CardEditorProps) {
 	onMount(() => {
 		document.execCommand("defaultParagraphSeparator", false, "p");
 		build(props.value);
-		// A block that changes is written from what it now holds; one that does not keeps its source.
-		const watch = new MutationObserver((records) => {
-			for (const record of records) {
-				const top = topOf(record.target === ed ? null : record.target);
-				if (top) top.dataset.dirty = "1";
-			}
-		});
-		watch.observe(ed, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["data-on"] });
+		const watch = watchBlocks(ed, topOf);
 		past.push(serialise());
 		followCard({ bar, wrap, closeMenus, placeBar });
 		listenOnPage({ onPointerMove, endDrag, cardBar, showBar, ed, bar, watch, cardHistory });
