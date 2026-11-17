@@ -51,9 +51,9 @@ async function laggedSocket(page) {
 async function boardStaysDropped(page, label, { picture }) {
 	const canvas = await canvasFrame(page);
 	// The server draws the pictures, and a busy machine takes a while: wait for one on screen before looking.
-	if (picture) await canvas.waitForFunction(() => JSON.parse(globalThis.__decksProbes?.rust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
+	if (picture) await canvas.waitForFunction(() => JSON.parse(globalThis.__decksProbes?.rust?.cardLayer.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
 	const candidates = await canvas.evaluate((picture) => {
-		const pictured = new Set(JSON.parse(globalThis.__decksProbes.rust.picturedKey || "[]"));
+		const pictured = new Set(JSON.parse(globalThis.__decksProbes.rust.cardLayer.picturedKey || "[]"));
 		return window.__decksProbes.cards()
 			.filter((one) => {
 				const r = one.rect;
@@ -85,9 +85,9 @@ async function boardStaysDropped(page, label, { picture }) {
 			break;
 		}
 	}
-	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksProbes.rust.camera.zoom, pictured: globalThis.__decksProbes.rust.picturedKey, boards: window.__decksProbes.cards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
+	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksProbes.rust.camera.zoom, pictured: globalThis.__decksProbes.rust.cardLayer.picturedKey, boards: window.__decksProbes.cards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
 	const from = await canvas.evaluate((path) => {
-		const board = globalThis.__decksProbes.rust.placedCards.find((one) => one.path === path);
+		const board = globalThis.__decksProbes.rust.cardLayer.placedCards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	await canvas.evaluate((path) => {
@@ -97,11 +97,11 @@ async function boardStaysDropped(page, label, { picture }) {
 		const sample = () => {
 			const node = document.querySelector(`.card-node[data-path="${CSS.escape(path)}"]`);
 			const box = engine.placedCards.find((one) => one.path === path);
-			const carried = engine.carriedCount > 0;
+			const carried = engine.cardLayer.carriedCount > 0;
 			globalThis.__boardFrames.push({
 				t: performance.now(),
 				node: node ? [node.getBoundingClientRect().x, node.getBoundingClientRect().y] : null,
-				drawn: box ? [box.x + (carried ? engine.carriedBy.dx : 0), box.y + (carried ? engine.carriedBy.dy : 0)] : null,
+				drawn: box ? [box.x + (carried ? engine.cardLayer.carriedBy.dx : 0), box.y + (carried ? engine.cardLayer.carriedBy.dy : 0)] : null,
 			});
 			if (globalThis.__boardSampling) requestAnimationFrame(sample);
 		};
@@ -126,7 +126,7 @@ async function boardStaysDropped(page, label, { picture }) {
 	});
 	const after = frames.filter((f) => f.t > dropAt);
 	const to = await canvas.evaluate((path) => {
-		const board = globalThis.__decksProbes.rust.placedCards.find((one) => one.path === path);
+		const board = globalThis.__decksProbes.rust.cardLayer.placedCards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	say(`${label}: the board moved`, Math.abs(to.x - from.x) > 20 && Math.abs(to.y - from.y) > 10, JSON.stringify({ from, to }));
@@ -146,7 +146,7 @@ async function boardStaysDropped(page, label, { picture }) {
 async function zoomToPictures(page) {
 	const canvas = await canvasFrame(page);
 	for (let i = 0; i < 16; i++) {
-		if (await canvas.evaluate(() => window.__decksProbes.cards().some((one) => JSON.parse(globalThis.__decksProbes.rust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
+		if (await canvas.evaluate(() => window.__decksProbes.cards().some((one) => JSON.parse(globalThis.__decksProbes.rust.cardLayer.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
 		await zoomStep(page, 60);
 		await settle(page, 350);
 	}
@@ -228,11 +228,11 @@ for (let i = 1; i <= 10; i++) {
 	await page.mouse.move(x + i * 10, y + i * 5);
 	await page.waitForTimeout(30);
 }
-const during = await canvas.evaluate(() => [...globalThis.__decksProbes.rust.lifted]);
+const during = await canvas.evaluate(() => [...globalThis.__decksProbes.rust.cardLayer.lifted]);
 say("dragged, the box is lifted", during.includes("lift-a"), JSON.stringify(during));
 const before = await canvas.evaluate(() => globalThis.__decksProbes.rust.placed.get("lift-a").box);
 await page.mouse.up();
-const down = await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes.rust.lifted.size)) === 0, 4000);
+const down = await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes.rust.cardLayer.lifted.size)) === 0, 4000);
 say("dropped, it is put down once the saved drawing has come", down);
 const moved = await canvas.evaluate(() => globalThis.__decksProbes.rust.placed.get("lift-a").box);
 say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.stringify({ before, moved }));

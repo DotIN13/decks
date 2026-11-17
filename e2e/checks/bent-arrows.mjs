@@ -50,13 +50,13 @@ await canvas.evaluate(() => {
 await settle(page, 800);
 
 const step = (dy) => canvas.evaluate((dy) => new Promise((done) => {
-	globalThis.__decksProbes.rust.preview(new Map([["bend-a", { dx: 0, dy }]]));
+	globalThis.__decksProbes.rust.previews.preview(new Map([["bend-a", { dx: 0, dy }]]));
 	requestAnimationFrame(() => done());
 }), dy);
 
 await step(10);
 await settle(page, 600);
-const lifted = await canvas.evaluate(() => [...globalThis.__decksProbes.rust.lifted]);
+const lifted = await canvas.evaluate(() => [...globalThis.__decksProbes.rust.cardLayer.lifted]);
 say("the first step lifts the box and the arrow joined to it", lifted.includes("bend-a") && lifted.includes("bend-ab"), JSON.stringify(lifted));
 
 await canvas.evaluate(() => (globalThis.__tilesPainted = 0));
@@ -82,7 +82,7 @@ const timed = await canvas.evaluate(async () => {
 	let last = performance.now();
 	for (let dy = 310; dy <= 600; dy += 10) {
 		const t0 = performance.now();
-		stage.preview(new Map([["bend-a", { dx: 0, dy }]]));
+		stage.previews.preview(new Map([["bend-a", { dx: 0, dy }]]));
 		costs.push(performance.now() - t0);
 		await new Promise((done) => requestAnimationFrame(() => done()));
 		const now = performance.now();
@@ -94,7 +94,7 @@ const timed = await canvas.evaluate(async () => {
 say("a step takes well under a frame of the main thread, and no frame while it moves runs past two", timed.cost < 4 && timed.gap < 34, `${timed.cost.toFixed(2)} ms a step (worst ${timed.worst.toFixed(1)}), longest frame ${timed.gap.toFixed(1)} ms`);
 
 // Let go without saving: the drawing's own arrow comes back.
-await canvas.evaluate(() => globalThis.__decksProbes.rust.preview(undefined));
+await canvas.evaluate(() => globalThis.__decksProbes.rust.previews.preview(undefined));
 await settle(page, 400);
 const back = await placed("bend-ab");
 say("letting go puts the saved arrow back", back && Math.abs(back.h - routed.h) < 0.5, JSON.stringify(back));
@@ -105,7 +105,7 @@ link.edit(agentId, [{ op: "insert", node: { type: "path", id: "bend-board", geom
 const saved = await until(() => placed("bend-board"));
 say("an arrow from a box to a board is routed by the server", !!saved, JSON.stringify(saved));
 const carry = (path, dy) => canvas.evaluate(([path, dy]) => new Promise((done) => {
-	globalThis.__decksProbes.rust.carry(path ? [path] : [], { dx: 0, dy });
+	globalThis.__decksProbes.rust.cardLayer.carry(path ? [path] : [], { dx: 0, dy });
 	requestAnimationFrame(() => done());
 }), [board.path, dy].map((v, i) => (i === 0 ? (dy === null ? "" : v) : (v ?? 0))));
 // The first step lifts the arrow, which paints the tiles under it once without it.
@@ -117,7 +117,7 @@ for (let dy = 40; dy <= 400; dy += 40) {
 	await carry(board.path, dy);
 	carried.push(await placed("bend-board"));
 }
-const liftedNow = await canvas.evaluate(() => globalThis.__decksProbes.rust.lifted.has("bend-board"));
+const liftedNow = await canvas.evaluate(() => globalThis.__decksProbes.rust.cardLayer.lifted.has("bend-board"));
 say("dragging the board alone lifts the arrow and routes it at every step", liftedNow && carried.every((box, i) => i === 0 || JSON.stringify(box) !== JSON.stringify(carried[i - 1])), JSON.stringify([saved, carried.at(-1)]));
 await settle(page, 600);
 const boardPainted = await canvas.evaluate(() => globalThis.__tilesPainted);

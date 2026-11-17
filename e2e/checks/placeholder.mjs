@@ -165,7 +165,7 @@ const plain = await onCanvas("no-writer");
 say("with no writer the edge is dashed in the accent", plain.accent.band > 400 && plain.accent.turns >= 10, JSON.stringify(plain));
 say("with no writer there is no name tag", plain.accent.tag < 40 && plain.green.band < 40, JSON.stringify(plain));
 
-await canvas.evaluate(() => window.__decksProbes.rust.setWriter({ name: "Atelier", color: "#2eaf5a" }));
+await canvas.evaluate(() => window.__decksProbes.rust.previews.setWriter({ name: "Atelier", color: "#2eaf5a" }));
 await settle(page, 1500);
 const named = await onCanvas("writer");
 say("with a writer the edge is dashed in the writer's colour", named.green.band > 400 && named.green.turns >= 10 && named.accent.band < 40, JSON.stringify(named));

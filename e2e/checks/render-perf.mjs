@@ -358,7 +358,7 @@ if (want("drag")) {
 		let held = true;
 		for (let s = 1; s <= STEPS; s++) {
 			if (s === 6) {
-				held = await canvas.evaluate(() => globalThis.__decksProbes.rust.lifted.size > 0);
+				held = await canvas.evaluate(() => globalThis.__decksProbes.rust.cardLayer.lifted.size > 0);
 				if (!held) break;
 				before = await taskSeconds();
 			}
@@ -367,7 +367,7 @@ if (want("drag")) {
 		}
 		const step = held ? ((await taskSeconds()) - before) * 1000 / (STEPS - 5) : undefined;
 		await page.mouse.up();
-		await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes.rust.lifted.size)) === 0, 5000);
+		await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes.rust.cardLayer.lifted.size)) === 0, 5000);
 		await page.keyboard.press("Escape");
 		await quiet(1000);
 		return step;

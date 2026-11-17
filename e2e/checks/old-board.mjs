@@ -39,7 +39,7 @@ const live = await canvas.evaluate((path) => {
 	return { node: !!node, frames: [...document.querySelectorAll("iframe")].filter((frame) => (frame.src ?? "").includes("old-notes/boards")).length };
 }, SHARED_BOARD);
 say("it runs no page of its own: no card node, no frame", !live.node && live.frames === 0, JSON.stringify(live));
-const held = await canvas.evaluate((path) => window.__decksProbes?.rust?.heldWidth?.get(`card:${path}`) ?? 0, SHARED_BOARD);
+const held = await canvas.evaluate((path) => window.__decksProbes?.rust?.cardPictures.heldWidth?.get(`card:${path}`) ?? 0, SHARED_BOARD);
 say("no picture is asked of it", held === 0, `${held}px wide`);
 
 // Kept: the friend's drawing still holds the item as they wrote it.

@@ -39,7 +39,7 @@ const layouts = async () =>
 		const held = [...engine.placed.values()].map((p) => [p.node.id, r(p.box.x), r(p.box.y), r(p.box.w), r(p.box.h), p.parent ?? null, p.order]);
 		const whole = JSON.parse(engine.page.layout()).map(([id, x, y, w, h, parent, order]) => [id, r(x), r(y), r(w), r(h), parent, order]);
 		const bounds = [...engine.bounds].map(([id, b]) => [id, r(b.x), r(b.y), r(b.w), r(b.h)]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
-		const cards = engine.cards().map((c) => [c.id, c.order, r(c.box.x), r(c.box.y), r(c.box.w), r(c.box.h), c.links.length]);
+		const cards = engine.layout.cards().map((c) => [c.id, c.order, r(c.box.x), r(c.box.y), r(c.box.w), r(c.box.h), c.links.length]);
 		const wholeCards = JSON.parse(engine.page.cards()).map((c) => [c.id, c.order, r(c.box.x), r(c.box.y), r(c.box.w), r(c.box.h), c.links.length]);
 		return { held, whole, bounds, cards, wholeCards, doc: engine.doc };
 	});
@@ -108,11 +108,11 @@ for (let i = 1; i <= 12; i++) {
 	await page.mouse.move(ax + i * 8, ay - i * 6);
 	await page.waitForTimeout(25);
 }
-const lifted = await (await inCanvas(page)).evaluate(() => [...globalThis.__decksProbes.rust.lifted]);
+const lifted = await (await inCanvas(page)).evaluate(() => [...globalThis.__decksProbes.rust.cardLayer.lifted]);
 await agree("a drag's step");
 say("a person's drag lifts the box and bends its arrow", lifted.includes("sd-a") && lifted.includes("sd-arrow"), JSON.stringify(lifted));
 await page.mouse.up();
-say("…and is put down", await until(async () => (await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.lifted.size)) === 0, 5000), JSON.stringify(await (await inCanvas(page)).evaluate(() => [...globalThis.__decksProbes.rust.lifted])));
+say("…and is put down", await until(async () => (await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.cardLayer.lifted.size)) === 0, 5000), JSON.stringify(await (await inCanvas(page)).evaluate(() => [...globalThis.__decksProbes.rust.cardLayer.lifted])));
 const after = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.placed.get("sd-a").box);
 say("…where it was dropped", after.x > before.x && after.y < before.y, JSON.stringify({ before, after }));
 await settle(page, 1200);

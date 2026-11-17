@@ -274,7 +274,7 @@ async function run(engine, lags) {
 	} else say(`${engine}: boards on screen to nudge`, false, JSON.stringify(onScreen));
 
 	// Items, on bare canvas right of the boards at 100%.
-	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksProbes.rust.placedCards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksProbes.rust.cardLayer.placedCards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
@@ -308,7 +308,7 @@ async function run(engine, lags) {
 	if (process.env.NUDGE_BOARDS !== "0" && boardsHere.length) {
 		await page.keyboard.press("Escape");
 		await page.keyboard.press("Escape");
-		const board = await (await cv()).evaluate((path) => globalThis.__decksProbes.rust.placedCards.find((one) => one.path === path), boardsHere[0]);
+		const board = await (await cv()).evaluate((path) => globalThis.__decksProbes.rust.cardLayer.placedCards.find((one) => one.path === path), boardsHere[0]);
 		send([
 			{ op: "update", id: "nd-a", set: { x: Math.round(board.x + board.w + 80), y: Math.round(board.y) } },
 			{ op: "update", id: "nd-b", set: { x: Math.round(board.x + board.w + 80), y: Math.round(board.y + 200) } },

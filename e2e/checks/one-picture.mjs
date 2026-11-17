@@ -34,16 +34,16 @@ const held = (frame) =>
 	frame.evaluate(() => {
 		const engine = window.__decksProbes.rust;
 		const out = {};
-		for (const [key, one] of engine.picturesAsked) if (key.startsWith("card:")) out[key] = Math.max(one.size ?? 0, engine.heldWidth.get(key) ?? 0);
+		for (const [key, one] of engine.cardPictures.picturesAsked) if (key.startsWith("card:")) out[key] = Math.max(one.size ?? 0, engine.cardPictures.heldWidth.get(key) ?? 0);
 		return out;
 	});
 /** The rung each card wants at this zoom, the way `rungFor` chooses it. */
 const wanted = (frame) =>
 	frame.evaluate(() => {
 		const engine = window.__decksProbes.rust;
-		const ladder = engine.pictures.ladder;
+		const ladder = engine.cardPictures.pictures.ladder;
 		const out = {};
-		for (const card of engine.placedCards) {
+		for (const card of engine.cardLayer.placedCards) {
 			const drawn = card.w * engine.camera.zoom * (devicePixelRatio || 1);
 			out[`card:${card.path}`] = ladder.find((width) => width * 1.25 >= drawn) ?? ladder[ladder.length - 1];
 		}
@@ -58,7 +58,7 @@ for (const target of TARGETS) {
 	// The stage and its engine are in the canvas frame.
 	const canvas = await canvasFrame(page);
 	await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
-	say(`${name}: the device's ladder is ${ladder.join(" / ")}`, JSON.stringify(await canvas.evaluate(() => window.__decksProbes.rust.pictures.ladder)) === JSON.stringify(ladder));
+	say(`${name}: the device's ladder is ${ladder.join(" / ")}`, JSON.stringify(await canvas.evaluate(() => window.__decksProbes.rust.cardPictures.pictures.ladder)) === JSON.stringify(ladder));
 	const asked = watchCopies(page);
 	await outOfLive(page);
 	for (let i = 0; i < 6; i++) {
@@ -74,11 +74,11 @@ for (const target of TARGETS) {
 	if (await canvas.evaluate(() => window.__decksProbes.rust.page.compressedPictures())) {
 		// A first look gets the server's stand-in for a rung it has not made yet, asked again until it has.
 		const cards = Object.keys(first).length;
-		const put = () => canvas.evaluate(() => window.__decksProbes.rust.compressedPut);
+		const put = () => canvas.evaluate(() => window.__decksProbes.rust.cardPictures.compressedPut);
 		for (let i = 0; i < 40 && (await put()) < cards; i++) await settle(page, 500);
 		const perPixel = await canvas.evaluate(() => {
 			const engine = window.__decksProbes.rust;
-			const each = [...engine.compressedSize].map(([key, [w, h]]) => engine.pictureBytes.get(key) / (w * h));
+			const each = [...engine.cardPictures.compressedSize].map(([key, [w, h]]) => engine.cardPictures.pictureBytes.get(key) / (w * h));
 			return each.length ? Math.max(...each) : 0;
 		});
 		say(`${name}: pictures are asked for compressed, for the GPU`, asked.every((one) => one.astc), JSON.stringify(asked.slice(0, 3)));
@@ -112,11 +112,11 @@ for (const target of TARGETS) {
 	const sent = asked.length;
 	const shrunk = await canvas.evaluate(async () => {
 		const engine = window.__decksProbes.rust;
-		const was = engine.heldBytes();
+		const was = engine.cardPictures.heldBytes();
 		window.__decksKnobs.pictureMB = 0.05;
-		engine.fitPictures();
+		engine.cardPictures.fitPictures();
 		await new Promise((done) => setTimeout(done, 300));
-		return { was, bytes: engine.heldBytes() };
+		return { was, bytes: engine.cardPictures.heldBytes() };
 	});
 	const backend = await canvas.evaluate(() => window.__decksProbes?.engine?.stats?.().backend);
 	// WebGL 2 cannot copy a compressed picture's smaller sizes (`Gpu::shrink`), so a compressed one does not shrink there.
