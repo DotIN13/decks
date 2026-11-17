@@ -82,7 +82,7 @@ const SAMPLER = () => {
 			const e = globalThis.__decksProbes.rust;
 			const out = {};
 			if (!e) return out;
-			const shown = e.shown ? new Map(JSON.parse(e.shown)) : undefined;
+			const shown = e.cardLayer.shown ? new Map(JSON.parse(e.cardLayer.shown)) : undefined;
 			for (const id of probe.items ?? []) {
 				const p = e.placed.get(id);
 				if (!p) continue;

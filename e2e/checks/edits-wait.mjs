@@ -70,7 +70,7 @@ const SAMPLER = () => {
 				 * What a gesture's preview draws over the layout: a move's offset (a move is drawn lifted, not
 				 * laid out again) and a corner's radius; a resize is laid out already.
 				 */
-				const shown = e.shown ? new Map(JSON.parse(e.shown)) : undefined;
+				const shown = e.cardLayer.shown ? new Map(JSON.parse(e.cardLayer.shown)) : undefined;
 				const preview = e.cardLayer.lifted?.has(id) ? shown?.get(id) : undefined;
 				const moveOnly = preview && preview.w === undefined && preview.h === undefined && preview.radius === undefined && !(preview.set && Object.keys(preview.set).length);
 				const dx = moveOnly ? (preview.dx ?? 0) : 0;
