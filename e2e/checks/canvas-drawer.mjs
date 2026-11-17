@@ -66,7 +66,61 @@ for (const scheme of OUT ? ["light", "dark"] : ["light"]) {
 	say("…each with its picture, name, rename and delete inside the screen, and its name whole", rows.every((row) => row.inside && !row.cut), JSON.stringify(rows.filter((row) => !row.inside || row.cut)));
 	const targets = await page.evaluate(() => [...document.querySelectorAll(".stage-acts .stage-icon, .stage-new, .stage-sort > button")].map((one) => Math.round(one.getBoundingClientRect().height)));
 	say("…and every control at least 34 px tall, for a finger", targets.length > 0 && targets.every((height) => height >= 34), JSON.stringify(targets));
+	// One centre line a row: the picture, the name over its line, the faces of who is on it, rename and delete.
+	const lines = await page.evaluate(() =>
+		[...document.querySelectorAll(".stage-card")].map((card) => {
+			const mid = (one) => {
+				const box = one.getBoundingClientRect();
+				return box.top + box.height / 2;
+			};
+			const row = mid(card);
+			const label = card.querySelector(".row-label").getBoundingClientRect();
+			const meta = card.querySelector(".stage-meta").getBoundingClientRect();
+			const marks = [...card.querySelectorAll(".stage-open, .stage-faces .agent-face, .stage-acts .stage-icon")].map((one) => Math.round((mid(one) - row) * 10) / 10);
+			return { marks, words: Math.round(((label.top + meta.bottom) / 2 - row) * 10) / 10, left: Math.round((label.left - meta.left) * 10) / 10, faces: card.querySelectorAll(".stage-faces .agent-face").length };
+		}),
+	);
+	say("each row keeps one centre line: its picture, its words, the faces on it, rename and delete", lines.some((line) => line.faces > 0) && lines.every((line) => line.marks.every((off) => Math.abs(off) <= 1) && Math.abs(line.words) <= 1.5 && Math.abs(line.left) <= 0.5), JSON.stringify(lines));
+	const edges = await page.evaluate(() => {
+		const left = (selector) => [...document.querySelectorAll(selector)].map((one) => Math.round(one.getBoundingClientRect().left * 10) / 10);
+		const right = (selector) => [...document.querySelectorAll(selector)].map((one) => Math.round(one.getBoundingClientRect().right * 10) / 10);
+		return { pictures: left(".stage-open"), names: left(".row-label"), bins: right(".stage-acts"), head: [left(".stage-title")[0], left(".stage-search")[0]], headRight: [right(".stage-title-row .stage-new")[0], right(".stage-sort")[0]] };
+	});
+	const same = (list) => list.every((one) => Math.abs(one - list[0]) <= 0.5);
+	say("…and the rows share their edges: pictures, names, and rename and delete each in a column, under the head's own edges", same(edges.pictures) && same(edges.names) && same(edges.bins) && same([...edges.head, edges.pictures[0]]) && same(edges.headRight), JSON.stringify(edges));
 	await shot("canvases-drawer");
+
+	// --- renaming and deleting keep the row's line ---------------------------------------------------------------
+	const second = page.locator(".stage-card").nth(1);
+	const state = () =>
+		second.evaluate((card) => {
+			const mid = (one) => {
+				const box = one.getBoundingClientRect();
+				return box.top + box.height / 2;
+			};
+			const parts = [...card.querySelectorAll(".stage-rename, .stage-acts > *")];
+			return { h: Math.round(card.getBoundingClientRect().height), off: parts.map((one) => Math.round((mid(one) - mid(card.querySelector(".stage-open"))) * 10) / 10), inside: parts.every((one) => one.getBoundingClientRect().left >= 0 && one.getBoundingClientRect().right <= innerWidth), words: !!card.querySelector(".stage-rename") || card.querySelector(".stage-foot").getBoundingClientRect().width };
+		});
+	const rowHeight = (await state()).h;
+	await second.locator('[title="Delete"]').tap();
+	await until(() => second.locator(".stage-confirm").count());
+	const asking = await state();
+	say("Delete asks in the row: its two buttons inside the screen, on the row's line, the row no taller, its name still showing", asking.inside && asking.off.every((off) => Math.abs(off) <= 1) && asking.h === rowHeight && asking.words > 60, JSON.stringify(asking));
+	await shot("canvases-drawer-delete");
+	await second.locator('[aria-label="Keep it"]').tap();
+	await second.locator('[title="Rename"]').tap();
+	await until(() => second.locator(".stage-rename").count());
+	const naming = await state();
+	const renameAt = await second.evaluate((card) => {
+		const field = card.querySelector(".stage-rename").getBoundingClientRect();
+		const meta = card.querySelector(".stage-meta").getBoundingClientRect();
+		const acts = card.querySelector(".stage-acts").getBoundingClientRect();
+		const style = getComputedStyle(card.querySelector(".stage-rename"));
+		return { letters: Math.round(field.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) - meta.left), gap: Math.round(acts.left - field.right), over: field.bottom > meta.top + 1 };
+	});
+	say("Rename edits the name where it is: its letters where they were, the field clear of rename and delete and over its line, the row no taller", naming.inside && naming.h === rowHeight && Math.abs(renameAt.letters) <= 1 && renameAt.gap >= 4 && !renameAt.over, JSON.stringify([naming, renameAt, rowHeight]));
+	await shot("canvases-drawer-rename");
+	await page.keyboard.press("Escape");
 
 	// --- naming a new canvas fits the drawer's head -----------------------------------------------------------
 	await page.locator(".stage-new").first().tap();

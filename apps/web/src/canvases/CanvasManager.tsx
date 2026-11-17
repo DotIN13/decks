@@ -399,7 +399,8 @@ function StageCard(props: {
 			data-here={here() ? "true" : undefined}
 			title={`${stage().title}: ${meta()}${here() ? ", you are here" : stage().agents.length === 0 ? ", nobody on it" : ""}`}
 			onClick={() => !editing() && props.onOpen(stage().name)}
-			onPointerLeave={() => setConfirming(false)}
+			/* A mouse that leaves the card takes the question back. A finger leaves with every lift, which took it back under the press on its answer: under a finger, Keep it does that. */
+			onPointerLeave={(event) => event.pointerType === "mouse" && setConfirming(false)}
 		>
 			{/*
 				The picture is the canvas as the server drew it, cached by the drawing's revision — so an

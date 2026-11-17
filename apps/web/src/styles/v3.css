@@ -3529,8 +3529,7 @@ body {
 	}
 	/* 16px in every field: under that, iOS zooms the page when the field takes the keyboard. */
 	body .stage-manager[data-form="drawer"] .stage-new-field,
-	body .stage-manager[data-form="drawer"] .stage-search > input,
-	body .stage-manager[data-form="drawer"] .stage-rename {
+	body .stage-manager[data-form="drawer"] .stage-search > input {
 		height: 36px;
 		font-size: 16px;
 	}
@@ -3585,10 +3584,46 @@ body {
 		width: 16px;
 		height: 16px;
 	}
+	/*
+	 * The row's middle: the name over its line, and the faces of who is on it beside both, on the
+	 * row's centre line with the picture and with rename and delete. In the panel the faces end the
+	 * name's own line; here that set them above the row's other marks.
+	 */
 	body .stage-manager[data-form="drawer"] .stage-foot {
+		display: grid;
 		flex: 1;
 		order: 2;
-		gap: 1px;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 1px 10px;
+		padding: 0;
+	}
+	body .stage-manager[data-form="drawer"] .stage-name-row {
+		display: contents;
+	}
+	body .stage-manager[data-form="drawer"] .stage-name-row > .row-label,
+	body .stage-manager[data-form="drawer"] .stage-rename {
+		grid-column: 1;
+		align-self: end;
+	}
+	/* The name, edited where it is: its letters stay where they were, and the row is no taller for the field. */
+	body .stage-manager[data-form="drawer"] .stage-rename {
+		width: calc(100% + 7px);
+		height: 27px;
+		margin: 0 0 0 -7px;
+		font-size: 16px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-meta {
+		grid-column: 1;
+		align-self: start;
+	}
+	body .stage-manager[data-form="drawer"] .stage-faces {
+		grid-column: 2;
+		grid-row: 1 / span 2;
+		padding-left: 5px;
+	}
+	body .stage-manager[data-form="drawer"] .stage-faces:empty {
+		display: none;
 	}
 	/* A long name takes a second line, not an ellipsis. */
 	body .stage-manager[data-form="drawer"] .stage-name-row > .row-label {
