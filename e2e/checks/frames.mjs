@@ -209,6 +209,8 @@ if (spot) {
 	 */
 	await page.click('.v3-tool[data-tool="shape"]');
 	await page.click('.v3-menu-row:has-text("Frame")');
+	// Picked on the page, armed in the frame a message later: the press below waits for it, as a hand cannot help doing.
+	await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.penTool === "frame", undefined, { timeout: 5000 }).catch(() => {});
 	const room = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage");
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
