@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { messageParts } from "../composer/pill-about.ts";
+import { commentPill, messageParts } from "../composer/pill-about.ts";
 import type { Draft } from "@decks/agent-ui/composer";
 import { withComments } from "../markup/comments.ts";
 import { takeComments } from "../state/comments.ts";
@@ -54,13 +54,16 @@ export function createBar(names: BarNames) {
 				 * again after a reload and on another device. The `@name` that picked the agent is not part of it.
 				 */
 				const stage = canvasOnScreen()?.name;
-				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
+				const partsOf = (wrote: Draft) => messageParts(wrote, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
+				const written = draft && partsOf(dest.named ? withoutName(draft, dest.name) : draft);
 				/*
-				 * Written on a tab that is not home: the agent's text says what the person was looking at
-				 * (`tabs/about.ts`), and the message is kept as it was written, without that line.
+				 * The agent's text says what the person was looking at (`tabs/about.ts`), and the message is
+				 * kept as it was written, without that line. One sent with no draft (a comment's Send now) is
+				 * its comments' pills and then its words, as the composer would have held it.
 				 */
 				const about = aboutLine();
-				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : about ? { parts: written ?? [{ type: "text" as const, text: typed }] } : {};
+				const asWritten = () => written ?? partsOf([...notes.map((note) => commentPill(note, names.titleOf, names.itemName)), { type: "text" as const, text: typed }]);
+				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : about && (typed || notes.length > 0) ? { parts: asWritten() } : {};
 				const said = about ? `${about}\n\n${line}` : line;
 				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
 				if (queue) void call("chat.queue", [dest.id, { action: "add", text: said, ...parts }]).then(warnIfFailed);
