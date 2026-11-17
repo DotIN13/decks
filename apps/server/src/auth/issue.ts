@@ -24,7 +24,8 @@ import { bearerOf, originOf } from "./guard.ts";
  * - **A canvas pass**: `POST /api/passes { canvas }`, asked by the person or a site for the sandboxed
  *   editor it is about to show, and again at half its hour to renew it (`passes.ts`).
  * - **An app pass**: an app's server is given one when it starts (`apps/service.ts`); a tab another site
- *   opens an app in, `POST /api/passes { app }`, for a day.
+ *   opens an app in, `POST /api/passes { app }`, for a day; with `frame: true`, for a frame of its
+ *   own in the Decks window, the pass in the app's path, while the token works.
  * - **A document pass**: `POST /api/passes { document }`, for a document opened whole in a tab, an hour.
  */
 
@@ -345,7 +346,7 @@ export function doorRoutes(app: App): express.Router {
 			res.status(403).json({ error: "Only the person, or a front end paired with this harness, asks for a pass, with its own token." });
 			return;
 		}
-		const body = (req.body ?? {}) as { canvas?: unknown; app?: unknown; document?: unknown };
+		const body = (req.body ?? {}) as { canvas?: unknown; app?: unknown; frame?: unknown; document?: unknown };
 		// A document pass for a document opened whole, in a frame of its own: its editor's line, for that file alone, an hour.
 		if (body.document !== undefined) {
 			const path = app.documentKey(String(body.document));
@@ -362,6 +363,23 @@ export function doorRoutes(app: App): express.Router {
 			const name = String(body.app);
 			if (!app.apps.exists(name)) {
 				res.status(404).json({ error: `There is no app called ${name || "that"}.` });
+				return;
+			}
+			// For a frame of its own in the Decks window: the pass in the path, so every request the app makes carries it; no day, since the app cannot be handed a new address.
+			if (body.frame === true) {
+				let prefix = false;
+				try {
+					prefix = !!app.apps.manifest(name).prefix;
+				} catch (error) {
+					res.status(500).json({ error: (error as Error).message });
+					return;
+				}
+				if (prefix) {
+					res.status(409).json({ error: `${name} is told its base path, so it loads by absolute addresses, which carry no pass: it opens in the browser's tab.`, tab: true });
+					return;
+				}
+				const pass = app.passes.appWindow(name, req.tokenId);
+				res.set("cache-control", "no-store").json({ pass, url: `/app/t/${pass}/${name}/` });
 				return;
 			}
 			const { pass, expires } = app.passes.appTab(name, req.tokenId);

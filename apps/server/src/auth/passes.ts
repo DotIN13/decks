@@ -22,7 +22,9 @@ import { join } from "node:path";
  * frame opens the app with its canvas pass (`POST /api/apps/<name>/open`) and loads it at
  * `/app/t/<pass>/<name>/`, so every request the app makes carries it. It is checked on every use: the
  * token still works, the app is still placed on the canvas, and the canvas is still trusted (yours,
- * and nobody else may edit it); there is no day, so the app never reloads to renew it.
+ * and nobody else may edit it); there is no day, so the app never reloads to renew it. An app opened
+ * whole in a tab of the Decks window holds one the same way, in its path (`/app/t/<pass>/<name>/`),
+ * made for that window: good while the token that asked works, with no day either.
  *
  * A **document pass** (`dk_dp_`) reaches one document: its editor's messages on the line
  * (`connections/line.ts`), for that file and no other, and nothing else of the harness. A document
@@ -88,13 +90,15 @@ interface AppPayload {
 	e?: number;
 	/** Or, with `k`, the canvas it was made for: no `e`, since it lasts while it is checked. */
 	c?: string;
+	/** Or, with `k`, made for a tab of the Decks window that shows the app in a frame: no `e` either. */
+	w?: true;
 }
 
 /** An app pass as it is read: which app, and whether it is its server's or a tab's. */
 interface AppPassOf {
 	app: string;
-	/** `server`: the app's own server, while that run of it goes; `tab`: one page opening it; `canvas`: the app placed on a canvas. */
-	holder: "server" | "tab" | "canvas";
+	/** `server`: the app's own server, while that run of it goes; `tab`: one page opening it; `canvas`: the app placed on a canvas; `window`: the app in a frame of its own in the Decks window. */
+	holder: "server" | "tab" | "canvas" | "window";
 	/** For `canvas`, which one. */
 	canvas?: string;
 }
@@ -187,7 +191,12 @@ export class Passes {
 		return this.sign(APP_PASS, { a: name, k: by, c: canvas } satisfies AppPayload);
 	}
 
-	/** An app pass read and checked: a server's while its run goes on, a tab's while its token works and its day lasts, a canvas's while its token works and the app is on that canvas. */
+	/** A pass for an app shown in a frame of its own in the Decks window, bound to the harness token whose id is `by`: good while that token works. */
+	appWindow(name: string, by: string): string {
+		return this.sign(APP_PASS, { a: name, k: by, w: true } satisfies AppPayload);
+	}
+
+	/** An app pass read and checked: a server's while its run goes on, a tab's while its token works and its day lasts, a canvas's while its token works and the app is on that canvas, a window's while its token works. */
 	openApp(pass: string | undefined, now = Date.now()): AppPassOf | undefined {
 		if (!isAppPass(pass)) return undefined;
 		const payload = this.open(APP_PASS, pass) as Partial<AppPayload> | undefined;
@@ -195,6 +204,7 @@ export class Passes {
 		if (typeof payload.r === "string") return this.checks.appRun?.(payload.a) === payload.r ? { app: payload.a, holder: "server" } : undefined;
 		if (typeof payload.k !== "string" || !this.checks.live(payload.k)) return undefined;
 		if (typeof payload.c === "string") return this.checks.appOnCanvas?.(payload.a, payload.c) ? { app: payload.a, holder: "canvas", canvas: payload.c } : undefined;
+		if (payload.w === true) return { app: payload.a, holder: "window" };
 		if (typeof payload.e !== "number" || payload.e <= now) return undefined;
 		return { app: payload.a, holder: "tab" };
 	}

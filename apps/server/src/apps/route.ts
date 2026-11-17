@@ -35,11 +35,12 @@ type PairedCheck = (token: string | undefined, origin?: string) => boolean;
 /** Whether what a GET carries in its address opens this app: an app pass for a tab, for this app (`decks_pass`, `auth/passes.ts`). */
 type TicketCheck = (pass: string | undefined, name: string) => boolean;
 
-/** Whether the pass in an address's path opens this app: an app pass held by a canvas the app is placed on (`/app/t/<pass>/<name>/…`). */
+/** Whether the pass in an address's path opens this app: an app pass held by a canvas the app is placed on, or made for a tab of the Decks window (`/app/t/<pass>/<name>/…`). */
 type CarriedCheck = (pass: string, name: string) => boolean;
 
 /**
- * `/app/t/<pass>/<name>/…`: an app opened inside the canvas frame (`connections/routes/apps.ts`, `open`). The frame is
+ * `/app/t/<pass>/<name>/…`: an app opened inside the canvas frame (`connections/routes/apps.ts`, `open`), or whole in a
+ * frame of its own in the Decks window (`auth/issue.ts`, `/passes { app, frame }`). The frame is
  * sandboxed and so is the app's iframe in it, with no origin of its own and no cookies, so the pass rides in
  * the path, and every relative address the app loads, fetches or opens a socket to carries it too.
  */
@@ -73,7 +74,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 	const base = inFrame ? `/app/t/${inFrame.pass}/${at.name}` : `/app/${at.name}`;
 	if (inFrame) {
 		if (!carried?.(inFrame.pass, at.name)) {
-			plain(res, 401, "This app's address has stopped working: the app is no longer on that canvas, the canvas is no longer yours alone, or you signed out. Reload the canvas.");
+			plain(res, 401, "This app's address has stopped working: the app is no longer on that canvas, the canvas is no longer yours alone, or you signed out. Reload the page.");
 			return true;
 		}
 		// The page's address holds the pass: not sent on as the Referer of what it loads from elsewhere.
