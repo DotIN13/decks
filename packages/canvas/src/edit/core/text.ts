@@ -203,3 +203,6 @@ export function legacyCard(base: PenNode, sizes: { gap: number; pad: number; rad
 		children: [],
 	} as PenNode;
 }
+
+/** The item types that are words: a tap or a double-click on one opens its text. */
+export const TEXTY = new Set(["text", "note", "prompt", "context"]);

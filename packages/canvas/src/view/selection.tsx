@@ -1,13 +1,8 @@
 import type { Camera } from "@decks/protocol";
-import { Show, createEffect, createMemo, type Accessor } from "solid-js";
-import { boxOf, type Viewport } from "../camera/camera.ts";
+import { createEffect, createMemo, type Accessor } from "solid-js";
+import { type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import { PageCallout } from "../ui/Callout.tsx";
-import { isInk } from "../model/ink.ts";
-import { inkSelection, setInkSelection } from "../ink/ink.ts";
 import { setPenBoxes } from "../edit/pen-tools.ts";
-import { firstLine } from "../look/look.ts";
-import { parseMarkdown } from "../model/markdown.ts";
 import { walk, type PenNode } from "@decks/pen";
 import type { CanvasEngine } from "../render/engine.ts";
 import {
@@ -33,6 +28,10 @@ import {
 	type tsScene,
 } from "../edit/dom/index.ts";
 import type { CanvasViewProps } from "./CanvasView.tsx";
+import { createPills } from "./pills.tsx";
+import { createOverlayModel } from "./overlay-model.ts";
+import { createPenActions } from "./pen-actions.ts";
+import { createPillObstacles } from "./pill-obstacles.ts";
 
 /** What the selection's drawing needs of the stage around it. */
 type SelectionDeps = {
@@ -119,41 +118,10 @@ export function createSelection(deps: SelectionDeps) {
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
 	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: ctl.zoom() }));
 
-	/**
-	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
-	 * round the item. What the *sheet* draws is told separately, as a preview the worker applies to
-	 * its own copy (`penLayer.preview`): a turn used to send the whole drawing to the worker on every
-	 * frame, which is a relayout of the whole stage sixty times a second, and that was the flicker.
-	 *
-	 * Neither is cleared when the gesture ends. The worker lets a preview go when the server's answer
-	 * arrives — "whatever a drag was previewing is now the drawing itself" — and clearing it first is
-	 * what shows the item at its old angle for a frame.
-	 */
-	/*
-	 * The radius (`editor.radius`) is let go of when the drawing comes back with the change in it, not
-	 * when the hand lifts (`editor/core/gesture.ts`, `drawn`). The sheet's own preview works that way
-	 * already; the outline and the handles are drawn from it, and dropping it first shows the item
-	 * upright for the frame or two the save takes. A time limit is for an edit that is refused, which
-	 * would otherwise leave the handles turned for an item that is not.
-	 */
-
-	/**
-	 * What the pill should not sit on (`PageCallout`): every board and drawn item but those touching the
-	 * box it is for, which are the selection itself, what is in it and what holds it.
-	 */
-	const pillObstacles = (box: { x: number; y: number; w: number; h: number }) => {
-		const touches = (o: { x: number; y: number; w: number; h: number }) => o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y;
-		const out: Array<{ x: number; y: number; w: number; h: number }> = [];
-		for (const board of props.boards) {
-			const b = boxOf(board);
-			if (!touches(b)) out.push(b);
-		}
-		for (const [id, placed] of penLayer.placed) {
-			const b = penLayer.bounds.get(id) ?? placed.box;
-			if (b.w > 0 && b.h > 0 && !touches(b)) out.push(b);
-		}
-		return out;
-	};
+	const { pillObstacles } = createPillObstacles({
+		props,
+		penLayer,
+	});
 
 	/** The words an item shows, its own or its children's, on one line: what a comment on it quotes. */
 	const quoteOf = (node: PenNode | undefined): string => {
@@ -162,290 +130,57 @@ export function createSelection(deps: SelectionDeps) {
 		for (const one of walk([node])) if (typeof one.content === "string" && one.content.trim()) said.push(one.content.trim());
 		return said.join(" ").replace(/\s+/g, " ").slice(0, 120);
 	};
-	/** Take the selected drawn items off the canvas: the Delete key, and the pill's Delete. */
-	const penDeleteSelected = (selected = editor.items(), ops = deleteOps(selected, scene)) => {
-		if (!selected.length) return;
-		// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
-		penLayer.previews.hide(new Set(selected));
-		const mark = penLayer.tiles.mark();
-		penEdit(ops);
-		const clear = () => editor.select((now) => (now === selected ? [] : now));
-		editor.afterFrame(mark, clear);
-		// A sheet that shows no frame (nothing painting) does not keep the outline.
-		setTimeout(clear, 250);
-	};
-
-	const penDuplicate = () => {
-		const { ops, made } = duplicateOps(scene, editor.items(), freshIds());
-		penEdit(ops);
-		if (made.length) selectMade(made);
-	};
-
-	/** Where the frame a drag would drop into is, for the outline that says so. */
-	const dropBox = createMemo(() => dropBoxOf(editor.dropInto(), scene));
-
-	/**
-	 * The one selected item's corner radius, when it has corners to round: a rounded shape from the
-	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
-	 * corner, as it does in a drawing program, and every corner follows it.
-	 */
-	const radiusHandle = createMemo(() => radiusHandleOf(penHandles(), { editable: !!props.onPenEdit, resizing: !!editor.resize(), drag: editor.drag() }, scene));
-	/**
-	 * The drawn items the same pill is for, when no board has it, or a group picked together, boards
-	 * among them: the box round all of it, and what to call it. Not while one is typed into (its
-	 * editor has its own toolbar) or drawn with the pen.
-	 */
-	/*
-	 * What the draw tool's lasso holds (`inkSelection`): the same pill as a selection's, so its strokes can
-	 * go to the agent as the select tool's can (Make a drawing, Make a board, Send), and be commented on, duplicated or deleted.
-	 */
-	const lassoItems = createMemo(() => {
-		if (!props.drawing || !props.onInk || !props.inkAgent) return undefined;
-		const held = inkSelection();
-		const boxes = (held?.ids ?? []).map((id) => penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box).filter((b): b is NonNullable<typeof b> => !!b);
-		if (!held || boxes.length === 0) return undefined;
-		const x = Math.min(...boxes.map((b) => b.x));
-		const y = Math.min(...boxes.map((b) => b.y));
-		return { ids: [...held.ids], box: { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y } };
-	});
-	const calloutItems = createMemo(() => {
-		if ((props.selected && !groupPicked()) || props.drawing || !props.onPenEdit || editor.text()) return undefined;
-		const all = penOutlines().filter((one) => one.id);
-		const outlines = all.filter((one) => !one.id.startsWith("page:"));
-		const boards = all.length - outlines.length;
-		if (outlines.length !== editor.items().length || boards !== editor.pagePicks().length || !all.length) return undefined;
-		const x = Math.min(...all.map((one) => one.x));
-		const y = Math.min(...all.map((one) => one.y));
-		const box = { x, y, w: Math.max(...all.map((one) => one.x + one.w)) - x, h: Math.max(...all.map((one) => one.y + one.h)) - y };
-		const ids = outlines.map((one) => one.id);
-		/* The cards picked with them, by path: what a picture of the group takes with the items (`canvas.screenshot`'s `of`). */
-		const cards = all.filter((one) => one.id.startsWith("page:")).map((one) => one.id.slice(5));
-		const words = ids.map((id) => quoteOf(penLayer.placed.get(id)?.node)).filter(Boolean).join(" / ").slice(0, 160);
-		const first = penLayer.placed.get(ids[0]!)?.node;
-		const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
-		const name = boards
-			? [count(boards, "card"), ids.length ? count(ids.length, "item") : ""].filter(Boolean).join(", ")
-			: ids.length > 1
-				? `${ids.length} items`
-				: words || (typeof first?.name === "string" ? first.name : first?.type) || "item";
-		return { box, ids, cards, words, name };
-	});
-	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
-
-	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
-	const arrowEnds = createMemo(() => {
-		penDrawn();
-		return arrowEndsOf({ selection: editor.items(), pagePicks: editor.pagePicks(), drag: shownDrag() }, scene);
+	const { penDuplicate, penDeleteSelected } = createPenActions({
+		editor,
+		scene,
+		penLayer,
+		penEdit,
+		freshIds,
+		selectMade,
 	});
 
-	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
-	const gripBox = createMemo(() => {
-		penDrawn();
-		return gripBoxOf({ block: editor.hoverBlock(), busy: !!editor.pageDrag() || panning(), editing: props.mode === "edit" }, scene, (id, node) => {
-			// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
-			const look = editor.textEditing.lookOf(node, penLayer.placed.get(id));
-			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
-		});
+	const { calloutItems, canvasPenPath, lassoItems, radiusHandle, arrowEnds, overlay } = createOverlayModel({
+		editor,
+		scene,
+		penHandles,
+		props,
+		penLayer,
+		groupPicked,
+		penOutlines,
+		quoteOf,
+		penDrawn,
+		shownDrag,
+		panning,
+		penAnchors,
+		pageHandles,
 	});
 
-	/** The hovered item's box as it is drawn now, or the board under the pointer. */
-	const hoverBox = createMemo(() => {
-		penDrawn();
-		return hoverBoxOf(
-			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: editor.typing(), board: editor.hoverPage() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.pageDrag() || panning(), boards: scene.boards(), glide: editor.glide() },
-			scene,
-		);
+	const { pills } = createPills({
+		props,
+		calloutPath,
+		calloutPage,
+		pillObstacles,
+		moving,
+		panning,
+		scaling,
+		gliding,
+		editor,
+		ctl,
+		view,
+		pushCamera,
+		frame,
+		calloutItems,
+		penAnchors,
+		pressHeld,
+		canvasPenPath,
+		penNode,
+		penDuplicate,
+		penDeleteSelected,
+		lassoItems,
+		scene,
+		freshIds,
+		penEdit,
 	});
-
-	/** What the selection and the hovered item sit in and hold: light outlines round their parents and children. */
-	const kinBoxes = createMemo(() => {
-		penDrawn();
-		return kinOutlines(
-			{ selection: editor.items(), drag: shownDrag(), glide: editor.glide(), resizing: !!editor.resize(), typing: editor.typing(), editing: props.mode === "edit", hover: editor.hoverItem(), busy: !!editor.pageDrag() || panning() || !!editor.gesture() },
-			scene,
-		);
-	});
-	/** One box round everything selected, with its size under it. */
-	const penFrame = createMemo(() => selectionFrame(penOutlines()));
-	/** Alt held over another item or board, in edit mode: the distances to it from the selection. */
-	const penDistances = createMemo(() => {
-		const over = hoverBox();
-		// A board picked up with the selection is part of it, not something to measure to.
-		const path = editor.hoverPage() ?? editor.hoverPicture();
-		const picked = !!over?.board && !!path && editor.pagePicks().includes(path);
-		return distancesOf({ editing: props.mode === "edit", alt: editor.altHeld(), busy: !!editor.gesture() || !!editor.pageDrag() || panning(), selection: penFrame(), over: picked ? undefined : over });
-	});
-
-	const canvasPenPath = () => (props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : undefined);
-	/** A dragged arrow handle's dashed route, where it sits. */
-	const routeShown = editor.route;
-	/**
-	 * Everything the editor draws over the canvas (`editor/core/overlay.ts`), for `OverlayLayer`. Each
-	 * part keeps its own memo above, read here, so a part that has not changed hands the layer the
-	 * same value and nothing it draws is touched.
-	 */
-	const overlay = createMemo<Overlay>(() => ({
-		outlines: penOutlines(),
-		handles: penHandles(),
-		anchors: penAnchors(),
-		pageHandles: pageHandles(),
-		radius: radiusHandle(),
-		radiusDrag: editor.radius(),
-		arrow: arrowEnds(),
-		hover: hoverBox(),
-		kin: kinBoxes(),
-		selectionFrame: penFrame(),
-		distances: penDistances(),
-		grip: gripBox(),
-		gripHidden: gripHidden(editor.drag(), !!editor.resize()),
-		drop: dropBox(),
-		insert: editor.dropSlot()?.line,
-		slots: editor.dropNear()?.slots ?? [],
-		slotFrames: editor.dropNear()?.frames ?? [],
-		joins: editor.joins(),
-		sides: editor.sides(),
-		guides: editor.guides(),
-		draft: editor.draft(),
-		route: routeShown(),
-		endDraft: editor.endDraft(),
-	}));
-
-	/** The pills: over the selected board, over drawn items or a group, and over the lasso's strokes. */
-	const pills = () => (
-		<>
-
-			{/*
-				Boards have no title bars: the selected board's name and actions are a pill over it
-				(`PageCallout`), on every device. Kept mounted through a movement and only hidden, so a
-				drag that began on its grip keeps the element it captured the pointer on.
-			*/}
-			{/* Keyed by the card's path, not its object: the board list is made again at each change, and a pill made again would shut its ⋯ menu. */}
-			<Show when={!props.drawing ? calloutPath() : undefined} keyed>
-				{(path) => {
-					let last = calloutPage()!;
-					const board = () => (last = calloutPage() ?? last);
-					return (
-					<PageCallout
-						board={board()}
-						box={boxOf(board())}
-						obstacles={() => pillObstacles(boxOf(board()))}
-						label={`${board().title}: card actions`}
-						hidden={moving() || panning() || scaling() || gliding() || editor.carrying()}
-						camera={ctl.settled()}
-						view={view()}
-						onOpen={() => pushCamera(frame([boxOf(board())]))}
-						onCopyPath={() => void navigator.clipboard?.writeText(path).catch(() => {})}
-						{...(props.onExport && board().item !== "app" ? { onExport: (format: "png" | "pdf") => props.onExport?.([path], format) } : {})}
-						{...(props.onHide ? { onHide: () => props.onHide?.(path) } : {})}
-						{...(props.onDeleteCard ? { onDelete: () => props.onDeleteCard?.(path) } : {})}
-						{...(props.onComment
-							? {
-									onComment: () =>
-										props.onComment?.({
-											path: path,
-											quote: "",
-											title: board().title,
-											// Under the pill, which follows the board as the camera moves.
-											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
-											open: true,
-										}),
-								}
-							: {})}
-					/>
-					);
-				}}
-			</Show>
-			<Show when={calloutItems()}>
-				{(items) => (
-					<PageCallout
-						box={items().box}
-						obstacles={() => pillObstacles(items().box)}
-						label={`${items().name}: actions`}
-						gap={penAnchors() ? ANCHOR_OUT + ANCHOR_PX / 2 + 6 : undefined}
-						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || editor.drag().dx !== 0 || editor.drag().dy !== 0 || !!editor.resize()}
-						camera={ctl.settled()}
-						view={view()}
-						onOpen={() => pushCamera(frame([items().box]))}
-						// ⋯ holds a picture of them all, cards included.
-						{...(props.onExport ? { onExport: (format: "png" | "pdf") => props.onExport?.([...items().ids, ...items().cards], format) } : {})}
-						// What acts on drawn items: a group of boards alone has only Open.
-						{...(items().ids.length
-							? {
-									...(props.onComment
-										? {
-												onComment: () =>
-													props.onComment?.({
-														// A drawn item is found by its canvas's file and its id (`CardComment.items`).
-														path: canvasPenPath() ?? "the canvas",
-														items: items().ids,
-														quote: items().words,
-														title: items().name,
-														anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
-														open: true,
-													}),
-											}
-										: {}),
-									...(props.onInk && props.inkAgent && items().ids.every((id) => { const node = penNode(id); return !!node && isInk(node); })
-										? {
-												ink: {
-													agent: props.inkAgent,
-													onDrawing: () => props.onInk?.({ action: "drawing", ids: items().ids, canvas: props.canvasName ?? "", box: items().box }),
-													onCard: () => props.onInk?.({ action: "card", ids: items().ids, canvas: props.canvasName ?? "", box: items().box }),
-													onSend: () => props.onInk?.({ action: "send", ids: items().ids, canvas: props.canvasName ?? "", box: items().box }),
-												},
-											}
-										: {}),
-									onDuplicate: () => penDuplicate(),
-									onDelete: () => penDeleteSelected(),
-								}
-							: {})}
-					/>
-				)}
-			</Show>
-			<Show when={lassoItems()}>
-				{(held) => (
-					<PageCallout
-						box={held().box}
-						obstacles={() => pillObstacles(held().box)}
-						label={`${held().ids.length} strokes: actions`}
-						hidden={moving() || panning() || scaling() || gliding()}
-						camera={ctl.settled()}
-						view={view()}
-						onOpen={() => pushCamera(frame([held().box]))}
-						ink={{
-							agent: props.inkAgent ?? "the agent",
-							onDrawing: () => props.onInk?.({ action: "drawing", ids: held().ids, canvas: props.canvasName ?? "", box: held().box }),
-							onCard: () => props.onInk?.({ action: "card", ids: held().ids, canvas: props.canvasName ?? "", box: held().box }),
-							onSend: () => props.onInk?.({ action: "send", ids: held().ids, canvas: props.canvasName ?? "", box: held().box }),
-						}}
-						// The rest of a selection's pill, acting on the lasso's strokes instead of the editor's pick.
-						{...(props.onComment
-							? {
-									onComment: () =>
-										props.onComment?.({
-											path: canvasPenPath() ?? "the canvas",
-											items: held().ids,
-											quote: "",
-											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,
-											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
-											open: true,
-										}),
-								}
-							: {})}
-						onDuplicate={() => {
-							const { ops, made } = duplicateOps(scene, held().ids, freshIds());
-							penEdit(ops);
-							if (made.length) setInkSelection({ path: inkSelection()?.path ?? "stage", ids: made });
-						}}
-						onDelete={() => {
-							penEdit(held().ids.map((id) => ({ op: "delete", id })));
-							setInkSelection(undefined);
-						}}
-					/>
-				)}
-			</Show>
-		</>
-	);
 
 	return { penHandles, pageHandles, radiusHandle, arrowEnds, penDeleteSelected, penDuplicate, overlay, pills };
 }
