@@ -10,21 +10,22 @@
  *
  * Also the openers a double-click or a double tap reaches for that are not words: a file's chip.
  */
-import { indexOf, isCard, isMarkdown, makeLabel, shapeLabel, type Op, type PenDocument, type PenNode } from "@decks/pen";
+import { isCard, type Op, type PenDocument, type PenNode } from "@decks/pen";
 import { isScribbleCatch, ScribbleCatch } from "@decks/ui";
 import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { setPenTyping } from "../pen-tools.ts";
-import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../model/card-frame.ts";
+import { cardMarkdown, CARD_PAD } from "../../model/card-frame.ts";
 import { CardEditor } from "../../cards/CardEditor.tsx";
 import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../look/look.ts";
-import { dropSlot } from "../core/drop.ts";
-import type { Pt, Rect } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
-import type { Picked } from "../core/pick.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
-import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
+import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
 import type { Editor } from "./controller.ts";
-import { openInTab, pictureAddress } from "../../base/host.ts";
+import { createPictureSizes } from "./picture-sizes.ts";
+import { createTextCommit } from "./text-commit.ts";
+import { createTextGhost } from "./text-ghost.ts";
+import { createTypedPreview } from "./typed-preview.ts";
+import { createTextOpen } from "./text-open.ts";
 
 export type TextHost = {
 	scene: SceneQuery;
@@ -60,75 +61,18 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 	/** How wide a card's words are: its width less its padding. */
 	const cardInner = (card: PenNode) => cardInnerOf(card, host.scene.item(card.id)?.box.w, CARD_PAD);
 
-	/**
-	 * Type a shape's words: its own, or a new text made inside it, centred and as wide as the shape,
-	 * which goes again if nothing is typed (`commitPenText`, `fresh`).
-	 */
-	const openShapeWords = (id: string) => {
-		const current = doc();
-		const frame = current ? indexOf(current).get(id)?.node : undefined;
-		const box = host.scene.item(id)?.box;
-		if (!frame || !box) return;
-		editor.select([id]);
-		const label = shapeLabel(frame);
-		if (label) {
-			const placed = host.scene.item(label.id);
-			openPenText({ id: label.id, node: label, box: placed?.box ?? box });
-			return;
-		}
-		const labelId = host.freshId();
-		const node = makeLabel(labelId);
-		host.edit([{ op: "insert", parent: id, node }]);
-		openPenText({ id: labelId, node, box: labelBox(box) }, true);
-	};
-	const openPenText = (given: Picked, fresh?: boolean) => {
-		// The item as the server has it now: what the canvas last drew can be a save behind.
-		const pen = host.pen();
-		const now = pen ? indexOf(pen.doc).get(given.id)?.node : undefined;
-		const hit = now ? { ...given, node: now } : given;
-		// A card, or one of its blocks: the whole card is typed into, as one piece of markdown.
-		const card = isCard(hit.node) ? hit.node : cardOf(hit.id);
-		if (card) return openCard(card, hit.box, fresh);
-		const node = hit.node;
-		const placed = host.scene.item(hit.id);
-		const box = placed?.box ?? hit.box;
-		host.engine.muteText(new Set([hit.id]));
-		setOpen({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), kind: node.type, ...(fresh ? { fresh } : {}), ...(isMarkdown(node) ? { legacy: true as const } : {}) });
-	};
-	/** A file's chip, or its icon or name: the file opens in a tab of its own. Answers whether it was one. */
-	const openFileOf = (id: string): boolean => {
-		// The chip itself, or anything inside it: a file card's picture, tile, name.
-		const file = fileOf(doc(), id);
-		if (!file) return false;
-		editor.select([file.id]);
-		openInTab(new URL(file.metadata.path, new URL(host.pen()?.base || "/", location.origin)).href);
-		return true;
-	};
+	const { openPenText, openShapeWords, openCardAt, openFileOf } = createTextOpen({
+		doc,
+		host,
+		editor,
+		cardOf,
+		setOpen,
+		textLookOf,
+		cardLook,
+	});
 	// While a card is typed into its toolbar is the panel, so the properties stand aside.
 	createEffect(() => setPenTyping(!!open() && !!open()!.card));
 	onCleanup(() => setPenTyping(false));
-	const openCard = (card: PenNode, at: Rect, fresh?: boolean, where?: { insertAt?: number; caretAt?: Pt }) => {
-		const placed = host.scene.item(card.id);
-		const kids = card.children ?? [];
-		editor.select([card.id]);
-		host.engine.muteText(new Set(kids.filter((child) => child.type === "text").map((child) => child.id)));
-		setOpen({ id: card.id, box: { ...(placed?.box ?? at) }, value: cardMarkdown(kids), style: cardLook(card), card: true, held: heldLabels(kids), ...(fresh ? { fresh } : {}), ...where });
-	};
-	/**
-	 * A double-click or a double tap on a card: on its words, the card opens with the caret there; in a
-	 * gap, between blocks or in its padding, a new empty line is made there to type into. Answers
-	 * whether it was a card. The canvas menu is for empty canvas only.
-	 */
-	const openCardAt = (hit: Picked, at: Pt, client: Pt): boolean => {
-		const card = isCard(hit.node) ? hit.node : cardOf(hit.id);
-		if (!card) return false;
-		const pen = host.pen();
-		const current = (pen ? indexOf(pen.doc).get(card.id)?.node : undefined) ?? card;
-		const box = host.scene.item(card.id)?.box ?? hit.box;
-		if (hit.node.id === card.id) openCard(current, box, false, { insertAt: dropSlot(host.scene, card.id, at, [])?.index ?? (current.children ?? []).length });
-		else openCard(current, box, false, { caretAt: client });
-		return true;
-	};
 	// The editor's font, fetched before it is first needed so the words never open in a stand-in.
 	createEffect(() => {
 		if (!host.pen()) return;
@@ -136,45 +80,16 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		pageFont("Inter", 600, false);
 	});
 
-	/**
-	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
-	 * a card round its title, a note round its words. A copy of the document with the one item's
-	 * words changed, drawn in place of the real one until the server answers with the real edit.
-	 * Once a frame at most.
-	 */
-	let typedFrame: number | undefined;
-	let typedValue: { id: string; value: string } | undefined;
-	const previewTyped = (id: string, value: string) => {
-		typedValue = { id, value };
-		typedFrame ??= requestAnimationFrame(() => showTyped());
-	};
-	/** The typed words drawn now, not at the next frame: what putting the editor away draws in its place. */
-	const showTyped = () => {
-		{
-			if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
-			typedFrame = undefined;
-			const current = doc();
-			if (!current || !typedValue) return;
-			const copy = structuredClone(current);
-			const found = indexOf(copy).get(typedValue.id);
-			if (!found) return;
-			if (isCard(found.node)) {
-				// The card grows as its blocks are typed: stand-in ids, swapped for real ones when it is saved.
-				let n = 0;
-				found.node.children = cardChildren(typedValue.value, found.node.children ?? [], { fresh: () => `typing-${n++}`, inner: cardInner(found.node), size: pictureSize });
-			} else found.node.content = typedValue.value;
-			host.engine.showDoc(copy, host.pen()?.base ?? "");
-		}
-	};
-	/** Back to the document as the server has it, for an edit taken back with Escape. */
-	const dropTyped = () => {
-		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
-		typedFrame = undefined;
-		typedValue = undefined;
-		host.engine.showDoc(host.pen()?.doc, host.pen()?.base ?? "");
-	};
+	const { pictureSize, measurePictures } = createPictureSizes({ host });
+	const typedPreview = createTypedPreview({
+		doc,
+		cardInner,
+		pictureSize,
+		host,
+	});
+	const { dropTyped, showTyped, previewTyped } = typedPreview;
 	onCleanup(() => {
-		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
+		if (typedPreview.typedFrame !== undefined) cancelAnimationFrame(typedPreview.typedFrame);
 	});
 	/** Where the item being typed into is now: a made item is placed once the server answers. */
 	const penTextBox = createMemo(() => {
@@ -192,100 +107,26 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		unmute = undefined;
 		host.engine.muteText(undefined);
 		// The canvas draws the words on its next frame: the editor's still copy goes then, not before.
-		if (editorGhost) ghostUntil = host.engine.mark();
+		if (textGhost.editorGhost) textGhost.ghostUntil = host.engine.mark();
 	};
-	/*
-	 * A still copy of the editor, left where the editor was when the typing was put away, until the
-	 * canvas has a frame with the words in it. Without it the words were gone for two or three frames:
-	 * the editor was taken away at once, and the canvas, which leaves the words out while they are
-	 * the editor's, drew them only once the server's answer had been laid out.
-	 */
-	let editorGhost: HTMLElement | undefined;
-	/** The copy goes with the first frame painted after the canvas heard it may draw the words (`render/engine.ts`, `mark`). */
-	let ghostUntil: number | undefined;
-	const leaveGhost = () => {
-		dropGhost();
-		const live = host.world()?.querySelector<HTMLElement>(":scope > .pen-text");
-		if (!live) return;
-		const copy = live.cloneNode(true) as HTMLElement;
-		if (live instanceof HTMLTextAreaElement) (copy as HTMLTextAreaElement).value = live.value;
-		// Only the words and what holds them: not the card's style bar, the caret, or the focus ring.
-		for (const extra of copy.querySelectorAll(".pce-bar, [data-editorGhost-skip]")) extra.remove();
-		copy.removeAttribute("id");
-		copy.setAttribute("aria-hidden", "true");
-		copy.setAttribute("tabindex", "-1");
-		copy.querySelectorAll("[contenteditable]").forEach((el) => el.setAttribute("contenteditable", "false"));
-		if (copy.hasAttribute("contenteditable")) copy.setAttribute("contenteditable", "false");
-		copy.style.pointerEvents = "none";
-		copy.style.boxShadow = "none";
-		copy.style.caretColor = "transparent";
-		copy.classList.add("pen-editorGhost");
-		live.after(copy);
-		editorGhost = copy;
-		ghostUntil = undefined;
-		// Never left standing: a sheet that paints nothing for a second has had its chance.
-		const left = copy;
-		setTimeout(() => {
-			if (editorGhost === left && ghostUntil !== undefined) dropGhost();
-		}, 1000);
-	};
-	const dropGhost = () => {
-		editorGhost?.remove();
-		editorGhost = undefined;
-		ghostUntil = undefined;
-	};
-	onCleanup(dropGhost);
+	const textGhost = createTextGhost({ host });
+	const { leaveGhost, dropGhost } = textGhost;
 
-	const commitPenText = (value: string) => {
-		const now = open();
-		if (now) leaveGhost();
-		setOpen(undefined);
-		// Against the document the server has: the one drawn already has the typed words in it.
-		const pen = host.pen();
-		const node = now && pen ? indexOf(pen.doc).get(now.id)?.node : undefined;
-		const was = now && node ? (now.card ? cardMarkdown(node.children ?? []) : node.content) : undefined;
-		const commit = commitOf(now, value, was, host.editable());
-		switch (commit.do) {
-			case "close":
-				return unmuteNow();
-			case "vanish":
-				unmuteNow();
-				dropTyped();
-				return host.edit(commit.ops);
-			case "unchanged":
-				unmuteNow();
-				return dropTyped();
-		}
-		const session = now!;
-		if (unmute) clearTimeout(unmute.timer);
-		/*
-		 * The words as typed are drawn at once, from a copy of the drawing (`showTyped`), and the canvas
-		 * may draw them now: the editor's still copy stands over them until that frame is on screen. It
-		 * used to wait for the server's answer to be drawn, and a card's words, which keep their ids in
-		 * the answer, were left out for a frame after its copy had already shown them.
-		 */
-		typedValue = { id: session.id, value };
-		showTyped();
-		unmuteNow();
-		if (commit.do === "update") {
-			host.edit(commit.ops);
-			return;
-		}
-		// A card is saved as edits to its blocks, each untouched block left alone. A note card from before
-		// becomes a card frame here, in its place. Pictures are measured first, for their shape.
-		void measurePictures(value).then(() => {
-			const later = host.pen();
-			const current = later ? indexOf(later.doc).get(session.id)?.node : undefined;
-			const base = current ?? node;
-			if (!base) return unmuteNow();
-			const card = isCard(base) ? base : legacyCard(base, { gap: CARD_GAP, pad: CARD_PAD, radius: CARD_RADIUS });
-			const children = cardChildren(value, card.children ?? [], { fresh: host.nextIds(), inner: cardInner(card), size: pictureSize });
-			// A card's blocks are edited one by one, and only the ones that changed; a note card becomes a frame.
-			const ops = isCard(base) ? cardEdits(base.id, base.children ?? [], children) : [{ op: "replace" as const, id: session.id, node: { ...card, children } }];
-			if (!ops.length) return unmuteNow();
-			host.edit(ops);
-		});
-	};
+	const { commitPenText } = createTextCommit({
+		open,
+		leaveGhost,
+		setOpen,
+		host,
+		unmuteNow,
+		dropTyped,
+		get unmute() { return unmute; },
+		get typedValue() { return typedPreview.typedValue; },
+		set typedValue(next) { typedPreview.typedValue = next; },
+		showTyped,
+		measurePictures,
+		cardInner,
+		pictureSize,
+	});
 	/**
 	 * Escape: the words go back as they were, and a fresh text never typed into goes. An item a tool
 	 * has just made keeps what was typed (`escapeKeeps`), given as `value`.
@@ -298,32 +139,6 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		dropTyped();
 		const ops = cancelOps(now);
 		if (ops.length) host.edit(ops);
-	};
-	/** Pictures' own sizes, as they arrive, so a picture put in a card keeps its shape. */
-	const pictureSizes = new Map<string, { w: number; h: number } | null>();
-	const pictureSize = (url: string) => pictureSizes.get(url) ?? undefined;
-	const measurePictures = async (markdown: string) => {
-		const urls = pictureUrls(markdown).filter((url) => !pictureSizes.has(url));
-		await Promise.all(
-			urls.map(
-				(url) =>
-					new Promise<void>((done) => {
-						const image = new Image();
-						const finish = (size: { w: number; h: number } | null) => {
-							pictureSizes.set(url, size);
-							done();
-						};
-						image.onload = () => finish(image.naturalWidth ? { w: image.naturalWidth, h: image.naturalHeight } : null);
-						image.onerror = () => finish(null);
-						setTimeout(() => finish(null), 1500);
-						try {
-							image.src = pictureAddress(url, new URL(host.pen()?.base || "/", location.origin).href);
-						} catch {
-							finish(null);
-						}
-					}),
-			),
-		);
 	};
 	/** The words an item holds, for telling when the canvas has drawn a save: a card's are its blocks'. */
 	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
@@ -352,7 +167,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		},
 		/** The sheet put a frame on screen: the still copy goes once the words are in one. */
 		presented: () => {
-			if (ghostUntil !== undefined && host.engine.shows(ghostUntil)) dropGhost();
+			if (textGhost.ghostUntil !== undefined && host.engine.shows(textGhost.ghostUntil)) dropGhost();
 		},
 	};
 }
