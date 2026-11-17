@@ -11,7 +11,7 @@
  * and documents by typing.
  */
 import { API, CANVAS, asPerson, canvasFrame, card, deckState, open, resetStage, rest, say, socket } from "../harness.mjs";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const until = async (test, ms = 8000) => {
@@ -102,6 +102,13 @@ say("an address that names a document opens it in front, beside the row kept", J
 await addressed.evaluate((path) => (location.hash = `#card/${path}`), plan);
 say("the address changed by hand brings the tab it names forward", (await until(async () => ((await chips(addressed)).some((one) => one === "card*") ? true : undefined))) === true, JSON.stringify(await chips(addressed)));
 await addressed.close();
+
+// --- a tab whose document is gone says so --------------------------------------------------------------------------
+rmSync(join(deck, "docs", "kept.md"));
+const gone = await page.context().newPage();
+await gone.goto(`${base}#doc/docs/kept.md`);
+say("a tab kept for a document since deleted says it is gone, and shows no frame", (await until(() => gone.locator('.surface[data-surface="document"] .tab-missing').count())) === 1 && (await gone.locator("iframe.document-frame").count()) === 0, await gone.locator('.surface[data-surface="document"]').innerText().catch(() => ""));
+await gone.close();
 
 // --- closed, a tab leaves the row kept ---------------------------------------------------------------------------
 for (const kind of ["app", "document", "card"]) await page.locator(`.tab-chip[data-kind="${kind}"] .tab-chip-close`).click();

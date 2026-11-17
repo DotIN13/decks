@@ -1,7 +1,7 @@
 import SquarePen from "lucide-solid/icons/square-pen";
 import { DocumentFrame } from "@decks/canvas";
 import { Icon } from "@decks/ui";
-import { Show } from "solid-js";
+import { createResource, Match, Show, Switch } from "solid-js";
 import { cardAgentCall, documentPass } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { act } from "../../state/decks.ts";
@@ -39,9 +39,35 @@ export const documentKind: TabKind = {
 
 function DocumentTab(props: { tab: Tab; foot: number }) {
 	const path = props.tab.target ?? "";
+	/*
+	 * The first pass is asked for here, so a document that is gone (a row kept from last week, a file
+	 * since deleted) is said in the tab; the frame is handed that one, and asks for each later one itself.
+	 */
+	const [first] = createResource(() => documentPass(path).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error)))));
+	let handed = false;
 	return (
 		<div class="surface" data-surface="document">
-			<DocumentFrame path={path} title={nameOf(path)} pass={documentPass} dark={scheme() === "dark"} foot={props.foot} agent={cardAgentCall} />
+			<Switch>
+				<Match when={first() instanceof Error}>
+					<p class="tab-missing">This document is not in the deck any more.</p>
+				</Match>
+				<Match when={first()}>
+					{(held) => (
+						<DocumentFrame
+							path={path}
+							title={nameOf(path)}
+							pass={(asked) => {
+								if (handed) return documentPass(asked);
+								handed = true;
+								return Promise.resolve(held() as Awaited<ReturnType<typeof documentPass>>);
+							}}
+							dark={scheme() === "dark"}
+							foot={props.foot}
+							agent={cardAgentCall}
+						/>
+					)}
+				</Match>
+			</Switch>
 		</div>
 	);
 }
