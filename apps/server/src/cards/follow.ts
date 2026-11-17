@@ -20,6 +20,18 @@ import type { CardService } from "./service.ts";
  */
 const RESYNC_MS = 4000;
 
+/**
+ * How long the deck's other files are quiet before the pages are told they changed, and the longest
+ * a run of changes is waited out.
+ *
+ * Every card reloads at this message, which carries the deck whole, so it is said once for a burst
+ * and not once for each file in it: an app building, a film's frames written, a folder copied in.
+ * Said for each, a few thousand files changed at once were a few thousand copies of the deck made
+ * and handed to every page faster than any could take them.
+ */
+const ASSETS_QUIET_MS = 200;
+const ASSETS_WAIT_MS = 1000;
+
 /** What following the deck needs of the harness. */
 export interface FollowHost {
 	/** The deck open now: asked each time, since another can be opened. */
@@ -57,6 +69,19 @@ export function followDeck(of: FollowHost): () => void {
 		}
 	};
 
+	/** The deck's other files changed: one `deck.changed` when they go quiet (`ASSETS_QUIET_MS`). */
+	let assets: { timer: NodeJS.Timeout; since: number } | undefined;
+	const assetsChanged = (): void => {
+		const since = assets?.since ?? Date.now();
+		if (assets) clearTimeout(assets.timer);
+		const timer = setTimeout(() => {
+			assets = undefined;
+			of.send({ type: "deck.changed", deck: of.state() });
+		}, Math.max(0, Math.min(ASSETS_QUIET_MS, since + ASSETS_WAIT_MS - Date.now())));
+		timer.unref?.();
+		assets = { timer, since };
+	};
+
 	const unwatch = watchDeck(of.deck().path, (change) => {
 			if (change.kind === "rescan") {
 				// A rename went past, or the watcher was replaced. Either way what we
@@ -77,6 +102,12 @@ export function followDeck(of: FollowHost): () => void {
 				return;
 			}
 			if (change.kind === "board") {
+				/*
+				 * Named, and not changed: its file and its folder are what they were when it was last read. A
+				 * copy of the deck's folder made by cloning names every file in it this way, and a card for each
+				 * was read again, recorded and said to every page.
+				 */
+				if (of.deck().unchanged(change.path)) return;
 				const board = of.deck().refresh(change.path);
 				// Whoever wrote it — the agent, an editor, a shell redirect — this is the
 				// moment the new version exists, so this is where it is recorded.
@@ -103,8 +134,8 @@ export function followDeck(of: FollowHost): () => void {
 				return;
 			}
 			// An asset under the deck moved. A board may be showing it, and the frame
-			// has no way to know, so every board reloads — cheap, and rare.
-			of.send({ type: "deck.changed", deck: of.state() });
+			// has no way to know, so every board reloads: once for a burst of them.
+			assetsChanged();
 		});
 
 		/*
@@ -126,5 +157,6 @@ export function followDeck(of: FollowHost): () => void {
 	return () => {
 		unwatch();
 		clearInterval(timer);
+		if (assets) clearTimeout(assets.timer);
 	};
 }

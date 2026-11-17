@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { test } from "node:test";
-import { watchDeck, type DeckChange } from "./watcher.ts";
+import { ignored, watchDeck, type DeckChange } from "./watcher.ts";
 import { realPathOf } from "./roots.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
@@ -136,4 +136,9 @@ test("nothing is reported after the watch is stopped", async () => {
 	await new Promise((resolve) => setTimeout(resolve, 300));
 	assert.deepEqual(changes, []);
 	rmSync(root, { recursive: true, force: true });
+});
+
+test("a .git or node_modules folder is not watched wherever it is, an app's among them", () => {
+	for (const path of [".decks/revisions/a", ".git/index", "node_modules/a/index.js", "apps/food/node_modules/a/index.js", "apps/food/.git/HEAD", "canvases/plan/files/site/node_modules/b.js"]) assert.equal(ignored(path), true, path);
+	for (const path of ["apps/food/index.html", "assets/a.png", "canvases/plan/cards/first/index.html", ".gitignore", "apps/food/.gitignore", "assets/node_modules.png"]) assert.equal(ignored(path), false, path);
 });

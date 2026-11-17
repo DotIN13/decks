@@ -316,6 +316,12 @@ export class Deck {
 		return { changed, removed };
 	}
 
+	/** Whether a card known here is on disk as it was last read: its file and its folder, by place, time and size (`pageSignature`). */
+	unchanged(boardPath: string): boolean {
+		const path = normalizeBoardPath(boardPath);
+		return this.boardsByPath.has(path) && this.signatures.get(path) === pageSignature(this.path, path);
+	}
+
 	/** Re-read one board after a change, keeping everything else as it is. */
 	refresh(boardPath: string): Page | undefined {
 		const path = normalizeBoardPath(boardPath);

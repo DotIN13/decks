@@ -14,14 +14,13 @@ export type DeckChange =
 	 */
 	| { kind: "rescan" };
 
-/** `.decks/` is the revision store, written *in response to* a change; watching it loops. */
-function ignored(path: string): boolean {
-	return (
-		path === ".decks" ||
-		path.startsWith(".decks/") ||
-		path.startsWith(".git/") ||
-		path.startsWith("node_modules/")
-	);
+/**
+ * `.decks/` is the revision store, written *in response to* a change; watching it loops. A `.git` or
+ * a `node_modules` folder is nobody's card or picture wherever it is, an app's among them
+ * (`apps/<name>/node_modules`), and one install writes tens of thousands of files into it.
+ */
+export function ignored(path: string): boolean {
+	return path === ".decks" || path.startsWith(".decks/") || /(^|\/)(\.git|node_modules)(\/|$)/.test(path);
 }
 
 /**
