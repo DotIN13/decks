@@ -1,5 +1,5 @@
 import type { Camera } from "@decks/protocol";
-import { createSignal, onCleanup, untrack, type JSX } from "solid-js";
+import { createSignal, untrack, type JSX } from "solid-js";
 import type { EditorState, CanvasComment } from "../../view/types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
 import type { InkTool } from "../../ink/ink.ts";
@@ -8,6 +8,8 @@ import { createSurface } from "./surface.tsx";
 import { createSync } from "./sync.ts";
 import { createWire } from "./wire.ts";
 import { createStart } from "./start.ts";
+import { createFrameFocus } from "./focus.ts";
+import { createFrameStores } from "./stores.ts";
 
 
 /** What the page answers for its frame beyond the editor's own options. */
@@ -159,31 +161,9 @@ export function createFramedEditor(options: Options): FramedEditor {
 	let localCamera: Camera = untrack(() => state?.camera?.[0]()) ?? options.camera ?? { x: 0, y: 0, zoom: 1 };
 	let darkNow = options.dark === true;
 	let modeNow: "edit" | "browse" = options.mode ?? "edit";
-	const storage = options.frame.storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
-	const storeKey = (canvas: string) => `decks.frame:${canvas}:`;
-	/**
-	 * Where an app inside a canvas keeps its browser storage on this page: by the app, not the canvas, so
-	 * the same app on another canvas reads the same values; the same keys its own tab uses on this origin
-	 * (`decks-canvas.js`, `server/src/apps/canvas-guest.ts`).
-	 */
-	const APP_STORE = "decks.app:";
-	/** What the frame's own views were kept under in that store (`createAgentViews`'s key "frame"). */
-	const FRAME_VIEWS = "decks.views:frame";
-
-	/** Every app's saved browser values on this page, by app name and key. */
-	const appStoredNow = (): Record<string, Record<string, string>> => {
-		const out: Record<string, Record<string, string>> = {};
-		if (!storage) return out;
-		for (let i = 0; i < (storage as Storage).length; i++) {
-			const key = (storage as Storage).key(i);
-			if (!key?.startsWith(APP_STORE)) continue;
-			const rest = key.slice(APP_STORE.length);
-			const at = rest.indexOf(":");
-			if (at <= 0) continue;
-			(out[rest.slice(0, at)] ??= {})[rest.slice(at + 1)] = storage.getItem(key) ?? "";
-		}
-		return out;
-	};
+	const { storage, storeKey, appStoredNow } = createFrameStores({
+		options,
+	});
 
 	/** A rectangle on the frame's screen, on this page's. */
 	const onPage = (at: Rect | undefined): DOMRect | undefined => {
@@ -193,49 +173,15 @@ export function createFramedEditor(options: Options): FramedEditor {
 		return new DOMRect(box.x + at.x, box.y + at.y, at.w, at.h);
 	};
 
-	/*
-	 * Whether you are using the canvas: the frame has focus, or had it a moment ago (the popover's Enter
-	 * moves focus out to the composer as the comment is handed over). Drafts for the composer are taken
-	 * only then: a card's script runs as the frame's own code, and could otherwise slip one in at any time.
-	 */
-	let frameLeftAt = 0;
-	let frameHadFocus = false;
-	const FOCUS_GRACE = 2000;
-	const frameFocused = () => {
-		const frame = frameAt();
-		return !!frame && document.activeElement === frame && document.hasFocus();
-	};
-	/*
-	 * And only just after a press or a key of yours: a script in the frame can focus it without one
-	 * (Chrome lets a sandboxed frame take focus from a timer), but cannot make one, and a press or a key
-	 * in the frame counts on this page too (`navigator.userActivation`, a few seconds long).
-	 */
-	const pressed = () => (typeof navigator === "undefined" || !navigator.userActivation ? true : navigator.userActivation.isActive);
-	const frameInUse = () => (frameFocused() || (frameLeftAt > 0 && Date.now() - frameLeftAt < FOCUS_GRACE)) && pressed();
-	if (typeof window !== "undefined") {
-		const noteFocus = () => {
-			const now = frameFocused();
-			if (frameHadFocus && !now) frameLeftAt = Date.now();
-			frameHadFocus = now;
-		};
-		// Focus going into the frame blurs this window; focus coming out lands on something here.
-		const onBlur = () => setTimeout(noteFocus, 0);
-		window.addEventListener("blur", onBlur);
-		window.addEventListener("focus", noteFocus);
-		document.addEventListener("focusin", noteFocus, true);
-		onCleanup(() => {
-			window.removeEventListener("blur", onBlur);
-			window.removeEventListener("focus", noteFocus);
-			document.removeEventListener("focusin", noteFocus, true);
-		});
-	}
+	const { frameInUse } = createFrameFocus({
+		frameAt,
+	});
 
 	const { startFrame } = createStart({
 		options,
 		state,
 		storage,
 		storeKey,
-		FRAME_VIEWS,
 		get darkNow() {
 			return darkNow;
 		},
@@ -273,7 +219,6 @@ export function createFramedEditor(options: Options): FramedEditor {
 		},
 		onPage,
 		storage,
-		APP_STORE,
 		storeKey,
 		frameAt,
 	});

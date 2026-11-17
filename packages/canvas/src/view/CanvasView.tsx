@@ -4,7 +4,7 @@ import { Show, createEffect, type Component, createMemo, createSignal, untrack }
 import { boxOf, fitInto, toWorld, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { viewPoint } from "../camera/coords.ts";
-import type { ItemSlotProps } from "../items/item-slot.tsx";
+import type { ItemSlotProps } from "../items/item-slot-props.ts";
 import type { DocEdits } from "../model/drawing.ts";
 import type { DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";

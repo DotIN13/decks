@@ -5,7 +5,7 @@ import type { Camera } from "@decks/protocol";
 import { pan } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import { untilReleased } from "../edit/held.ts";
-import type { ItemSlotProps } from "../items/item-slot.tsx";
+import type { ItemSlotProps } from "../items/item-slot-props.ts";
 import type { CanvasViewProps } from "./CanvasView.tsx";
 import type { ViewInputDeps } from "./input.ts";
 

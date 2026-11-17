@@ -583,26 +583,8 @@ export function wordsSelectedInCards(): boolean {
 	return roots.some((root) => ((root as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.()?.toString() ?? "").trim() !== "");
 }
 
-/**
- * Put a card into `host`: its own closed root, card.css adopted, its HTML (cleaned first when it is
- * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
- * they arrive.
- */
-export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
-	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
-	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
-	openRoots.add(root);
-	host.dataset.theme = source.theme;
-	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
-	const lib = new URL("../../lib/", source.url).href;
-	const sheetReady = cardSheet(lib).then((css) => {
-		if (css === undefined) return;
-		const style = document.createElement("style");
-		style.setAttribute(CARD_SHEET, "");
-		style.textContent = css;
-		root.prepend(style);
-	});
-
+/** A card's HTML read where nothing runs: its scripts taken out to be run in order, and a friend's stylesheets cleaned. */
+function readFragment(source: CardSource): { fragment: DocumentFragment; scripts: Array<{ src?: string; n?: number }> } {
 	// Parsed where nothing runs: a template's content is inert, scripts and all.
 	const template = document.createElement("template");
 	template.innerHTML = source.html;
@@ -637,6 +619,31 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 			.then((response) => (response.ok ? response.text() : ""))
 			.then((css) => (into.textContent = cleanCss(cssFromCard(css, href), href)))
 			.catch(() => undefined);
+
+	return { fragment, scripts };
+}
+
+/**
+ * Put a card into `host`: its own closed root, card.css adopted, its HTML (cleaned first when it is
+ * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
+ * they arrive.
+ */
+export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
+	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
+	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
+	openRoots.add(root);
+	host.dataset.theme = source.theme;
+	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
+	const lib = new URL("../../lib/", source.url).href;
+	const sheetReady = cardSheet(lib).then((css) => {
+		if (css === undefined) return;
+		const style = document.createElement("style");
+		style.setAttribute(CARD_SHEET, "");
+		style.textContent = css;
+		root.prepend(style);
+	});
+
+	const { fragment, scripts } = readFragment(source);
 	const body = document.createElement("div");
 	// Also `board`, so a board's own `.board .doc` rules match a card made from it.
 	body.className = "card-body board";

@@ -12,12 +12,10 @@
  * A board's frame reads what the editor says about it through `pageView(path)`, and nothing else.
  */
 import { type MediaItem, type PenNode } from "@decks/pen";
-import { onCleanup } from "solid-js";
-import { type BareTap, type LastTap } from "../core/dispatch.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
 import type { PageBox, PenTool, Pt } from "../core/model.ts";
 import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
-import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../core/pick.ts";
+import { blockAt, type Picked } from "../core/pick.ts";
 import type { SceneQuery } from "../core/scene.ts";
 import { type Editor } from "./controller.ts";
 import { createPageViews } from "./page-views.ts";
@@ -29,6 +27,8 @@ import { createStarts } from "./starts.ts";
 import { createFollow } from "./follow.ts";
 import { createPress } from "./press.ts";
 import { createPenPress } from "./pen-press.ts";
+import { createUnder } from "./under.ts";
+import { createPressMemory } from "./press-memory.ts";
 
 /** A point on the screen, as a pointer or mouse event has it. */
 export type Client = { clientX: number; clientY: number };
@@ -116,48 +116,11 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * camera, and what is carried stays under the cursor.
 	 */
 	const cameraWatchers = new Set<() => void>();
-	/**
-	 * When the camera was last dragged, so a double-click can tell itself apart from a pan.
-	 *
-	 * Chromium fires `dblclick` after two presses whatever happened between them, and a quick
-	 * pan is two presses with a lot happening between them — so without this, dragging the
-	 * canvas about would leave a new note behind at the end of it.
-	 */
-	let pannedAt = 0;
-	/**
-	 * What the last press landed on, before anything it did moved: a double-click's second press on a
-	 * handle whose edit is drawn at once (an arrow's bend put back) leaves bare canvas under the
-	 * pointer by the time `dblclick` comes, and that is not a double-click on the canvas or on what is
-	 * under it now (a note there would open for typing).
-	 */
-	let pressedOn: EventTarget | null = null;
-	const notePress = (event: PointerEvent) => {
-		pressedOn = event.target;
-	};
-	addEventListener("pointerdown", notePress, true);
-	onCleanup(() => removeEventListener("pointerdown", notePress, true));
-	let lastBareTap: BareTap | undefined;
-	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
-	let lastTap: LastTap | undefined;
+	const pressMemory = createPressMemory();
 
-	const worldAt = host.worldAt;
-	const pickAtHere = (at: Pt, options?: PickOptions) => pickAt(host.scene, at, options);
-	/**
-	 * The board whose picture is under a point and that has no node of its own to take the press
-	 * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
-	 */
-	const pictureUnder = (event: Client): string | undefined => {
-		const at = worldAt(event);
-		// The spatial index finds the few boards near the point; core decides among them, in paint order.
-		return pictureAt(host.pagesNear(at), at, host.rendered());
-	};
-	/**
-	 * A press on a drawn item's click shape (`render/engine.ts`, `attachHits`). Only items over a board have one, to take
-	 * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
-	 */
-	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
-	/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
-	const onCanvas = (target: EventTarget | null) => target === host.element() || onDrawn(target);
+	const { worldAt, pictureUnder, pickAtHere, onDrawn, onCanvas } = createUnder({
+		host,
+	});
 
 	const { followEditor, fingerIn, follow } = createFollow({
 		host,
@@ -201,10 +164,10 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		worldAt,
 		editor,
 		get lastBareTap() {
-			return lastBareTap;
+			return pressMemory.lastBareTap;
 		},
 		set lastBareTap(next) {
-			lastBareTap = next;
+			pressMemory.lastBareTap = next;
 		},
 	});
 
@@ -214,16 +177,16 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		editor,
 		host,
 		get lastTap() {
-			return lastTap;
+			return pressMemory.lastTap;
 		},
 		set lastTap(next) {
-			lastTap = next;
+			pressMemory.lastTap = next;
 		},
 	});
 
 	const { onDblClick } = createDoubleClick({
 		get pressedOn() {
-			return pressedOn;
+			return pressMemory.pressedOn;
 		},
 		host,
 		pickAtHere,
@@ -233,7 +196,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		editor,
 		pictureUnder,
 		get pannedAt() {
-			return pannedAt;
+			return pressMemory.pannedAt;
 		},
 	});
 
@@ -265,7 +228,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		},
 		/** The camera was dragged, or something carried: a double-click soon after is not one. */
 		panned: () => {
-			pannedAt = performance.now();
+			pressMemory.pannedAt = performance.now();
 		},
 		onPointerDown,
 		onPointerMove: onHover,

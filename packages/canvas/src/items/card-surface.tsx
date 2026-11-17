@@ -6,7 +6,9 @@ import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
 import { cardLoader } from "./card-load.ts";
 import { scheme } from "../base/theme.ts";
 import { markMissing } from "../base/missing.ts";
-import { canvasHost, freshAddress, openInTab } from "../base/host.ts";
+import { canvasHost } from "../base/host.ts";
+import { createCardLinks } from "./card-links.ts";
+import type { CardSurfaceProps } from "./card-surface-props.ts";
 
 /** The cards mounted on this page, by path: how each is written out for an agent's screenshot (`card-snapshot.ts`). */
 const shots = new Map<string, () => CardShot | undefined>();
@@ -28,31 +30,7 @@ export function cardShot(path: string): CardShot | undefined {
  * module's and act through `card.decks` (`card.ts`), answered where the host says
  * (`CanvasHost.cardCall`). A card has no `data-eval` blocks.
  */
-export function CardSurface(props: {
-	page: string;
-	path: string;
-	trusted: boolean;
-	rev: number;
-	/** The revision is of a change of size alone: the card keeps the document it has (`Page.sized`). */
-	sized?: true | undefined;
-	reload?: number | undefined;
-	size: () => { w: number; h: number };
-	selected: boolean;
-	onSelect: () => void;
-	/**
-	 * A mouse or pen press with Shift (or ⌘) inside the card, offered to the editor as a press on the
-	 * card's edge is (`PageView.press`): it adds the card to the selection, or takes it out, rather
-	 * than picking it alone. True when the editor took it.
-	 */
-	onAddPress?: ((event: PointerEvent, on: HTMLElement) => boolean) | undefined;
-	onShown: () => void;
-	/** Open a board or card the card links to, beside it (`CanvasView`'s `onOpenPage`), by its deck path. */
-	onOpenPage?: ((path: string) => void) | undefined;
-	/** The card's content height, for `decks.canvas.fit` (`card-reading.ts`): its file's height stays the floor. */
-	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
-	/** Words selected in the card, when a press or a key ends a selection: what to quote, the block they are in, and where they are. */
-	onWords?: ((words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void) | undefined;
-}) {
+export function CardSurface(props: CardSurfaceProps) {
 	let host!: HTMLDivElement;
 	// For the checks: how many surfaces were made for each card, and how many times each mounted its file.
 	const made = probes.made;
@@ -190,70 +168,10 @@ export function CardSurface(props: {
 		props.onWords({ quote, ...(component ? { component } : {}), anchor: () => (range.collapsed ? undefined : range.getBoundingClientRect()) });
 	};
 
-	/*
-	 * A link in a card never takes the app's own page away. Its address is read against the card's own
-	 * (`../../files/plan.html` is a file of the card's canvas), never against the page the card is drawn
-	 * in. A link to another card (`cards/<name>/index.html`) or a board opens it beside this one, as on a
-	 * board (`card.js`); a link with `download` saves the file, under the name it gives; any other link,
-	 * a file of the deck's among them, opens in a tab of its own.
-	 */
-	const followLink = (event: MouseEvent) => {
-		if (event.defaultPrevented || event.button !== 0) return;
-		const origin = event.composedPath()[0];
-		const link = origin instanceof Element ? origin.closest("a[href]") : null;
-		const href = link?.getAttribute("href");
-		if (!link || !href || href.startsWith("#")) return;
-		event.preventDefault();
-		let url: URL;
-		try {
-			url = new URL(href, stamped());
-		} catch {
-			return;
-		}
-		if (!/^(?:https?|blob|data):$/.test(url.protocol)) return;
-		const address = freshAddress(url.href);
-		if (link.hasAttribute("download")) return void saveFile(address, link.getAttribute("download") || decodeURIComponent(url.pathname.split("/").pop() ?? "") || "download");
-		const page = pageOf(url);
-		if (page && opensBeside(page) && props.onOpenPage) return props.onOpenPage(page);
-		openInTab(address);
-	};
-
-	/**
-	 * A file saved as a download from inside the canvas's frame: the browser saves a link's `download` only
-	 * for an address of the page's own origin, which the frame's blank origin never is, so the file is
-	 * fetched and saved from memory. One that cannot be fetched (another site's, which says no) opens in a tab.
-	 */
-	const saveFile = async (address: string, name: string) => {
-		try {
-			const response = await fetch(address);
-			if (!response.ok) throw new Error(String(response.status));
-			const blob = await response.blob();
-			const local = URL.createObjectURL(blob);
-			const anchor = document.createElement("a");
-			anchor.href = local;
-			anchor.download = name;
-			anchor.style.display = "none";
-			document.body.append(anchor);
-			anchor.click();
-			anchor.remove();
-			setTimeout(() => URL.revokeObjectURL(local), 60_000);
-		} catch {
-			openInTab(address);
-		}
-	};
-
-	/**
-	 * The deck path a link names: under the app's `/api/card/` on this
-	 * page's origin, or, in the canvas frame, under its pass's address, which only its host knows.
-	 */
-	const pageOf = (url: URL): string | undefined => {
-		const prefix = /\/api\/card\//.exec(url.pathname);
-		const named = url.origin === location.origin && prefix ? decodeURIComponent(url.pathname.slice(prefix.index + prefix[0].length)) : canvasHost().cardLink(url.href, location.href);
-		const path = named?.replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
-		return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;
-	};
-	/** Whether a deck path is one the canvas opens beside a card: another card, or a board. */
-	const opensBeside = (path: string) => /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path) || /(?:^|\/)boards\/.+\.html?$/i.test(path);
+	const { followLink } = createCardLinks({
+		stamped,
+		props,
+	});
 
 	return <div class="card-surface" ref={(element) => (host = element)} style={{ width: "100%", height: "100%" }} />;
 }

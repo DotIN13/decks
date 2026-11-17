@@ -4,6 +4,7 @@ import { dismissMenus } from "@decks/ui";
 import type { EditorState } from "../../view/types.ts";
 import { CallRefused, type PageEnd, type Rect } from "../protocol.ts";
 import { type FramedEditorOptions } from "./host.tsx";
+import { APP_STORE } from "./stores.ts";
 
 /** What `createWire` reads of `createFramedEditor` (`host.tsx`), each read when it is used. */
 export interface WireNeeds {
@@ -14,7 +15,6 @@ export interface WireNeeds {
 	localCamera: Camera;
 	readonly onPage: (at: Rect | undefined) => DOMRect | undefined;
 	readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | undefined;
-	readonly APP_STORE: "decks.app:";
 	readonly storeKey: (canvas: string) => string;
 	readonly frameAt: Accessor<HTMLIFrameElement | undefined>;
 }
@@ -79,7 +79,7 @@ export function createWire(d: WireNeeds) {
 		page.on("export", (data) => d.options.onExport?.(data.ids, data.format));
 		page.on("app-store", (data) => {
 			if (!d.storage || !data.app || data.app.includes(":")) return;
-			const key = `${d.APP_STORE}${data.app}:${data.key}`;
+			const key = `${APP_STORE}${data.app}:${data.key}`;
 			if (data.value === null) d.storage.removeItem(key);
 			else d.storage.setItem(key, data.value);
 		});

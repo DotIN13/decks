@@ -3,7 +3,7 @@ import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import type { ItemSlotProps } from "../items/item-slot.tsx";
+import type { ItemSlotProps } from "../items/item-slot-props.ts";
 import { AWAKE, DEVICE, ENGINE, MOVING } from "../render/device.ts";
 import type { CanvasEngine } from "../render/engine.ts";
 import type { CanvasEditor } from "../edit/dom/index.ts";

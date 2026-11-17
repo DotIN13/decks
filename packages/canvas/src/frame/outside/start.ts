@@ -5,6 +5,7 @@ import type { EditorState } from "../../view/types.ts";
 import { insets } from "../../camera/insets.ts";
 import { PROTOCOL, peer, type PageEnd, type Start } from "../protocol.ts";
 import { type CanvasPass, type FramedEditorOptions, } from "./host.tsx";
+import { FRAME_VIEWS } from "./stores.ts";
 
 /** How long after a failed renewal it is asked for again. */
 const RETRY_MS = 30_000;
@@ -15,7 +16,6 @@ export interface StartNeeds {
 	readonly state: EditorState | undefined;
 	readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | undefined;
 	readonly storeKey: (canvas: string) => string;
-	readonly FRAME_VIEWS: "decks.views:frame";
 	readonly darkNow: boolean;
 	readonly modeNow: "edit" | "browse";
 	readonly localCamera: Camera;
@@ -61,9 +61,9 @@ export function createStart(d: StartNeeds) {
 					if (key?.startsWith(prefix)) stored[key.slice(prefix.length)] = d.storage.getItem(key) ?? "";
 				}
 				// A harness's frame keeps no view of its own any more (the page keeps one per agent and canvas): what one kept is dropped.
-				if (backend.kind !== "studio" && d.FRAME_VIEWS in stored) {
-					delete stored[d.FRAME_VIEWS];
-					d.storage.removeItem(prefix + d.FRAME_VIEWS);
+				if (backend.kind !== "studio" && FRAME_VIEWS in stored) {
+					delete stored[FRAME_VIEWS];
+					d.storage.removeItem(prefix + FRAME_VIEWS);
 				}
 			}
 			const start: Start = {

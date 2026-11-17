@@ -1,10 +1,11 @@
 import { SHAPE_GROUPS, SHAPES } from "@decks/pen";
 import Search from "lucide-solid/icons/search";
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../edit/pen-tools.ts";
-import { Icon, onDismiss } from "@decks/ui";
+import { Icon } from "@decks/ui";
 import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "../look/icon-index.ts";
 import { iconUrl } from "../look/icons.ts";
+import { createInsertPlace } from "./insert-place.ts";
 
 /**
  * The insert panel: the shape library, or the icons — two panels, one for each button in the tool
@@ -74,44 +75,11 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 		props.onPick("icon");
 	};
 
-	/*
-	 * Where it sits: beside the tool column, or at the point it was opened for, kept on screen.
-	 */
-	const [place, setPlace] = createSignal<{ left: number; top: number }>({ left: 64, top: 80 });
-	const position = () => {
-		const width = 288;
-		const height = panel?.offsetHeight ?? 460;
-		if (props.open.client) {
-			const left = Math.max(8, Math.min(props.open.client.x - 20, window.innerWidth - width - 8));
-			const top = Math.max(8, Math.min(props.open.client.y + 12, window.innerHeight - height - 8));
-			return setPlace({ left, top });
-		}
-		const tools = document.querySelector(".pen-tools")?.getBoundingClientRect();
-		const left = tools ? tools.right + 8 : 64;
-		const top = Math.max(8, Math.min(tools ? tools.top : 80, window.innerHeight - height - 8));
-		setPlace({ left, top });
-	};
-	onMount(() => {
-		position();
-		requestAnimationFrame(position);
-		window.addEventListener("resize", position);
-		const away = (event: PointerEvent) => {
-			const target = event.target as Element | null;
-			if (panel?.contains(target) || target?.closest?.("[data-insert-button]")) return;
-			props.onClose();
-		};
-		const key = (event: KeyboardEvent) => {
-			if (event.key === "Escape") props.onClose();
-		};
-		window.addEventListener("pointerdown", away, true);
-		window.addEventListener("keydown", key);
-		const stopDismiss = onDismiss(() => props.onClose());
-		onCleanup(() => {
-			stopDismiss();
-			window.removeEventListener("resize", position);
-			window.removeEventListener("pointerdown", away, true);
-			window.removeEventListener("keydown", key);
-		});
+	const { place } = createInsertPlace({
+		get panel() {
+			return panel;
+		},
+		props,
 	});
 
 	return (

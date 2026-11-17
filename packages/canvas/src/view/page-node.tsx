@@ -2,7 +2,7 @@ import type { Page, Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, untrack, type Accessor, type Component } from "solid-js";
 import { boxOf } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import type { ItemSlotProps } from "../items/item-slot.tsx";
+import type { ItemSlotProps } from "../items/item-slot-props.ts";
 import { drawing } from "../ink/ink.ts";
 import type { CanvasEditor } from "../edit/dom/index.ts";
 import type { CanvasViewProps } from "./CanvasView.tsx";
