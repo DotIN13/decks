@@ -9,11 +9,26 @@ export interface SelectedWords {
  * Hear a card's root for words selected in it, and say them (`onWords`, read at each time, so a card
  * nobody comments on reads nothing). A selection ends with a press let go, or a key with Shift: a
  * moment later, it is read.
+ *
+ * Only a press that began in this card: one that began elsewhere and ends here selected nothing in it.
+ * A drag out of the comment box, which the page draws over the words it is on, is let go over the card
+ * and heard here as a release alone; read then, the words still selected were offered again, and the
+ * box began anew, shut and empty.
  */
 export function listenForWords(root: ShadowRoot, onWords: () => ((words: SelectedWords) => void) | undefined): void {
 	const readSoon = () => void setTimeout(() => readWords(root, onWords()), 0);
-	root.addEventListener("pointerup", readSoon);
+	root.addEventListener("pointerdown", () => (pressedIn = root));
+	root.addEventListener("pointerup", () => pressedIn === root && readSoon());
 	root.addEventListener("keyup", (event) => (event as KeyboardEvent).shiftKey && readSoon());
+}
+
+/** The root a press began in, until that press ends, wherever it ends: one press at a time, for every card of this document. */
+let pressedIn: ShadowRoot | undefined;
+if (typeof document !== "undefined") {
+	// After every listener has heard the release, the root's own among them.
+	const pressOver = () => void setTimeout(() => (pressedIn = undefined), 0);
+	document.addEventListener("pointerup", pressOver, true);
+	document.addEventListener("pointercancel", pressOver, true);
 }
 
 /**

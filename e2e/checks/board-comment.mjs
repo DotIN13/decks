@@ -66,6 +66,28 @@ if (line) {
 		const quote = opened ? await popup.locator(".comment-quote").innerText().catch(() => "") : "";
 		say("pressing it opens the box on those words", opened && quote.trim().length > 0, quote);
 		if (opened) {
+			/*
+			 * A press that starts in the box is the box's wherever it ends: a drag from the field that runs out
+			 * over the card's words, the button let go there, leaves the box as it was, open with what was
+			 * typed. The card heard the press end over its words, read the words still selected in it and
+			 * offered them again, and the box began anew, shut and empty.
+			 */
+			await field.fill("Typed, then dragged out of");
+			const typed = await field.boundingBox();
+			const around = await popup.boundingBox();
+			const clearOfBox = (at) => at.x < around.x - 12 || at.x > around.x + around.width + 12 || at.y < around.y - 12 || at.y > around.y + around.height + 12;
+			// On the card's words, clear of the box: the selected line itself, or the heading over it.
+			const out = [{ x: line.x + line.w / 2, y: line.y }, { x: line.x + line.w / 2, y: line.y - 34 }, { x: line.x - 60, y: line.y }].find(clearOfBox);
+			say("there are words on the card clear of the box", !!out, JSON.stringify({ line, around }));
+			if (out) {
+				await page.mouse.move(typed.x + typed.width - 30, typed.y + 14);
+				await page.mouse.down();
+				await page.mouse.move(out.x, out.y, { steps: 10 });
+				await page.waitForTimeout(150);
+				await page.mouse.up();
+				await settle(page, 500);
+				say("a press in the field, dragged out over the card's words and let go, leaves the box open with what was typed", (await field.isVisible().catch(() => false)) && (await field.inputValue().catch(() => "")) === "Typed, then dragged out of", JSON.stringify({ out, field: await field.isVisible().catch(() => false), start: await popup.locator(".comment-start").isVisible().catch(() => false) }));
+			}
 			await field.fill("A note on these words");
 			await page.keyboard.press("Enter");
 			const kept = await until(async () => !(await popup.isVisible().catch(() => false)) && (await page.locator(".dock").innerText().catch(() => "")).includes(quote.trim().slice(0, 12)));

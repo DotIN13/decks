@@ -91,7 +91,12 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		onViewport: () => reportCameraSoon(camera()),
 		onExport: exportPicture,
 		onRefer: frameRefer,
-		onComment: (target) => setCommenting(target),
+		// The same words offered again are the comment already open, with what is typed in it.
+		onComment: (target) => {
+			const now = untrack(commenting);
+			if (now && !target.open && now.path === target.path && now.quote === target.quote && now.component === target.component) return;
+			setCommenting(target);
+		},
 		frame: {
 			pass: canvasPass,
 			// Between canvases that are yours alone the frame moves in place; a friend's, or one someone else may edit, gets a frame of its own.
