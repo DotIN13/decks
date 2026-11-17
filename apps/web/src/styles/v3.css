@@ -1327,19 +1327,6 @@ body {
 	.dock .dock-to[data-compact="true"] .dock-to-chip[aria-expanded="true"] {
 		background: var(--v3-bg3);
 	}
-	/* The tab a message says it was written on (`tabs/about.ts`), beside the recipient in the composer's row. */
-	.dock .dock-row .dock-about {
-		height: 30px;
-		padding: 0 10px;
-		border: 1px solid var(--v3-line);
-		border-radius: 15px;
-		background: transparent;
-		color: var(--v3-fg);
-		font-size: 13px;
-	}
-	.dock .dock-row .dock-about:hover {
-		background: var(--v3-bg3);
-	}
 	.dock .dock-to[data-compact="true"] .dock-to-name {
 		max-width: 140px;
 		font-size: 14px;
@@ -1856,10 +1843,6 @@ body {
 		margin: 0;
 		overflow: hidden;
 		visibility: hidden;
-	}
-	/* A phone's composer row is short: the tab's chip gives way before the model's name does. */
-	.app[data-phone="true"] .dock .dock-row .dock-about {
-		max-width: 132px;
 	}
 	/* The canvas's tool row goes with them: it stood where it was, over the open panel. */
 	.app[data-phone="true"] .frame-tool-row {

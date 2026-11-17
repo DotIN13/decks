@@ -1,5 +1,4 @@
 import { Icon } from "@decks/ui";
-import { aboutTab, toggleAbout } from "../tabs/about.ts";
 import type { ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import { Show } from "solid-js";
@@ -95,10 +94,6 @@ export function DockBar(props: { parts: Parts }) {
 						onClose: closeAgent,
 						onMore: openAgentsPanel,
 					}}
-					about={(() => {
-						const about = aboutTab();
-						return about ? { name: about.name, on: about.on, toggle: toggleAbout } : undefined;
-					})()}
 					mentionables={state.chats.map((chat) => ({ name: agentName(chat.id), chat }))}
 					onAbort={() => void call("chat.abort", [state.focused ?? ""])}
 					/*

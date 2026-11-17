@@ -128,8 +128,6 @@ export function Composer(props: {
 	destination?: string;
 	/** Who gets the line, as a chip that can change it. Without it the word alone is drawn. */
 	recipient?: RecipientProps;
-	/** The tab the message will say it was written on, when that is not the agent's own canvas (`tabs/about.ts`): a chip, and a press leaves it out. */
-	about?: { name: string; on: boolean; toggle: () => void };
 	/** Everybody an `@` can name, for the completion under the caret. */
 	mentionables?: Mentionable[];
 	/** The text as it is typed, so the destination word can follow an @ name. */
@@ -774,14 +772,6 @@ export function Composer(props: {
 					>
 					<Show when={props.recipient} fallback={<Show when={props.destination}>{(word) => <span class="dock-to" data-dest={word()}>{word()}</span>}</Show>}>
 						{(recipient) => <Recipient {...recipient()} compact />}
-					</Show>
-					<Show when={props.about}>
-						{(about) => (
-							<button type="button" class="dock-about" aria-pressed={about().on} data-tip={about().on ? "Your message says you wrote it on this tab. Press to leave that out." : "Your message does not say which tab you are on. Press to say it."} onClick={() => about().toggle()}>
-								<span class="dock-about-word">{about().on ? "On" : "Not on"}</span>
-								<span class="dock-about-name">{about().name}</span>
-							</button>
-						)}
 					</Show>
 					<Show when={props.onAttach}>
 						<button class="icon-button" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>

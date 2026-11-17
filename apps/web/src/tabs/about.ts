@@ -1,37 +1,23 @@
-import { createSignal } from "solid-js";
 import { kindOf } from "./kinds.ts";
-import { front } from "./tabs.ts";
+import { cameraCanvasTab, front } from "./tabs.ts";
 
 /**
- * What a message says of the tab it was written on.
+ * What a message says of where it was written.
  *
  * The composer talks to the agent of the conversation on screen whichever tab is in front, and an
- * agent has no canvas of its own to take "here" for: its calls name the canvas they work on. So the
- * message says where the person was: one line in front of the words, in the agent's text only,
- * naming what they were looking at as its kind names it (`TabKind.says`), a canvas by the name a
- * call can use. The composer shows that it will, as a chip with the tab's name, and a press on the
- * chip leaves it out for that tab.
+ * agent has no canvas of its own to take "here" for: its calls name the canvas they work on. So
+ * every message says where the chat's camera was: one line in front of the words, in the agent's
+ * text only, naming what the person was looking at as its kind names it (`TabKind.says`), a canvas
+ * by the name a call can use; with a card, a document or an app in front, the canvas held behind it
+ * too. It is always there: the composer shows nothing of it and offers no way to leave it out, and
+ * the message kept in the conversation is the words alone (`app/bar.ts`).
  */
-const [left, setLeft] = createSignal<readonly string[]>([]);
-
-/** The tab a message would name now: the one in front, when there is something on it. With whether the person left it out. */
-export function aboutTab(): { id: string; name: string; on: boolean } | undefined {
-	const tab = front();
-	const kind = kindOf(tab.kind);
-	if (!kind?.says(tab)) return undefined;
-	return { id: tab.id, name: kind.title(tab) ?? tab.target ?? "", on: !left().includes(tab.id) };
-}
-
-/** Leave the tab in front out of the messages written on it, or put it back. */
-export function toggleAbout(): void {
-	const id = front().id;
-	setLeft((was) => (was.includes(id) ? was.filter((one) => one !== id) : [...was, id]));
-}
-
-/** The line a message written now carries in front of its words, for the agent: none when left out, or on a chat with no canvas. */
 export function aboutLine(): string | undefined {
-	const about = aboutTab();
-	if (!about?.on) return undefined;
 	const tab = front();
-	return `[The person wrote this while looking at ${kindOf(tab.kind)!.says(tab)}.]`;
+	const says = kindOf(tab.kind)?.says(tab);
+	// A chat on no canvas yet has nothing to say of where it is.
+	if (!says) return undefined;
+	const canvas = cameraCanvasTab();
+	const behind = tab === canvas ? undefined : kindOf(canvas.kind)?.says(canvas);
+	return `[The person wrote this while looking at ${says}${behind ? `, with ${behind} behind it` : ""}.]`;
 }

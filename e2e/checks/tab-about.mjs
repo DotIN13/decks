@@ -1,11 +1,11 @@
 /**
- * A message says which tab it was written on (`apps/web/src/tabs/about.ts`).
+ * A message says where the chat's camera was (`apps/web/src/tabs/about.ts`).
  *
  * The composer talks to the agent of the conversation on screen whichever tab is in front, and an agent
- * has no home canvas to take "here" for. So the composer shows a chip with the name of the tab in
- * front, a canvas, a card, a document or an app, and the agent's text carries one line in front of
- * the words saying what the person was looking at, a canvas by the name a call can use, while the
- * message kept in the conversation is the words alone. A press on the chip leaves the line out.
+ * has no home canvas to take "here" for. So the agent's text always carries one line in front of the
+ * words saying what the person was looking at: a canvas by the name a call can use, and a card, a
+ * document or an app with the canvas held behind it. The composer shows nothing of it and has no way
+ * to leave it out, and the message kept in the conversation is the words alone.
  *
  * No agent runs here: the page's line is routed, and what it would send an agent is held back and read.
  */
@@ -61,33 +61,29 @@ const write = async (words) => {
 	return sent.at(-1);
 };
 
-// --- on the chat's canvas: the composer names it, and the agent is told where the person is ----------------
-const chip = page.locator(".dock-about");
-say("the composer names the canvas the chat's camera is on", (await until(() => chip.count())) === 1 && (await chip.getAttribute("aria-pressed")) === "true" && (await chip.innerText()).includes("Auth refresh"), await chip.innerText().catch(() => ""));
+// --- on the chat's canvas: the agent is told where the person is, and the composer says nothing of it --------
+if (process.env.LOOK_SHOTS) await page.locator(".dock").first().screenshot({ path: `${process.env.LOOK_SHOTS}/composer.png` });
+say("the composer has no chip for it: nothing to press, nothing to leave out", (await page.locator(".dock-about").count()) === 0 && !/\bOn\b/.test(await page.locator(".dock .dock-row").first().innerText()), await page.locator(".dock .dock-row").first().innerText().catch(() => ""));
 const first = await write("hello from the first canvas");
 say("the agent's text says which canvas the person was looking at, by the name a call can use", first?.text === `[The person wrote this while looking at the canvas "Auth refresh" (--canvas ${CANVAS}).]\n\nhello from the first canvas`, JSON.stringify(first?.text));
 say("…and the message kept is the words alone", JSON.stringify(first?.parts) === JSON.stringify([{ type: "text", text: "hello from the first canvas" }]), JSON.stringify(first?.parts));
 
-// --- the camera on another canvas: the chip and the line follow ----------------------------------------------
+// --- the camera on another canvas: the line follows ------------------------------------------------------------
 await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
 await page.locator('.switcher-canvas:has-text("Tab two")').click();
-say("with the camera on another canvas the composer names that one", (await until(async () => ((await chip.innerText()).includes("Tab two") ? true : undefined))) === true && (await chip.getAttribute("aria-pressed")) === "true", await chip.innerText().catch(() => ""));
+await until(async () => ((await page.locator('.v3-topbar .tab-chip[data-camera="true"]').innerText()).includes("Tab two") ? true : undefined));
 const there = await write("hello from the tab");
-say("…and so does the agent's text", there?.text === `[The person wrote this while looking at the canvas "Tab two" (--canvas ${second}).]\n\nhello from the tab`, JSON.stringify(there?.text));
+say("with the camera on another canvas the agent's text names that one", there?.text === `[The person wrote this while looking at the canvas "Tab two" (--canvas ${second}).]\n\nhello from the tab`, JSON.stringify(there?.text));
+const again = await write("and again");
+say("…in every message, not only the first", again?.text === `[The person wrote this while looking at the canvas "Tab two" (--canvas ${second}).]\n\nand again`, JSON.stringify(again?.text));
 
-// --- left out with a press ----------------------------------------------------------------------------------
-await chip.click();
-say("a press on the chip leaves the tab out", (await chip.getAttribute("aria-pressed")) === "false");
-const without = await write("hello, no tab");
-say("…and the message goes as written", without?.text === "hello, no tab" && without?.parts === undefined, JSON.stringify(without));
-await chip.click();
-say("a second press puts it back", (await chip.getAttribute("aria-pressed")) === "true" && /looking at the canvas/.test((await write("back on")).text ?? ""));
-
-// --- a card in front: the line names the card ------------------------------------------------------------------
+// --- a card in front: the line names the card, and the canvas behind it ------------------------------------------
 await call("view.open", [card("plan")]);
-say("with a card in front the composer names the card", (await until(async () => (/plan/i.test(await chip.innerText()) ? true : undefined))) === true, await chip.innerText().catch(() => ""));
+await until(() => page.locator('.tab-chip[data-kind="card"][data-front="true"]').count());
 const onCard = await write("about this card");
-say("…and the agent's text names it by its path", (onCard?.text ?? "").startsWith(`[The person wrote this while looking at the card "`) && (onCard?.text ?? "").includes(`(@${card("plan")})`), JSON.stringify(onCard?.text));
+say("with a card in front the agent's text names it by its path", (onCard?.text ?? "").startsWith(`[The person wrote this while looking at the card "`) && (onCard?.text ?? "").includes(`(@${card("plan")})`), JSON.stringify(onCard?.text));
+say("…and the canvas held behind it, by the name a call can use", (onCard?.text ?? "").includes(`, with the canvas "Tab two" (--canvas ${second}) behind it.]\n\nabout this card`), JSON.stringify(onCard?.text));
+say("…and the message kept is still the words alone", JSON.stringify(onCard?.parts) === JSON.stringify([{ type: "text", text: "about this card" }]), JSON.stringify(onCard?.parts));
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();
