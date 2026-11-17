@@ -9,7 +9,8 @@
  * already open comes forward and no second is made; ⌘ asks for the browser's tab; and a link to
  * something that is not in the deck says so and opens nothing. And a link chip, a link as an item of
  * its own (`decks canvas insert --type link --to …`): a click opens it and leaves nothing selected,
- * Shift-click selects it and opens nothing, and a drag moves it and opens nothing.
+ * Shift-click selects it and opens nothing, and a drag moves it and opens nothing. One is added by
+ * hand from the card tool's menu (Link to…, the finder the row of tabs' + has) or by pasting an address.
  */
 import { API, CANVAS, asPerson, canvasFrame, card, open, resetStage, rest, say, settle } from "../harness.mjs";
 
@@ -170,6 +171,38 @@ await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').cl
 await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined));
 await settle(page, 400);
 say("…and back on the canvas the chip is not left selected", (await selected()) === 0, String(await selected()));
+// --- adding one by hand: the tool column's "Link to…", and a pasted address ------------------------------------------
+const links = async () => ((await call("canvas.read", [{ canvas: CANVAS }])).value?.items ?? []).filter((item) => item.type === "link").map((item) => `${item.to}|${item.title}`);
+const before = await links();
+const tabsBefore = JSON.stringify(await row());
+await page.locator('.pen-tools [data-tool="card"]').first().click();
+await page.locator(".v3-menu-row", { hasText: "Link to" }).first().click();
+const finder = page.locator('input[aria-label="Link to a canvas, an app, a card or a document"]');
+say("the card tool's menu has Link to…, which opens the finder the row of tabs' + has, with the select tool back in hand", (await until(() => finder.count())) === 1 && (await page.locator('.pen-tools [data-tool="select"]').first().getAttribute("data-on")) === "true" && (await page.locator('.popover .switcher-canvas:has-text("Tab two")').count()) === 1 && (await page.locator(".popover", { hasText: "New canvas" }).count()) === 0);
+if (process.env.LOOK_SHOTS) await page.screenshot({ path: `${process.env.LOOK_SHOTS}/links-finder.png` });
+await finder.fill("plan");
+await page.locator('.popover .open-offer[data-kind="card"]').first().click();
+const made = await until(async () => {
+	const now = await links();
+	return now.length === before.length + 1 ? now.find((one) => !before.includes(one)) : undefined;
+});
+say("a pick puts a chip on the canvas that points at it, and opens nothing", !!made && made.startsWith(`#card/${plan}|`) && JSON.stringify(await row()) === tabsBefore && (await finder.count()) === 0, `${made} ${JSON.stringify(await row())}`);
+// An address pasted with the keyboard on the canvas: a chip, where words would be a note.
+const frame = await canvasFrame(page);
+const pasting = (text) =>
+	frame.evaluate((words) => {
+		const data = new DataTransfer();
+		data.setData("text/plain", words);
+		document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+	}, text);
+await pasting("#app/budget");
+const pasted = await until(async () => ((await links()).filter((one) => one.startsWith("#app/budget|")).length === 2 ? true : undefined));
+say("an address pasted on the canvas lands as a chip", pasted === true, JSON.stringify(await links()));
+await pasting("just some words");
+const notes = await until(async () => (((await call("canvas.read", [{ canvas: CANVAS }])).value?.items ?? []).some((item) => item.type === "note" && item.content === "just some words") ? true : undefined));
+say("…and words that are no address are still a note", notes === true);
+await page.mouse.click((other.x + at.x) / 2, Math.min(other.y, at.y) - 90);
+
 // The pointer shows it is a link.
 at = await whole(chip.id);
 await page.mouse.move(at.x - 3, at.y);

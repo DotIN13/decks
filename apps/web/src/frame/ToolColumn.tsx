@@ -8,6 +8,7 @@ import FileText from "lucide-solid/icons/file-text";
 import FrameIcon from "lucide-solid/icons/frame";
 import Hand from "lucide-solid/icons/hand";
 import Minus from "lucide-solid/icons/minus";
+import Link2 from "lucide-solid/icons/link-2";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import SquareDashedMousePointer from "lucide-solid/icons/square-dashed-mouse-pointer";
 import Paperclip from "lucide-solid/icons/paperclip";
@@ -68,6 +69,8 @@ export function ToolColumn(props: {
 	onStep: (direction: "undo" | "redo") => void;
 	onOpenFile?: () => void;
 	onApps: () => void;
+	/** Put a link to something in the deck on the canvas: the finder opens beside the element given (`tabs/LinkFinder.tsx`). */
+	onLink?: (beside: HTMLElement) => void;
 	/** The column as a float: dragged by its grip (`App.tsx`, `mountToolsFloat`). */
 	onFloat?: (tools: HTMLElement, grip: HTMLElement) => { unstow: () => void };
 	/** On a phone the column is a row above the composer. */
@@ -172,6 +175,7 @@ export function ToolColumn(props: {
 			return [
 				{ id: "document", label: "Markdown card", icon: FileText, key: "D", pick: () => arm("card") },
 				{ id: "app", label: "App", icon: AppWindow, pick: () => props.onApps() },
+				...(props.onLink ? [{ id: "link", label: "Link to…", icon: Link2, rule: true, pick: () => (select(), props.onLink?.(column?.querySelector<HTMLElement>('[data-tool="card"]') ?? column!)) }] : []),
 			];
 		if (family === "arrow")
 			return [
