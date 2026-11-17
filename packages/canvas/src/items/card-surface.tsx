@@ -8,6 +8,7 @@ import { scheme } from "../base/theme.ts";
 import { markMissing } from "../base/missing.ts";
 import { canvasHost } from "../base/host.ts";
 import { createCardLinks } from "./card-links.ts";
+import { listenForWords } from "./card-selected-words.ts";
 import type { CardSurfaceProps } from "./card-surface-props.ts";
 
 /** The cards mounted on this page, by path: how each is written out for an agent's screenshot (`card-snapshot.ts`). */
@@ -134,38 +135,7 @@ export function CardSurface(props: CardSurfaceProps) {
 	const listen = (root: ShadowRoot, element: HTMLElement) => {
 		ownInput(root, element, { selected: () => props.selected, onSelect: () => props.onSelect(), onAddPress: props.onAddPress });
 		root.addEventListener("click", (event) => followLink(event as MouseEvent));
-		// A selection ends with a press let go, or a key with Shift: a moment later, it is read.
-		const readSoon = () => void setTimeout(() => readWords(root), 0);
-		root.addEventListener("pointerup", readSoon);
-		root.addEventListener("keyup", (event) => (event as KeyboardEvent).shiftKey && readSoon());
-	};
-
-	/**
-	 * The words selected in this card. A closed root hides its selection from the page's `getSelection()`,
-	 * which reports the host; `getComposedRanges`, handed the root, gives the range inside it.
-	 */
-	const readWords = (root: ShadowRoot) => {
-		if (!props.onWords) return;
-		const selection = document.getSelection() as (Selection & { getComposedRanges?: (...args: unknown[]) => StaticRange[] }) | null;
-		// Not `isCollapsed`: seen from the page, a selection inside a shadow root is collapsed at its host.
-		if (!selection || selection.rangeCount === 0 || typeof selection.getComposedRanges !== "function") return;
-		let ranges: StaticRange[];
-		try {
-			ranges = selection.getComposedRanges({ shadowRoots: [root] });
-		} catch {
-			// Safari 17's form: the roots as arguments.
-			ranges = selection.getComposedRanges(root);
-		}
-		const given = ranges[0];
-		if (!given || given.collapsed || !root.contains(given.startContainer) || !root.contains(given.endContainer)) return;
-		const range = document.createRange();
-		range.setStart(given.startContainer, given.startOffset);
-		range.setEnd(given.endContainer, given.endOffset);
-		const quote = range.toString().replace(/\s+/g, " ").trim();
-		if (!quote) return;
-		const at = given.startContainer instanceof Element ? given.startContainer : given.startContainer.parentElement;
-		const component = at?.closest("[data-id]")?.getAttribute("data-id") ?? undefined;
-		props.onWords({ quote, ...(component ? { component } : {}), anchor: () => (range.collapsed ? undefined : range.getBoundingClientRect()) });
+		listenForWords(root, () => props.onWords);
 	};
 
 	const { followLink } = createCardLinks({
