@@ -252,3 +252,12 @@ export interface Editor {
 	root: () => JSX.Element;
 	dispose(): void;
 }
+
+/** What `createEditor` is given (`editor.tsx`): the canvas's options, and what only the host that makes the editor knows. */
+export type EditorOptions = CanvasOptions & {
+	state?: EditorOwnState;
+	/** How big the stage is on screen. Default: the window. */
+	size?: () => { width: number; height: number };
+	/** The scheme changed (`setDark`): a host paints it where its own styles read it. */
+	onScheme?: (scheme: "light" | "dark") => void;
+};
