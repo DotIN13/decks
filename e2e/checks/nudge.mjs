@@ -86,13 +86,13 @@ const SAMPLER = () => {
 			for (const id of probe.items ?? []) {
 				const p = e.placed.get(id);
 				if (!p) continue;
-				const preview = e.lifted?.has(id) ? shown?.get(id) : undefined;
+				const preview = e.cardLayer.lifted?.has(id) ? shown?.get(id) : undefined;
 				const moveOnly = preview && preview.w === undefined && preview.h === undefined && preview.radius === undefined && !(preview.set && Object.keys(preview.set).length);
 				out[id] = [r(p.box.x + (moveOnly ? (preview.dx ?? 0) : 0)), r(p.box.y + (moveOnly ? (preview.dy ?? 0) : 0))];
 			}
-			const carrying = e.carriedCount > 0 ? e.carriedBy : { dx: 0, dy: 0 };
+			const carrying = e.cardLayer.carriedCount > 0 ? e.cardLayer.carriedBy : { dx: 0, dy: 0 };
 			for (const path of probe.boards ?? []) {
-				const b = e.placedCards.find((one) => one.path === path);
+				const b = e.cardLayer.placedCards.find((one) => one.path === path);
 				if (b) out[path] = [r(b.x + carrying.dx), r(b.y + carrying.dy)];
 			}
 			return out;

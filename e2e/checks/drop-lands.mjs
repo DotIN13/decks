@@ -96,7 +96,7 @@ async function boardStaysDropped(page, label, { picture }) {
 		globalThis.__boardSampling = true;
 		const sample = () => {
 			const node = document.querySelector(`.card-node[data-path="${CSS.escape(path)}"]`);
-			const box = engine.placedCards.find((one) => one.path === path);
+			const box = engine.cardLayer.placedCards.find((one) => one.path === path);
 			const carried = engine.cardLayer.carriedCount > 0;
 			globalThis.__boardFrames.push({
 				t: performance.now(),

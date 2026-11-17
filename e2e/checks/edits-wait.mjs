@@ -71,7 +71,7 @@ const SAMPLER = () => {
 				 * laid out again) and a corner's radius; a resize is laid out already.
 				 */
 				const shown = e.shown ? new Map(JSON.parse(e.shown)) : undefined;
-				const preview = e.lifted?.has(id) ? shown?.get(id) : undefined;
+				const preview = e.cardLayer.lifted?.has(id) ? shown?.get(id) : undefined;
 				const moveOnly = preview && preview.w === undefined && preview.h === undefined && preview.radius === undefined && !(preview.set && Object.keys(preview.set).length);
 				const dx = moveOnly ? (preview.dx ?? 0) : 0;
 				const dy = moveOnly ? (preview.dy ?? 0) : 0;
@@ -83,8 +83,8 @@ const SAMPLER = () => {
 			}
 			if (probe.count) out.count = String([...e.placed.values()].filter((p) => !p.parent).length);
 			for (const path of probe.boards ?? []) {
-				const b = e.placedCards.find((one) => one.path === path);
-				const carrying = e.carriedCount > 0 ? e.carriedBy : { dx: 0, dy: 0 };
+				const b = e.cardLayer.placedCards.find((one) => one.path === path);
+				const carrying = e.cardLayer.carriedCount > 0 ? e.cardLayer.carriedBy : { dx: 0, dy: 0 };
 				out[`board ${path}`] = b ? JSON.stringify([r(b.x + carrying.dx), r(b.y + carrying.dy), r(b.w), r(b.h)]) : "absent";
 			}
 			if (probe.outline) {
