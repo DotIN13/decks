@@ -10,6 +10,8 @@ import { editorOptions, installHost } from "./options.ts";
 import { wireFrame } from "./events.ts";
 import { bootGuest } from "@decks/frame";
 import { runCard } from "../card/guest.tsx";
+import { runApp } from "../app/guest.tsx";
+import type { AppEnd, AppStart } from "../app/protocol.ts";
 import type { CardEnd, CardStart } from "../card/protocol.ts";
 import { runDocument } from "../document/guest.tsx";
 import type { DocumentEnd, DocumentStart } from "../document/protocol.ts";
@@ -38,11 +40,12 @@ export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView
 	 * frame says hello again for the next one, keeping what it loaded (its code, the engine's compiled
 	 * module). The page decides when, and makes a new frame for a friend's canvas.
 	 */
-	bootGuest<Start | CardStart | DocumentStart>({
-		// Which kind the page started (`start.kind`): a card or a document whole (`card/guest.tsx`, `document/guest.tsx`), or a canvas, whose start names none.
+	bootGuest<Start | CardStart | DocumentStart | AppStart>({
+		// Which kind the page started (`start.kind`): a card, a document or an app whole (`card/`, `document/`, `app/`), or a canvas, whose start names none.
 		run: (start, port) => {
 			if (!("kind" in start)) return run(root, start, peer(port) as FrameEnd, options.chrome);
-			return start.kind === "card" ? runCard(root, start, peer(port) as CardEnd) : runDocument(root, start, peer(port) as DocumentEnd);
+			if (start.kind === "card") return runCard(root, start, peer(port) as CardEnd);
+			return start.kind === "document" ? runDocument(root, start, peer(port) as DocumentEnd) : runApp(root, start, peer(port) as AppEnd);
 		},
 		cleared: () => {
 			forgetMissing();

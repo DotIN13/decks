@@ -29,10 +29,10 @@ export interface PageToItem extends SharedToFrame {
 }
 
 type NoCalls = Record<never, { data: unknown; value: unknown }>;
-/** The page's end of an item's frame, with the words its kind adds (`Own`). */
-export type ItemPageEnd<Own = unknown> = Peer<PageToItem & Own, NoCalls, SharedToPage, SharedCalls>;
+/** The page's end of an item's frame, with the words its kind adds: what the page says to it (`Own`), and what it says to the page (`Says`). */
+export type ItemPageEnd<Own = unknown, Says = unknown> = Peer<PageToItem & Own, NoCalls, SharedToPage & Says, SharedCalls>;
 /** The frame's end. */
-export type ItemEnd<Own = unknown> = Peer<SharedToPage, SharedCalls, PageToItem & Own, NoCalls>;
+export type ItemEnd<Own = unknown, Says = unknown> = Peer<SharedToPage & Says, SharedCalls, PageToItem & Own, NoCalls>;
 
 /** The pass a frame of one item holds, as the page fetched it: a canvas's whole, or a document's, which reads no files. */
 export type ItemPass = Pick<CanvasPass, "api" | "token" | "expires"> & Partial<Pick<CanvasPass, "files" | "imports">>;
@@ -51,12 +51,23 @@ export interface ItemLookProps {
  * (`@decks/frame`), begun as the canvas's is (its hello, its pass kept current, its start
  * and the port), with the kind named in the start run inside it. The shared words are answered as
  * for any frame, and the look is said again when it changes. What the kind adds: what it starts
- * from (`start`), and what it is told later (`say`, run where it tracks what it reads).
+ * from (`start`, given the pass held), what the page hears from it (`hear`, once, as the port opens),
+ * and what it is told later (`say`, run where it tracks what it reads).
  */
-export function ItemFrame<Own>(props: ItemLookProps & { kind: string; title: string; /** The pass the frame holds, fetched now and again at half its life. */ pass: () => Promise<ItemPass>; start: () => Record<string, unknown>; say?: (end: ItemPageEnd<Own>) => void }): JSX.Element {
+export function ItemFrame<Own = unknown, Says = unknown, Pass extends ItemPass = ItemPass>(
+	props: ItemLookProps & {
+		kind: string;
+		title: string;
+		/** The pass the frame holds, fetched now and again at half its life. */
+		pass: () => Promise<Pass>;
+		start: (held: Pass) => Record<string, unknown>;
+		hear?: (end: ItemPageEnd<Own, Says>) => void;
+		say?: (end: ItemPageEnd<Own, Says>) => void;
+	},
+): JSX.Element {
 	let gone = false;
 	let stopWaiting = () => {};
-	const [end, setEnd] = createSignal<ItemPageEnd<Own>>();
+	const [end, setEnd] = createSignal<ItemPageEnd<Own, Says>>();
 	const begin = (frame: HTMLIFrameElement) => {
 		const pass = untrack(() => props.pass);
 		stopWaiting = awaitHello(frame, {
@@ -64,10 +75,12 @@ export function ItemFrame<Own>(props: ItemLookProps & { kind: string; title: str
 			cancelled: () => gone,
 			begin: (held) => {
 				const channel = new MessageChannel();
-				const page = peer(channel.port1) as ItemPageEnd<Own>;
+				const page = peer(channel.port1) as ItemPageEnd<Own, Says>;
 				hearShared(page as never, { dismiss: dismissMenus, agent: props.agent, refuse: (message) => new CallRefused(message, "refused") });
+				props.hear?.(page);
 				setEnd(() => page);
-				renewPass({ pass, expires: held.expires, cancelled: () => gone, renewed: (next) => (page as ItemPageEnd).emit("token", { token: next.token, ...(next.files ? { files: { base: next.files, expires: next.expires } } : {}) }) });
+				// A pass that never runs out (an app's, good while the token behind it works) is not asked for again.
+				if (Number.isFinite(held.expires)) renewPass({ pass, expires: held.expires, cancelled: () => gone, renewed: (next) => (page as ItemPageEnd).emit("token", { token: next.token, ...(next.files ? { files: { base: next.files, expires: next.expires } } : {}) }) });
 				const start: ItemStart = {
 					protocol: PROTOCOL,
 					kind: props.kind,
@@ -76,7 +89,7 @@ export function ItemFrame<Own>(props: ItemLookProps & { kind: string; title: str
 					...(held.imports ? { imports: held.imports } : {}),
 					look: untrack(() => ({ dark: props.dark, foot: props.foot })),
 				};
-				sendStart(frame, { ...start, ...untrack(props.start) }, channel.port2);
+				sendStart(frame, { ...start, ...untrack(() => props.start(held)) }, channel.port2);
 			},
 		});
 	};

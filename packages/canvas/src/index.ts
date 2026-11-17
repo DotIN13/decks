@@ -20,6 +20,8 @@ export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEdit
 export { CardFrame, type CardFrameProps } from "./frame/card/host.tsx";
 // A document whole, the same way: the document kind (`frame/document/`).
 export { DocumentFrame, type DocumentFrameProps } from "./frame/document/host.tsx";
+// An app whole, the same way: the app kind (`frame/app/`).
+export { AppFrame, type AppFramePass, type AppFrameProps } from "./frame/app/host.tsx";
 export type { CardShown } from "./frame/card/protocol.ts";
 // The tools on the page (`FramedEditorOptions.pageTools`): the zoom as the frame's camera has it at each step, for the page's zoom reading.
 export { frameZoom } from "./frame/tools-mirror.ts";

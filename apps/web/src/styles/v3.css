@@ -318,17 +318,36 @@ body {
 	}
 	/* A card whole in its tab (`tabs/kinds/card.tsx`): in the canvas's column, beside the side panel and under the top bars. */
 	.surface[data-surface="card"],
-	.surface[data-surface="document"] {
+	.surface[data-surface="document"],
+	.surface[data-surface="app"] {
 		inset: var(--inset-top, 0px) var(--inset-right, 0px) 0 var(--inset-left, 0px);
 	}
-	/* A tab whose card is gone from the deck (`tabs/kinds/card.tsx`): said in the middle of the window. */
+	/* A tab with nothing to show (a card gone from the deck, an app that cannot load in a frame): said in the middle of the window. */
 	.tab-missing {
 		position: absolute;
 		inset: 0;
 		display: grid;
+		gap: 12px;
 		margin: 0;
+		padding: 0 24px;
 		color: var(--v3-fg2);
-		place-items: center;
+		text-align: center;
+		place-content: center;
+		justify-items: center;
+	}
+	.tab-missing p {
+		max-width: 520px;
+		margin: 0;
+	}
+	.tab-missing-open {
+		height: 30px;
+		padding: 0 12px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--v3-accent-soft);
+		color: var(--v3-accent);
+		cursor: pointer;
+		font: inherit;
 	}
 	.v3-viewonly {
 		height: 28px;

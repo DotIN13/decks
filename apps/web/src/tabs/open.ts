@@ -9,11 +9,9 @@ export function canvasOfPath(path: string): string | undefined {
 }
 
 /**
- * Open a card, a document or an app whole, from its pill on a canvas (New tab): a card and a document
- * in a tab of this window, each by its kind (`kinds/`). An app has no kind yet, and opens as it did,
- * in the browser's tab, on its own page.
+ * Open a card, a document or an app whole, from its pill on a canvas (New tab): in a tab of this
+ * window, each by its kind (`kinds/`).
  */
 export function openItem(item: { kind: "card" | "document" | "app"; target: string }): void {
-	if (item.kind === "app") return void window.open(`/app/${encodeURIComponent(item.target)}/`, "_blank", "noopener");
 	openTab(item.kind, item.target);
 }

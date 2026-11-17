@@ -2,7 +2,7 @@ import { api } from "../connections/connection.ts";
 import { cardCalls } from "@decks/api";
 import { connect } from "@decks/sdk";
 import { authHeaders } from "../lib/session.ts";
-import type { CanvasPass } from "@decks/canvas";
+import type { AppFramePass, CanvasPass } from "@decks/canvas";
 import { ask } from "../state/confirm.ts";
 import { deckAddress, stageOnScreen } from "../state/decks.ts";
 
@@ -60,6 +60,17 @@ export async function documentPass(path: string): Promise<Pick<CanvasPass, "api"
 	const answer = (await response.json().catch(() => ({}))) as { pass?: string; expires?: number; error?: string };
 	if (!answer.pass) throw new Error(`No pass for the document ${path}: ${answer.error ?? response.status}`);
 	return { api: new URL(api("/"), location.href).href.replace(/\/$/, ""), token: answer.pass, expires: answer.expires ?? Date.now() + 3_600_000 };
+}
+
+/**
+ * The address an app loads at in a frame of this window, its app pass in the path
+ * (`server/src/auth/passes.ts`, a window's): asked for with this tab's token, and good while it works.
+ */
+export async function appFramePass(name: string): Promise<AppFramePass> {
+	const response = await fetch(api("/passes"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ app: name, frame: true }) });
+	const answer = (await response.json().catch(() => ({}))) as { pass?: string; url?: string; error?: string; tab?: boolean };
+	if (!answer.pass || !answer.url) throw new Error(answer.error ?? `No pass for the app ${name}: ${response.status}`);
+	return { api: new URL(api("/"), location.href).href.replace(/\/$/, ""), token: answer.pass, url: new URL(answer.url, new URL(api("/"), location.href)).href, expires: Infinity };
 }
 
 /** A card's calls the page answers (`@decks/api`, a verb's `card: "page"`; `@decks/canvas`, `frame/card-calls.ts`): the agents, and showing another canvas. */
