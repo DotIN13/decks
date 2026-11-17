@@ -82,7 +82,7 @@ export function CanvasInk(props: {
 		 * SVG is kept behind `__inkOnSvg`.
 		 */
 		if (!(globalThis as { __inkOnSvg?: boolean }).__inkOnSvg) {
-			props.layer.ink(want);
+			props.layer.previews.ink(want);
 			for (const [, path] of shown) path.el.remove();
 			shown.clear();
 			return;
@@ -146,10 +146,10 @@ export function CanvasInk(props: {
 		if (handedOver.has(id)) return;
 		handedOver.add(id);
 		requestAnimationFrame(() => {
-			const mark = props.layer.mark();
+			const mark = props.layer.tiles.mark();
 			const wait = () => {
 				if (!waiting.has(id)) return void handedOver.delete(id);
-				if (!props.layer.shows(mark)) return void requestAnimationFrame(wait);
+				if (!props.layer.tiles.shows(mark)) return void requestAnimationFrame(wait);
 				// The frame that shows it is up: the next one draws without the glass's copy.
 				requestAnimationFrame(() => {
 					handedOver.delete(id);
@@ -261,13 +261,13 @@ export function CanvasInk(props: {
 			erasing.gone.add(stroke.id);
 			more = true;
 		}
-		if (more) props.layer.hide(new Set(erasing.gone));
+		if (more) props.layer.previews.hide(new Set(erasing.gone));
 	};
 
 	const cancel = () => {
 		if (!gesture) return;
-		if (gesture.kind === "erase") props.layer.hide(undefined);
-		if (gesture.kind === "move" || gesture.kind === "scale") props.layer.preview(undefined);
+		if (gesture.kind === "erase") props.layer.previews.hide(undefined);
+		if (gesture.kind === "move" || gesture.kind === "scale") props.layer.previews.preview(undefined);
 		if (gesture.kind === "draw") clearTimeout(gesture.timer);
 		if (gesture.kind === "scale") setResizing(undefined);
 		gesture = undefined;
@@ -474,7 +474,7 @@ export function CanvasInk(props: {
 				const diagonal = { x: corner.x - anchor.x, y: corner.y - anchor.y };
 				const length = diagonal.x * diagonal.x + diagonal.y * diagonal.y || 1;
 				gesture.scale = Math.max(0.05, ((point.x - anchor.x) * diagonal.x + (point.y - anchor.y) * diagonal.y) / length);
-				props.layer.preview(scaled(gesture.boxes, anchor, gesture.scale));
+				props.layer.previews.preview(scaled(gesture.boxes, anchor, gesture.scale));
 				setResizing({ anchor, by: gesture.scale });
 				return;
 			}
@@ -503,7 +503,7 @@ export function CanvasInk(props: {
 				gesture.moved = true;
 				gesture.dx = dx;
 				gesture.dy = dy;
-				props.layer.preview(new Map<string, PenPreview>(gesture.ids.map((id) => [id, { dx, dy }])));
+				props.layer.previews.preview(new Map<string, PenPreview>(gesture.ids.map((id) => [id, { dx, dy }])));
 				setInkSelection({ path: STAGE_INK, ids: [...gesture.ids] });
 				return;
 			}
@@ -531,8 +531,8 @@ export function CanvasInk(props: {
 		}
 		clearLive();
 		if (event.type === "pointercancel") {
-			if (done.kind === "erase") props.layer.hide(undefined);
-			if (done.kind === "move" || done.kind === "scale") props.layer.preview(undefined);
+			if (done.kind === "erase") props.layer.previews.hide(undefined);
+			if (done.kind === "move" || done.kind === "scale") props.layer.previews.preview(undefined);
 			return;
 		}
 		switch (done.kind) {
@@ -549,7 +549,7 @@ export function CanvasInk(props: {
 				if (done.moved) props.onShift(done.ids, done.dx, done.dy);
 				return;
 			case "scale": {
-				if (done.scale === 1) return props.layer.preview(undefined);
+				if (done.scale === 1) return props.layer.previews.preview(undefined);
 				const r = (n: number) => Math.round(n * 10) / 10;
 				const ops = [...scaled(done.boxes, done.anchor, done.scale)].flatMap(([id, change]) => {
 					const box = done.boxes.get(id);
@@ -648,7 +648,7 @@ export function CanvasInk(props: {
 		for (const id of [...waiting.keys()]) settle(id);
 		cancelAnimationFrame(frame);
 		// The engine's copies go with the sheet.
-		props.layer.ink([]);
+		props.layer.previews.ink([]);
 	});
 
 	return (

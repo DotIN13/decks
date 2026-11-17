@@ -266,7 +266,7 @@ export function CanvasView(props: CanvasViewProps) {
 		moved: () => cameraChanged(),
 		publish: (cam) => props.setCamera(cam),
 		asked: () => ({ camera: props.camera, glide: props.glide }),
-		flush: () => penLayer.flush(),
+		flush: () => penLayer.frames.flush(),
 	});
 	/*
 	 * For the browser checks: the camera as the world's transform said it before the stage scrolled
@@ -360,7 +360,7 @@ export function CanvasView(props: CanvasViewProps) {
 			setView(viewport);
 			props.onViewport?.(viewport);
 		},
-		scrollBy: (at, by) => penLayer.scrollBy(at, by),
+		scrollBy: (at, by) => penLayer.questions.scrollBy(at, by),
 		worldAt,
 	});
 	const { grabbing } = input;
@@ -425,8 +425,8 @@ export function CanvasView(props: CanvasViewProps) {
 			element: () => element,
 			toScreen: (point) => toScreen(ctl.now(), view(), point),
 			box: (id) => penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box,
-			cutFromCarried: (rect) => penLayer.cutFromCarried(rect),
-			showCarriedLayer: (on) => penLayer.showCarriedLayer(on),
+			cutFromCarried: (rect) => penLayer.cardLayer.cutFromCarried(rect),
+			showCarriedLayer: (on) => penLayer.cardLayer.showCarriedLayer(on),
 			pen: () => props.pen,
 			get onRefer() {
 				return props.onRefer;
@@ -454,7 +454,7 @@ export function CanvasView(props: CanvasViewProps) {
 					.sort((a, b) => a - b)
 					.map((index) => props.boards[index]!),
 			rendered: () => items.renderedPaths(),
-			linkAt: (at) => penLayer.linkAt(at),
+			linkAt: (at) => penLayer.questions.linkAt(at),
 			onSelect: (path) => props.onSelect(path),
 			fingers: () => input.touches.count(),
 			caught: () => input.caught(),
@@ -559,7 +559,7 @@ export function CanvasView(props: CanvasViewProps) {
 	createEffect(() => {
 		const writer = props.pen?.writer;
 		const color = resolveColour(writer?.color ?? "var(--canvas-accent)");
-		penLayer.setWriter(writer?.name ? { name: writer.name, color } : { color });
+		penLayer.previews.setWriter(writer?.name ? { name: writer.name, color } : { color });
 	});
 
 	/* The placed items (`items-layer.tsx`): which are near, have a slot and are awake, and the one playing. */
@@ -660,7 +660,7 @@ export function CanvasView(props: CanvasViewProps) {
 	 */
 	createEffect(() => {
 		const live = penLive();
-		penLayer.preview(live?.length ? new Map(live.map((change) => [change.id, { dx: 0, dy: 0, set: change.set }])) : undefined);
+		penLayer.previews.preview(live?.length ? new Map(live.map((change) => [change.id, { dx: 0, dy: 0, set: change.set }])) : undefined);
 	});
 
 	{
@@ -843,7 +843,7 @@ export function CanvasView(props: CanvasViewProps) {
 						penLayer.attachCanvas(canvas);
 					}}
 				/>
-				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
+				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.questions.attachHits(svg)} />
 				{/* By index, not by box: a drag makes a new box every move, and a new element for it every
 				    move made the page restyle what it holds (`Index` keeps the element and moves it). */}
 				<OverlayLayer

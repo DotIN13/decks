@@ -281,7 +281,7 @@ export function createEditor(
 	);
 
 	const handle: CanvasHandle = {
-		itemBox: (id) => engine?.boxOf(id),
+		itemBox: (id) => engine?.layout.boxOf(id),
 		setDocument: (next, at, made) => {
 			if (at !== undefined) setPenBase(at);
 			drawing.set(next, undefined, made);

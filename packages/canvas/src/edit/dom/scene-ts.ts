@@ -8,7 +8,7 @@ import type { CanvasEngine } from "../../render/engine.ts";
 import type { PageBox } from "../core/model.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 
-export function tsScene(engine: Pick<CanvasEngine, "placed" | "bounds" | "pickAll" | "onLine" | "pageIdOf">, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
+export function tsScene(engine: CanvasEngine, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
 	const found = (id: string) => {
 		const current = doc();
 		return current ? docIndex(current).get(id) : undefined;
@@ -21,22 +21,22 @@ export function tsScene(engine: Pick<CanvasEngine, "placed" | "bounds" | "pickAl
 		node: (id) => found(id)?.node,
 		parent: (id) => found(id)?.parent,
 		boards,
-		pageItem: (path) => engine.pageIdOf(path),
-		under: (point) => engine.pickAll(point),
-		onLine: (id, point) => engine.onLine(id, point),
+		pageItem: (path) => engine.questions.pageIdOf(path),
+		under: (point) => engine.questions.pickAll(point),
+		onLine: (id, point) => engine.questions.onLine(id, point),
 	};
 }
 
 /** What the editor tells the engine (`core/scene.ts`, `EngineSeam`), said to the TypeScript side of it. */
-export function tsSeam(engine: Pick<CanvasEngine, "preview" | "settle" | "carry" | "mark" | "shows" | "linkAt" | "muteText" | "setDoc">): EngineSeam {
+export function tsSeam(engine: CanvasEngine): EngineSeam {
 	return {
-		preview: (changes) => engine.preview(changes),
-		settle: (landing) => engine.settle(landing),
-		carry: (paths, offset) => engine.carry(paths, offset),
-		mark: () => engine.mark(),
-		shows: (mark) => engine.shows(mark),
-		linkAt: (point) => engine.linkAt(point),
-		muteText: (ids) => engine.muteText(ids),
+		preview: (changes) => engine.previews.preview(changes),
+		settle: (landing) => engine.glides.settle(landing),
+		carry: (paths, offset) => engine.cardLayer.carry(paths, offset),
+		mark: () => engine.tiles.mark(),
+		shows: (mark) => engine.tiles.shows(mark),
+		linkAt: (point) => engine.questions.linkAt(point),
+		muteText: (ids) => engine.previews.muteText(ids),
 		showDoc: (doc, base) => engine.setDoc(doc, base),
 	};
 }

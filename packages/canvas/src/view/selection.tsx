@@ -166,8 +166,8 @@ export function createSelection(deps: SelectionDeps) {
 	const penDeleteSelected = (selected = editor.items(), ops = deleteOps(selected, scene)) => {
 		if (!selected.length) return;
 		// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
-		penLayer.hide(new Set(selected));
-		const mark = penLayer.mark();
+		penLayer.previews.hide(new Set(selected));
+		const mark = penLayer.tiles.mark();
 		penEdit(ops);
 		const clear = () => editor.select((now) => (now === selected ? [] : now));
 		editor.afterFrame(mark, clear);

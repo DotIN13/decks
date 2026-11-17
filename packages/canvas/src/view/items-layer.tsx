@@ -223,7 +223,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			 * is handed the stage's own index over them (`pageIndex`, the same order), so it builds none;
 			 * not while one is being sized, when the boxes it holds are not the index's.
 			 */
-			penLayer.setCards(cards, resize ? undefined : untrack(pageIndex));
+			penLayer.cardLayer.setCards(cards, resize ? undefined : untrack(pageIndex));
 		};
 		const inMotion = covering();
 		// Each card's item on the drawing, by its path: what the engine keeps a glide's offset under.
@@ -489,7 +489,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return kept.size === 0 ? slotPaths() : new Set([...slotPaths()].filter((path) => !kept.has(path)));
 	});
 	// The engine writes click shapes only over cards with a node (`writeHits`): told the set as it changes.
-	createEffect(() => penLayer.setNodes(renderedPaths()));
+	createEffect(() => penLayer.questions.setNodes(renderedPaths()));
 	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
 	const layered = createMemo(() => scaling() && rendered().filter((board) => ((board.card && !cardsHidden()) || board.item) && isVisible(board)).length <= LAYER_BUDGET);
 
@@ -541,8 +541,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	);
 	createEffect(
 		on(fileHoles, (ids) => {
-			penLayer.holes(ids);
-			holesAsked = { ids, mark: penLayer.mark() };
+			penLayer.previews.holes(ids);
+			holesAsked = { ids, mark: penLayer.tiles.mark() };
 		}),
 	);
 	/** Where each live file is on the stage, from the layout the sheet drew. */
@@ -650,7 +650,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 
 	/** A frame on screen shows the holes asked for: their files' elements show from then (`liveFiles`). */
 	const presented = () => {
-		if (holesAsked && penLayer.shows(holesAsked.mark)) {
+		if (holesAsked && penLayer.tiles.shows(holesAsked.mark)) {
 			setHolesShown(holesAsked.ids);
 			holesAsked = undefined;
 		}

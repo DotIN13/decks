@@ -76,10 +76,10 @@ async function main(): Promise<void> {
 	// Placeholder frames as the canvas marks them: in the canvas's last writer's colour, with its name.
 	const writerColor = query.get("writerColor");
 	const writerName = query.get("writerName");
-	engine.setWriter({ color: writerColor ?? (getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#3b5cf6"), ...(writerName ? { name: writerName } : {}) });
+	engine.previews.setWriter({ color: writerColor ?? (getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#3b5cf6"), ...(writerName ? { name: writerName } : {}) });
 	engine.attachCanvas(document.querySelector("canvas.over") as HTMLCanvasElement);
 	// Every card is live here, so the engine leaves a hole over each and fetches no pictures.
-	engine.setCards(boards.map((board) => ({ ...board, live: true })));
+	engine.cardLayer.setCards(boards.map((board) => ({ ...board, live: true })));
 	engine.setDoc(doc, base);
 	engine.setCamera(camera);
 
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
 	for (;;) {
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		if (failed) throw new Error(`the stage engine did not start: ${failed}`);
-		const drawingShown = doc.children.length === 0 || engine.tileCount() > 0;
+		const drawingShown = doc.children.length === 0 || engine.tiles.tileCount() > 0;
 		if (drawingShown && performance.now() - lastDrawn > QUIET_MS) break;
 		if (performance.now() - started > PAGE_MS) break;
 	}
