@@ -251,7 +251,7 @@ export type ServerMessage =
 	/** Someone else on a canvas moved, selected or looked elsewhere, or left (`gone`): never logged, never a revision. */
 	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: Camera | null }
 	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
-	| { type: "line.hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
+	| { type: "line.hello"; who: "person" | "site" | "agent" | "canvas" | "document"; canvas?: string; role?: "edit" | "view" }
 	/**
 	 * Every stage in the deck, for the canvas manager (`canvases/CanvasManager.tsx`).
 	 *

@@ -5,7 +5,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import type { App } from "../app.ts";
 import type { View } from "../calls/person-table.ts";
 import { verifyOn } from "../auth/guard.ts";
-import { isCanvasPass } from "../auth/passes.ts";
+import { isCanvasPass, isDocumentPass } from "../auth/passes.ts";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
 import { cardRefusedFor, DOC_CALLS, onCanvas } from "../calls/canvas-frame.ts";
 import { runVerb } from "../calls/run.ts";
@@ -52,8 +52,8 @@ interface LineState {
  * The token comes in `hello`, the first message, never in the address: a sandboxed page has no header
  * to put one in, and an address is logged and copied where a message is not. Until `hello` nothing is
  * heard, and a line that does not say it in `HELLO_MS` is closed. A canvas pass hears only its canvas
- * and calls only what a canvas frame may (`refusedForCanvas`); the person's and a paired site's token
- * may watch any canvas, or everything (`all`).
+ * and calls only what a canvas frame may (`refusedForCanvas`); a document pass says and hears only its
+ * document's messages; the person's and a paired site's token may watch any canvas, or everything (`all`).
  */
 /**
  * How much may wait for one line before it is let go.
@@ -128,6 +128,11 @@ export class Line {
 			const pass = this.app.passes.openCanvas(token);
 			return pass && pass.canvas ? { kind: "canvas", canvas: pass.canvas, role: pass.role } : undefined;
 		}
+		// A document pass: one document's editor, in a frame of its own, on that file alone.
+		if (isDocumentPass(token)) {
+			const pass = this.app.passes.openDocument(token);
+			return pass ? { kind: "document", path: pass.path } : undefined;
+		}
 		const seen = verifyOn(this.app, token, state.headers);
 		if (!seen.ok) return undefined;
 		state.tokenId = seen.id;
@@ -156,7 +161,7 @@ export class Line {
 				if (!state.token || !this.verify(state, state.token)) socket.close(4401, "The token no longer opens the line.");
 			}, RECHECK_MS);
 			state.recheck.unref?.();
-			send(socket, { type: "line.hello", who: principal.kind as "person" | "site" | "agent" | "canvas", ...(principal.kind === "canvas" ? { canvas: principal.canvas, role: principal.role } : {}) });
+			send(socket, { type: "line.hello", who: principal.kind as "person" | "site" | "agent" | "canvas" | "document", ...(principal.kind === "canvas" ? { canvas: principal.canvas, role: principal.role } : {}) });
 			// A page: greeted with the whole deck, with a screen of its own that `forView` renders for.
 			if (message.greet === true && actsAsPerson(principal)) {
 				state.view = {};
@@ -166,12 +171,17 @@ export class Line {
 			return;
 		}
 		const principal = state.principal;
+		// A document pass says its document's messages and renews itself: no canvas, no call, no card.
+		if (principal.kind === "document" && !message.type.startsWith("doc.") && message.type !== "line.hello" && message.type !== "line.token") {
+			send(socket, { type: "harness.error", text: `This line is the document ${principal.path}'s: it says only that document's messages.` });
+			return;
+		}
 		switch (message.type) {
 			case "line.hello":
 			case "line.token": {
 				// A renewed token: it must open the line as the same one did.
 				const next = this.verify(state, message.token);
-				if (!next || next.kind !== principal.kind || (next.kind === "canvas" && principal.kind === "canvas" && next.canvas !== principal.canvas)) {
+				if (!next || next.kind !== principal.kind || (next.kind === "canvas" && principal.kind === "canvas" && next.canvas !== principal.canvas) || (next.kind === "document" && principal.kind === "document" && next.path !== principal.path)) {
 					socket.close(4401, "That token does not open this line.");
 					return;
 				}
@@ -203,11 +213,19 @@ export class Line {
 					send(socket, { type: "harness.error", text: "A document message names its file: { type: \"doc.open\", path }, for a document on a watched canvas." });
 					return;
 				}
-				// A canvas frame opens only the files the document items on its canvas name; the person any watched canvas's.
-				const canvases = principal.kind === "canvas" ? [principal.canvas] : [...state.watched];
-				if (!canvases.some((canvas) => this.app.documentsOn(canvas).has(doc.path as string))) {
-					send(socket, { type: "harness.error", text: `${doc.path} is not a document on this canvas.` });
-					return;
+				if (principal.kind === "document") {
+					// A document pass opens its one file, by whichever name it is asked for.
+					if (this.app.documentKey(doc.path) !== principal.path) {
+						send(socket, { type: "harness.error", text: `${doc.path} is not this line's document.` });
+						return;
+					}
+				} else {
+					// A canvas frame opens only the files the document items on its canvas name; the person any watched canvas's.
+					const canvases = principal.kind === "canvas" ? [principal.canvas] : [...state.watched];
+					if (!canvases.some((canvas) => this.app.documentsOn(canvas).has(doc.path as string))) {
+						send(socket, { type: "harness.error", text: `${doc.path} is not a document on this canvas.` });
+						return;
+					}
 				}
 				this.app.docs.handle(message as never, (answer) => send(socket, answer as ServerMessage));
 				return;
@@ -255,6 +273,10 @@ export class Line {
 	private watch(socket: WebSocket, state: LineState, canvas: unknown, since: unknown, whole?: unknown): void {
 		if (typeof canvas !== "string" || !canvas) return;
 		const principal = state.principal!;
+		if (principal.kind === "document") {
+			send(socket, { type: "harness.error", text: `This line is the document ${principal.path}'s: it hears no canvas.` });
+			return;
+		}
 		if (principal.kind === "canvas" && principal.canvas !== canvas) {
 			send(socket, { type: "harness.error", text: `This line is ${principal.canvas}'s: it hears no other canvas.` });
 			return;
@@ -313,7 +335,11 @@ export class Line {
 		let text: string | undefined;
 		for (const [socket, state] of this.sockets) {
 			if (!state.principal) continue;
-			const wanted = state.all || (message.type === "canvas.changed" ? state.watched.has(message.canvas) : [...state.watched].some((canvas) => onCanvas(this.app, message, canvas)));
+			// A document's line hears what is said of its document (by the name it is kept under, as the service says it); a canvas's or a page's, its canvases.
+			const wanted =
+				state.principal.kind === "document"
+					? message.type.startsWith("doc.") && (message as { path?: unknown }).path === state.principal.path
+					: state.all || (message.type === "canvas.changed" ? state.watched.has(message.canvas) : [...state.watched].some((canvas) => onCanvas(this.app, message, canvas)));
 			if (!wanted) continue;
 			if (!this.takes(socket)) continue;
 			// A page's line is told what its own screen should see (`forView`): the deck as its agent's canvas has it.

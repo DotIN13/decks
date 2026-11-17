@@ -1,7 +1,7 @@
 import { titleCanvas } from "./canvas/admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
 import { closeOldShapes } from "./deck/old-shapes.ts";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
 import type { Page, DeckState, RuntimeInfo, ServerMessage } from "@decks/protocol";
@@ -185,6 +185,7 @@ export class App {
 					const pens = this.stage?.pens;
 					return !!pens?.has(canvas) && pens.rights.yoursAlone(canvas) && canvasShowsApp(pens, canvas, name);
 				},
+				document: (path) => this.documentKey(path) === path,
 			},
 			passSecret(config.dataDir),
 		);
@@ -592,6 +593,19 @@ export class App {
 	/** The files a canvas's document items name, as the document service keys them (`docs/on-canvas.ts`). */
 	documentsOn(canvas: string): Map<string, string> {
 		return documentsOnCanvas(this.pens, this.deck, canvas);
+	}
+
+	/**
+	 * The name a document is kept under (`docs/resolve.ts`), for a file a document may be and that is
+	 * there: in the deck or a root it declares, never the app's own records. What a document pass names.
+	 */
+	documentKey(path: string): string | undefined {
+		try {
+			const found = resolveDoc(this.deck.roots, path);
+			return statSync(found.file).isFile() ? found.key : undefined;
+		} catch {
+			return undefined;
+		}
 	}
 
 	/**

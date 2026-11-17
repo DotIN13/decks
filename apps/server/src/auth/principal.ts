@@ -16,13 +16,16 @@
  * - `canvas`: the canvas frame for one canvas, acting as the person on that canvas alone, with their
  *   role there now (`view` reads only): the editor in its sandboxed page, and the cards it runs. From a
  *   canvas pass (`passes.ts`), not a token.
+ * - `document`: one document's editor, in a frame of its own, acting as the person on that file alone
+ *   (`path`, the name the document is kept under). From a document pass (`passes.ts`), on the line only.
  */
 export type Principal =
 	| { kind: "person" }
 	| { kind: "site"; origin?: string; label: string; studio?: true }
 	| { kind: "agent"; id: string }
 	| { kind: "app"; name: string }
-	| { kind: "canvas"; canvas: string; role: "edit" | "view" };
+	| { kind: "canvas"; canvas: string; role: "edit" | "view" }
+	| { kind: "document"; path: string };
 
 export type PrincipalKind = Principal["kind"];
 
@@ -44,6 +47,8 @@ export function describe(principal: Principal): string {
 			return `app ${principal.name}`;
 		case "canvas":
 			return `the canvas frame for ${principal.canvas}`;
+		case "document":
+			return `the document ${principal.path}`;
 	}
 }
 

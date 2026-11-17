@@ -24,6 +24,11 @@ import { join } from "node:path";
  * token still works, the app is still placed on the canvas, and the canvas is still trusted (yours,
  * and nobody else may edit it); there is no day, so the app never reloads to renew it.
  *
+ * A **document pass** (`dk_dp_`) reaches one document: its editor's messages on the line
+ * (`connections/line.ts`), for that file and no other, and nothing else of the harness. A document
+ * opened whole in a tab holds one (`@decks/canvas`, `frame/document/`), placed on a canvas or not. Asked
+ * for with a harness token, bound to it, for an hour, renewed as a canvas pass is.
+ *
  * A pass is `<prefix><payload>.<mac>`, the payload base64url JSON and the mac its HMAC-SHA256, over
  * the prefix and the payload, under the harness's secret (`<dataDir>/ticket-secret`, `passSecret`), so
  * a restart ends no pass. Nothing about it is stored: it is taken back by taking
@@ -32,6 +37,7 @@ import { join } from "node:path";
 
 const CANVAS_PASS = "dk_cp_";
 const APP_PASS = "dk_ap_";
+const DOCUMENT_PASS = "dk_dp_";
 
 /** How long an app pass for a tab lives: a day. An app's server's lives as long as that run of it. */
 const APP_TAB_MS = 24 * 3_600_000;
@@ -69,6 +75,8 @@ interface PassChecks {
 	appRun?(name: string): string | undefined;
 	/** Whether an app is placed on a canvas now, and the canvas is one whose cards may use it: yours alone. */
 	appOnCanvas?(name: string, canvas: string): boolean;
+	/** Whether a file, by the name a document is kept under, is still one a document may be: in the deck or a root it declares, and there. */
+	document?(path: string): boolean;
 }
 
 interface AppPayload {
@@ -91,8 +99,25 @@ interface AppPassOf {
 	canvas?: string;
 }
 
+interface DocumentPayload {
+	/** The document, by the name it is kept under (`docs/resolve.ts`, `key`). */
+	d: string;
+	k: string;
+	e: number;
+}
+
+/** A document pass as it is read. */
+interface DocumentPassOf {
+	/** The document, by the name it is kept under. */
+	path: string;
+	by: string;
+	expires: number;
+}
+
 /** Whether a string looks like a canvas pass, before it is checked. */
 export const isCanvasPass = (value: string | undefined): value is string => typeof value === "string" && value.startsWith(CANVAS_PASS);
+/** Whether a string looks like a document pass, before it is checked. */
+export const isDocumentPass = (value: string | undefined): value is string => typeof value === "string" && value.startsWith(DOCUMENT_PASS);
 /** Whether a string looks like an app pass, before it is checked. */
 export const isAppPass = (value: string | undefined): value is string => typeof value === "string" && value.startsWith(APP_PASS);
 
@@ -128,6 +153,22 @@ export class Passes {
 		if (!current) return undefined;
 		const role = payload.r === "view" || current === "view" ? "view" : "edit";
 		return { canvas: payload.c, role, by: payload.k, expires: payload.e };
+	}
+
+	/** A document pass for one document, by the name it is kept under, bound to the harness token whose id is `by`: an hour, as a canvas pass. */
+	document(path: string, by: string, now = Date.now()): { pass: string; expires: number } {
+		const expires = now + this.canvasMs;
+		return { pass: this.sign(DOCUMENT_PASS, { d: path, k: by, e: expires } satisfies DocumentPayload), expires };
+	}
+
+	/** A document pass read and checked: made here, not run out, its token still working, and the file still one a document may be (`PassChecks.document`). */
+	openDocument(pass: string | undefined, now = Date.now()): DocumentPassOf | undefined {
+		if (!isDocumentPass(pass)) return undefined;
+		const payload = this.open(DOCUMENT_PASS, pass) as Partial<DocumentPayload> | undefined;
+		if (!payload || typeof payload.d !== "string" || typeof payload.k !== "string" || typeof payload.e !== "number") return undefined;
+		if (payload.e <= now || !this.checks.live(payload.k)) return undefined;
+		if (this.checks.document && !this.checks.document(payload.d)) return undefined;
+		return { path: payload.d, by: payload.k, expires: payload.e };
 	}
 
 	/** The pass an app's server holds for one run of it (`run`), good while that run is the app's. */

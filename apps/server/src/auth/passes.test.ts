@@ -36,6 +36,23 @@ test("one pass kind for one use: a canvas pass is no app pass, and an app pass n
 	assert.equal(passes.openCanvas(`dk_cp_${app.slice("dk_ap_".length)}`), undefined);
 });
 
+test("a document pass names one document, for an hour, while its token works and the file is still a document", () => {
+	let live = true;
+	let there = true;
+	const passes = new Passes({ live: () => live, role: () => "edit", document: (path) => there && path === "docs/plan.md" });
+	const { pass, expires } = passes.document("docs/plan.md", "k1");
+	assert.deepEqual(passes.openDocument(pass), { path: "docs/plan.md", by: "k1", expires });
+	assert.equal(passes.openDocument(pass, expires + 1), undefined, "run out");
+	assert.equal(passes.openCanvas(pass), undefined, "no canvas pass");
+	assert.equal(passes.openCanvas(`dk_cp_${pass.slice("dk_dp_".length)}`), undefined, "the mac covers the prefix");
+	assert.equal(passes.openDocument(passes.canvas("main", "edit", "k1").pass), undefined, "and a canvas pass no document pass");
+	there = false;
+	assert.equal(passes.openDocument(pass), undefined, "the file gone, or no longer one a document may be");
+	there = true;
+	live = false;
+	assert.equal(passes.openDocument(pass), undefined, "signed out: it stops");
+});
+
 test("a pass in the path reaches its canvas's folder and pictures, every part plain", () => {
 	assert.deepEqual(splitPathPass("/api/t/dk_cp_a.b/card/canvases/main/x.png?v=1"), { pass: "dk_cp_a.b", rest: "/api/card/canvases/main/x.png?v=1" });
 	assert.ok(!passCovers("main", "/api/board/canvases/main/cards/a/index.html"), "the old prefix reaches nothing");

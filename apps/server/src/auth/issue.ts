@@ -25,6 +25,7 @@ import { bearerOf, originOf } from "./guard.ts";
  *   editor it is about to show, and again at half its hour to renew it (`passes.ts`).
  * - **An app pass**: an app's server is given one when it starts (`apps/service.ts`); a tab another site
  *   opens an app in, `POST /api/passes { app }`, for a day.
+ * - **A document pass**: `POST /api/passes { document }`, for a document opened whole in a tab, an hour.
  */
 
 // --- codes ---------------------------------------------------------------------------
@@ -344,7 +345,18 @@ export function doorRoutes(app: App): express.Router {
 			res.status(403).json({ error: "Only the person, or a front end paired with this harness, asks for a pass, with its own token." });
 			return;
 		}
-		const body = (req.body ?? {}) as { canvas?: unknown; app?: unknown };
+		const body = (req.body ?? {}) as { canvas?: unknown; app?: unknown; document?: unknown };
+		// A document pass for a document opened whole, in a frame of its own: its editor's line, for that file alone, an hour.
+		if (body.document !== undefined) {
+			const path = app.documentKey(String(body.document));
+			if (!path) {
+				res.status(404).json({ error: `There is no document at ${String(body.document) || "that path"}.` });
+				return;
+			}
+			const { pass, expires } = app.passes.document(path, req.tokenId);
+			res.set("cache-control", "no-store").json({ pass, expires, path });
+			return;
+		}
 		// An app pass for a tab another site opens the app in: `/app/<name>/?decks_pass=…`, a day.
 		if (body.app !== undefined) {
 			const name = String(body.app);

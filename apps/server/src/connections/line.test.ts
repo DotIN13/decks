@@ -170,6 +170,55 @@ test("a canvas pass on the line hears its own canvas alone and calls only what a
 	}
 });
 
+test("a document pass on the line opens its one document, placed on a canvas or not, and says and hears nothing else", async () => {
+	const { app, connect, stop } = await open();
+	try {
+		const canvas = app.pens.claim("Mine");
+		mkdirSync(join(app.deck.path, "docs"), { recursive: true });
+		writeFileSync(join(app.deck.path, "docs", "plan.md"), "# The plan\n\nOn no canvas.\n");
+		writeFileSync(join(app.deck.path, "docs", "other.md"), "# Another\n");
+		const person = app.tokens.issue({ kind: "person" }, { label: "line test" });
+		const id = (app.tokens.verify(person.token) as { id: string }).id;
+		assert.equal(app.documentKey("docs/plan.md"), "docs/plan.md");
+		assert.equal(app.documentKey("docs/none.md"), undefined, "a file that is not there is no document");
+		assert.equal(app.documentKey(".decks/tokens.json"), undefined, "the app's own records are never one");
+		const pass = app.passes.document("docs/plan.md", id).pass;
+		const frame = connect();
+		await frame.opened;
+		frame.send({ type: "line.hello", token: pass, watch: [{ canvas, since: 0 }] });
+		const hello = (await frame.next((m) => m.type === "line.hello")) as Extract<ServerMessage, { type: "line.hello" }>;
+		assert.equal(hello.who, "document");
+		assert.match(((await frame.next((m) => m.type === "harness.error")) as { text: string }).text, /hears no canvas/);
+		// Its own document opens, though no canvas places it.
+		frame.send({ type: "doc.open", path: "docs/plan.md", client: "c1" } as never);
+		const state = (await frame.next((m) => m.type === "doc.state")) as unknown as { path: string; text?: string };
+		assert.equal(state.path, "docs/plan.md");
+		// Another document does not, and neither does a call, a canvas or a card.
+		const errors = () => frame.heard.filter((m) => m.type === "harness.error").map((m) => (m as { text: string }).text);
+		frame.send({ type: "doc.open", path: "docs/other.md", client: "c1" } as never);
+		await frame.next((m) => m.type === "harness.error" && /not this line's document/.test((m as { text: string }).text));
+		frame.send({ type: "line.call", id: "a1", verb: "canvas.read", args: [] });
+		frame.send({ type: "canvas.watch", canvas });
+		await frame.next(() => errors().filter((text) => /says only that document's messages/.test(text)).length === 2);
+		assert.equal(frame.heard.some((m) => m.type === "call.answered"), false, "no call is answered");
+		// What is said of its document is heard; of another, or of a canvas, not.
+		app.send({ type: "doc.changed", path: "docs/other.md", base: 0, rev: 1, splices: [], by: "person" } as never);
+		app.send({ type: "doc.changed", path: "docs/plan.md", base: 0, rev: 1, splices: [], by: "person" } as never);
+		app.pens.edit(canvas, [{ op: "insert", node: { type: "note", id: "n", content: "n" }, box: { x1: 0, y1: 0 } }]);
+		const changed = (await frame.next((m) => m.type === "doc.changed")) as unknown as { path: string };
+		assert.equal(changed.path, "docs/plan.md");
+		await new Promise((done) => setTimeout(done, 50));
+		assert.equal(frame.heard.filter((m) => m.type === "doc.changed").length, 1);
+		assert.equal(frame.heard.some((m) => m.type === "canvas.changed"), false);
+		// The token it was made with taken back: the pass opens nothing.
+		app.tokens.revoke(id);
+		assert.equal(app.passes.openDocument(pass), undefined);
+		frame.ws.close();
+	} finally {
+		await stop();
+	}
+});
+
 test("presence: a line's pointer and selection reach the other lines on the canvas, a newcomer is told who is there, and a leave is said", async () => {
 	const { app, connect, stop } = await open();
 	try {
