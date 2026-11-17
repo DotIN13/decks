@@ -1,3 +1,4 @@
+import { hearShared } from "@decks/frame";
 import type { Accessor } from "solid-js";
 import type { Camera } from "@decks/protocol";
 import { dismissMenus } from "@decks/ui";
@@ -65,17 +66,8 @@ export function createWire(d: WireNeeds) {
 			else delete composer.dataset.refer;
 		});
 		page.on("open-app", (data) => d.options.frame.openApp?.(data.name));
-		// A press or Escape in the frame: this page's menus go, as on a press here (`@decks/ui` dismiss).
-		page.on("away", () => dismissMenus());
-		// A link the frame may not open: an http(s) address alone, in a tab that cannot reach back to this page.
-		page.on("open-link", (data) => {
-			try {
-				const url = new URL(data.href);
-				if (url.protocol === "http:" || url.protocol === "https:") window.open(url.href, "_blank", "noopener");
-			} catch {
-				/* not an address */
-			}
-		});
+		// The words every frame shares (`@decks/frame`): a press or Escape in the frame puts this page's menus away, a link opens in a tab, a shortcut the canvas did not take is played here, and a card's agent call is this page's to answer.
+		hearShared(page as never, { dismiss: dismissMenus, agent: d.options.frame.agent, refuse: (message) => new CallRefused(message, "refused") });
 		page.on("goto", (data) => d.options.frame.moveTo?.(data.agent, data.canvas));
 		page.on("camera", (data) => {
 			if (data.agent) return d.options.frame.viewFor?.(data.agent, data.camera, data.selected);
@@ -98,13 +90,7 @@ export function createWire(d: WireNeeds) {
 			if (data.value === null) d.storage.removeItem(d.storeKey(canvas) + data.key);
 			else d.storage.setItem(d.storeKey(canvas) + data.key, data.value);
 		});
-		// A shortcut the canvas did not take, played on this page as if typed here.
-		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
 		page.answer("open", (data) => d.options.pages?.onOpenLink?.(data.path, data.from) ?? false);
-		page.answer("agent", (data) => {
-			if (!d.options.frame.agent) throw new CallRefused("This page answers no card's agent calls.", "refused");
-			return d.options.frame.agent(data);
-		});
 		page.answer("upload", (data) => {
 			if (!d.options.frame.upload) throw new CallRefused("Files cannot be dropped on this canvas here.", "refused");
 			// The point on this page: where the frame sits, plus where in it they landed.

@@ -4,3 +4,4 @@ export { ALLOW, SANDBOX } from "./sandbox.ts";
 export { endLife, life } from "./life.ts";
 export { bootGuest, type Guest } from "./guest.ts";
 export { awaitHello, renewPass, sendStart } from "./host.ts";
+export { hearShared, sayShared, type SharedCalls, type SharedToFrame, type SharedToPage } from "./words.ts";
