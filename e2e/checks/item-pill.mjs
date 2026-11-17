@@ -75,7 +75,7 @@ say("two selected have no handles, and the pill sits 10 px above them", both.anc
 const person = await asPerson();
 const view = (args) => fetch(`${API}/api/v1/view.move`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) });
 const before = await canvas.evaluate(() => globalThis.__decksProbes.rust.camera);
-await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
+await page.locator("[aria-label='Fit everything on the canvas']").first().click();
 await rest(page);
 const [box2, two2] = await canvas.evaluate(() => ["pill-box", "pill-two"].map((id) => window.__decksProbes.penBox(id).toJSON()));
 let press;

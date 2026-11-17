@@ -58,7 +58,7 @@ say("the agent's edit lands in the card's file", now.includes('data-id="walk"'))
 frame = await canvasFrame(page);
 const pen = page.locator('.v3-tool[data-tool="pen"]:visible').first();
 if (await pen.count()) await pen.click();
-else await frame.locator('[data-tool="pen"]:visible').first().click().catch(() => {});
+else await page.locator('[data-tool="pen"]:visible').first().click().catch(() => {});
 await frame.waitForSelector(".stage-ink", { timeout: 10000 }).catch(() => {});
 const frameBox = await (await frame.frameElement()).boundingBox();
 const r = await frame.evaluate(() => document.querySelector(".stage-ink")?.getBoundingClientRect().toJSON());
@@ -80,7 +80,7 @@ if (await select.count()) await select.click();
 
 // 5. zoom and fit
 const zoomBefore = await zoom(page);
-await (await canvasFrame(page)).locator('button[aria-label="Zoom in"]:visible').first().click().catch(() => {});
+await page.locator('button[aria-label="Zoom in"]:visible').first().click().catch(() => {});
 await settle(page, 900);
 const zoomedIn = await zoom(page);
 say("the zoom bar zooms in", zoomedIn > zoomBefore, `${zoomBefore}% → ${zoomedIn}%`);

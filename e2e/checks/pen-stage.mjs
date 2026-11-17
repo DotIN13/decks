@@ -221,7 +221,7 @@ if (spot) {
 	say("a drag with the rectangle tool draws one into the file", !!rect && rect.width > 0 && rect.height > 0, JSON.stringify(rect));
 	const handles = await until(() => canvas.evaluate(() => document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length === 8));
 	say("…and it is selected, with eight handles", !!handles);
-	await canvas.locator('.props-panel .props-swatches [data-adaptive="decks-fill-yellow"]').first().click();
+	await page.locator('.props-panel .props-swatches [data-adaptive="decks-fill-yellow"]').first().click();
 	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "$decks-fill-yellow");
 	say("the properties panel's fill colours the selected item in the file", !!filled);
 	await page.keyboard.press("Control+z");
@@ -378,12 +378,12 @@ if (spot) {
 		});
 		say("dragging its bottom pins a height on it, in pixels", !!pinned && pinned.height > tall.height, JSON.stringify({ height: pinned?.height, was: Math.round(tall.height) }));
 		// And the panel gives the words their say back, with the same two words the frame's height uses.
-		const back = await until(() => canvas.evaluate(() => {
+		const back = await until(() => page.evaluate(() => {
 			const group = document.querySelector('[data-section="place"] [aria-label="height"]');
 			return group ? [...group.querySelectorAll("button")].map((b) => b.textContent?.trim()) : undefined;
 		}));
 		say("a card's own height control is in the panel", JSON.stringify(back) === JSON.stringify(["fit-content", "px"]), JSON.stringify(back));
-		await canvas.evaluate(() => {
+		await page.evaluate(() => {
 			const group = document.querySelector('[data-section="place"] [aria-label="height"]');
 			[...group.querySelectorAll("button")].find((b) => b.textContent?.trim() === "fit-content")?.click();
 		});

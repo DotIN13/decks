@@ -351,10 +351,10 @@ async function run(engine, lags) {
 	await edit("a box's fill colour from the properties", {
 		setup: async () => {
 			await clickOn("as-box-b");
-			await (await cv()).locator(".props-panel").first().waitFor({ timeout: 3000 });
+			await page.locator(".props-panel").first().waitFor({ timeout: 3000 });
 		},
 		commit: async (arm) => {
-			const swatch = (await cv()).locator('.props-panel .props-swatches button[aria-pressed="false"]').nth(2);
+			const swatch = page.locator('.props-panel .props-swatches button[aria-pressed="false"]').nth(2);
 			await swatch.waitFor({ timeout: 3000 });
 			const r = await swatch.boundingBox();
 			await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);

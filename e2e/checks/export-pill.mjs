@@ -45,7 +45,7 @@ link.edit(agentId, [
 	]);
 await until(() => link.drawn.some((m) => m.doc?.children?.some((n) => n.id === "ex-square")));
 await page.keyboard.press("Escape");
-await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
+await page.locator("[aria-label='Fit everything on the canvas']").first().click();
 await rest(page);
 await settle(page, 600);
 

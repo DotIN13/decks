@@ -164,7 +164,7 @@ try {
 	say("…still a column beside the canvas, declaring its width", (await mounted()) === 1 && narrow === "360px", `${await mounted()} / ${narrow}`);
 	await focusCanvas(page);
 	await page.keyboard.press("0");
-	await (await canvasFrame(page)).waitForFunction(`${ZOOM_IN_PAGE} > 5`, null, { timeout: 6000 });
+	await page.waitForFunction(`${ZOOM_IN_PAGE} > 5`, null, { timeout: 6000 });
 	say("…so fit still frames the deck at a workable zoom", (await zoom(page)) > 5, `${await zoom(page)}%`);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));

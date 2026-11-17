@@ -230,7 +230,7 @@ async function run(engine, { all }) {
 		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 	};
 	/** The properties panel, which shows for what is selected (`pen/Properties.tsx`). */
-	const properties = async () => (await cv()).locator(".props-panel").first().waitFor({ timeout: 3000 });
+	const properties = async () => page.locator(".props-panel").first().waitFor({ timeout: 3000 });
 	/** A button on the selection's pill, pressed with the commit armed. */
 	const pillButton = async (label, arm) => {
 		const button = (await cv()).locator(`.stage-fixed > .card-callout:not([data-hidden]) [aria-label="${label}"]`).first();
@@ -242,7 +242,7 @@ async function run(engine, { all }) {
 	};
 
 	// Boards first, the whole canvas framed: a board is its picture, pressed and dragged where it is.
-	await (await cv()).locator("[aria-label='Fit everything on the canvas']").first().click();
+	await page.locator("[aria-label='Fit everything on the canvas']").first().click();
 	await rest(page);
 	/** A point on a board's picture that is the canvas's, not the page's chrome over it. */
 	const pictureSpot = async (path) => {
@@ -567,7 +567,7 @@ async function run(engine, { all }) {
 			await properties();
 		},
 		commit: async (arm) => {
-			const swatch = (await cv()).locator('.props-panel .props-swatches button[aria-pressed="false"]').nth(2);
+			const swatch = page.locator('.props-panel .props-swatches button[aria-pressed="false"]').nth(2);
 			await swatch.waitFor({ timeout: 3000 });
 			const r = await swatch.boundingBox();
 			await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
@@ -589,7 +589,7 @@ async function run(engine, { all }) {
 			await properties();
 		},
 		commit: async (arm) => {
-			const button = (await cv()).locator('.props-panel [aria-label="Bring to the front"]').first();
+			const button = page.locator('.props-panel [aria-label="Bring to the front"]').first();
 			const r = await button.boundingBox();
 			await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 			await arm();
@@ -610,7 +610,7 @@ async function run(engine, { all }) {
 			await properties();
 		},
 		commit: async (arm) => {
-			const button = (await cv()).locator('.props-panel [aria-label="Align left edges"]').first();
+			const button = page.locator('.props-panel [aria-label="Align left edges"]').first();
 			const r = await button.boundingBox();
 			await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 			await arm();
@@ -804,9 +804,9 @@ async function run(engine, { all }) {
 		probe: { count: true },
 		prepare: async () => {
 			await remember();
-			await (await cv()).click('.v3-tool[data-tool="pen"]');
+			await page.click('.v3-tool[data-tool="pen"]');
 			await (await cv()).waitForSelector(".stage-ink");
-			await (await cv()).click('.v3-tray [aria-label^="Pen"]');
+			await page.click('.v3-tray [aria-label^="Pen"]');
 			await drag({ x: 600, y: 420 }, { x: 820, y: 470 }, 14);
 		},
 		commit: async (arm) => {
@@ -817,11 +817,11 @@ async function run(engine, { all }) {
 	await op(page, engine, "an ink stroke erased", {
 		probe: { count: true },
 		setup: async () => {
-			await (await cv()).click('.v3-tool[data-tool="pen"]');
+			await page.click('.v3-tool[data-tool="pen"]');
 			await (await cv()).waitForSelector(".stage-ink");
 		},
 		prepare: async () => {
-			await (await cv()).click('.v3-tray [aria-label^="Eraser"]');
+			await page.click('.v3-tray [aria-label^="Eraser"]');
 			await drag({ x: 700, y: 380 }, { x: 712, y: 520 }, 12);
 		},
 		commit: async (arm) => {
@@ -829,7 +829,7 @@ async function run(engine, { all }) {
 			await page.mouse.up();
 		},
 		cleanup: async () => {
-			await (await cv()).click('.v3-tool[data-tool="pen"]').catch(() => {});
+			await page.click('.v3-tool[data-tool="pen"]').catch(() => {});
 			await dropMade();
 		},
 	});

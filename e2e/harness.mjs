@@ -345,7 +345,7 @@ export async function editMode(page, on = true) {
 	void on;
 	const canvas = await canvasFrame(page);
 	/* Select stands alone and is browsing: pressing it puts the pen and the hand down and turns highlights off. */
-	const browse = canvas.locator('.v3-tool[data-tool="select"]:visible').first();
+	const browse = page.locator('.v3-tool[data-tool="select"]:visible').first();
 	if ((await browse.count()) && ((await browse.getAttribute("aria-pressed")) !== "true" || (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.mode)) !== "browse")) await browse.click();
 	await canvas.waitForFunction(() => (document.querySelector(".stage")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
@@ -819,7 +819,7 @@ export async function openAgents(page) {
  * this to be a function rather than a selector copied eleven times.
  */
 export async function zoom(page) {
-	const text = await (await canvasFrame(page)).locator(".v3-zoom-value").first().textContent();
+	const text = await page.locator(".v3-zoom-value").first().textContent();
 	return Number((text ?? "0%").replace(/[^\d.]/g, ""));
 }
 
@@ -1003,7 +1003,7 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	let at = await spot();
 	// Off screen, or under the chrome: fit the canvas, as a person looking for it would.
 	if (!at) {
-		const fitButton = canvas.locator('button[aria-label="Fit everything on the canvas"]').first();
+		const fitButton = page.locator('button[aria-label="Fit everything on the canvas"]').first();
 		if (await fitButton.isVisible().catch(() => false)) {
 			await fitButton.click();
 			await rest(page);
@@ -1201,6 +1201,6 @@ export async function lagCanvasLine(page) {
 /** Fit everything on the canvas, as the zoom bar's button in the frame does, and wait for the camera to rest. */
 export async function fitCanvas(page) {
 	const canvas = await canvasFrame(page);
-	await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
+	await page.locator("[aria-label='Fit everything on the canvas']").first().click();
 	await rest(page);
 }

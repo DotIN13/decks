@@ -55,7 +55,7 @@ await page.mouse.move(700, 450);
 for (let i = 0; i < 20; i++) await page.mouse.wheel(4000, 4000);
 await settle(page, 600);
 say("…the view was moved away from them", !near(await middleShown()), JSON.stringify(await middleShown()));
-await (await canvasFrame(page)).locator("[aria-label='Fit everything on the canvas']").click();
+await page.locator("[aria-label='Fit everything on the canvas']").click();
 const fitted = await until(async () => { const c = await middleShown(); return near(c) ? c : undefined; }, 4000);
 say("Fit frames the drawing too", !!fitted, JSON.stringify(await middleShown()));
 

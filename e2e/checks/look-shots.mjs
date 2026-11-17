@@ -40,10 +40,10 @@ for (const scheme of ["light", "dark"]) {
 
 	await page.keyboard.press("Escape");
 	canvas = await canvasFrame(page);
-	await canvas.locator('.v3-tool[data-tool="pen"]').first().click().catch(() => {});
+	await page.locator('.v3-tool[data-tool="pen"]').first().click().catch(() => {});
 	await shot("04-pen-tray");
 	await page.keyboard.press("Escape");
-	await canvas.locator('.v3-tool[data-tool="select"]').first().click().catch(() => {});
+	await page.locator('.v3-tool[data-tool="select"]').first().click().catch(() => {});
 
 	await selectCard(page, card("plan"));
 	await pressCardAction(page, "Comment").catch(() => {});

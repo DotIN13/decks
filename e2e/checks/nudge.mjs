@@ -221,7 +221,7 @@ async function run(engine, lags) {
 	};
 
 	// Two boards on screen, picked by a press on their pictures (the second with Shift): the whole canvas framed first.
-	await (await cv()).locator("[aria-label='Fit everything on the canvas']").first().click();
+	await page.locator("[aria-label='Fit everything on the canvas']").first().click();
 	await rest(page);
 	const onScreen = await until(
 		async () =>

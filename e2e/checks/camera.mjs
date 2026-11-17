@@ -101,9 +101,10 @@ const fitted = await canvas.evaluate(() => {
 			(r) => r.left >= stage.left - 2 && r.right <= stage.right + 2 && r.top >= stage.top - 2 && r.bottom <= stage.bottom + 2,
 		),
 		count: nodes.length,
-		level: document.querySelector('.v3-zoom-value').textContent,
 	};
 });
+// The zoom's reading is on the page, with the rest of the tools.
+fitted.level = await page.locator(".v3-zoom-value").first().textContent();
 // The count comes from the deck, not a literal: this asserted 3 and started failing the
 // moment an agent added a fourth board to the fixture, which is not what it tests.
 const expected = (await deckState()).boards.length;

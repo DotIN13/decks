@@ -75,12 +75,14 @@ for (const one of candidates) {
 say("the canvas has room for two shapes", spots.length === 2, JSON.stringify(spots));
 
 // --- a shape from the library -----------------------------------------------------------------------
-await canvas.locator('.v3-tool[data-tool="shape"]').click();
-await canvas.locator('.v3-menu-row:has-text("More shapes")').click();
-say("the shapes button opens the insert panel on its shapes", await canvas.locator(".insert-panel .insert-cell[data-shape]").count() >= 30);
-await canvas.locator('.insert-panel .insert-cell[data-shape="Decision"]').click();
+await page.locator('.v3-tool[data-tool="shape"]').click();
+await page.locator('.v3-menu-row:has-text("More shapes")').click();
+say("the shapes button opens the insert panel on its shapes", await page.locator(".insert-panel .insert-cell[data-shape]").count() >= 30);
+await page.locator('.insert-panel .insert-cell[data-shape="Decision"]').click();
+// Picked on the page: the canvas, in its frame, hears which shape a moment later, and the press waits for that.
+await settle(page, 200);
 const armed = await canvas.evaluate(() => document.querySelector(".stage")?.dataset.penTool);
-say("a pick arms the shape tool and closes the panel", armed === "shape" && (await canvas.locator(".insert-panel").count()) === 0, armed);
+say("a pick arms the shape tool and closes the panel", armed === "shape" && (await page.locator(".insert-panel").count()) === 0, armed);
 const had = new Set(shapesNow().map((n) => n.id));
 await page.mouse.click(spots[0].x, spots[0].y);
 const made = await until(() => shapesNow().find((n) => !had.has(n.id)));
@@ -89,15 +91,15 @@ const outline = made?.children?.find((n) => n.type === "path");
 say("…whose outline is its size, in a 100 by 100 box", outline?.width === made?.width && outline?.height === made?.height && JSON.stringify(outline?.viewBox) === "[0,0,100,100]", JSON.stringify({ frame: [made?.width, made?.height], outline: [outline?.width, outline?.height] }));
 
 // --- the properties panel ----------------------------------------------------------------------------
-await until(() => canvas.locator(".props-panel").count());
-say("the properties panel shows the selection", (await canvas.locator(".props-panel .props-title").inputValue().catch(() => "")) === "Decision");
-const across = await canvas.evaluate(() => {
+await until(() => page.locator(".props-panel").count());
+say("the properties panel shows the selection", (await page.locator(".props-panel .props-title").inputValue().catch(() => "")) === "Decision");
+const across = await page.evaluate(() => {
 	const body = document.querySelector(".props-panel .props-body");
 	for (const details of body.querySelectorAll("details")) details.open = true;
 	return { scroll: body.scrollWidth, client: body.clientWidth, panel: document.querySelector(".props-panel").getBoundingClientRect().width };
 });
 say("…272 px wide, and it never scrolls sideways", across.panel === 272 && across.scroll <= across.client, JSON.stringify(across));
-await canvas.locator('.props-panel select[aria-label="Kind of shape"]').selectOption("Terminator");
+await page.locator('.props-panel select[aria-label="Kind of shape"]').selectOption("Terminator");
 const swapped = await until(() => {
 	const now = onDisk().children.find((n) => n.id === made?.id);
 	// Built at the shape's own size (`@decks/pen`, `build`): its viewBox is the frame's, and its ends are half circles.
@@ -106,12 +108,12 @@ const swapped = await until(() => {
 	return now?.metadata?.kind === "Terminator" && outline?.viewBox?.[2] === now.width && outline.geometry.includes(`A${Math.round(r * 100) / 100} ${Math.round(r * 100) / 100}`) ? now : undefined;
 });
 say("its kind swaps the outline and keeps the shape", !!swapped, JSON.stringify(onDisk().children.find((n) => n.id === made?.id)?.metadata));
-const words = canvas.locator('.props-panel input[placeholder="Double-click the shape, or type here"]');
+const words = page.locator('.props-panel input[placeholder="Double-click the shape, or type here"]');
 await words.fill("Start");
 await words.press("Tab");
 const labelled = await until(() => onDisk().children.find((n) => n.id === made?.id)?.children?.find((n) => n.type === "text" && n.content === "Start"));
 say("words typed in the panel go inside the shape", !!labelled);
-const width = canvas.locator('.props-panel [data-field="w"] input');
+const width = page.locator('.props-panel [data-field="w"] input');
 await width.fill("220");
 await width.press("Enter");
 const sized = await until(() => {
@@ -119,7 +121,7 @@ const sized = await until(() => {
 	return now?.width === 220 && now.children.find((n) => n.type === "path")?.width === 220 ? now : undefined;
 });
 say("a width typed in the panel sizes the shape, and its outline follows", !!sized, JSON.stringify((({ children, ...rest }) => ({ ...rest, kids: children?.map((c) => [c.type, c.width, c.height]) }))(onDisk().children.find((n) => n.id === made?.id) ?? {})));
-const wField = canvas.locator('.props-panel [data-field="w"] input');
+const wField = page.locator('.props-panel [data-field="w"] input');
 await wField.hover();
 for (let i = 0; i < 3; i++) {
 	await page.mouse.wheel(0, -100);
@@ -127,8 +129,8 @@ for (let i = 0; i < 3; i++) {
 }
 const wheeled = await until(() => onDisk().children.find((n) => n.id === made?.id)?.width === 223);
 say("the wheel over a number steps it, one a turn, and sends it once", !!wheeled, String(onDisk().children.find((n) => n.id === made?.id)?.width));
-await canvas.locator('.props-panel [aria-label="Pick any fill colour"]').click();
-const sv = await until(() => canvas.locator(".color-picker .color-sv").boundingBox());
+await page.locator('.props-panel [aria-label="Pick any fill colour"]').click();
+const sv = await until(() => page.locator(".color-picker .color-sv").boundingBox());
 say("a colour field's swatch opens a colour picker", !!sv);
 if (sv) {
 	/**
@@ -159,14 +161,17 @@ if (sv) {
 	});
 	say("…and sets the fill once, when it is let go", !!picked, String(picked));
 	await page.keyboard.press("Escape");
-	say("Escape closes the picker and keeps the selection", (await canvas.locator(".color-picker").count()) === 0 && (await canvas.locator(".props-panel").count()) === 1);
+	say("Escape closes the picker and keeps the selection", (await page.locator(".color-picker").count()) === 0 && (await page.locator(".props-panel").count()) === 1);
 }
 
 // --- an arrow from a side ----------------------------------------------------------------------------
 await page.keyboard.press("Escape");
-await canvas.locator('.v3-tool[data-tool="shape"]').click();
-await canvas.locator('.v3-menu-row:has-text("More shapes")').click();
-await canvas.locator('.insert-panel .insert-cell[data-shape="Process"]').click();
+await page.locator('.v3-tool[data-tool="shape"]').click();
+await page.locator('.v3-menu-row:has-text("More shapes")').click();
+await page.locator('.insert-panel .insert-cell[data-shape="Process"]').click();
+// Picked on the page: the canvas hears of it a moment later, and the press waits for that.
+await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.penTool === "shape", null, { timeout: 3000 });
+await settle(page, 200);
 const had2 = new Set(shapesNow().map((n) => n.id));
 await page.mouse.click(spots[1].x, spots[1].y);
 const second = await until(() => shapesNow().find((n) => !had2.has(n.id)));
@@ -196,7 +201,7 @@ if (first && target) {
 		arrowDrawn = arrow?.id;
 		say("an arrow drawn from a side keeps to it in the file", arrow?.metadata.from?.side === "bottom" && (arrow?.metadata.to === second?.id || arrow?.metadata.to?.item === second?.id), JSON.stringify(arrow?.metadata));
 		if (arrow) {
-			await canvas.locator('.props-panel input[placeholder="On the middle of the line"]').fill("yes");
+			await page.locator('.props-panel input[placeholder="On the middle of the line"]').fill("yes");
 			await page.keyboard.press("Tab");
 			const worded = await until(() => onDisk().children.find((n) => n.id === arrow.id)?.metadata.label === "yes");
 			say("words on an arrow are its label", !!worded);
@@ -299,16 +304,28 @@ if (arrowDrawn) {
  * canvas. A press in an empty corner of it used to pick the arrow, because the box was the whole
  * test; now the browser is asked whether the point is on what the path draws.
  */
-const diagonal = await canvas.evaluate(() => {
+const diagonals = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+	const found = [];
 	for (let y = 170; y < 700; y += 40) {
 		for (let x = 380; x < 1300; x += 40) {
-			if ([0, 60, 120, 180].every((dy) => [0, 80, 160, 240].every((dx) => empty(x + dx, y + dy)))) return { world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, zoom: m.a };
+			if ([0, 60, 120, 180].every((dy) => [0, 80, 160, 240].every((dx) => empty(x + dx, y + dy)))) found.push({ at: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, zoom: m.a });
 		}
 	}
+	return found;
 });
+// …and not under the page's own chrome: the tool column stands over the canvas's left edge.
+let diagonal;
+for (const one of diagonals) {
+	let clear = true;
+	for (const dx of [0, 80, 160, 240]) for (const dy of [0, 60, 120, 180]) if (clear && !(await onCanvasAt(page, one.at.x + dx, one.at.y + dy))) clear = false;
+	if (clear) {
+		diagonal = one;
+		break;
+	}
+}
 say("the canvas has room for a diagonal arrow", !!diagonal, JSON.stringify(diagonal?.world));
 if (diagonal) {
 	const a = { x: Math.round(diagonal.world.x), y: Math.round(diagonal.world.y) };
@@ -340,7 +357,7 @@ if (diagonal) {
 		 * Read from the properties panel, not from the selection outline: an arrow has no outline, so
 		 * counting outlines would call a selected arrow "nothing selected".
 		 */
-		const named = () => canvas.evaluate(() => document.querySelector(".props-panel .props-title")?.value ?? "");
+		const named = () => page.evaluate(() => document.querySelector(".props-panel .props-title")?.value ?? "");
 		await page.mouse.click(corner.x, corner.y);
 		await settle(page, 400);
 		const nothing = await named();

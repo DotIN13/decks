@@ -132,7 +132,7 @@ const itemOf = (doc, path) => doc.children.find((n) => n.metadata?.path === path
 
 // --- browse mode: the tools, the hover, the marquee ----------------------------------------------
 say("the canvas is browsing", (await canvas.evaluate(() => document.querySelector(".stage").dataset.mode)) === "browse");
-say("…and the tool column is there, select pressed: that is browsing", (await count(".pen-tools button[data-tool]")) >= 10 && (await canvas.evaluate(() => document.querySelector('.pen-tools [data-tool="select"]')?.getAttribute("aria-pressed"))) === "true");
+say("…and the tool column is there, select pressed: that is browsing", (await page.locator(".pen-tools button[data-tool]").count()) >= 10 && (await page.evaluate(() => document.querySelector('.pen-tools [data-tool="select"]')?.getAttribute("aria-pressed"))) === "true");
 const a0 = await centre("g-a");
 await page.mouse.move(a0.x, a0.y);
 await settle(page, 300);
@@ -396,21 +396,21 @@ let ITEM_WASH = "";
 		const rejoined = await until(() => onDisk().children.find((n) => n.id === arrow.id)?.metadata.to === "g-b");
 		say("…and letting go joins the arrow to it", !!rejoined, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
 		// Its style, from the properties panel: a curve, heads at both ends, dashed. The path is redrawn from it.
-		await canvas.click('.props-panel [data-route="curved"]');
+		await page.click('.props-panel [data-route="curved"]');
 		const curved = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			// Two items side by side on one level are joined by a straight line even when curved.
 			return now?.metadata.route === "curved" ? now : undefined;
 		});
 		say("an arrow's bar makes it curved", !!curved, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		await canvas.click('.props-panel [data-heads="both"]');
-		await canvas.click('.props-panel [data-dash="dashed"]');
+		await page.click('.props-panel [data-heads="both"]');
+		await page.click('.props-panel [data-dash="dashed"]');
 		const styled = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			return now?.metadata.heads === "both" && now.metadata.dash === true && now.geometry.split("M").length - 1 === 3 ? now : undefined;
 		});
 		say("…with a head at each end, and dashed", !!styled, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		await canvas.click('.props-panel [data-route="straight"]');
+		await page.click('.props-panel [data-route="straight"]');
 		const straight = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			return now && now.metadata.route === undefined && !/ C/.test(now.geometry) ? now : undefined;
@@ -648,7 +648,7 @@ let ITEM_WASH = "";
 }
 
 // --- the pen: a held stroke straightens, two fingers undo, the lasso resizes -------------------------
-await canvas.click('.v3-tool[data-tool="pen"]');
+await page.click('.v3-tool[data-tool="pen"]');
 await canvas.waitForSelector(".stage-ink");
 {
 	const had = new Set(onDisk().children.map((n) => n.id));
@@ -687,7 +687,9 @@ await canvas.waitForSelector(".stage-ink");
 	await page.mouse.up();
 	const stroke = await until(() => onDisk().children.find((n) => !had2.has(n.id) && n.metadata?.type === "decks.ink"));
 	await settle(page, 400);
-	await canvas.click('.v3-tray [aria-label^="Lasso"]');
+	await page.click('.v3-tray [aria-label^="Lasso"]');
+	// Picked on the page; the canvas hears of it a moment later.
+	await settle(page, 200);
 	await page.mouse.click(p.x + 80, p.y + 10);
 	const corner = await until(() => canvas.evaluate(() => {
 		const c = document.querySelector('.ink-corner[data-corner="se"]');

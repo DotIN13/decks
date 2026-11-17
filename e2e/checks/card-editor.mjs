@@ -315,7 +315,7 @@ await page.keyboard.press("Escape");
 await settle(page, 300);
 const cardBox = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-editor"));
 await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 6);
-const exportButton = canvas.locator('[title="Export to Obsidian (.md)"]');
+const exportButton = page.locator('[title="Export to Obsidian (.md)"]');
 await exportButton.waitFor({ timeout: 3000 }).catch(() => {});
 const [download] = await Promise.all([page.waitForEvent("download", { timeout: 5000 }).catch(() => undefined), exportButton.click().catch(() => {})]);
 const note = download ? readFileSync(await download.path(), "utf8") : "";

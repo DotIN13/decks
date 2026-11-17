@@ -176,21 +176,21 @@ if (spot) {
 		// Its edge, not its middle, which is where the item it holds would be.
 		const box = await boxOf("f-box");
 		await page.mouse.click(box.x + 6, box.y + box.height / 2);
-		const panel = await until(() => canvas.evaluate(() => {
+		const panel = await until(() => page.evaluate(() => {
 			const section = document.querySelector('[data-section="layout"]');
 			return section ? { buttons: [...section.querySelectorAll("button")].map((b) => b.textContent?.trim()).filter(Boolean) } : undefined;
 		}));
 		say("a selected frame has a Layout section", !!panel, JSON.stringify(panel?.buttons?.slice(0, 6)));
 		if (panel) {
 			say("…whose words are CSS: a direction, a size that can fit its content, and overflow", ["none", "column", "row", "fit-content", "hidden"].every((word) => panel.buttons.includes(word)), JSON.stringify(panel.buttons));
-			await canvas.evaluate(() => {
+			await page.evaluate(() => {
 				const section = document.querySelector('[data-section="layout"]');
 				[...section.querySelectorAll("button")].find((b) => b.textContent?.trim() === "column")?.click();
 			});
 			const stacked = await until(() => (onDisk().children.find((n) => n.id === "f-box")?.layout === "vertical" ? true : undefined));
 			say("…and pressing column writes pen's own vertical layout to the file", !!stacked, JSON.stringify(onDisk().children.find((n) => n.id === "f-box")?.layout));
 			// A frame that follows its children keeps a floor, so emptying it leaves something to drop into.
-			await canvas.evaluate(() => {
+			await page.evaluate(() => {
 				const group = document.querySelector('[data-section="layout"] [aria-label="height"]');
 				[...group.querySelectorAll("button")].find((b) => b.textContent?.trim() === "fit-content")?.click();
 			});
@@ -207,8 +207,8 @@ if (spot) {
 	 * frame is a column, so a drop into it is a place in an order rather than a pixel, and the line
 	 * between two children is what says which place.
 	 */
-	await canvas.click('.v3-tool[data-tool="shape"]');
-	await canvas.click('.v3-menu-row:has-text("Frame")');
+	await page.click('.v3-tool[data-tool="shape"]');
+	await page.click('.v3-menu-row:has-text("Frame")');
 	const room = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage");
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());

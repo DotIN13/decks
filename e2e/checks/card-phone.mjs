@@ -159,7 +159,7 @@ const spot = world(view.w / 2 - 60, Math.min(view.h * 0.58 - 80, drawn.y + drawn
 link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "phone-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...spot, x2: spot.x1 + 120, y2: spot.y1 + 68 } }]);
 const picture = await until(() => canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-picture")));
 const first = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("p-h"));
-const props = () => canvas.evaluate(() => !!document.querySelector(".props-panel"));
+const props = () => page.evaluate(() => !!document.querySelector(".props-panel"));
 /* On a phone the properties are a drawer, opened from the pill's Properties button, not with every selection (`Properties.tsx`, `touch-rules.ts`). */
 const openDrawer = async () => {
 	const button = await until(() => canvas.evaluate(() => { const b = document.querySelector(".stage-fixed > .card-callout [aria-label='Properties']"); const r = b?.getBoundingClientRect(); return r && r.width ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : undefined; }), 2000);
@@ -169,6 +169,14 @@ const openDrawer = async () => {
 await page.touchscreen.tap(picture.x + picture.width / 2, picture.y + picture.height / 2);
 await settle(page, 400);
 say("a tap on a picture selects it, and its pill offers Properties, which opens the drawer", (await openDrawer()) && (await until(props, 2000)));
+/*
+ * The drawer is shut again before the picture is carried: open, it takes the foot of the screen (56%)
+ * and the picture is under it. While the tools stood in the canvas's frame this check pressed before
+ * the drawer had finished rising, and so reached the picture through it.
+ */
+await page.locator(".props-panel .close").tap();
+await until(async () => ((await props()) ? undefined : true), 2000);
+await settle(page, 350);
 const cdp = await page.context().newCDPSession(page);
 
 const point = (x, y) => [{ x, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }];

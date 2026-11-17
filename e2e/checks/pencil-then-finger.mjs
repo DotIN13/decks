@@ -37,7 +37,7 @@ const canvas = await canvasFrame(page);
 const cdp = await context.newCDPSession(page);
 const box = await (await page.$("iframe.canvas-frame")).boundingBox();
 
-await canvas.locator('.v3-tool[data-tool="pen"]').tap();
+await page.locator('.v3-tool[data-tool="pen"]').tap();
 await canvas.waitForSelector(".stage-ink");
 
 /** A pencil stroke, in page coordinates. */

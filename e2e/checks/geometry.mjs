@@ -66,7 +66,7 @@ const select = async (path) => {
 	await flyToCard(page, path);
 	await settle(page, 300);
 	for (let i = 0; i < 8; i++) {
-		const level = await canvas.evaluate(() =>
+		const level = await page.evaluate(() =>
 			Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),
 		);
 		if (level >= 70 && level <= 200) break;
