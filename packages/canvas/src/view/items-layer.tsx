@@ -1,25 +1,23 @@
 import { probes } from "../base/debug.ts";
-import type { Page, Camera } from "@decks/protocol";
-import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
-import { boxOf, LIVE_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
+import type { Camera } from "@decks/protocol";
+import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
+import { toScreen, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import { canvasHost, openInTab } from "../base/host.ts";
-import { appShowing } from "../items/item-surfaces.tsx";
-import MediaPlayer from "../items/MediaPlayer.tsx";
-import { chooseAwake, NO_AWAKE, sameAwake, type Awake, type AwakeItem } from "../items/awake.ts";
-import { missing } from "../base/missing.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
-import type { SceneCard } from "../render/types.ts";
-import { docIndex } from "../model/doc-index.ts";
-import { BoxIndex } from "../render/spatial.ts";
 import { AWAKE, DEVICE, ENGINE, MOVING } from "../render/device.ts";
-import { drawing } from "../ink/ink.ts";
-import { scheme } from "../base/theme.ts";
-import { mediaOf, type PenNode } from "@decks/pen";
-import { isLiveFile } from "../model/card-frame.ts";
 import type { CanvasEngine } from "../render/engine.ts";
 import type { CanvasEditor } from "../edit/dom/index.ts";
 import type { CanvasViewProps } from "./CanvasView.tsx";
+import { createItemNodes } from "./item-nodes.tsx";
+import { createCardSizing } from "./card-sizing.ts";
+import { createPageNode } from "./page-node.tsx";
+import { createLiveFiles } from "./live-files.ts";
+import { createRendered } from "./rendered.ts";
+import { createAwakeCards } from "./awake-cards.ts";
+import { createCovering } from "./covering.ts";
+import { createPlayingBox } from "./playing-box.ts";
+import { createAppStates } from "./app-states.ts";
+import { createMedia } from "./media.ts";
 
 /** What the items layer needs of the stage around it. */
 type ItemsLayerDeps = {
@@ -41,6 +39,9 @@ type ItemsLayerDeps = {
 	/** What an item's slot asks of the stage's fingers (`input.ts`). */
 	gestures: ItemSlotProps["gestures"];
 };
+
+/** A file shown live (`liveFiles`): which item, what it is, and its deck path. */
+export type LiveFile = { id: string; file: string; name: string };
 
 /**
  * The placed items: cards, documents, apps and boards, which of them are near, have a slot and are
@@ -132,137 +133,34 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
 	const [holesShown, setHolesShown] = createSignal<ReadonlySet<string>>(new Set());
 	let holesAsked: { ids: ReadonlySet<string>; mark: number } | undefined;
-	/**
-	 * The one film or sound playing, if any.
-	 *
-	 * **One at a time, on purpose.** A film at rest is paint and costs a picture; a film playing is
-	 * a decoder, and eight of those are already the edge of a frame's budget on a machine with no
-	 * graphics card — forty-eight cost a thousand times what forty-eight stills cost. So starting
-	 * one stops the last, and the canvas never holds more than a single player.
-	 */
-	const [playing, setPlaying] = createSignal<{ id: string; kind: "video" | "audio"; file: string } | undefined>();
-	/** The playing element, for a click on the item to pause and resume. */
-	let playingElement: HTMLMediaElement | undefined;
-	/** When the one playing was started, so the second press of a double-click does not pause it at once. */
-	let playingSince = 0;
-	/** Where each film or sound was left, so pressing it again goes on from there. */
-	const playedTo = new Map<string, number>();
-	/**
-	 * A press on a film or a sound: it plays, or the one playing pauses or goes on. The press
-	 * selects it as well, as a press on any item does, so it can still be moved and styled.
-	 */
-	const toggleMedia = (id: string, media: { kind: "video" | "audio"; file: string }) => {
-		const now = playing();
-		if (now?.id === id && playingElement) {
-			if (playingElement.paused) void playingElement.play().catch(() => {});
-			else if (performance.now() - playingSince > 400) playingElement.pause();
-			return;
-		}
-		playingSince = performance.now();
-		setPlaying({ id, kind: media.kind, file: media.file });
-	};
+	const media = createMedia({
 
-	/**
-	 * Each app's status, by name, for the dot on the window the engine paints: read once per app on the
-	 * canvas and then heard from the harness as it changes (`CanvasHost.apps.watch`).
-	 */
-	const [appStates, setAppStates] = createSignal<ReadonlyMap<string, string>>(new Map());
-	const appWatched = new Map<string, () => void>();
-	createEffect(() => {
-		const apps = canvasHost().apps;
-		const names = new Set(props.boards.filter((board) => board.item === "app" && board.app).map((board) => board.app!));
-		for (const [name, stop] of appWatched) {
-			if (names.has(name)) continue;
-			stop();
-			appWatched.delete(name);
-		}
-		for (const name of names) {
-			if (appWatched.has(name) || !apps) continue;
-			const put = (status: string | undefined) => status && setAppStates((was) => (was.get(name) === status ? was : new Map(was).set(name, status)));
-			void apps.status(name).then((got) => put(got?.status)).catch(() => {});
-			appWatched.set(name, apps.watch?.(name, (state) => put(state.status)) ?? (() => {}));
-		}
 	});
-	onCleanup(() => {
-		for (const stop of appWatched.values()) stop();
+	const { playing, setPlaying, playedTo, toggleMedia } = media;
+
+	const { appStates } = createAppStates({
+		props,
 	});
 
-	/**
-	 * Whether the camera's motion covers an app or a document with its picture (`COVER`): read by the list
-	 * below through this memo, so where neither kind is covered (Chromium) the list does not depend on the
-	 * motion at all. Read directly, every pan and zoom rebuilt the whole list twice, at its first step and
-	 * at rest, to the same 112 cards: 17 ms each on a 4× slowed CPU, a dropped frame at either end.
-	 */
-	const covering = createMemo(() => (COVER.app || COVER.document) && (moving() || panning() || scaling() || gliding()));
-
-	/**
-	 * Each board as the sheet draws it: where it is, and whether it is a hole or a picture.
-	 *
-	 * A dragged board is where it was picked up, here: the sheet draws its picture once on the carried
-	 * layer and the page slides that with the pointer (`carry` below), so a move redraws nothing.
-	 */
-	createEffect(() => {
-		const live = liveCards();
-		const look = scheme();
-		const pictures = cardPictures();
-		const states = appStates();
-		/*
-		 * An awake card being sized is its surface, drawn over the sheet at the new box, so the sheet
-		 * keeps it where it was until the file has the size: each step otherwise painted the whole
-		 * sheet again, about 10 ms of the worker's time, to move a hole nobody can see. A board
-		 * shown as a picture is drawn by the sheet, and one an arrow ends on is followed by the
-		 * arrow, so those two are still sent at every step.
-		 */
-		const resize = editor.sheetResize((path) => live.has(path));
-		// How often this list is rebuilt, for `awake-bench.mjs` (`cardLists`): a camera step should not rebuild it.
-		probes.cardLists++;
-		const sendCards = (cards: SceneCard[]) => {
-			/*
-			 * The engine draws the cards' pictures, and hears of every card: an arrow follows the card it
-			 * ends on, and a drawn item over a card gets the click shape that lets it be pressed there. It
-			 * is handed the stage's own index over them (`pageIndex`, the same order), so it builds none;
-			 * not while one is being sized, when the boxes it holds are not the index's.
-			 */
-			penLayer.cardLayer.setCards(cards, resize ? undefined : untrack(pageIndex));
-		};
-		const inMotion = covering();
-		// Each card's item on the drawing, by its path: what the engine keeps a glide's offset under.
-		const itemIds = new Map<string, string>();
-		for (const placed of penLayer.placed.values()) {
-			const path = (placed.node.metadata as { path?: unknown } | undefined)?.path;
-			if (typeof path === "string") itemIds.set(path, placed.node.id);
-		}
-		// Read once: the host works it out over every page each time it is asked, and it was asked once per card.
-		const news = props.news;
-		sendCards(
-			props.boards
-				.map((board) => {
-					const sized = resize?.path === board.path ? resize : undefined;
-					const id = itemIds.get(board.path) ?? [...itemIds].find(([path]) => board.path.endsWith(path))?.[1];
-					return {
-						path: board.path,
-						...(id ? { id } : {}),
-						...(board.corners ? { corners: board.corners } : {}),
-						x: sized?.x ?? board.x,
-						y: sized?.y ?? board.y,
-						w: sized?.w ?? board.w,
-						h: sized?.h ?? board.h,
-						// Every kind by one rule: live while its slot says its surface shows (`onLive`: awake and not asleep); an app besides only once its window
-						// has loaded the app, and an app or a document only while the camera is still (`MOVING`), its picture otherwise: an app that
-						// animates repainted its window at every step of a pan, and a document's editor laid out at every step of a zoom.
-						live: board.item === "app" ? live.has(board.path) && appShowing(board.path) && !(COVER.app && inMotion) : board.item === "document" ? live.has(board.path) && !(COVER.document && inMotion) : live.has(board.path),
-						// An awake item's picture is kept ready, for a zoom on WebKit or a drag to show at once.
-						...(live.has(board.path) ? { ready: true } : {}),
-						// An item not live is its picture: a card's own, an app's as the frame runs it, a document's of its file.
-						picture: board.item === "app" && board.app ? props.shots().picture({ ...board, path: `apps/${board.app}` }, look) : board.item === "document" && board.file ? props.shots().picture({ path: board.file, rev: board.rev }, look) : board.item ? "" : props.shots().picture(board, look),
-						// Painted on its paper until its picture comes; an app's window carries its name and status in every state.
-						title: board.title,
-						kind: board.item ?? (missing().has(board.path) ? "missing" : "card"),
-						...(board.item === "app" && board.app ? { status: states.get(board.app) ?? "" } : {}),
-						...(news?.[board.path] ? { news: resolveColour(news[board.path]!), glow: !isLive(board.path) } : {}),
-					};
-				}),
-		);
+	createCovering({
+		COVER,
+		moving,
+		panning,
+		scaling,
+		gliding,
+		liveCards,
+		cardPictures,
+		appStates,
+		editor,
+		penLayer,
+		get pageIndex() {
+			return pageIndex;
+		},
+		props,
+		resolveColour,
+		get isLive() {
+			return isLive;
+		},
 	});
 	// The boards a drag carries go with it on the engine's carried layer (`editor/dom/controller.ts`).
 	/** The items whose carried picture is on screen: their slots hide where they were picked up (`item-slot.tsx`). */
@@ -283,8 +181,6 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return new Set(paths.filter((path) => !live.has(path)));
 	});
 
-	/** A file shown live (`liveFiles`): which item, what it is, and its deck path. */
-	type LiveFile = { id: string; file: string; name: string };
 	/** The most file items alive at once, the nearest the middle of the screen: a frame each is a page's worth of work. */
 	const LIVE_FILES = 12;
 	/**
@@ -305,449 +201,107 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	};
 	probes.cards = cardsOnScreen;
 
-	/**
-	 * Where the player sits, while something is playing: the item's own drawn box.
-	 *
-	 * It plays on while you work elsewhere on the canvas: letting go of the item, panning or zooming
-	 * out does not stop it, because one decoder costs nothing a frame notices and a sound you are
-	 * listening to should not end because you clicked away. It goes when it ends, when another is
-	 * started, or when the item is gone from the file.
-	 */
-	const playingBox = createMemo(() => {
-		penDrawn();
-		const now = playing();
-		if (!now) return undefined;
-		const node = penLayer.placed.get(now.id)?.node;
-		const box = penLayer.bounds.get(now.id);
-		const media = mediaOf(node);
-		if (!node || !box || !media) return undefined;
-		const drag = editor.itemShift(now.id);
-		return {
-			...now,
-			name: String(node.name ?? media.file.split("/").pop() ?? ""),
-			...(media.seconds === undefined ? {} : { seconds: media.seconds }),
-			...(media.peaks ? { peaks: media.peaks } : {}),
-			radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 8,
-			x: box.x + drag.dx,
-			y: box.y + drag.dy,
-			w: box.w,
-			h: box.h,
-		};
-	});
-	// What stopped it above is still holding the file open: let it go, so nothing decodes off screen.
-	createEffect(() => {
-		if (playing() && !playingBox()) setPlaying(undefined);
+	const { playingBox } = createPlayingBox({
+		penDrawn,
+		playing,
+		penLayer,
+		editor,
+		setPlaying,
 	});
 
-	/** The camera boards and their bookkeeping see: the settled one (`camera/controller.ts`). */
-	const pageCamera = ctl.settled;
-	/**
-	 * The boards and cards within a window of the screen, by path, from the R-tree, as of the settled
-	 * camera. A new set only when one enters or leaves it, so what reads it through `isNear` hears only
-	 * about its own item, and a pan that keeps the same ones near reaches none of them.
-	 */
-	const nearPaths = createMemo<ReadonlySet<string>>(
-		() => {
-			if (view().width === 0) return new Set();
-			const boards = props.boards;
-			return new Set(pageIndex().search(reach()).map((at) => boards[at]!.path));
+	const { pageIndex, isLive, pageSlot, livePaths, keptPaths, leavingPaths, isVisible, isKept, isLeaving, isPictured, isNear, liveNow } = createAwakeCards({
+		ctl,
+		view,
+		props,
+		BUDGET,
+		editor,
+		liveCards,
+		picturedNow,
+	});
+	const { renderedPaths, restCamera, isRendered, layered } = createRendered({
+		props,
+		view,
+		moving,
+		panning,
+		scaling,
+		gliding,
+		pageSlot,
+		editor,
+		liveCards,
+		livePaths,
+		keptPaths,
+		leavingPaths,
+		penLayer,
+		cardsHidden,
+		isVisible,
+		LAYER_BUDGET,
+	});
+
+	const { liveFiles, liveBox, openLiveFile } = createLiveFiles({
+		penDrawn,
+		restCamera,
+		props,
+		view,
+		penLayer,
+		LIVE_FILES,
+		scaling,
+		get holesAsked() {
+			return holesAsked;
 		},
-		new Set(),
-		{ equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)) },
-	);
-	/** Whether a board is in `nearPaths`: each board is told only when its own answer changes. */
-	const isNear = createSelector(nearPaths, (path: string, near) => near.has(path));
-	/** On screen, or within a window of it: the R-tree's answer, not each board's own arithmetic. */
-	const isVisible = (board: Page) => isNear(board.path);
-
-	/** At or above the live zoom (`LIVE_ZOOM`): items may be awake, and files near the window show live. */
-	const liveNow = createMemo(() => ctl.zoom() >= LIVE_ZOOM);
-	const pageIndex = createMemo(() => new BoxIndex(props.boards));
-	const pageSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
-	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
-	const reach = () => {
-		const v = view();
-		const cam = pageCamera();
-		const corner = toWorld(cam, v, { x: -v.width, y: -v.height });
-		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
-	};
-	/** The placed items as the chooser sees them: the same order as `props.boards` and `pageIndex`, each with its kind. */
-	// A card its host has no copy of (`base/missing.ts`) is never woken, as a board is not: its page would be blank paper, and the sheet paints why.
-	const awakeItems = createMemo<readonly AwakeItem[]>(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, kind: board.card ? (missing().has(board.path) ? undefined : "card") : board.item })));
-	/*
-	 * Which items are awake (`items/awake.ts`): chosen from the camera at rest, so nothing mounts or
-	 * unmounts while a pinch, a pan or a glide moves it; the nearest the middle of the screen, each kind
-	 * cut to this device's budget, none below `LIVE_ZOOM`, and the selected item at any zoom. Every other
-	 * card, app or document sleeps as its picture. A board is never awake: the sheet draws it as its
-	 * picture, and the canvas runs no board's page.
-	 */
-	const cardChoice = createMemo<Awake>((was) => {
-		const v = view();
-		if (v.width === 0) return was;
-		const next = chooseAwake({ index: pageIndex(), items: awakeItems(), rest: ctl.rest(), view: v, selected: props.selected, budget: BUDGET, was });
-		return sameAwake(was, next) ? was : next;
-	}, NO_AWAKE);
-	/** For the browser checks: the items chosen awake and kept asleep, of every kind. */
-	probes.liveCards = () => untrack(cardChoice);
-	probes.awake = () => ({ ...untrack(cardChoice), selected: props.selected, hover: untrack(editor.hoverPicture), held: [...untrack(editor.heldPages)], shown: [...untrack(liveCards).entries()].map(([path, n]) => `${path}:${n}`), leaving: [...untrack(leaving).keys()] });
-	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().live), new Set(), {
-		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
-	});
-	/** Cards let go lately and kept with their roots, asleep (`cardChoice().kept`): waking one again is instant. */
-	const keptPaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().kept), new Set(), {
-		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
-	});
-	/*
-	 * Cards just let go, kept on the page until the sheet draws their pictures over them: put away at once,
-	 * a card left a frame or more of bare canvas in its place (the sheet still had a hole there, or its
-	 * picture was not drawn yet), a flicker each time one went to sleep. A second at most.
-	 */
-	const [leaving, setLeaving] = createSignal<ReadonlyMap<string, number>>(new Map());
-	let awakeBefore = new Set<string>();
-	createEffect(() => {
-		const now = new Set([...livePaths(), ...keptPaths()]);
-		const gone = [...awakeBefore].filter((path) => !now.has(path));
-		awakeBefore = now;
-		const at = performance.now();
-		setLeaving((was) => {
-			const next = new Map([...was].filter(([path]) => !now.has(path)));
-			for (const path of gone) next.set(path, at);
-			return next.size === was.size && [...next.keys()].every((path) => was.has(path)) ? was : next;
-		});
-	});
-	createEffect(() => {
-		const drawn = picturedNow();
-		const left = leaving();
-		if (left.size === 0) return;
-		const at = performance.now();
-		const next = new Map([...left].filter(([path, since]) => !drawn.has(path) && at - since < 1000));
-		if (next.size !== left.size) setLeaving(next);
-		else if (next.size) setTimeout(() => setLeaving((was) => new Map([...was].filter(([, since]) => performance.now() - since < 1000))), 1000);
-	});
-	const leavingPaths = createMemo<ReadonlySet<string>>(() => new Set(leaving().keys()), new Set(), {
-		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
-	});
-	const isLeaving = createSelector(leavingPaths, (path: string, paths) => paths.has(path));
-	const isPictured = createSelector(picturedNow, (path: string, paths) => paths.has(path));
-	const isKept = createSelector(keptPaths, (path: string, paths) => paths.has(path));
-	/** Whether a card is awake: each slot is told only when its own answer changes. */
-	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
-	/**
-	 * The items that have a slot on the page at all: the awake ones (`items/awake.ts`: live, kept and
-	 * leaving), the selected item, one being dragged or resized, and the sleeping item under the pointer,
-	 * which gets its bar and edge band to move it by. A sleeping item is its picture on the sheet and
-	 * nothing else, at any zoom, its title painted over it by the engine: 400 nodes cost a pan step 10 ms
-	 * of the page's time, and each camera step reached every one. The stage finds the one under a press
-	 * itself (`editor/dom/pointer.ts`, `pictureUnder`).
-	 */
-	const rendered = createMemo<readonly Page[]>((was) => {
-		const boards = props.boards;
-		if (view().width === 0) return was ?? [];
-		/*
-		 * Only at rest: a pan or a zoom keeps the nodes it started with, and the items it brings in are
-		 * drawn by the sheet until it stops. Making a zoom's new nodes mid-pinch, title bars and all,
-		 * held camera steps for up to 52 ms on an iPad mini.
-		 */
-		const moved = was !== undefined && (moving() || panning() || scaling() || gliding());
-		const found = new Set(
-			moved
-				? was.flatMap((board) => {
-						const at = pageSlot().get(board.path);
-						return at === undefined ? [] : [at];
-					})
-				: [],
-		);
-		const keep = (path: string | undefined) => {
-			const at = path === undefined ? undefined : pageSlot().get(path);
-			if (at !== undefined) found.add(at);
-		};
-		// The sleeping item under the pointer: its bar and edge band, never mid-gesture.
-		if (!moved) keep(editor.hoverPicture());
-		for (const path of liveCards().keys()) keep(path);
-		keep(props.selected);
-		for (const path of livePaths()) keep(path);
-		for (const path of keptPaths()) keep(path);
-		for (const path of leavingPaths()) keep(path);
-		for (const path of editor.heldPages()) keep(path);
-		const next = [...found]
-			.sort((a, b) => a - b)
-			.map((at) => boards[at]!);
-		// The same boards as last frame, which is nearly every frame of a pan: the same array, so nothing downstream runs.
-		return was && was.length === next.length && next.every((board, i) => board === was[i]) ? was : next;
-	});
-
-	/** `rendered`, as a set to look a board up in. */
-	const slotPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
-	/** Whether a board has a node: each board's slot is told only when its own answer changes. */
-	const isRendered = createSelector(slotPaths, (path: string, paths) => paths.has(path));
-	/**
-	 * The items whose node takes a press: those in `rendered` but a kept card asleep, which is its picture
-	 * on the sheet as any sleeping card is, so the stage finds it under a press itself (`pictureUnder`).
-	 */
-	const renderedPaths = createMemo<ReadonlySet<string>>(() => {
-		const kept = keptPaths();
-		return kept.size === 0 ? slotPaths() : new Set([...slotPaths()].filter((path) => !kept.has(path)));
-	});
-	// The engine writes click shapes only over cards with a node (`writeHits`): told the set as it changes.
-	createEffect(() => penLayer.questions.setNodes(renderedPaths()));
-	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
-	const layered = createMemo(() => scaling() && rendered().filter((board) => ((board.card && !cardsHidden()) || board.item) && isVisible(board)).length <= LAYER_BUDGET);
-
-	/** The camera as of its last rest. */
-	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
-
-	/*
-	 * SVGs shown live on the canvas (`liveFileItem`), each as an image. Each is an element in the boards' layer, under the sheet, which draws a hole
-	 * where it is (`render/engine.ts`, `holes`): so it moves with the boards in the same frame, and what is drawn
-	 * over it stays over it. As a board's page: only from the live zoom, only near the screen as of the
-	 * camera's last rest, the nearest few; while a zoom moves, or the item is being moved or sized, the
-	 * sheet draws its still over it instead, and the element waits underneath, still loaded.
-	 */
-	const liveFiles = createMemo(
-		() => {
-			penDrawn();
-			const cam = restCamera();
-			if (cam.zoom < LIVE_ZOOM || !props.pen) return [] as LiveFile[];
-			const v = view();
-			const mx = v.width * 0.25;
-			const my = v.height * 0.25;
-			const near: Array<LiveFile & { d: number }> = [];
-			for (const placed of penLayer.placed.values()) {
-				const node = placed.node;
-				if (!isLiveFile(node) || node.metadata?.kind !== "svg" || typeof node.metadata.file !== "string") continue;
-				const box = penLayer.bounds.get(node.id) ?? placed.box;
-				const a = toScreen(cam, v, { x: box.x, y: box.y });
-				const b = toScreen(cam, v, { x: box.x + box.w, y: box.y + box.h });
-				if (b.x < -mx || a.x > v.width + mx || b.y < -my || a.y > v.height + my) continue;
-				near.push({ id: node.id, file: node.metadata.file, name: String(node.name ?? node.metadata.file.split("/").pop()), d: Math.hypot((a.x + b.x - v.width) / 2, (a.y + b.y - v.height) / 2) });
-			}
-			return near.sort((p, q) => p.d - q.d).slice(0, LIVE_FILES).map(({ d: _d, ...file }) => file);
+		set holesAsked(next) {
+			holesAsked = next;
 		},
-		[],
-		{ equals: (a, b) => a.length === b.length && a.every((file, k) => file.id === b[k]!.id && file.file === b[k]!.file && file.name === b[k]!.name) },
-	);
-	/**
-	 * The items the sheet draws as holes: the live ones, and none while a zoom moves. A moved or sized one
-	 * stays live: its element goes with the drag as the sheet's hole does (`liveBox`), so an animation being
-	 * carried keeps playing, not its still.
-	 */
-	const fileHoles = createMemo(
-		() => {
-			if (scaling()) return new Set<string>();
-			return new Set(liveFiles().map((file) => file.id));
+		editor,
+	});
+
+	const { pageNode } = createPageNode({
+		props,
+		Frame,
+		ctl,
+		isLive,
+		isKept,
+		isLeaving,
+		isPictured,
+		isNear,
+		markLive,
+		carriedPages,
+		draggedAsPicture,
+		gestures,
+		editor,
+		pushCamera,
+		frame,
+	});
+
+	const { sizingPaths } = createCardSizing({
+		editor,
+		props,
+	});
+
+	const { presented, slots, fileNodes, player } = createItemNodes({
+		get holesAsked() {
+			return holesAsked;
 		},
-		new Set<string>(),
-		{ equals: (a, b) => a.size === b.size && [...a].every((id) => b.has(id)) },
-	);
-	createEffect(
-		on(fileHoles, (ids) => {
-			penLayer.previews.holes(ids);
-			holesAsked = { ids, mark: penLayer.tiles.mark() };
-		}),
-	);
-	/** Where each live file is on the stage, from the layout the sheet drew. */
-	const liveBox = (id: string) => {
-		penDrawn();
-		const placed = penLayer.placed.get(id);
-		const resized = editor.itemResize(id);
-		if (resized) return { x: resized.x, y: resized.y, w: resized.w, h: resized.h, radius: Number(placed?.node.cornerRadius ?? 0) || 0 };
-		const box = penLayer.bounds.get(id) ?? placed?.box;
-		if (!box) return undefined;
-		// Carried with the drag, from the frame the sheet carries it in (`shownDrag`).
-		const drag = editor.itemShift(id);
-		return { x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h, radius: Number(placed?.node.cornerRadius ?? 0) || 0 };
-	};
-	/** A double-click on a live SVG opens it in a tab. */
-	const openLiveFile = (id: string): boolean => {
-		const index = props.pen ? docIndex(props.pen.doc) : undefined;
-		let node: PenNode | undefined;
-		for (let at = index?.get(id); at && !node; at = at.parent ? index?.get(at.parent.id) : undefined) if (isLiveFile(at.node)) node = at.node;
-		if (!node || typeof node.metadata?.file !== "string") return false;
-		editor.select([node.id]);
-		openInTab(canvasHost().fileUrl(node.metadata.file));
-		return true;
-	};
-
-	/**
-	 * On a touch screen, the one item whose page takes the fingers (`item-slot.tsx`, `active`): activated by
-	 * a second tap on the selected item, and let go when the selection moves to anything else.
-	 */
-	const [activeItem, setActiveItem] = createSignal<string | undefined>();
-	createEffect(on(() => props.selected, (selected) => { if (selected !== untrack(activeItem)) setActiveItem(undefined); }));
-	/** One placed item's slot: the host's, told where it is and what it may do. */
-	const pageNode = (board: Page) => (
-		<Frame
-			board={board}
-			zoom={ctl.zoom()}
-			mounted={isLive(board.path) || isKept(board.path) || isLeaving(board.path)}
-			asleep={isKept(board.path) || isLeaving(board.path)}
-			kept={isKept(board.path)}
-			covered={isPictured(board.path)}
-			visible={isNear(board.path)}
-			onLive={(on: boolean) => markLive(board.path, on)}
-			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
-			selected={props.selected === board.path}
-			active={activeItem() === board.path}
-			onActivate={() => setActiveItem(board.path)}
-			gestures={gestures}
-			{...(props.onOpenPage ? { onOpenPage: props.onOpenPage } : {})}
-			view={editor.pageView(board.path)}
-			{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
-			onMove={(x, y) => props.onMove(board.path, x, y)}
-			onOpen={() => pushCamera(frame([boxOf(board)]))}
-			{...(props.onComment
-				? {
-						// Words selected in a card while browsing: a comment on them, as on a board's page before.
-						onWords: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => {
-							if (props.mode !== "browse" || drawing()) return;
-							props.onComment?.({ path: board.path, title: board.title, quote: words.quote, ...(words.component ? { component: words.component } : {}), anchor: words.anchor });
-						},
-					}
-				: {})}
-		/>
-	);
-
-	/*
-	 * Boards whose size just changed from outside a drag (`decks.canvas.fit`, an agent's `decks.canvas.update`, a write that
-	 * measured taller): for `SIZE_MS` their box, title bar and outline ease to the new size rather
-	 * than jump (`canvas.css`, `[data-sizing]`). A size the person drags is never eased: it follows
-	 * the pointer, and the board takes it while `pageResize` still holds it, so nothing changes here.
-	 */
-	const SIZE_MS = 280;
-	const [sizingPaths, setSizingPaths] = createSignal<ReadonlySet<string>>(new Set());
-	const lastSizes = new Map<string, { size: string; since: number }>();
-	/** A board that arrived this recently is still taking its measured height: it is not eased. */
-	const SETTLE_MS = 2500;
-	const sizingTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	createEffect(() => {
-		const held = editor.resizingPage();
-		const grew: string[] = [];
-		for (const board of props.boards) {
-			const size = `${board.w}x${board.h}`;
-			const before = lastSizes.get(board.path);
-			const now = performance.now();
-			lastSizes.set(board.path, { size, since: before?.since ?? now });
-			if (before !== undefined && before.size !== size && board.path !== held && now - before.since > SETTLE_MS) grew.push(board.path);
-		}
-		if (grew.length === 0) return;
-		untrack(() => setSizingPaths(new Set([...sizingPaths(), ...grew])));
-		for (const path of grew) {
-			clearTimeout(sizingTimers.get(path));
-			sizingTimers.set(
-				path,
-				setTimeout(() => {
-					sizingTimers.delete(path);
-					const next = new Set(sizingPaths());
-					next.delete(path);
-					setSizingPaths(next);
-				}, SIZE_MS + 60),
-			);
-		}
+		set holesAsked(next) {
+			holesAsked = next;
+		},
+		penLayer,
+		setHolesShown,
+		props,
+		isRendered,
+		pageNode,
+		liveFiles,
+		liveBox,
+		holesShown,
+		playingBox,
+		playedTo,
+		get playingElement() {
+			return media.playingElement;
+		},
+		set playingElement(next) {
+			media.playingElement = next;
+		},
+		setPlaying,
 	});
-	onCleanup(() => {
-		for (const timer of sizingTimers.values()) clearTimeout(timer);
-	});
-
-	/** A frame on screen shows the holes asked for: their files' elements show from then (`liveFiles`). */
-	const presented = () => {
-		if (holesAsked && penLayer.tiles.shows(holesAsked.mark)) {
-			setHolesShown(holesAsked.ids);
-			holesAsked = undefined;
-		}
-	};
-
-	/** Every board's slot, in the world. */
-	const slots = () => (
-		<>
-
-				{/*
-				 * A place for every board on the canvas, in file order, filled while it is within reach.
-				 *
-				 * A list of only the boards in reach was reconciled as boards came and went, and the
-				 * reconciler kept the order by moving nodes: **moving an iframe reloads its page**, and
-				 * zooming out from 60 to 40% reloaded six loaded boards of twenty-three. Even a list that
-				 * only gains boards in the middle is diffed with moves. So each board has a slot of its own
-				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
-				 * is within reach: only a slot's inside changes, and boards still stack in file order.
-				 */}
-				<For each={props.boards} fallback={null}>
-					{(board) => (
-						<div class="card-slot">
-							<Show when={isRendered(board.path)}>{pageNode(board)}</Show>
-						</div>
-					)}
-				</For>
-		</>
-	);
-	/** The live files' elements, after the slots. */
-	const fileNodes = () => (
-		<>
-
-				{/* Files shown live, under the sheet's holes for them (`liveFiles`): after the boards, so over them, as the drawing is. */}
-				<For each={liveFiles()}>
-					{(file) => {
-						const box = () => liveBox(file.id);
-						const shown = () => holesShown().has(file.id);
-						return (
-							<Show when={box()}>
-								{(at) => (
-									<div
-										class="file-live"
-										data-live-file={file.id}
-										style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${at().w}px`, height: `${at().h}px`, "border-radius": `${at().radius}px`, visibility: shown() ? "visible" : "hidden" }}
-									>
-										<img src={canvasHost().fileUrl(file.file)} alt={file.name} draggable={false} />
-									</div>
-								)}
-							</Show>
-						);
-					}}
-				</For>
-		</>
-	);
-	/** The one player, over the item it belongs to (inside the overlay layer). */
-	const player = () => (
-		<>
-
-					{/*
-					 * The one player, laid over the item it belongs to.
-					 *
-					 * A real element because nothing else can play: the canvas draws in a worker and there
-					 * is no browser in there. It is the same bargain a board makes — a picture until you
-					 * are close and have asked — and it is one element, never a wall of them.
-					 */}
-					<Show when={playingBox()?.id} keyed>
-						{(id) => {
-							const now = () => playingBox()!;
-							const first = now();
-							return (
-								<Show when={playingBox()}>
-									<MediaPlayer
-										kind={first.kind}
-										src={canvasHost().fileUrl(first.file)}
-										name={first.name}
-										{...(first.seconds === undefined ? {} : { seconds: first.seconds })}
-										{...(first.peaks ? { peaks: first.peaks } : {})}
-										box={{ x: now().x, y: now().y, w: now().w, h: now().h }}
-										radius={now().radius}
-										scheme={scheme()}
-										{...(playedTo.get(id) ? { from: playedTo.get(id)! } : {})}
-										ref={(element) => (playingElement = element)}
-										onEnded={() => {
-											playedTo.delete(id);
-											setPlaying(undefined);
-										}}
-										onLeave={(at) => {
-											playingElement = undefined;
-											if (at > 0.5) playedTo.set(id, at);
-										}}
-									/>
-								</Show>
-							);
-						}}
-					</Show>
-		</>
-	);
 
 	return { isLive, renderedPaths, pageIndex, liveNow, layered, cardsHidden, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };
 }
