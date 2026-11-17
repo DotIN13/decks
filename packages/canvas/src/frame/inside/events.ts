@@ -11,6 +11,7 @@ import type { FrameContext } from "./boot.ts";
 import { followLine } from "./follow-line.ts";
 import { createViewCalls } from "./view-calls.ts";
 import { listenToPage } from "./page-events.ts";
+import { mirrorTools } from "../tools-mirror.ts";
 
 /**
  * What the frame hears, once its editor is made: the clipboard, the drawing as the harness or Studio
@@ -124,6 +125,10 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		if (data.tool) handle.setTool(data.tool);
 		if (data.ink) setDrawing(data.ink.on);
 	});
+	end.on("step", (data) => (data.direction === "undo" ? handle.undo() : handle.redo()));
+	end.on("fit", () => handle.fit());
+	// The page draws the tools: their state is the same here and there (`tools-mirror.ts`), until this canvas ends.
+	if (start.look.pageTools) life().addEventListener("abort", mirrorTools("frame", end, { frame: { zoom: () => ctx.camera().zoom } }), { once: true });
 	end.on("camera", (data) => (data.glide ? handle.glide(data.camera, data.glide) : handle.setCamera(data.camera)));
 	end.on("select", (data) => (data.page ? selectCard(data.page) : handle.select(data.ids)));
 	end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
@@ -132,8 +137,6 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		return true as const;
 	});
 
-	listenToPage({
-		end,
-	});
+	listenToPage({ end, pageKeys: start.look.pageKeys, pageTools: start.look.pageTools });
 	return { reread };
 }

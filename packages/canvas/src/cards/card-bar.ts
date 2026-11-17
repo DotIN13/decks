@@ -2,6 +2,7 @@ import { pageFont } from "../look/look.ts";
 import type { CardEditorProps } from "./card-editor-props.ts";
 import { createCardDrag } from "./card-drag.ts";
 import { BLOCK_MENU, SIZE_MENU } from "./card-menus.ts";
+import { canvasHost } from "../base/host.ts";
 
 /** How long a selection the keyboard grows must rest before the bar shows. */
 export const SELECTION_PAUSE_MS = 300;
@@ -52,7 +53,10 @@ export function createCardBar(d: CardBarNeeds) {
 		const above = r.top - bh - 10;
 		const top = above >= ceiling ? above : Math.min(innerHeight - bh - 8, r.bottom + 10);
 		// Centred on the words selected, kept on the screen and clear of the app's tool column at its side.
-		const floor = Math.max(8, ...[...document.querySelectorAll(".pen-tools")].map((el) => el.getBoundingClientRect()).filter((t) => t.width && t.top < top + bh && t.bottom > top && t.left < innerWidth / 3).map((t) => t.right + 6));
+		// The column in this document, or where the app's page says its own stands over the canvas (`CanvasHost.toolsAt`).
+		const said = canvasHost().toolsAt?.();
+		const columns = [...[...document.querySelectorAll(".pen-tools")].map((el) => el.getBoundingClientRect()).map((t) => ({ left: t.left, top: t.top, right: t.right, bottom: t.bottom })), ...(said ? [said] : [])];
+		const floor = Math.max(8, ...columns.filter((t) => t.right > t.left && t.top < top + bh && t.bottom > top && t.left < innerWidth / 3).map((t) => t.right + 6));
 		const left = Math.max(floor, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
 		d.bar.style.left = `${(left - w.left) / z}px`;
 		d.bar.style.top = `${(top - w.top) / z}px`;

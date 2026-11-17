@@ -84,6 +84,18 @@ export interface FramedEditorOptions {
 	readOnly?: boolean;
 	/** The frame draws the canvas's own column of tools (when it has no chrome of its own). Default: true. */
 	toolbar?: boolean;
+	/**
+	 * The page draws the tools itself (the tool column, the pen tray, the properties, the zoom), on its own
+	 * page over the frame, from the same components and the same signals (`@decks/canvas/tools`): the frame
+	 * draws none, and the two ends' signals are kept in step (`frame/tools-mirror.ts`). Default: false.
+	 */
+	pageTools?: boolean;
+	/**
+	 * The bare keys the page's own tools take, a letter each (the Decks app's hand, pen and line): pressed
+	 * with the keyboard on the canvas and not taken by it or typed into anything, they are played on the
+	 * page as a key with a modifier already is. Only with `pageTools`.
+	 */
+	pageKeys?: readonly string[];
 	/** Where the camera starts, unless `state.camera` says. */
 	camera?: Camera;
 	/** The page's own camera, selection, mode and ink (and its copy of the drawing), kept in step with the frame. */
@@ -130,6 +142,12 @@ export interface FramedHandle {
 	setCamera(camera: Camera): void;
 	/** A card's file changed: it loads again. */
 	reloadCard(path: string): void;
+	/** Undo or redo the person's last edit, as the canvas's own keys do. */
+	step(direction: "undo" | "redo"): void;
+	/** Fit everything on the canvas into view. */
+	fit(): void;
+	/** Give the canvas the keyboard: after a press on the page's tools, its keys go on working. */
+	focus(): void;
 	/** Always false: the page keeps the views, not the frame. */
 	readonly restored: boolean;
 	dispose(): void;
@@ -226,6 +244,9 @@ export function createFramedEditor(options: Options): FramedEditor {
 			end()?.emit("camera", { camera });
 		},
 		reloadCard: (path) => end()?.emit("reload", { path }),
+		step: (direction) => end()?.emit("step", { direction }),
+		fit: () => end()?.emit("fit", {}),
+		focus: () => frameAt()?.focus({ preventScroll: true }),
 		paste: (data) => end()?.emit("paste", data),
 		restored: false,
 		dispose: () => {

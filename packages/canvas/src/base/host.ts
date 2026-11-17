@@ -20,6 +20,10 @@ export interface CanvasHost {
 	 * canvas, read against the drawing's own folder `base`. Undefined opens it in a tab.
 	 */
 	cardLink(href: string, base: string): string | undefined;
+	/** The app draws the tools on its own page, outside the canvas's frame: what sits beside the tool column (the insert panel opened from it) is drawn there too. */
+	toolsOnPage?: boolean;
+	/** Where that tool column stands on the canvas's own screen, when the app's page draws it: what opens beside words on the canvas (a card's style bar) keeps clear of it. */
+	toolsAt?(): { left: number; top: number; right: number; bottom: number } | undefined;
 	/** Where an icon's SVG is, before the CDN is asked (`pen/icons.ts`). Absent: the CDN. */
 	iconUrl?: IconSource;
 	/**

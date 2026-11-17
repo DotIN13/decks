@@ -3,10 +3,14 @@ import { life } from "./life.ts";
 import { probes } from "../../base/debug.ts";
 import { dismissMenus } from "@decks/ui";
 import type { CardSlot } from "../protocol.ts";
+import { drawing, inkSelection } from "../../ink/ink.ts";
 
 /** What `listenToPage` reads of `wireFrame` (`events.ts`). */
 export interface ListenToPageNeeds {
 	readonly end: FrameEnd;
+	readonly pageKeys?: readonly string[] | undefined;
+	/** The page draws the tools, the pen tray among them. */
+	readonly pageTools?: boolean | undefined;
 }
 
 /** What the frame hears from its own page: a file dropped on it, keys, and a press that closes the page's menus. */
@@ -37,12 +41,40 @@ export function listenToPage(d: ListenToPageNeeds) {
 	}, { signal: life() });
 
 	/*
+	 * While the pen is out and the page draws its tray, the tray's keys are the page's: Escape (let the
+	 * lasso go, then put the pen away) and Delete on what the lasso holds. Heard first and passed on, as
+	 * the tray heard them first when it stood in this document; nothing here acts on them as well.
+	 */
+	addEventListener("keydown", (event) => {
+		if (!d.pageTools || !drawing() || event.metaKey || event.ctrlKey || event.altKey) return;
+		const key = event.key.toLowerCase();
+		if (key !== "escape" && !((key === "delete" || key === "backspace") && inkSelection())) return;
+		const target = event.composedPath()[0];
+		if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		d.end.emit("keys", { key: event.key, code: event.code, meta: false, ctrl: false, alt: false, shift: event.shiftKey });
+	}, { capture: true, signal: life() });
+
+	/*
 	 * A shortcut the canvas did not take goes to the page, so the app's own keys work wherever the focus
 	 * is: only one with a modifier, since a bare letter typed here is the canvas's or a card's.
 	 */
 	addEventListener("keydown", (event) => {
-		if (event.defaultPrevented || !(event.metaKey || event.ctrlKey || event.altKey)) return;
-		d.end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
+		const said = { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey };
+		if (event.metaKey || event.ctrlKey || event.altKey) {
+			if (!event.defaultPrevented) d.end.emit("keys", said);
+			return;
+		}
+		/*
+		 * And the bare keys the page's own tools take, when the page draws the tools (`pageKeys`): not one
+		 * held down, not one typed into a field or a card's words, and only if nothing here took it, which is
+		 * known once every listener has heard it.
+		 */
+		if (!d.pageKeys?.includes(event.key.toLowerCase()) || event.repeat) return;
+		const target = event.composedPath()[0];
+		if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
+		setTimeout(() => !event.defaultPrevented && d.end.emit("keys", said), 0);
 	}, { signal: life() });
 
 	/*

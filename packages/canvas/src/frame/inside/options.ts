@@ -11,6 +11,7 @@ import { placedItems } from "../../model/boxes.ts";
 import { cardCalls } from "./card-calls.ts";
 import type { FrameContext } from "./boot.ts";
 import type { Rect } from "../protocol.ts";
+import { penToolsAt } from "../../edit/pen-tools.ts";
 
 /**
  * How the server draws card pictures, in each picture's address: raised with `CARD_LOOK` in the server's
@@ -66,6 +67,7 @@ export function installHost(ctx: FrameContext): void {
 					},
 				}),
 		canWrite: () => start.canvas.role !== "view" && !start.look.readOnly,
+		...(start.look.pageTools ? { toolsOnPage: true, toolsAt: penToolsAt } : {}),
 		// A card loaded on an older pass reads its files on the current one.
 		freshAddress: (url) => {
 			const pass = passOf(ctx.filesBase());

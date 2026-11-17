@@ -60,6 +60,20 @@ const [penIcon, setPenIcon] = createSignal<{ library: string; name: string }>({ 
  * position and size (`canvas/pen/Properties.tsx`). Set by the stage, which has the layout.
  */
 const [penBoxes, setPenBoxes] = createSignal<ReadonlyMap<string, { x: number; y: number; w: number; h: number }>>(new Map());
+/**
+ * Where the selection's outline is on the screen, when whoever shows the properties is not where the
+ * canvas is: an app that draws its tools on its page is told it by the canvas frame (`frame/tools-mirror.ts`).
+ * Unset wherever the properties and the canvas share a page, which measures the outline itself.
+ */
+const [penOutline, setPenOutline] = createSignal<{ left: number; top: number; right: number; bottom: number } | undefined>();
+export { penOutline, setPenOutline };
+/**
+ * Where the app's tool column stands on the canvas's screen, when the app draws it on its own page
+ * over the canvas's frame: what opens on the canvas beside the words it is for (a card's style bar)
+ * keeps clear of it, as it does of a column in its own document.
+ */
+const [penToolsAt, setPenToolsAt] = createSignal<{ left: number; top: number; right: number; bottom: number } | undefined>();
+export { penToolsAt, setPenToolsAt };
 /** On a touch screen the properties drawer opens only when asked, from the pill or the hold menu (`Properties.tsx`, `Callout.tsx`); elsewhere the panel shows with the selection. */
 const [propsOpen, setPropsOpen] = createSignal(false);
 

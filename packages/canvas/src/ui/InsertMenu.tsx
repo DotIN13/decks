@@ -190,5 +190,10 @@ type InsertMenuApi = ReturnType<typeof createInsertMenu>;
 
 /** The insert panel a shape or an icon is picked in, while it is open. */
 export function InsertMenu(props: { menu: InsertMenuApi }) {
-	return <Show when={insertPanel()}>{(open) => <Insert open={open()} onPick={props.menu.insertPicked} onClose={() => setInsertPanel(undefined)} />}</Show>;
+	// Beside the tool column it is drawn where the column is: by the page, when the page draws the tools (`CanvasHost.toolsOnPage`).
+	const here = () => {
+		const open = insertPanel();
+		return open && (!canvasHost().toolsOnPage || open.at || open.replace) ? open : undefined;
+	};
+	return <Show when={here()}>{(open) => <Insert open={open()} onPick={props.menu.insertPicked} onClose={() => setInsertPanel(undefined)} />}</Show>;
 }

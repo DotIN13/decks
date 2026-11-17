@@ -5,6 +5,7 @@ import type { EditorState } from "../../view/types.ts";
 import { CallRefused, type PageEnd, type Rect } from "../protocol.ts";
 import { type FramedEditorOptions } from "./host.tsx";
 import { APP_STORE } from "./stores.ts";
+import { mirrorTools } from "../tools-mirror.ts";
 
 /** What `createWire` reads of `createFramedEditor` (`host.tsx`), each read when it is used. */
 export interface WireNeeds {
@@ -46,6 +47,15 @@ export function createWire(d: WireNeeds) {
 			if (data.comment) d.options.frame.comment?.(data.comment);
 			if (data.ink) d.options.frame.ink?.(data.ink);
 		});
+		// The tools the page draws: their state, the same at both ends for as long as this line is open.
+		if (d.options.pageTools) {
+			const stop = mirrorTools("page", page, { frameAt: () => d.frameAt()?.getBoundingClientRect() });
+			const close = page.close;
+			page.close = () => {
+				stop();
+				close();
+			};
+		}
 		page.on("panel", (data) => d.options.frame.panel?.(data.name));
 		page.on("sheet", (data) => d.options.frame.sheet?.(data.open));
 		page.on("refer", (data) => {

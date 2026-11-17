@@ -16,3 +16,5 @@ export { bootFrame } from "./frame/inside/frame.tsx";
 export type { FrameChrome, FrameChromeView } from "./frame/chrome.ts";
 export { CallRefused, type FrameCalls } from "./frame/protocol.ts";
 export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEditorOptions, type FramedHandle, type FrameHostOptions } from "./frame/outside/host.tsx";
+// The tools on the page (`FramedEditorOptions.pageTools`): the zoom as the frame's camera has it at each step, for the page's zoom reading.
+export { frameZoom } from "./frame/tools-mirror.ts";

@@ -12,6 +12,7 @@ import { mode, selected, setMode, setSelected } from "../state/selection.ts";
 import { reportCameraSoon } from "./camera-report.ts";
 import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "./frame-handoffs.ts";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
+import { TOOL_KEYS } from "../frame/ToolColumn.tsx";
 import type { CanvasComment } from "@decks/canvas";
 import type { createFileDrops } from "./files/drops.ts";
 import { rememberView } from "./heard/view.ts";
@@ -73,6 +74,9 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
 		dark: untrack(scheme) === "dark",
 		toolbar: false,
+		// The tools are this page's own, over the frame (`app/canvas-tools.tsx`).
+		pageTools: true,
+		pageKeys: TOOL_KEYS,
 		onSelection: (ids) => setPenSelected([...ids]),
 		state: {
 			pen: stagePen,

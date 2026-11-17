@@ -57,7 +57,7 @@ export interface Start {
 	pictures: string;
 	/** The deck's import map, given once for every card on the canvas: names to another site's addresses, or to paths under `assets/`, read beside the canvas's cards. Left out, each card looks for the deck's own. */
 	imports?: Record<string, string>;
-	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }>; /** The page draws the comment box (`onComment`), so its Send now is a press of yours the page can send on; the frame only says where. */ pageComments?: boolean };
+	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }>; /** The page draws the comment box (`onComment`), so its Send now is a press of yours the page can send on; the frame only says where. */ pageComments?: boolean; /** The page draws the tools (the tool column, the pen tray, the properties, the zoom): the frame draws none, and keeps the tools' state in step with the page's (`tools-mirror.ts`). */ pageTools?: boolean; /** The bare keys the page's tools take (a letter each): pressed on the canvas and not taken there, they are passed on to the page (`keys`). */ pageKeys?: readonly string[] };
 	camera?: Camera;
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
@@ -93,6 +93,12 @@ export interface PageToFrame {
 	busy: { writer?: { name?: string; color: string } };
 	/** A press or Escape on the page, which the frame does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
 	away: Record<string, never>;
+	/** The tools' state as the page has it, when the page draws the tools (`tools-mirror.ts`): each value that changed. */
+	tools: Record<string, unknown>;
+	/** Undo or redo, pressed on the page's tools. */
+	step: { direction: "undo" | "redo" };
+	/** Fit everything on the canvas, pressed on the page's zoom. */
+	fit: Record<string, never>;
 	/** A paste the page heard, with the focus on the page: a copy of items (a clip's JSON) or words, for the canvas (`frame/inside/clipboard.ts`). */
 	paste: { clip?: string; text?: string };
 }
@@ -139,6 +145,8 @@ interface FrameToPage {
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
 	/** A press or Escape in the frame, which the page does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
 	away: Record<string, never>;
+	/** The tools' state as the frame has it, when the page draws the tools (`tools-mirror.ts`): each value that changed. */
+	tools: Record<string, unknown>;
 	/** The person pressed Go on an agent's move to another canvas (`view.goto` offered): the page moves that conversation there, as its canvas switcher does. */
 	goto: { agent: string; canvas: string };
 }

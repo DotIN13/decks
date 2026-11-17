@@ -1554,7 +1554,7 @@ body {
 		transform: none;
 	}
 	.app[data-phone="true"] .props-panel.panel-float,
-	.decks-canvas[data-phone="true"] .props-panel.panel-float {
+	:is(.app, .decks-canvas)[data-phone="true"] .props-panel.panel-float {
 		top: auto;
 		right: 0;
 		bottom: 0;
@@ -1569,13 +1569,13 @@ body {
 	 * In the canvas frame the page's composer is drawn over the frame's foot (`--frame-dock`, how far up it
 	 * reaches): the sheet stands on it, its top where the page's has it, so what is selected stays in sight.
 	 */
-	.decks-canvas[data-phone="true"] .props-panel.panel-float {
+	:is(.app, .decks-canvas)[data-phone="true"] .props-panel.panel-float {
 		bottom: var(--frame-dock, 0px);
 		max-height: calc(42% - var(--frame-dock, 0px));
 		border-radius: 26px;
 	}
 	/* Opened as the drawer from the pill (`data-sheet`): the page's composer slides out of its way, so it sits on the foot of the screen, as an iOS sheet does. */
-	.decks-canvas[data-phone="true"] .props-panel.panel-float[data-sheet] {
+	:is(.app, .decks-canvas)[data-phone="true"] .props-panel.panel-float[data-sheet] {
 		bottom: 0;
 		max-height: 56%;
 		border-radius: 26px 26px 0 0;
@@ -2200,7 +2200,7 @@ body {
 	}
 	/* The phone's properties rise as a sheet. */
 	.app[data-phone="true"] .props-panel.panel-float,
-	.decks-canvas[data-phone="true"] .props-panel.panel-float {
+	:is(.app, .decks-canvas)[data-phone="true"] .props-panel.panel-float {
 		animation: v3-sheet-in 300ms var(--v3-ease);
 	}
 	@keyframes v3-sheet-in {
@@ -2220,7 +2220,7 @@ body {
 	@media (prefers-reduced-motion: reduce) {
 		.v3-chat[data-sheet="true"][data-leaving="true"],
 		.app[data-phone="true"] .props-panel.panel-float,
-	.decks-canvas[data-phone="true"] .props-panel.panel-float {
+	:is(.app, .decks-canvas)[data-phone="true"] .props-panel.panel-float {
 			animation: none;
 		}
 	}

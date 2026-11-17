@@ -77,6 +77,8 @@ export interface Probes {
 	/** The canvas frame's: its drawing, its news, select items, its camera and its state. */
 	frameDrawn?: (() => unknown) | undefined;
 	frameNews?: (() => unknown) | undefined;
+	/** The tools' state as the frame has it from the page that draws them (`frame/tools-mirror.ts`): the tool, the shape, where the page's column stands. */
+	frameTools?: (() => unknown) | undefined;
 	frameSelect?: ((ids: string[]) => void) | undefined;
 	frameCamera?: (() => unknown) | undefined;
 	frameState?: (() => unknown) | undefined;

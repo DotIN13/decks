@@ -1,5 +1,6 @@
 import { can } from "./connections/backend.ts";
 import { CanvasHost } from "./app/canvas-host.tsx";
+import { CanvasTools } from "./app/canvas-tools.tsx";
 import { DockBar } from "./app/dock-bar.tsx";
 import { Modals, Pickers } from "./app/overlays.tsx";
 import { createParts } from "./app/parts.ts";
@@ -33,6 +34,7 @@ export function App() {
 						<CanvasHost host={canvasHost} />
 					</div>
 				</div>
+				<CanvasTools parts={parts} />
 				<Top parts={parts} />
 				<Pickers parts={parts} />
 				<SidePanel parts={parts} />

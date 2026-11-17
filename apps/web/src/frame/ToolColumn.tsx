@@ -56,6 +56,9 @@ import { Icon, onDismiss } from "@decks/ui";
  * `.pen-tools` wherever it is.
  */
 
+/** The column's own keys (below, `keys`), for a page that draws it outside the canvas's frame: the frame passes these on (`pageKeys`). */
+export const TOOL_KEYS = ["h", "e", "d", "l", "p", "v"] as const;
+
 type Family = "view" | "card" | "shape" | "arrow";
 type Choice = { id: string; label: string; icon: LucideIcon; key?: string; rule?: boolean; pick: () => void };
 

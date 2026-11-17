@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount, on, untrack } from "solid-js";
-import { penBoxes, penSelection, penTyping, propsOpen, setPropsOpen } from "../../edit/pen-tools.ts";
+import { penBoxes, penOutline, penSelection, penTyping, propsOpen, setPropsOpen } from "../../edit/pen-tools.ts";
 import { COARSE } from "../../edit/core/touch-rules.ts";
 
 /** Where the properties panel sits on a touch screen, and what it tells the page of it. */
@@ -18,8 +18,10 @@ export function createPlacement() {
 
 	const place = () => {
 		if (!COARSE || untrack(narrow) || typeof document === "undefined") return setAnchor(null);
-		const outline = document.querySelector(".world > .pen-selection, .world > .pen-selection-box");
-		const r = outline?.getBoundingClientRect();
+		// The outline on this page, or where the canvas frame says it is when the canvas is in a frame of its own (`penOutline`).
+		const outline = document.querySelector(".world > .pen-selection, .world > .pen-selection-box")?.getBoundingClientRect();
+		const said = untrack(penOutline);
+		const r = outline && outline.width > 0 ? outline : said ? { ...said, width: said.right - said.left } : undefined;
 		if (!r || r.width === 0) return setAnchor(null);
 		const top = Math.max(60, Math.min(r.top, innerHeight - 420));
 		// Clear of the pill too, which is centred under the selection and about 220 px wide (`Callout.tsx`): a narrow item's pill reaches past its sides.
@@ -41,7 +43,7 @@ export function createPlacement() {
 		onCleanup(() => { removeEventListener("resize", onResize); removeEventListener("pointerup", settle, true); removeEventListener("touchend", settle, true); });
 	});
 
-	createEffect(on([penSelection, penBoxes], () => { if (COARSE) queueMicrotask(place); }));
+	createEffect(on([penSelection, penBoxes, penOutline], () => { if (COARSE) queueMicrotask(place); }));
 
 	// Nothing selected: the drawer is shut, so the next selection does not open it unasked.
 	createEffect(on(penSelection, (ids) => { if (!ids.length) setPropsOpen(false); }));
