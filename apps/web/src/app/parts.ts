@@ -7,7 +7,6 @@ import { syncRings } from "../agents/ring-sync.ts";
 import { can } from "../connections/backend.ts";
 import { scheme } from "../lib/theme.ts";
 import { installTooltips } from "../shell/tooltip.ts";
-import { stageOf } from "../state/canvases.ts";
 import { preview, state } from "../state/deck.ts";
 import { setPersonStage } from "../state/decks.ts";
 import { ensureHistory } from "../state/history.ts";
@@ -32,6 +31,7 @@ import { focusAgent, moveConversation, openAppsPanel, showPanel, viewOnlyStage }
 import { createPills } from "./pills.ts";
 import { listenToHarness, type FrameHooks } from "./socket-messages.ts";
 import { installViewport } from "./viewport.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /** The page's parts, as its sections are handed them. */
 export type Parts = ReturnType<typeof createParts>;
@@ -105,9 +105,9 @@ export function createParts() {
 	 */
 	onMount(() => watchInsets());
 	// A person's change goes to the canvas they are looking at, named on the frame (`state/socket.ts`).
-	setOnScreen(() => stageOf(state.focused)?.name, () => state.focused);
+	setOnScreen(() => canvasOnScreen()?.name, () => state.focused);
 	// The same two for the person's clicks sent as verbs (`state/decks.ts`).
-	setPersonStage(() => stageOf(state.focused)?.name, () => state.focused);
+	setPersonStage(() => canvasOnScreen()?.name, () => state.focused);
 	// One camera reading at startup, and again whenever this browser is come back to (`app/landing.ts`).
 	reportCameraOnArrival();
 

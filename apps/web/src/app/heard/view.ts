@@ -8,6 +8,7 @@ import { nameOf, state } from "../../state/deck.ts";
 import { offer } from "../../state/notices.ts";
 import { send } from "../../state/socket.ts";
 import type { FrameHooks, Of } from "../socket-messages.ts";
+import { canvasOnScreen } from "../../tabs/tabs.ts";
 
 /**
  * Keep a view for an agent that is not the one on screen, from its `decks view …`: here, or on the
@@ -34,10 +35,10 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 	 */
 	// An agent moving to another canvas while its own is on screen: the frame answers, which knows whether the person is using the canvas.
 	// The person's own move asks nobody, so this page answers it, whether or not that frame is up yet.
-	if (message.call.op === "goto" && message.call.agentId && (message.call.args as { person?: unknown } | undefined)?.person !== true && stageOf(message.call.agentId)?.name === stageOf(state.focused)?.name && document.querySelector("iframe.canvas-frame")) return;
+	if (message.call.op === "goto" && message.call.agentId && (message.call.args as { person?: unknown } | undefined)?.person !== true && stageOf(message.call.agentId)?.name === canvasOnScreen()?.name && document.querySelector("iframe.canvas-frame")) return;
 	if (["show", "camera", "reload", "cursor", "shot"].includes(message.call.op)) {
 		const args = message.call.args as { stage?: unknown; path?: unknown } | undefined;
-		const screen = stageOf(state.focused)?.name;
+		const screen = canvasOnScreen()?.name;
 		// A cursor, a reload or a card's picture names a card: the frame answers when that card is on the canvas it shows.
 		if ((message.call.op === "cursor" || message.call.op === "reload" || message.call.op === "shot") && typeof args?.path === "string") {
 			if (state.pages.some((board) => board.path === args.path) || (screen && args.path.startsWith(`canvases/${screen}/`))) return;
@@ -77,7 +78,7 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 			 * in `canvas/view-ops.ts`, which is where the reasoning lives.
 			 */
 			focused: () => state.focused,
-			canvasOnScreen: () => stageOf(state.focused)?.name,
+			canvasOnScreen: () => canvasOnScreen()?.name,
 			offerGoto: (agentId, stage) => offer(`${nameOf(agentId)} wants to take you to the canvas ${stage}`, { label: "Go", run: () => hooks.moveConversation?.(agentId, stage) }, "agent-view"),
 			/*
 			 * What reaches this page is never for the canvas on screen, whose frame carries out its own

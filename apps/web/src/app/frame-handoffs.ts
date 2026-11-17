@@ -9,6 +9,7 @@ import { notice } from "../state/notices.ts";
 import { stageOf } from "../state/canvases.ts";
 import { setDraft } from "../state/ui.ts";
 import { inkAsked } from "./ink-prompts.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /*
  * What the canvas frame hands the composer (`@decks/canvas`, `frame/`): a comment, a sketch. Drafts,
@@ -21,7 +22,7 @@ import { inkAsked } from "./ink-prompts.ts";
 export const frameComment = (handed: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] }) => {
 	const agentId = state.focused;
 	if (!agentId) return;
-	const canvas = stageOf(state.focused)?.name;
+	const canvas = canvasOnScreen()?.name;
 	const comment = cleanFrameComment(handed);
 	const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
 	if (comment.send) setDraft({ text: commentBlock([note]), at: Date.now(), insert: true, agentId });

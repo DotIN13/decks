@@ -2,7 +2,6 @@ import { forgetAskedResults, setToolResultSender } from "@decks/agent-ui/chat";
 import type { ServerMessage } from "@decks/protocol";
 import { createEffect, onCleanup, onMount } from "solid-js";
 import { scratch } from "../state/agent.ts";
-import { stageOf } from "../state/canvases.ts";
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
 import { rewatch, watchCanvas } from "../state/pens.ts";
@@ -13,6 +12,7 @@ import { heardChat } from "./heard/chat.ts";
 import { heardDeck } from "./heard/deck.ts";
 import { heardHarness } from "./heard/harness.ts";
 import { heardView } from "./heard/view.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
@@ -80,6 +80,6 @@ export function listenToHarness(hooks: FrameHooks): void {
 		const off = on((message) => handleFrame(message, hooks));
 		onCleanup(off);
 		// The drawing of the canvas on screen, whole and then every change (`state/pens.ts`), and again after a reconnect.
-		createEffect(() => watchCanvas(stageOf(state.focused)?.name));
+		createEffect(() => watchCanvas(canvasOnScreen()?.name));
 	});
 }

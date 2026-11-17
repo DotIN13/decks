@@ -12,6 +12,7 @@ import { canvasMenu, type CanvasMenuTrigger } from "./canvas-menu.tsx";
 import { moreItems } from "./more-menu.ts";
 import type { Parts } from "./parts.ts";
 import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, newCanvas, openAgentsPanel, openCanvas, setStagesOpen, showPanel, stagesOpen, viewOnlyStage } from "./person.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
  * The top of the page: the bar on the left (the panel's button, the agents, the canvas), the corner on
@@ -22,7 +23,7 @@ export function Top(props: { parts: Parts }) {
 	const phone = layout.phone;
 	/** The agents whose canvas is the one on screen: the faces in the top-right bar. */
 	const hereAgents = createMemo(() => {
-		const stage = stageOf(state.focused)?.name;
+		const stage = canvasOnScreen()?.name;
 		if (!stage) return state.chats.filter((chat) => chat.id === state.focused);
 		return state.chats.filter((chat) => stageOf(chat.id)?.name === stage);
 	});
@@ -52,7 +53,7 @@ export function Top(props: { parts: Parts }) {
 				onMoreAgents={openAgentsPanel}
 				phone={phone()}
 				onNewCanvas={newCanvas}
-				{...(stageOf(state.focused) ? { stage: stageOf(state.focused)!.title } : {})}
+				{...(canvasOnScreen() ? { stage: canvasOnScreen()!.title } : {})}
 				{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
 				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
 				{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}
@@ -69,7 +70,7 @@ export function Top(props: { parts: Parts }) {
 				onRename={(name, to) => void call("canvas.rename", [to, { canvas: name }]).then(warnIfFailed)}
 				onDelete={(name) => void call("canvas.remove", [name]).then(warnIfFailed)}
 				onCopy={copyShared}
-				here={stageOf(state.focused)?.name}
+				here={canvasOnScreen()?.name}
 				open={stagesOpen()}
 				onClose={() => void setStagesOpen(false)}
 				onPick={openCanvas}

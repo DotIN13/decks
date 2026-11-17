@@ -11,8 +11,8 @@ import { camera, moveCamera } from "../state/camera.ts";
 import type { WaitingComment } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
-import { stageOf } from "../state/canvases.ts";
 import { flyTo } from "./links.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /** What finding a named thing on the canvas reads of the page. */
 interface PillInputs {
@@ -33,7 +33,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 	 */
 	const pickItem = (item: CanvasItem) => {
 		if (item.board) {
-			const name = stageOf(state.focused)?.name;
+			const name = canvasOnScreen()?.name;
 			const path = state.pages.find((one) => one.path === item.board || (name && one.path === `canvases/${name}/${item.board}`))?.path;
 			if (path) return playAndFrame(path);
 		}
@@ -61,7 +61,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 		// Read with this tab's token, as every file is (`lib/authed.tsx`).
 		if (node.kind === "file") return void openAuthed(api(`/file?path=${encodeURIComponent(node.id)}`)).catch((error: unknown) => notice("warn", `${node.id} could not be opened: ${(error as Error).message}`));
 		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
-		const name = stageOf(state.focused)?.name;
+		const name = canvasOnScreen()?.name;
 		const item = canvasItems(stagePen()?.doc).items.find(
 			(one) => one.id === target || (!!one.board && (one.board === target || target.endsWith(`/${one.board}`) || (!!name && `canvases/${name}/${one.board}` === target))),
 		);

@@ -1,15 +1,15 @@
 import { can } from "./connections/backend.ts";
-import { CanvasHost } from "./tabs/kinds/canvas-host.tsx";
-import { CanvasTools } from "./tabs/kinds/canvas-tools.tsx";
 import { DockBar } from "./app/dock-bar.tsx";
 import { Modals, Pickers } from "./app/overlays.tsx";
 import { createParts } from "./app/parts.ts";
 import { SidePanel } from "./app/side-panel.tsx";
 import { Top } from "./app/top.tsx";
+import { TabView } from "./tabs/TabView.tsx";
 import { NoticeStrip } from "./shell/NoticeStrip.tsx";
 
 /**
- * The shell: the canvas, and the page's sections floating over it.
+ * The shell: the tab in front (`tabs/TabView.tsx`: a canvas, with its tools), and the page's sections
+ * floating over it.
  *
  * The parts are wired once (`app/parts.ts`): what is on screen, the layout, the dock, the files, the
  * camera's landing, and the connection to the harness. Each section draws from them and from the
@@ -25,16 +25,11 @@ import { NoticeStrip } from "./shell/NoticeStrip.tsx";
  */
 export function App() {
 	const parts = createParts();
-	const { presenting, layout, canvasHost } = parts;
+	const { presenting, layout } = parts;
 	return (
 		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={layout.phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
 			<div class="work">
-				<div class="surface" data-surface="stage">
-					<div class="surface-layer" data-layer="stage">
-						<CanvasHost host={canvasHost} />
-					</div>
-				</div>
-				<CanvasTools parts={parts} />
+				<TabView parts={parts} />
 				<Top parts={parts} />
 				<Pickers parts={parts} />
 				<SidePanel parts={parts} />

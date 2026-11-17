@@ -7,6 +7,7 @@ import { ensureHistory } from "../state/history.ts";
 import { notice } from "../state/notices.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { setDraft, setPanelOpen, setUnread } from "../state/ui.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
  * What the person does to agents and canvases from the page's chrome.
@@ -18,9 +19,9 @@ import { setDraft, setPanelOpen, setUnread } from "../state/ui.ts";
  */
 
 /** The canvas the conversation on screen is on: with the agent, what its draft and its waiting comments are kept under. */
-export const focusedCanvas = () => stageOf(state.focused)?.name;
+export const focusedCanvas = () => canvasOnScreen()?.name;
 /** The canvas on screen, when it is a friend's shared with you to view (`state/canvases.ts`). */
-export const viewOnlyStage = () => viewOnly(stageOf(state.focused)?.name);
+export const viewOnlyStage = () => viewOnly(canvasOnScreen()?.name);
 
 // ---- the panel ---------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { camera, glide } from "../../state/camera.ts";
 import { state } from "../../state/deck.ts";
-import { stageOf, stages } from "../../state/canvases.ts";
+import { stages } from "../../state/canvases.ts";
 import { setDrawingEditor } from "../../state/decks.ts";
 import { mode, selected, setMode, setSelected } from "../../state/selection.ts";
 import { reportCameraSoon } from "../../app/camera-report.ts";
@@ -17,6 +17,7 @@ import type { CanvasComment } from "@decks/canvas";
 import type { createFileDrops } from "../../app/files/drops.ts";
 import { rememberView } from "../../app/heard/view.ts";
 import { openLinkedPage } from "../../app/links.ts";
+import { canvasOnScreen } from "../tabs.ts";
 
 /** What the canvas host needs of the page around it. */
 export interface CanvasHostInputs {
@@ -86,7 +87,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			mode: [mode, setMode],
 			inking: drawing,
 		},
-		canvasName: () => stageOf(state.focused)?.name,
+		canvasName: () => canvasOnScreen()?.name,
 		pages: { onOpenLink: openLinkedPage },
 		onViewport: () => reportCameraSoon(camera()),
 		onExport: exportPicture,

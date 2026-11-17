@@ -1,12 +1,12 @@
 import type { Page } from "@decks/protocol";
 import { createComputed, createEffect, createMemo, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { stageOf } from "../state/canvases.ts";
 import { adoptFormerComments } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
 import { pens } from "../state/pens.ts";
 import { agentViews } from "../state/views.ts";
 import { focusedCanvas } from "./person.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
  * What is on screen: the conversation in focus, its canvas's drawing and cards, and the views this
@@ -55,7 +55,7 @@ export function createOnScreen() {
 
 	/** The drawing of the chat on screen, when it has one (`state/pens.ts`). */
 	const stagePen = createMemo(() => {
-		const name = stageOf(state.focused)?.name;
+		const name = canvasOnScreen()?.name;
 		const pen = name ? pens()[name] : undefined;
 		// Its placeholder frames are marked with the agent that last wrote it, as the canvas knows it.
 		const by = pen?.by ? state.identities[pen.by] : undefined;

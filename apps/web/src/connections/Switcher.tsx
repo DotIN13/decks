@@ -8,11 +8,11 @@ import { createSignal, For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { DecksMark, Icon, Popover } from "@decks/ui";
 import { state } from "../state/deck.ts";
-import { stageOf } from "../state/canvases.ts";
 import { backend, can } from "./backend.ts";
 import { forget, openBundle } from "./bundle.ts";
 import { active, api, connections, nameOf, newId, rename, saveConnections, switchTo, type Connection } from "./connection.ts";
 import { available, ensureWorker, reach } from "./worker.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
  * The connection switcher: the top of the left panel, where the deck's mark was.
@@ -92,7 +92,7 @@ export function Switcher(props: { label?: string } = {}) {
 		const own = one?.kind === "here" ? ownName() : one?.label;
 		rename(id, draftName().trim() === own ? "" : draftName());
 	};
-	const stage = () => stageOf(state.focused);
+	const stage = () => canvasOnScreen();
 
 	const opened = (open: boolean) => {
 		if (!open) {

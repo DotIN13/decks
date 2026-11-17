@@ -2,7 +2,7 @@ import { Show } from "solid-js";
 import { LeftPanel } from "../panel/LeftPanel.tsx";
 import { ChatSection } from "../shell/ChatSection.tsx";
 import { camera } from "../state/camera.ts";
-import { stageOf, stages } from "../state/canvases.ts";
+import { stages } from "../state/canvases.ts";
 import { state } from "../state/deck.ts";
 import { editDrawing } from "../state/decks.ts";
 import { selected } from "../state/selection.ts";
@@ -12,6 +12,7 @@ import { canvasMenu, type CanvasMenuTrigger } from "./canvas-menu.tsx";
 import { FocusedStream } from "./chat-stream.tsx";
 import type { Parts } from "./parts.ts";
 import { closeAgent, focusAgent, newAgent, panelAsk, setStagesOpen, showPanel } from "./person.ts";
+import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
  * The side panel, with the conversation in its lower half; on a phone the conversation is a sheet
@@ -46,7 +47,7 @@ export function SidePanel(props: { parts: Parts }) {
 				{...(panelAsk() ? { ask: panelAsk()! } : {})}
 				boards={state.pages}
 				{...(stagePen()?.doc ? { canvasDoc: stagePen()!.doc } : {})}
-				{...(stageOf(state.focused) ? { canvasTitle: stageOf(state.focused)!.title } : {})}
+				{...(canvasOnScreen() ? { canvasTitle: canvasOnScreen()!.title } : {})}
 				selectedItems={penSelected()}
 				onPickItem={pills.pickItem}
 				onCanvases={() => void setStagesOpen((was) => !was)}
