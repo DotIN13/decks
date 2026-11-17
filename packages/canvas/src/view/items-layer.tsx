@@ -1,6 +1,6 @@
 import { probes } from "../base/debug.ts";
 import type { Camera } from "@decks/protocol";
-import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
+import { createMemo, createSignal, untrack, type Accessor, type Component } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import type { ItemSlotProps } from "../items/item-slot-props.ts";
@@ -18,6 +18,7 @@ import { createCovering } from "./covering.ts";
 import { createPlayingBox } from "./playing-box.ts";
 import { createAppStates } from "./app-states.ts";
 import { createMedia } from "./media.ts";
+import { createPinchPictures } from "./pinch-pictures.ts";
 
 /** What the items layer needs of the stage around it. */
 type ItemsLayerDeps = {
@@ -53,67 +54,12 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
 	/** How many of each kind are awake at once besides the selected one, and how many let go are kept: this device's (`render/device.ts`). */
 	const BUDGET = AWAKE[DEVICE];
-	/**
-	 * A pinch on pictures: while the scale moves, the awake cards are hidden and the sheet draws each as
-	 * its picture, so the page stretches one sheet and lays out, paints and layers no card.
-	 *
-	 * By the engine's table (`render/device.ts`, `MOVING`): off everywhere today. Measured in a simulated
-	 * iPad (`scripts/card-zoom.mjs`, Playwright's iPad Pro 11, CPU 4×, 3 cards awake): it changed nothing
-	 * a pinch costs. Late frames in WebKit 2.0 and 2.0 per pinch off against 2.0 and 0.2 on, noise
-	 * either way; Chromium's paint, raster and layer work 4, 15 and 7 ms per pinch off, 5, 14 and 7 on;
-	 * the main thread's 71–98 ms off, 84–117 on, since each pinch tells the engine twice that its cards
-	 * changed. `?card-pictures=1` or `=0` in the page's address tries the other way, for a measure on a real device.
-	 */
-	const PINCH_ON_PICTURES = (() => {
-		const asked = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("card-pictures");
-		return asked === "1" ? true : asked === "0" ? false : MOVING[ENGINE].card === "cover";
-	})();
+	const { cardPictures, cardsHidden } = createPinchPictures({
+		scaling,
+	});
 	/** Whether an app's window or a document's editor is covered by its picture while the camera moves (`MOVING`). */
 	const COVER = { app: MOVING[ENGINE].app === "cover", document: MOVING[ENGINE].document === "cover" };
-	/** The awake cards are hidden: from the first step of a scale until it rests (`canvas.css`, `data-card-pictures`). */
-	const cardsHidden = createMemo(() => PINCH_ON_PICTURES && scaling());
-	/**
-	 * The sheet draws the awake cards as pictures rather than holes: from the first step of a scale, and
-	 * two frames past its rest, so a card shown again has painted under its picture before the hole
-	 * opens over it, and no frame shows it blank.
-	 */
-	const [cardPictures, setCardPictures] = createSignal(false);
-	{
-		let raf: number | undefined;
-		createEffect(
-			on(cardsHidden, (hidden) => {
-				if (raf !== undefined) cancelAnimationFrame(raf);
-				raf = undefined;
-				if (hidden) return setCardPictures(true);
-				if (!untrack(cardPictures)) return;
-				raf = requestAnimationFrame(() => (raf = requestAnimationFrame(() => ((raf = undefined), setCardPictures(false)))));
-			}),
-		);
-		onCleanup(() => raf !== undefined && cancelAnimationFrame(raf));
-	}
 
-	/**
-	 * How many awake items may be put on layers of their own while the scale moves before it stops being a saving.
-	 *
-	 * A layer is a picture the compositor keeps and can stretch without waking the main
-	 * thread, and that trade is a good one until there are so many that compositing them
-	 * costs more than drawing them. It reverses, and it was measured rather than guessed —
-	 * 1400×900 at 4× CPU throttle, milliseconds of work per finger movement while pinching:
-	 *
-	 *     12 documents in view   56 on layers · 134 without
-	 *     40 documents in view  126 on layers · 181 without
-	 *    120 documents in view  700 on layers · 523 without   ← the trade has reversed
-	 *
-	 * Those documents were boards' iframes, which the canvas no longer runs. What goes on a layer now
-	 * is an awake card's root, a document's editor or an app's window (`canvas.css`, `data-scaling`),
-	 * a few elements each, and only those are counted: a board is its picture on the sheet and has no
-	 * layer to make. Measured on a canvas of 65 cards, all on screen below 25%, a ctrl-wheel zoom
-	 * across 2%–400% in headed Chrome: with the cards over the old 48 and so off layers, Chrome drew
-	 * every card again at every step and a third of the frames were late (97 of 300 over 16.7 ms,
-	 * p95 35 ms); on layers, 0–6 of 495, and a frame mid-zoom as sharp as at rest. 128 is twice what
-	 * was measured.
-	 */
-	const LAYER_BUDGET = 128;
 
 	/**
 	 * Cards whose surfaces are showing, by how many of their slots say so: the sheet is a hole over each
@@ -193,7 +139,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	});
 	const { renderedPaths, restCamera, isRendered, layered } = createRendered({
 		props, view, moving, panning, scaling, gliding, pageSlot, editor, liveCards, livePaths, keptPaths, leavingPaths, penLayer,
-		cardsHidden, isVisible, LAYER_BUDGET,
+		cardsHidden, isVisible,
 	});
 
 	const { liveFiles, liveBox, openLiveFile } = createLiveFiles({

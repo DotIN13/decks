@@ -104,99 +104,104 @@ export function insetsOnly(targets: (() => readonly HTMLElement[]) | undefined):
 	for (const element of was) for (const name of Object.keys(published)) element.style.removeProperty(name);
 }
 
+/**
+ * What the chrome is covering now, measured from the elements that declared themselves, and published.
+ *
+ * The clear span of the top band: to the right of the left cluster, and to the left of
+ * the right one.
+ *
+ * The two top clusters are floats, so they are not insets — nothing is subtracted for
+ * them — but anything else that wants to sit *between* them has to know where they end.
+ * The focus view's exit chip is the case: centred on the canvas column it sat under the
+ * pill the moment the pill grew a canvas switcher, and a press aimed at it landed on the
+ * text tool. Measured, like everything else here, rather than stated beside a stylesheet.
+ * `band` is that span as last measured, kept by the watcher.
+ */
+function measureInsets(tracked: ReadonlySet<Element>, band: { left: number; right: number }): void {
+	const view = { width: window.innerWidth, height: window.innerHeight };
+	const next: Insets = { ...ZERO };
+	let bandLeft = 0;
+	let bandRight = view.width;
+	for (const el of tracked) {
+		const edge = (el as HTMLElement).dataset.inset as keyof Insets | undefined;
+		if (!edge) continue;
+		/*
+		 * The *layout* box, not the painted one — `offsetLeft`/`offsetTop` ignore
+		 * transforms where `getBoundingClientRect` does not.
+		 *
+		 * That distinction is the whole of a bug. The panel is slid out with a `translate`
+		 * rather than unmounted, so it animates; measured by its painted rect, a panel
+		 * that had just been asked to open was still off-screen at the moment its
+		 * `data-inset` came back, so the camera recorded nothing — and the ResizeObserver
+		 * never fired again, because a transform is not a resize. The canvas kept the
+		 * whole window for the rest of the session.
+		 *
+		 * Layout coordinates say where a surface *is* rather than where it is currently
+		 * drawn, which is also the honest answer for a camera: a panel arriving is a panel
+		 * the boards should already be making room for.
+		 *
+		 * These elements are all `position: fixed` with no positioned ancestor, so their
+		 * offsets are viewport coordinates.
+		 */
+		const box = el as HTMLElement;
+		const width = box.offsetWidth;
+		const height = box.offsetHeight;
+		// A surface that is `display: none` measures nothing, so nothing has to
+		// deregister it — but one that is merely slid away still counts, which is the
+		// point of reading the layout box.
+		if (width === 0 || height === 0) continue;
+		// Its own edge to the far side of it, gutter included: a panel inset 12px from the
+		// window is 12px the canvas cannot use either.
+		if (edge === "left") next.left = Math.max(next.left, box.offsetLeft + width);
+		if (edge === "right") next.right = Math.max(next.right, view.width - box.offsetLeft);
+		if (edge === "top") next.top = Math.max(next.top, box.offsetTop + height);
+		if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - box.offsetTop);
+		/*
+		 * And where the top band is taken. Which side a cluster belongs to is decided by
+		 * its own middle: the pill grows rightwards from the sidebar and the corner grows
+		 * leftwards from the window's edge, so nothing has to name them.
+		 */
+		if (edge === "top") {
+			const middle = box.offsetLeft + width / 2;
+			if (middle < view.width / 2) bandLeft = Math.max(bandLeft, box.offsetLeft + width);
+			else bandRight = Math.min(bandRight, box.offsetLeft);
+		}
+	}
+	bandLeft = Math.max(bandLeft, next.left);
+	bandRight = Math.max(bandLeft, Math.min(bandRight, view.width - next.right));
+	const now = insets();
+	const sameBand = band.left === bandLeft && band.right === bandRight;
+	if (sameBand && now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;
+	band.left = bandLeft;
+	band.right = bandRight;
+	setInsets(next);
+	/*
+	 * Published as custom properties as well as a signal, so that the parts of the
+	 * layout which are genuinely CSS can stay CSS.
+	 *
+	 * The dock is the reason: it centres on the canvas column, and expressing that as
+	 * `calc()` over these four numbers means the browser animates the slide and reflows
+	 * it on resize without a single line of JavaScript in the path. A component that
+	 * needs to *decide* something reads the signal; a rule that needs to *measure*
+	 * something reads these.
+	 */
+	publishInsets({
+		"--inset-left": `${next.left}px`,
+		"--inset-right": `${next.right}px`,
+		"--inset-top": `${next.top}px`,
+		"--inset-bottom": `${next.bottom}px`,
+		/* A gutter inside each cluster, so what centres here never touches one. */
+		"--band-left": `${bandLeft + 12}px`,
+		"--band-right": `${Math.max(bandLeft + 12, bandRight - 12)}px`,
+	});
+}
+
 export function watchInsets(root: HTMLElement = document.body): void {
 	let sizes = new ResizeObserver(() => soon(false));
 	const tracked = new Set<Element>();
 
-	/*
-	 * The clear span of the top band: to the right of the left cluster, and to the left of
-	 * the right one.
-	 *
-	 * The two top clusters are floats, so they are not insets — nothing is subtracted for
-	 * them — but anything else that wants to sit *between* them has to know where they end.
-	 * The focus view's exit chip is the case: centred on the canvas column it sat under the
-	 * pill the moment the pill grew a canvas switcher, and a press aimed at it landed on the
-	 * text tool. Measured, like everything else here, rather than stated beside a stylesheet.
-	 */
-	let band = { left: 0, right: 0 };
-
-	const measure = () => {
-		const view = { width: window.innerWidth, height: window.innerHeight };
-		const next: Insets = { ...ZERO };
-		let bandLeft = 0;
-		let bandRight = view.width;
-		for (const el of tracked) {
-			const edge = (el as HTMLElement).dataset.inset as keyof Insets | undefined;
-			if (!edge) continue;
-			/*
-			 * The *layout* box, not the painted one — `offsetLeft`/`offsetTop` ignore
-			 * transforms where `getBoundingClientRect` does not.
-			 *
-			 * That distinction is the whole of a bug. The panel is slid out with a `translate`
-			 * rather than unmounted, so it animates; measured by its painted rect, a panel
-			 * that had just been asked to open was still off-screen at the moment its
-			 * `data-inset` came back, so the camera recorded nothing — and the ResizeObserver
-			 * never fired again, because a transform is not a resize. The canvas kept the
-			 * whole window for the rest of the session.
-			 *
-			 * Layout coordinates say where a surface *is* rather than where it is currently
-			 * drawn, which is also the honest answer for a camera: a panel arriving is a panel
-			 * the boards should already be making room for.
-			 *
-			 * These elements are all `position: fixed` with no positioned ancestor, so their
-			 * offsets are viewport coordinates.
-			 */
-			const box = el as HTMLElement;
-			const width = box.offsetWidth;
-			const height = box.offsetHeight;
-			// A surface that is `display: none` measures nothing, so nothing has to
-			// deregister it — but one that is merely slid away still counts, which is the
-			// point of reading the layout box.
-			if (width === 0 || height === 0) continue;
-			// Its own edge to the far side of it, gutter included: a panel inset 12px from the
-			// window is 12px the canvas cannot use either.
-			if (edge === "left") next.left = Math.max(next.left, box.offsetLeft + width);
-			if (edge === "right") next.right = Math.max(next.right, view.width - box.offsetLeft);
-			if (edge === "top") next.top = Math.max(next.top, box.offsetTop + height);
-			if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - box.offsetTop);
-			/*
-			 * And where the top band is taken. Which side a cluster belongs to is decided by
-			 * its own middle: the pill grows rightwards from the sidebar and the corner grows
-			 * leftwards from the window's edge, so nothing has to name them.
-			 */
-			if (edge === "top") {
-				const middle = box.offsetLeft + width / 2;
-				if (middle < view.width / 2) bandLeft = Math.max(bandLeft, box.offsetLeft + width);
-				else bandRight = Math.min(bandRight, box.offsetLeft);
-			}
-		}
-		bandLeft = Math.max(bandLeft, next.left);
-		bandRight = Math.max(bandLeft, Math.min(bandRight, view.width - next.right));
-		const now = insets();
-		const sameBand = band.left === bandLeft && band.right === bandRight;
-		if (sameBand && now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;
-		band = { left: bandLeft, right: bandRight };
-		setInsets(next);
-		/*
-		 * Published as custom properties as well as a signal, so that the parts of the
-		 * layout which are genuinely CSS can stay CSS.
-		 *
-		 * The dock is the reason: it centres on the canvas column, and expressing that as
-		 * `calc()` over these four numbers means the browser animates the slide and reflows
-		 * it on resize without a single line of JavaScript in the path. A component that
-		 * needs to *decide* something reads the signal; a rule that needs to *measure*
-		 * something reads these.
-		 */
-		publishInsets({
-			"--inset-left": `${next.left}px`,
-			"--inset-right": `${next.right}px`,
-			"--inset-top": `${next.top}px`,
-			"--inset-bottom": `${next.bottom}px`,
-			/* A gutter inside each cluster, so what centres here never touches one. */
-			"--band-left": `${bandLeft + 12}px`,
-			"--band-right": `${Math.max(bandLeft + 12, bandRight - 12)}px`,
-		});
-	};
+	const band = { left: 0, right: 0 };
+	const measure = () => measureInsets(tracked, band);
 
 	const sync = () => {
 		const found = new Set(root.querySelectorAll("[data-inset]"));

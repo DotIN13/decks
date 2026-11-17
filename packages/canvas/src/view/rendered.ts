@@ -5,6 +5,29 @@ import type { CanvasEngine } from "../render/engine.ts";
 import type { CanvasEditor } from "../edit/dom/index.ts";
 import type { CanvasViewProps } from "./CanvasView.tsx";
 
+/**
+ * How many awake items may be put on layers of their own while the scale moves before it stops being a saving.
+ *
+ * A layer is a picture the compositor keeps and can stretch without waking the main
+ * thread, and that trade is a good one until there are so many that compositing them
+ * costs more than drawing them. It reverses, and it was measured rather than guessed —
+ * 1400×900 at 4× CPU throttle, milliseconds of work per finger movement while pinching:
+ *
+ *     12 documents in view   56 on layers · 134 without
+ *     40 documents in view  126 on layers · 181 without
+ *    120 documents in view  700 on layers · 523 without   ← the trade has reversed
+ *
+ * Those documents were boards' iframes, which the canvas no longer runs. What goes on a layer now
+ * is an awake card's root, a document's editor or an app's window (`canvas.css`, `data-scaling`),
+ * a few elements each, and only those are counted: a board is its picture on the sheet and has no
+ * layer to make. Measured on a canvas of 65 cards, all on screen below 25%, a ctrl-wheel zoom
+ * across 2%–400% in headed Chrome: with the cards over the old 48 and so off layers, Chrome drew
+ * every card again at every step and a third of the frames were late (97 of 300 over 16.7 ms,
+ * p95 35 ms); on layers, 0–6 of 495, and a frame mid-zoom as sharp as at rest. 128 is twice what
+ * was measured.
+ */
+const LAYER_BUDGET = 128;
+
 /** What `createRendered` reads of `createItemsLayer` (`items-layer.tsx`), each read when it is used. */
 export interface RenderedNeeds {
 	readonly props: CanvasViewProps;
@@ -22,7 +45,6 @@ export interface RenderedNeeds {
 	readonly penLayer: CanvasEngine;
 	readonly cardsHidden: Accessor<boolean>;
 	readonly isVisible: (board: Page) => boolean;
-	readonly LAYER_BUDGET: 128;
 }
 
 export function createRendered(d: RenderedNeeds) {
@@ -89,7 +111,7 @@ export function createRendered(d: RenderedNeeds) {
 	createEffect(() => d.penLayer.questions.setNodes(renderedPaths()));
 
 	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
-	const layered = createMemo(() => d.scaling() && rendered().filter((board) => ((board.card && !d.cardsHidden()) || board.item) && d.isVisible(board)).length <= d.LAYER_BUDGET);
+	const layered = createMemo(() => d.scaling() && rendered().filter((board) => ((board.card && !d.cardsHidden()) || board.item) && d.isVisible(board)).length <= LAYER_BUDGET);
 
 	/** The camera as of its last rest. */
 	const restCamera = createMemo<Camera>((was) => (was !== undefined && (d.moving() || d.scaling() || d.panning() || d.gliding()) ? was : d.props.camera));

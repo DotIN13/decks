@@ -7,6 +7,7 @@ import { createGlideTo } from "./glide-to.ts";
 import { createCoast } from "./coast.ts";
 import { followAsked } from "./follow-asked.ts";
 import { createMotion } from "./motion.ts";
+import { createCameraWrite } from "./write.ts";
 
 /**
  * The camera of one stage: where it is, whether it is moving, and the one place that moves it.
@@ -77,48 +78,23 @@ export function createCameraController(host: CameraHost) {
 
 
 
-	/**
-	 * Move the camera now: the body `pushCamera` has always been, given the name it deserves.
-	 *
-	 * A glide is **not a second way to move the camera**. It is a loop that calls this, which is why
-	 * an arrival gets everything a finger already had for free: the scale settle (a zooming glide
-	 * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp,
-	 * and the camera signal going up once per frame, so the zoom readout
-	 * ticks and `camera()` is never a lie about where the view is going.
-	 */
-	const write = (cam: Camera) => {
-		if (cam.zoom !== localCamera.zoom) nowScaling();
-		if (cam.x !== localCamera.x || cam.y !== localCamera.y || cam.zoom !== localCamera.zoom) nowMoving();
-		lastMoved = performance.now();
-		localCamera = cam;
-		host.moved();
-		/*
-		 * Placed and published once a frame, however many events move the camera in it. A pinch's two
-		 * fingers and a trackpad's wheel send two or three a frame, and each placed the world and gave the
-		 * engine its camera (its transform, its timers, a message to the worker) for a picture the frame
-		 * never showed; the frame's callback runs before the browser paints, so the one placing lands in
-		 * the same frame the events did. A glide's or a coast's step is in a frame already and places at once (`placeNow`).
-		 */
-		pendingCamera = cam;
-		if (rafId === undefined) {
-			rafId = requestAnimationFrame(() => {
-				rafId = undefined;
-				const next = pendingCamera!;
-				pendingCamera = undefined;
-				writeTransform(next);
-				host.publish(next);
-			});
-		}
-	};
+	const { write, placeNow, push, scrolled } = createCameraWrite({
+		nowScaling, nowMoving, host, writeTransform, motion,
+		get localCamera() { return localCamera; },
+		set localCamera(next) { localCamera = next; },
+		get lastMoved() { return lastMoved; },
+		set lastMoved(next) { lastMoved = next; },
+		get pendingCamera() { return pendingCamera; },
+		set pendingCamera(next) { pendingCamera = next; },
+		get rafId() { return rafId; },
+		set rafId(next) { rafId = next; },
+		get cancelGlide() { return cancelGlide; },
+	});
 
 	const { cancelCoast, coast } = createCoast({
 		write,
-		get localCamera() {
-			return localCamera;
-		},
-		get placeNow() {
-			return placeNow;
-		},
+		get localCamera() { return localCamera; },
+		get placeNow() { return placeNow; },
 		host,
 	});
 
@@ -132,111 +108,32 @@ export function createCameraController(host: CameraHost) {
 		setGliding(false);
 	};
 
-	/**
-	 * The browser scrolled the stage (a trackpad, a wheel, a finger), and the world is already where
-	 * this camera puts it: the camera follows, the drawing is told, and the camera is published once
-	 * a frame, as for any other step, with no transform written. A hand on the canvas wins over a
-	 * glide, as it does for every gesture.
-	 */
-	const scrolled = (cam: Camera) => {
-		if (cam.x === localCamera.x && cam.y === localCamera.y && cam.zoom === localCamera.zoom) return;
-		cancelGlide();
-		nowMoving();
-		lastMoved = performance.now();
-		localCamera = cam;
-		const v = host.view();
-		motion.written = { cam, width: v.width, height: v.height };
-		host.follow(cam);
-		host.moved();
-		pendingCamera = cam;
-		if (rafId === undefined) {
-			rafId = requestAnimationFrame(() => {
-				rafId = undefined;
-				host.publish(pendingCamera!);
-				pendingCamera = undefined;
-			});
-		}
-	};
-
-	/** Place the camera written and not yet placed now: for a caller in an animation frame that flushes the drawing itself. */
-	const placeNow = () => {
-		if (pendingCamera) writeTransform(pendingCamera);
-	};
-
-	/** A gesture, and the hand wins: it ends any glide before writing its own camera. */
-	const push = (cam: Camera) => {
-		cancelGlide();
-		write(cam);
-	};
-
 	const { glideTo } = createGlideTo({
-		get localCamera() {
-			return localCamera;
-		},
-		write,
-		get glideToken() {
-			return glideToken;
-		},
-		set glideToken(next) {
-			glideToken = next;
-		},
-		setGliding,
-		placeNow,
-		host,
-		get glideRaf() {
-			return glideRaf;
-		},
-		set glideRaf(next) {
-			glideRaf = next;
-		},
+		write, setGliding, placeNow, host,
+		get localCamera() { return localCamera; },
+		get glideToken() { return glideToken; },
+		set glideToken(next) { glideToken = next; },
+		get glideRaf() { return glideRaf; },
+		set glideRaf(next) { glideRaf = next; },
 	});
 
 	followAsked({
-		host,
-		get localCamera() {
-			return localCamera;
-		},
-		set localCamera(next) {
-			localCamera = next;
-		},
-		get lastGlideToken() {
-			return lastGlideToken;
-		},
-		set lastGlideToken(next) {
-			lastGlideToken = next;
-		},
-		glideTo,
-		cancelGlide,
-		nowScaling,
-		nowMoving,
-		get written() {
-			return motion.written;
-		},
-		writeTransform,
-		get rafId() {
-			return rafId;
-		},
-		get glideRaf() {
-			return glideRaf;
-		},
-		cancelCoast,
+		host, glideTo, cancelGlide, nowScaling, nowMoving, writeTransform, cancelCoast,
+		get localCamera() { return localCamera; },
+		set localCamera(next) { localCamera = next; },
+		get lastGlideToken() { return lastGlideToken; },
+		set lastGlideToken(next) { lastGlideToken = next; },
+		get written() { return motion.written; },
+		get rafId() { return rafId; },
+		get glideRaf() { return glideRaf; },
 	});
 	const { wheel } = createWheelZoom({
 		push,
-		get localCamera() {
-			return localCamera;
-		},
+		get localCamera() { return localCamera; },
 		host,
 	});
 
-	const { zoom, settled, rest } = createSettled({
-		host,
-		moving,
-		gliding,
-		panning,
-		scaling,
-		glidePending,
-	});
+	const { zoom, settled, rest } = createSettled({ host, moving, gliding, panning, scaling, glidePending });
 
 	return {
 		/** The camera as of the last step, exactly: what a gesture or a point on the screen needs. */
