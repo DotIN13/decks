@@ -57,13 +57,12 @@ export const canvasOnScreen = (): StageRow | undefined => canvasOf(canvasTab());
 
 /**
  * Open a tab on a target and bring it forward, or bring forward the one already open on it. A canvas
- * the home tab is showing is home: one canvas is not in the row twice by accident. `from` is the canvas
- * it is opened from, where the target does not say (`Tab.from`). No agent moves.
+ * the home tab is showing is home: one canvas is not in the row twice by accident. No agent moves.
  */
-export function openTab(kind: string, target: string, from?: string): void {
+export function openTab(kind: string, target: string): void {
 	if (kind === "canvas" && homeCanvas()?.name === target) return bring(HOME.id);
 	const id = `${kind}:${target}`;
-	if (!opened().some((tab) => tab.id === id)) setOpened((all) => [...all, { id, kind, target, ...(from ? { from } : {}) }]);
+	if (!opened().some((tab) => tab.id === id)) setOpened((all) => [...all, { id, kind, target }]);
 	bring(id);
 }
 

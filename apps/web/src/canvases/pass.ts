@@ -50,6 +50,18 @@ async function askPass(canvas: string): Promise<CanvasPass> {
 	};
 }
 
+/**
+ * A document pass for the one document a tab shows whole (`server/src/auth/passes.ts`), asked for with
+ * this tab's token: its frame says that document's messages on the line with it, and nothing else. It
+ * lives an hour; the frame's host asks for the next at half that, each one new.
+ */
+export async function documentPass(path: string): Promise<Pick<CanvasPass, "api" | "token" | "expires">> {
+	const response = await fetch(api("/passes"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ document: path }) });
+	const answer = (await response.json().catch(() => ({}))) as { pass?: string; expires?: number; error?: string };
+	if (!answer.pass) throw new Error(`No pass for the document ${path}: ${answer.error ?? response.status}`);
+	return { api: new URL(api("/"), location.href).href.replace(/\/$/, ""), token: answer.pass, expires: answer.expires ?? Date.now() + 3_600_000 };
+}
+
 /** A card's calls the page answers (`@decks/api`, a verb's `card: "page"`; `@decks/canvas`, `frame/card-calls.ts`): the agents, and showing another canvas. */
 const FOR_CARDS = cardCalls("page");
 /** The ones that put words in front of an agent, or make one: each waits for your OK. */

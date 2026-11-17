@@ -51,7 +51,7 @@ export type Heard =
 	/** The line is back after a drop and nothing says what was missed: the drawing is read again. */
 	| { type: "reconnected" };
 
-/** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
+/** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). `canvas` is the canvas the line follows; none (`""`) for a line that says only a document's messages. */
 export function createBackend(api: string, canvas: string, firstToken: string): Backend {
 	let token = firstToken;
 	/** This frame's name on its stream: what the harness says to it alone (a document's answers) carries it. */
@@ -67,7 +67,8 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 		(opened ??= openLine({
 			api: base,
 			token: () => token,
-			watch: () => [{ canvas, ...(sinceOf ? { since: sinceOf() } : {}) }],
+			// A line that is no canvas's (a document's, on its own pass) watches none.
+			watch: () => (canvas ? [{ canvas, ...(sinceOf ? { since: sinceOf() } : {}) }] : []),
 			hear: (message) => {
 				for (const one of hearers) one(message as Heard);
 			},

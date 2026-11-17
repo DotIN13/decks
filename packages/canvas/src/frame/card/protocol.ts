@@ -10,6 +10,8 @@ import type { ItemEnd, ItemStart } from "../kind-host.tsx";
 /** Everything a card frame starts from. `kind` tells the guest which kind to run: a canvas's start has none. */
 export interface CardStart extends ItemStart {
 	kind: "card";
+	/** The canvas the card is on, whose pass this frame holds. */
+	canvas: string;
 	card: CardShown;
 }
 

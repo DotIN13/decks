@@ -2,8 +2,9 @@ import type { ItemEnd, ItemStart } from "../kind-host.tsx";
 
 /**
  * The document frame: one document, whole, in the frame every kind runs in (`@decks/frame`), as a tab
- * of its own shows it: its editor, its history and its review (`@decks/docs/page`), on the line of
- * the canvas that places it, which answers for the files that canvas's document items name.
+ * of its own shows it: its editor, its history and its review (`@decks/docs/page`), on a line of its
+ * own to the harness, opened with a document pass: that file's messages and nothing else, whether a
+ * canvas places the document or not.
  */
 
 /** Everything a document frame starts from. */

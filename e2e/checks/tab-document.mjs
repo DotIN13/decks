@@ -3,9 +3,10 @@
  * `@decks/canvas` `frame/document/`, `apps/web/src/tabs/kinds/document.tsx`).
  *
  * The pill's New tab on a document opens it as a tab of this window, where it opened the file in the
- * browser's. The document runs in a sandboxed frame, as the canvas does, with its editor on the line
- * of the canvas it was opened from: its words show, what is typed there is saved to its file, and the
- * canvas is as it was left when the tab is closed.
+ * browser's. The document runs in a sandboxed frame, as the canvas does, with its editor on a line of
+ * its own, opened with a pass for that document alone: its words show, what is typed there is saved to
+ * its file, it goes on when the document is taken off its canvas, and the canvas is as it was left
+ * when the tab is closed.
  */
 import { CANVAS, API, asPerson, canvasFrame, deckState, focusCanvas, open, pressCardAction, resetStage, rest, say, selectCard, settle } from "../harness.mjs";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -76,6 +77,16 @@ if (at && box) {
 }
 const saved = await until(() => (readFileSync(join(deck, file), "utf8").includes("Typed in the tab.") ? true : undefined), 10000);
 say("words typed in the tab are saved to the document's file", !!saved, readFileSync(join(deck, file), "utf8").slice(0, 160));
+
+// --- it is on a pass of its own: taken off the canvas, the tab goes on -------------------------------------
+const off = await call("canvas.delete", ["tab-doc"]);
+await settle(page, 400);
+if (at && box) {
+	await page.mouse.click(box.x + at.x, box.y + at.y);
+	await page.keyboard.press("End");
+	await page.keyboard.type(" And off the canvas.");
+}
+say("taken off its canvas, the document in the tab is still typed into and saved", off.ok === true && !!(await until(() => (readFileSync(join(deck, file), "utf8").includes("And off the canvas.") ? true : undefined), 10000)), readFileSync(join(deck, file), "utf8").slice(0, 200));
 
 // --- behind another tab and back, closed --------------------------------------------------------------------
 await page.locator(".v3-canvas-chip").first().click();

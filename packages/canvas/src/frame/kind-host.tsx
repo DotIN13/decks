@@ -10,14 +10,13 @@ export interface ItemLook {
 	foot: number;
 }
 
-/** What every frame that shows one item of a canvas starts from, beside what its kind adds: the canvas, its pass, and the look. */
+/** What every frame that shows one item starts from, beside what its kind adds: the pass it holds, and the look. */
 export interface ItemStart {
 	protocol: number;
 	kind: string;
-	/** The canvas the item is on, whose pass this frame holds. */
-	canvas: string;
+	/** The harness, and the pass this frame holds for it: a canvas's for a card, a document's own for a document. */
 	backend: { api: string; token: string; expires: number };
-	/** Where the canvas's files are read, the pass in the address. */
+	/** Where its files are read, the pass in the address; none (`""`) on a pass that reads no files. */
 	files: { base: string; expires: number };
 	/** The deck's import map, as the canvas's frame is given it. */
 	imports?: Record<string, string>;
@@ -35,11 +34,11 @@ export type ItemPageEnd<Own = unknown> = Peer<PageToItem & Own, NoCalls, SharedT
 /** The frame's end. */
 export type ItemEnd<Own = unknown> = Peer<SharedToPage, SharedCalls, PageToItem & Own, NoCalls>;
 
+/** The pass a frame of one item holds, as the page fetched it: a canvas's whole, or a document's, which reads no files. */
+export type ItemPass = Pick<CanvasPass, "api" | "token" | "expires"> & Partial<Pick<CanvasPass, "files" | "imports">>;
+
 /** What the page gives the frame of one item, whatever its kind. */
-export interface ItemFrameProps {
-	/** The canvas the item is on, and the pass for it (the one its canvas's frame is given). */
-	canvas: string;
-	pass: (canvas: string) => Promise<CanvasPass>;
+export interface ItemLookProps {
 	dark: boolean;
 	/** How much of the window's foot the page's composer covers, in pixels. */
 	foot: number;
@@ -48,34 +47,33 @@ export interface ItemFrameProps {
 }
 
 /**
- * One item of a canvas whole, in a frame of its own on the page: the frame every kind runs in
- * (`@decks/frame`), begun as the canvas's is (its hello, its canvas's pass kept current, its start
+ * One item whole, in a frame of its own on the page: the frame every kind runs in
+ * (`@decks/frame`), begun as the canvas's is (its hello, its pass kept current, its start
  * and the port), with the kind named in the start run inside it. The shared words are answered as
  * for any frame, and the look is said again when it changes. What the kind adds: what it starts
  * from (`start`), and what it is told later (`say`, run where it tracks what it reads).
  */
-export function ItemFrame<Own>(props: ItemFrameProps & { kind: string; title: string; start: () => Record<string, unknown>; say?: (end: ItemPageEnd<Own>) => void }): JSX.Element {
+export function ItemFrame<Own>(props: ItemLookProps & { kind: string; title: string; /** The pass the frame holds, fetched now and again at half its life. */ pass: () => Promise<ItemPass>; start: () => Record<string, unknown>; say?: (end: ItemPageEnd<Own>) => void }): JSX.Element {
 	let gone = false;
 	let stopWaiting = () => {};
 	const [end, setEnd] = createSignal<ItemPageEnd<Own>>();
 	const begin = (frame: HTMLIFrameElement) => {
-		const canvas = props.canvas;
+		const pass = untrack(() => props.pass);
 		stopWaiting = awaitHello(frame, {
-			pass: () => props.pass(canvas),
+			pass,
 			cancelled: () => gone,
-			begin: (pass) => {
+			begin: (held) => {
 				const channel = new MessageChannel();
 				const page = peer(channel.port1) as ItemPageEnd<Own>;
 				hearShared(page as never, { dismiss: dismissMenus, agent: props.agent, refuse: (message) => new CallRefused(message, "refused") });
 				setEnd(() => page);
-				renewPass({ pass: () => props.pass(canvas), expires: pass.expires, cancelled: () => gone, renewed: (next) => (page as ItemPageEnd).emit("token", { token: next.token, files: { base: next.files, expires: next.expires } }) });
+				renewPass({ pass, expires: held.expires, cancelled: () => gone, renewed: (next) => (page as ItemPageEnd).emit("token", { token: next.token, ...(next.files ? { files: { base: next.files, expires: next.expires } } : {}) }) });
 				const start: ItemStart = {
 					protocol: PROTOCOL,
 					kind: props.kind,
-					canvas,
-					backend: { api: pass.api, token: pass.token, expires: pass.expires },
-					files: { base: pass.files, expires: pass.expires },
-					...(pass.imports ? { imports: pass.imports } : {}),
+					backend: { api: held.api, token: held.token, expires: held.expires },
+					files: { base: held.files ?? "", expires: held.expires },
+					...(held.imports ? { imports: held.imports } : {}),
 					look: untrack(() => ({ dark: props.dark, foot: props.foot })),
 				};
 				sendStart(frame, { ...start, ...untrack(props.start) }, channel.port2);

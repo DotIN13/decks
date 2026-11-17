@@ -14,19 +14,13 @@ const WIDEST = 980;
 /**
  * Run one document in the frame, whole: the document's own surface (`items/item-surfaces.tsx`), as on a
  * canvas, filling the window to a readable width, down to the composer. Its messages go to the harness
- * on the line of the canvas that places it, as they do from that canvas's frame, and what the harness
- * says of the document comes back the same way. Answers how to stop it.
+ * on a line of its own, opened with its document pass, which watches no canvas; what the harness says
+ * of the document comes back on it. Its markdown and maths are read from the harness's public `lib/`.
+ * Answers how to stop it.
  */
 export async function runDocument(root: HTMLElement, start: DocumentStart, end: DocumentEnd): Promise<() => void> {
-	const folder = `canvases/${start.canvas}/`;
-	let filesBase = start.files.base;
-	const backend = createBackend(start.backend.api, start.canvas, start.backend.token);
-	end.on("token", (data) => {
-		backend.setToken(data.token);
-		if (data.files) filesBase = data.files.base;
-	});
-	const inFolder = (path: string) => (path.startsWith(folder) || path.startsWith("shared/") ? path : `${folder}${path}`);
-	const address = (path: string) => `${filesBase}${path.split("/").map(encodeURIComponent).join("/")}`;
+	const backend = createBackend(start.backend.api, "", start.backend.token);
+	end.on("token", (data) => backend.setToken(data.token));
 
 	const [foot, setFoot] = createSignal(start.look.foot);
 	const look = (dark: boolean) => {
@@ -46,7 +40,7 @@ export async function runDocument(root: HTMLElement, start: DocumentStart, end: 
 		if (message.type.startsWith("doc.")) for (const listener of listeners) listener(message);
 	});
 	setCanvasHost({
-		fileUrl: (path, rev) => `${address(inFolder(path))}${rev === undefined ? "" : `?rev=${rev}`}`,
+		fileUrl: (path) => path,
 		canWrite: () => true,
 		openLink: (href) => end.emit("open-link", { href }),
 		documents: {
@@ -55,7 +49,7 @@ export async function runDocument(root: HTMLElement, start: DocumentStart, end: 
 				listeners.add(listener);
 				return () => listeners.delete(listener);
 			},
-			lib: address(inFolder("lib/")),
+			lib: `${start.backend.api.replace(/\/+$/, "")}/lib/`,
 		},
 	});
 
