@@ -112,7 +112,7 @@ const stealing = (await canvasFrame(page)).evaluate(async () => {
 	stage.dispatchEvent(new WheelEvent("wheel", { deltaY: 240, bubbles: true, cancelable: true }));
 	/*
 	 * A wheel's pan is a scrollBy of the stage, and the camera follows from the scroll event the
-	 * browser sends before the next frame (`Stage.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
+	 * browser sends before the next frame (`CanvasView.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
 	 * which is what ends the glide: so "within a frame" is read one frame on, not in the same task.
 	 */
 	await new Promise((resolve) => requestAnimationFrame(resolve));

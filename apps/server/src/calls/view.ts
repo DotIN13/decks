@@ -7,7 +7,7 @@ import { canvasOfPath, moveHome } from "./move-home.ts";
 /**
  * What the person is looking at, in every open Decks page, moved only on purpose. These write no
  * file; with no screen open they do nothing and say so. The browser keeps its rule for whose view
- * it is (`apps/web/src/canvas/stage-ops.ts`): a call from the conversation on screen moves it, one
+ * it is (`apps/web/src/canvas/view-ops.ts`): a call from the conversation on screen moves it, one
  * from another conversation waits for when that one is opened, and a person mid-gesture is offered
  * a button rather than moved.
  */

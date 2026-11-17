@@ -1,5 +1,5 @@
 import type { PenDocument } from "@decks/pen";
-import { StageEngine } from "@decks/canvas/host";
+import { CanvasEngine } from "@decks/canvas/host";
 
 /**
  * One stage, drawn for a picture: the page the server's Chromium loads to take `decks.canvas.screenshot`
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
 			}),
 	);
 
-	const engine = new StageEngine();
+	const engine = new CanvasEngine();
 	let lastDrawn = performance.now();
 	engine.drawn = () => {
 		lastDrawn = performance.now();

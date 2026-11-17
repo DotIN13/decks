@@ -9,7 +9,7 @@
  * - `view.focus(card)` with no canvas goes to the canvas the card's path names, and frames it;
  *   `view.focus(item, { canvas })` goes to that canvas first.
  * - None of them changed a canvas file. (Whether an agent's own call asks a person using the
- *   canvas, or moves quietly in the background, is `camera/stage-ops.test.ts`.)
+ *   canvas, or moves quietly in the background, is `camera/view-ops.test.ts`.)
  */
 import { API, asPerson, open, resetStage, say, settle } from "../harness.mjs";
 

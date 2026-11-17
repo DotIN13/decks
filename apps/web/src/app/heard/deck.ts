@@ -46,7 +46,7 @@ export function heardDeck(message: Of<"deck"> | Of<"card"> | Of<"doc"> | Of<"can
 			// Merged into the existing row so its frame survives; only a board that
 			// is genuinely new grows the array.
 			//
-			// `reconcile` with `merge` rather than a plain assignment: `Stage` renders
+			// `reconcile` with `merge` rather than a plain assignment: `CanvasView` renders
 			// the boards with `<For>`, which keys by reference, so replacing the object
 			// at this index makes the row new — and re-creating a row re-creates its
 			// iframe, which reloads the document. That is a full white-flash reload of

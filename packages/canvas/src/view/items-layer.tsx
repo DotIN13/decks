@@ -17,26 +17,26 @@ import { drawing } from "../ink/ink.ts";
 import { scheme } from "../base/theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
 import { isLiveFile } from "../model/card-frame.ts";
-import type { StageEngine } from "../render/engine.ts";
-import type { StageEditor } from "../edit/dom/index.ts";
-import type { StageProps } from "./Stage.tsx";
+import type { CanvasEngine } from "../render/engine.ts";
+import type { CanvasEditor } from "../edit/dom/index.ts";
+import type { CanvasViewProps } from "./CanvasView.tsx";
 
 /** What the items layer needs of the stage around it. */
 type ItemsLayerDeps = {
-	props: StageProps;
+	props: CanvasViewProps;
 	/** The host's slot for one placed item (`props.frame`, read once). */
 	Frame: Component<ItemSlotProps>;
 	/** The stage element, set once it is mounted. */
 	element: () => HTMLDivElement | undefined;
 	ctl: CameraController;
 	view: () => Viewport;
-	editor: StageEditor;
-	penLayer: StageEngine;
+	editor: CanvasEditor;
+	penLayer: CanvasEngine;
 	/** Counted up each time the engine lays the drawing out. */
 	penDrawn: Accessor<number>;
-	/** A writer's colour as the sheet can paint it (`Stage.tsx`). */
+	/** A writer's colour as the sheet can paint it (`CanvasView.tsx`). */
 	resolveColour: (colour: string) => string;
-	/** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
 	/** What an item's slot asks of the stage's fingers (`input.ts`). */
 	gestures: ItemSlotProps["gestures"];
@@ -45,7 +45,7 @@ type ItemsLayerDeps = {
 /**
  * The placed items: cards, documents, apps and boards, which of them are near, have a slot and are
  * awake, how the sheet draws each, their sizes easing, the SVGs shown live, and the one film or sound
- * playing. Made inside `Stage`, after the editor, which it reads.
+ * playing. Made inside `CanvasView`, after the editor, which it reads.
  */
 export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { props, Frame, ctl, view, editor, penLayer, penDrawn, resolveColour, frame, gestures } = deps;
@@ -268,7 +268,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** The items whose carried picture is on screen: their slots hide where they were picked up (`item-slot.tsx`). */
 	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.carrying = setCarriedPages;
-	/** The cards the sheet is drawing as their pictures, as of the frame on screen (`StageEngine.pictured`). */
+	/** The cards the sheet is drawing as their pictures, as of the frame on screen (`CanvasEngine.pictured`). */
 	const [picturedNow, setPicturedNow] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.pictured = setPicturedNow;
 	/** For the browser checks: the items the sheet is drawing as their pictures now. */

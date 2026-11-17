@@ -37,7 +37,7 @@ test("no app imports a shared package's files by path", () => {
  * and bring the list up to date.
  */
 const STUDIO_IMPORTS = {
-	"@decks/canvas": ["bootFrame", "createFramedEditor", "fitAll", "canvasHost", "setCanvasHost", "CanvasHandle", "FrameChrome", "FramedHandle", "PenEdit", "PenTool", "StageComment"],
+	"@decks/canvas": ["bootFrame", "createFramedEditor", "fitAll", "canvasHost", "setCanvasHost", "CanvasHandle", "FrameChrome", "FramedHandle", "PenEdit", "PenTool", "CanvasComment"],
 	"@decks/canvas/host": ["PenBar", "InkBar"],
 	"@decks/canvas/camera": ["fitInto", "insets", "keepVisible", "useInsets"],
 	"@decks/canvas/tools": ["drawing", "setDrawing", "penTool", "setPenTool", "setHandTool", "setInkTool", "setInsertPanel", "penBoxes", "penSelection", "fileCard", "InkTool", "PenTool"],

@@ -3,10 +3,10 @@
  * the page's end of it (`createFramedEditor`); `createEditor` makes the editor itself in a Solid tree,
  * as the frame does.
  */
-export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./stage/editor.tsx";
+export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./view/editor.tsx";
 export type { InkTool } from "./ink/ink.ts";
 export { canvasHost, setCanvasHost, type CanvasHost } from "./base/host.ts";
-export type { InkRequest, StageComment } from "./stage/types.ts";
+export type { InkRequest, CanvasComment } from "./view/types.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";
 export type { PenTool } from "./edit/pen-tools.ts";
 export type { DocEdits } from "./model/drawing.ts";

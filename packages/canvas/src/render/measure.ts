@@ -15,11 +15,11 @@ export type Words = (text: string, style: TextStyle, maxWidth: number, markdown:
 let words: Words | undefined;
 
 /** The running engine's words, or undefined when it stops (only the one given takes itself away). */
-export function setStageWords(next: Words | undefined, was?: Words): void {
+export function setCanvasWords(next: Words | undefined, was?: Words): void {
 	if (next || words === was) words = next;
 }
 
-export const stageMeasure: MeasureText = (text, style, maxWidth, node) => {
+export const canvasMeasure: MeasureText = (text, style, maxWidth, node) => {
 	const markdown = !!node && (isMarkdown(node) || isMarkdownText(node));
 	const align = markdown ? (node!.textAlign ?? "left") : "";
 	return words?.(text, style, markdown ? (maxWidth ?? 240) : (maxWidth ?? -1), markdown, align) ?? estimateText(text, style, maxWidth, node);

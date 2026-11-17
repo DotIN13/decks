@@ -4,15 +4,15 @@ import { createSignal, onCleanup, onMount } from "solid-js";
 import { touchedCanvas } from "../camera/touched.ts";
 import { boxOf, pan, pinchCamera, zoomAbout, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
+import { checkCanvasOrigin, viewPoint } from "../camera/coords.ts";
 import { zoomKey } from "../camera/zoom-keys.ts";
 import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
 import { handTool } from "../edit/pen-tools.ts";
 import { handPans } from "../edit/core/dispatch.ts";
 import { untilReleased } from "../edit/held.ts";
-import type { StageEditor } from "../edit/dom/index.ts";
+import type { CanvasEditor } from "../edit/dom/index.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
-import type { StageProps } from "./Stage.tsx";
+import type { CanvasViewProps } from "./CanvasView.tsx";
 
 
 /**
@@ -22,17 +22,17 @@ import type { StageProps } from "./Stage.tsx";
 const TOOL_KEYS: Record<string, "select"> = { v: "select" };
 
 /** What the stage's input needs of the stage around it. */
-type StageInputDeps = {
-	props: StageProps;
+type ViewInputDeps = {
+	props: CanvasViewProps;
 	/** The stage element, set once it is mounted. */
 	element: () => HTMLDivElement;
 	ctl: CameraController;
 	view: () => Viewport;
-	/** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
 	/** The editor, made after the input: read only once the stage is running. */
-	editor: () => StageEditor;
-	/** The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`). */
+	editor: () => CanvasEditor;
+	/** The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`). */
 	scrolled: () => void;
 	/** The stage's size, measured on mount and whenever it changes. */
 	measured: (viewport: Viewport) => void;
@@ -44,9 +44,9 @@ type StageInputDeps = {
 /**
  * What the stage hears from the person: the DOM listeners set up on mount, the wheel and the
  * trackpad, fingers and their pinch, the scroll the camera follows, the camera's keys, and whether a
- * press is held. Made inside `Stage`, so its effects and listeners belong to the stage.
+ * press is held. Made inside `CanvasView`, so its effects and listeners belong to the stage.
  */
-export function createStageInput(deps: StageInputDeps) {
+export function createViewInput(deps: ViewInputDeps) {
 	const { props, ctl, view, frame, worldAt } = deps;
 	const el = deps.element;
 	const { setPanning } = ctl;
@@ -111,7 +111,7 @@ export function createStageInput(deps: StageInputDeps) {
 		};
 		window.addEventListener("wheel", pinchOver, { capture: true, passive: false });
 		onCleanup(() => window.removeEventListener("wheel", pinchOver, { capture: true }));
-		// The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`).
+		// The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`).
 		const onScroll = () => {
 			lastScroll = performance.now();
 			deps.scrolled();
@@ -200,14 +200,14 @@ export function createStageInput(deps: StageInputDeps) {
 		 */
 		const fingersDown = () => touches.count() >= 2;
 		let gestureScale = 1;
-		let stageAt = { left: 0, top: 0 };
+		let viewAt = { left: 0, top: 0 };
 		const onGestureStart = (event: Event) => {
 			event.preventDefault();
 			gestureScale = 1;
 			gesturing = true;
 			if (fingersDown()) return;
 			const r = element.getBoundingClientRect();
-			stageAt = { left: r.left, top: r.top };
+			viewAt = { left: r.left, top: r.top };
 		};
 		const onGestureChange = (event: Event) => {
 			event.preventDefault();
@@ -216,7 +216,7 @@ export function createStageInput(deps: StageInputDeps) {
 			// Followed even while the canvas's pinch has the fingers, so handing back to these events does not jump.
 			gestureScale = g.scale;
 			if (fingersDown() || !Number.isFinite(factor) || factor <= 0 || factor === 1) return;
-			pushCamera(zoomAbout(ctl.now(), view(), { x: g.clientX - stageAt.left, y: g.clientY - stageAt.top }, factor));
+			pushCamera(zoomAbout(ctl.now(), view(), { x: g.clientX - viewAt.left, y: g.clientY - viewAt.top }, factor));
 		};
 		const onGestureEnd = (event: Event) => {
 			event.preventDefault();
@@ -237,7 +237,7 @@ export function createStageInput(deps: StageInputDeps) {
 		observer.observe(element);
 		measure();
 		// Everything on the canvas assumes a stage pixel is a client pixel; say so if it is not.
-		checkStageOrigin(element);
+		checkCanvasOrigin(element);
 		onCleanup(() => observer.disconnect());
 
 		const keydown = (event: KeyboardEvent) => {
@@ -348,10 +348,10 @@ export function createStageInput(deps: StageInputDeps) {
 	 *
 	 * There was a cached `getBoundingClientRect` here, refreshed every 250 ms, and a
 	 * subtraction at each of three call sites. The stage element *is* the viewport, so all of
-	 * that was adding zero: `camera/coords.ts` sets out why, and `checkStageOrigin` — called
+	 * that was adding zero: `camera/coords.ts` sets out why, and `checkCanvasOrigin` — called
 	 * at mount — is what stops it quietly ceasing to be true.
 	 */
-	const local = stagePoint;
+	const local = viewPoint;
 
 	/** A wheel or a trackpad's pinch, already in stage coordinates (`camera/controller.ts`). */
 	const wheel = ctl.wheel;
@@ -455,7 +455,7 @@ export function createStageInput(deps: StageInputDeps) {
 	const panned: Array<{ t: number; dx: number; dy: number }> = [];
 	/** A finger, in the stage's own coordinates: the space the camera works in. */
 	const fingerOf = (event: PointerEvent): Finger => {
-		const at = stagePoint(event);
+		const at = viewPoint(event);
 		return { id: event.pointerId, x: at.x, y: at.y };
 	};
 

@@ -1,7 +1,7 @@
 import type { Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { dismissMenus } from "@decks/ui";
-import type { EditorState, StageComment } from "../../stage/types.ts";
+import type { EditorState, CanvasComment } from "../../view/types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
 import type { InkTool } from "../../ink/ink.ts";
 import { insets } from "../../camera/insets.ts";
@@ -114,7 +114,7 @@ export interface FramedEditorOptions {
 	/** Cards or items dragged onto the page's composer, to talk about them. */
 	onRefer?: (pills: Array<{ kind: "card" | "item"; id: string; label: string; name?: string }>) => void;
 	/** A comment from a frame with no chrome of its own (its pill's Comment): the page opens its own box. */
-	onComment?: (comment: StageComment) => void;
+	onComment?: (comment: CanvasComment) => void;
 	/** Export drawn items as a picture. */
 	onExport?: (ids: string[], format?: "png" | "pdf") => void;
 	frame: FrameHostOptions;

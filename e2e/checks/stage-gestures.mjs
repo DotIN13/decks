@@ -171,7 +171,7 @@ say("dragging one selected item moves the whole selection", !!movedBoth, JSON.st
 // A press on a board's picture, clear of anything drawn over it.
 let bar;
 for (const one of await canvas.evaluate(() => window.__decksProbes.cards().map(({ path, rect }) => ({ path, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })))) {
-	// A board is its picture: the stage says which board is under a point (`Stage.tsx`), or its node's inert surface is there.
+	// A board is its picture: the stage says which board is under a point (`CanvasView.tsx`), or its node's inert surface is there.
 	const points = await canvas.evaluate(({ path, rect: r }) => {
 		const stage = document.querySelector(".stage");
 		const out = [];
@@ -565,7 +565,7 @@ let ITEM_WASH = "";
 	const spot = await firstOnCanvas(await canvas.evaluate(() => {
 		const out = [];
 		for (const one of window.__decksProbes.cards()) {
-			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+			// A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
 			const node = document.querySelector(`.card-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
 			if (node.dataset.selected === "true") continue;
 			const r = node.getBoundingClientRect();
@@ -598,7 +598,7 @@ let ITEM_WASH = "";
 	const find = async () => firstOnCanvas(await canvas.evaluate(() => {
 		const out = [];
 		for (const one of window.__decksProbes.cards()) {
-			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+			// A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
 			const node = document.querySelector(`.card-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
 			const r = node.getBoundingClientRect();
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5]]) {
@@ -730,7 +730,7 @@ await page.keyboard.press("Escape");
 	// A card on screen, carried by its edge.
 	const path = await canvas.evaluate(() => {
 		for (const one of window.__decksProbes.cards()) {
-			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+			// A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
 			const node = document.querySelector(`.card-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
 			const r = node.getBoundingClientRect();
 			const x = r.x + r.width / 2;

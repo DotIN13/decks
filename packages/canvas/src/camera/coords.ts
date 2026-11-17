@@ -9,14 +9,14 @@
  * gesture (a conversion that measured the DOM instead of asking the camera).
  *
  * They are not nine problems. Three of them crossed a boundary that is the identity — see
- * `stagePoint` — and five are the same three sums written five times. This file is those
+ * `viewPoint` — and five are the same three sums written five times. This file is those
  * three sums, named so the direction is in the name, and **the only place outside
  * `camera.ts` allowed to multiply or divide by a zoom.**
  *
  * ### The spaces
  *
  * - **stage** — pixels from the top-left of the stage element. The camera works in these,
- *   and because the stage *is* the viewport (`stagePoint`), they are also client pixels.
+ *   and because the stage *is* the viewport (`viewPoint`), they are also client pixels.
  * - **board** — pixels inside a board's own document. A board's iframe knows nothing of the
  *   camera, so these are the board's own layout coordinates, unscaled.
  * - **world** — what the boards are laid out in. `camera.ts` owns the trip to and from here.
@@ -44,28 +44,28 @@ export type Delta<S extends string> = { dx: number; dy: number } & In<S>;
  * in the app are on `.dock`, `.side` and a palette button, none of them above the stage).
  *
  * So the conversion across this boundary has always been adding zero — at the cost of a
- * cached `getBoundingClientRect`, and three places to get the sign wrong. `checkStageOrigin`
+ * cached `getBoundingClientRect`, and three places to get the sign wrong. `checkCanvasOrigin`
  * is what stops that silently ceasing to be true.
  */
-export const stagePoint = (event: { clientX: number; clientY: number }): Point<"stage"> => ({
+export const viewPoint = (event: { clientX: number; clientY: number }): Point<"view"> => ({
 	x: event.clientX,
 	y: event.clientY,
 });
 
 /**
- * Warn, once, if the stage is not where `stagePoint` assumes.
+ * Warn, once, if the stage is not where `viewPoint` assumes.
  *
  * Called from the stage's own mount. The day someone insets the stage — a title bar returns,
  * a border appears — every gesture would be off by that much, and silently: nothing throws,
  * the canvas simply drifts under the cursor. A measurement at mount costs one layout read and
  * turns that into a sentence in the console.
  */
-export function checkStageOrigin(stage: Element): void {
+export function checkCanvasOrigin(stage: Element): void {
 	const rect = stage.getBoundingClientRect();
 	if (Math.abs(rect.left) < 0.5 && Math.abs(rect.top) < 0.5) return;
 	console.warn(
 		`The stage is at (${Math.round(rect.left)}, ${Math.round(rect.top)}), not the viewport's origin. ` +
-			"Every pointer position on the canvas is now off by that much — see `stagePoint` in camera/coords.ts.",
+			"Every pointer position on the canvas is now off by that much — see `viewPoint` in camera/coords.ts.",
 	);
 }
 

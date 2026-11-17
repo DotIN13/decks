@@ -36,7 +36,7 @@ export type TextHost = {
 	world: () => HTMLElement | undefined;
 	/** Counted up each time the engine lays the drawing out: where a made item is, once it is placed. */
 	redrawn: () => number;
-	/** Whether the drawing can be edited here (`Stage`'s `onPenEdit`). */
+	/** Whether the drawing can be edited here (`CanvasView`'s `onPenEdit`). */
 	editable: () => boolean;
 	edit: (ops: Op[]) => void;
 	/** An id no item has. */

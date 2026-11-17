@@ -6,7 +6,7 @@
  *
  * A placeholder frame is put on empty paper by the person (so no agent is the writer), and the
  * canvas is screenshotted at about zoom 1: its edge must be dashed in the accent, with no tag. Then
- * the engine is told a writer (`StageEngine.setWriter`, what the app does with the drawing's `by`):
+ * the engine is told a writer (`CanvasEngine.setWriter`, what the app does with the drawing's `by`):
  * the same edge is dashed in the writer's green, and the tag is there, green with white words. The
  * server's pictures of the frame, native and in the browser, draw the same accent outline.
  *

@@ -69,7 +69,7 @@ export const ENGINE: BrowserEngine =
 
 /**
  * Which items an engine puts on layers of their own while the camera moves (`canvas.css`, set by
- * `stage/Stage.tsx`): `scaling`, each awake card, document and app while the zoom changes, so it is
+ * `view/CanvasView.tsx`): `scaling`, each awake card, document and app while the zoom changes, so it is
  * stretched rather than painted at every step; `sliding`, the whole world while the camera pans at one
  * zoom, so it is slid as one picture.
  *

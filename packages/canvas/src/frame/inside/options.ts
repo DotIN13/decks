@@ -2,7 +2,7 @@ import type { JSX } from "solid-js";
 import { serialize, type PenEdit } from "@decks/pen";
 import { untrack } from "solid-js";
 import type { Page } from "@decks/protocol";
-import type { createEditor } from "../../stage/editor.tsx";
+import type { createEditor } from "../../view/editor.tsx";
 import { passless, passOf, setCanvasHost, withPass } from "../../base/host.ts";
 import { drawing } from "../../ink/ink.ts";
 import { canvasBox } from "../../camera/insets.ts";

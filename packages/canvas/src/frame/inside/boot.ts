@@ -2,7 +2,7 @@ import { life } from "./life.ts";
 import { createSignal, untrack } from "solid-js";
 import type { Page, Camera } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
-import type { Editor, StageComment } from "../../stage/types.ts";
+import type { Editor, CanvasComment } from "../../view/types.ts";
 import type { FrameChromeView, ViewOffer } from "../chrome.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { isNews } from "../../items/news.ts";
@@ -55,7 +55,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
 	const [mode, setMode] = createSignal<"edit" | "browse">(start.look.mode);
 	const [dark, setDark] = createSignal(start.look.dark);
-	const [comment, setComment] = createSignal<StageComment>();
+	const [comment, setComment] = createSignal<CanvasComment>();
 	const [revision, setRevision] = createSignal(0);
 	const [agent, setAgent] = createSignal<string | undefined>(start.look.agent);
 	const [offer, setOffer] = createSignal<ViewOffer>();

@@ -1,6 +1,6 @@
 import type { Camera } from "@decks/protocol";
 import type { Accessor, JSX, Setter } from "solid-js";
-import type { CanvasHandle, StageComment } from "../stage/types.ts";
+import type { CanvasHandle, CanvasComment } from "../view/types.ts";
 import type { ComposerPart } from "./protocol.ts";
 
 /**
@@ -27,8 +27,8 @@ export interface FrameChrome {
 	canWrite(): boolean;
 	dark: Accessor<boolean>;
 	/** Words selected in a card, being commented on: the popover's, set by the canvas. */
-	comment: Accessor<StageComment | undefined>;
-	setComment: Setter<StageComment | undefined>;
+	comment: Accessor<CanvasComment | undefined>;
+	setComment: Setter<CanvasComment | undefined>;
 	/** Hand the composer a draft (`ComposerPart`); the page never sends it on the frame's word. */
 	compose(part: ComposerPart): void;
 	/** A picture of these items to download, taken by the page (it holds the token that can). */

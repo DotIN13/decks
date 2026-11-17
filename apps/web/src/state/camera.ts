@@ -30,7 +30,7 @@ const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
  *
  * 420ms: long enough to see the direction of the movement and read it as an arrival, which 260ms
  * was not — at 260 the first 50ms carried half the travel, so it read as a jump with a tail. The
- * scale settle is not a constraint on this number: `Stage`'s `nowScaling` re-arms its own 300ms
+ * scale settle is not a constraint on this number: `CanvasView`'s `nowScaling` re-arms its own 300ms
  * timer on every frame the zoom moves, so it fires 300ms after the glide lands whatever the
  * duration, and a zooming glide still asks for one redraw at the end rather than sixty.
  */
@@ -39,7 +39,7 @@ export const GLIDE_MS = 500;
 /**
  * The glide the app has been asked for, or nothing.
  *
- * A **request**, not a schedule: `Stage` owns the pixels and the clock, so this carries a token
+ * A **request**, not a schedule: `CanvasView` owns the pixels and the clock, so this carries a token
  * that tells one request from another plus the duration, and the stage does the rest. Two moves
  * in a row give two tokens and the second wins — the loop interpolates from wherever the camera
  * *is*, so nothing travels backwards.

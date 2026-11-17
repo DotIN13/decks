@@ -2,7 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { clockOf, filmLayout, SOUND_INK, soundLayout, waveBars } from "../look/media-look.ts";
 
 /**
- * The one live player, laid over the film or sound it plays (`Stage.tsx` `playing`).
+ * The one live player, laid over the film or sound it plays (`CanvasView.tsx` `playing`).
  *
  * It draws exactly what the still drew (the engine's painter, `packages/stage/crates/paint`), from the same layout, and adds
  * only what playing needs: the play button turns to pause, a sound's waveform fills as it plays

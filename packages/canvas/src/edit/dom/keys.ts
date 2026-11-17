@@ -14,7 +14,7 @@ import type { Editor } from "./controller.ts";
 
 export type KeysHost = {
 	scene: SceneQuery;
-	/** Whether the drawing can be edited here (`Stage`'s `onPenEdit`). */
+	/** Whether the drawing can be edited here (`CanvasView`'s `onPenEdit`). */
 	editable: () => boolean;
 	/** The draw tool is out: the keys are the ink's. */
 	drawing: () => boolean;
@@ -23,11 +23,11 @@ export type KeysHost = {
 	pageSelected: () => boolean;
 	/** That board's path: the arrows move it too. */
 	selectedPage?: () => string | undefined;
-	/** Step through the person's own edits, when the page can (`Stage`'s `onPenStep`). */
+	/** Step through the person's own edits, when the page can (`CanvasView`'s `onPenStep`). */
 	canStep: () => boolean;
 	step: (direction: "undo" | "redo") => void;
 	edit: (ops: Op[]) => void;
-	/** Take the selected items off the canvas, with these ops (`Stage`'s `penDeleteSelected`). */
+	/** Take the selected items off the canvas, with these ops (`CanvasView`'s `penDeleteSelected`). */
 	deleteSelected: (selected: readonly string[], ops: Op[]) => void;
 	/** Take the chosen cards, apps and documents off the canvas, as the pill's Delete does (`onDeleteCard`). */
 	deletePages?: (paths: readonly string[]) => void;

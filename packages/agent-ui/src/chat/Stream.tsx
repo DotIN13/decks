@@ -239,7 +239,7 @@ export function Stream(props: {
 	 */
 	onMount(() => {
 		const wheel = (event: WheelEvent) => {
-			// A pinch never scrolls the conversation; over it, a pinch does nothing (`Stage.tsx`, `pinchOver`).
+			// A pinch never scrolls the conversation; over it, a pinch does nothing (`CanvasView.tsx`, `pinchOver`).
 			if (event.ctrlKey) return;
 			if (!shownNow() || !column || !scroller) return;
 			const box = column.getBoundingClientRect();

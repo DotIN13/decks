@@ -6,12 +6,12 @@ import { boxOf, fitInto, toScreen, toWorld, type Viewport } from "../camera/came
 import { canvasBox } from "../camera/insets.ts";
 import { createCameraController } from "../camera/controller.ts";
 import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin } from "../camera/scroll-area.ts";
-import { stagePoint } from "../camera/coords.ts";
+import { viewPoint } from "../camera/coords.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { DocEdits } from "../model/drawing.ts";
 import type { DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
-import { StageInk } from "../ink/StageInk.tsx";
+import { CanvasInk } from "../ink/CanvasInk.tsx";
 import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
@@ -21,10 +21,10 @@ import { COARSE, HANDLE_DOT_PX } from "../edit/core/touch-rules.ts";
 import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
 import { scheme } from "../base/theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
-import { StageEngine } from "../render/engine.ts";
+import { CanvasEngine } from "../render/engine.ts";
 import { ENGINE, LAYERS } from "../render/device.ts";
 import {
-	createStageEditor,
+	createCanvasEditor,
 	dropSlot as dropSlotIn,
 	frameUnder as frameUnderIn,
 	idMaker,
@@ -35,7 +35,7 @@ import {
 	tsScene,
 	tsSeam,
 } from "../edit/dom/index.ts";
-import { createStageInput } from "./input.ts";
+import { createViewInput } from "./input.ts";
 import { createItemsLayer } from "./items-layer.tsx";
 import { createSelection } from "./selection.tsx";
 
@@ -60,12 +60,12 @@ import { createSelection } from "./selection.tsx";
  * finger on the canvas moves the canvas unless it landed on something that says
  * otherwise, which on a board means a title bar or a component already selected.
  */
-export type { InkRequest, StageComment, CanvasShots } from "./types.ts";
-import type { InkRequest, StageComment, CanvasShots } from "./types.ts";
+export type { InkRequest, CanvasComment, CanvasShots } from "./types.ts";
+import type { InkRequest, CanvasComment, CanvasShots } from "./types.ts";
 
 
 /** What the stage is given by its host. */
-export type StageProps = {
+export type CanvasViewProps = {
 	/**
 	 * Browse or edit. The stage draws the difference so it cannot be entered unnoticed.
 	 *
@@ -97,7 +97,7 @@ export type StageProps = {
 	onPenEdit?: (ops: unknown[]) => void;
 	/** Take back the person's last edit to the drawing, or put it back (`canvas.step`). */
 	onPenStep?: (direction: "undo" | "redo") => void;
-	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/StageInk.tsx`). */
+	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/CanvasInk.tsx`). */
 	drawing?: boolean;
 	/** A Pencil pressed bare canvas with the select tool: turn the pen on (and leave edit mode), so the press can start a stroke. */
 	onPencil?: () => void;
@@ -125,7 +125,7 @@ export type StageProps = {
 	 * (or the drawing's file, with the item ids in `items`), `anchor` where the button is on screen.
 	 * Absent: no comment buttons.
 	 */
-	onComment?: (comment: StageComment) => void;
+	onComment?: (comment: CanvasComment) => void;
 	onSelect: (path: string | undefined) => void;
 	onMove: (path: string, x: number, y: number) => void;
 	/** The board dragged to a new size, in board units. The file is what changes. */
@@ -140,13 +140,13 @@ export type StageProps = {
 	/** The host's own layer in the world, in canvas units (`CanvasOptions.world`). */
 	world?: () => JSX.Element;
 	/** The stage's engine, once made: for what the editor's handle answers from its layout (`itemBox`). */
-	onEngine?: (engine: StageEngine) => void;
+	onEngine?: (engine: CanvasEngine) => void;
 	/** A picture of a card to download, from the card pill's ⋯ menu (absent: no Export there). */
 	onExport?: (ids: string[], format?: "png" | "pdf") => void;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
 	onDeleteCard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
-	stageName?: string | undefined;
+	canvasName?: string | undefined;
 	/** The boards that are news, by path, each with the colour its glow is drawn in (`items/news.ts`). */
 	news?: Record<string, string>;
 	/** A card that was news was looked at (selected): said once for each change of it. */
@@ -179,7 +179,7 @@ export type StageProps = {
  * what the stage hears from the person; `items-layer.tsx`, the placed items; and `selection.tsx`, what
  * is drawn over the selection and under the pointer.
  */
-export function Stage(props: StageProps) {
+export function CanvasView(props: CanvasViewProps) {
 	/* The host's board, read once: a component, not a value that changes. */
 	const Frame = untrack(() => props.frame);
 	let element!: HTMLDivElement;
@@ -340,7 +340,7 @@ export function Stage(props: StageProps) {
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
-	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(ctl.now(), view(), stagePoint(event as PointerEvent));
+	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(ctl.now(), view(), viewPoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
 	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
 	const freshIds = (...also: string[]) => idMaker([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
@@ -348,7 +348,7 @@ export function Stage(props: StageProps) {
 	const penNode = (id: string) => (props.pen ? docIndex(props.pen.doc).get(id)?.node : undefined);
 
 	/* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
-	const input = createStageInput({
+	const input = createViewInput({
 		props,
 		element: () => element,
 		ctl,
@@ -370,7 +370,7 @@ export function Stage(props: StageProps) {
 	 * on two canvases, one under the item slots and one over them, in the same call that moves the
 	 * slots (`writeTransform`). The document, the window's size and the colour scheme reach it here.
 	 */
-	const penLayer = new StageEngine();
+	const penLayer = new CanvasEngine();
 	props.onEngine?.(penLayer);
 	/* An engine that cannot start says so over the stage (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
 	const [engineNotice, setEngineNotice] = createSignal<string>();
@@ -406,7 +406,7 @@ export function Stage(props: StageProps) {
 	 */
 	/** Counted up each time the engine lays the drawing out (`penLayer.drawn`): what reads where items are reads it. */
 	const [penDrawn, setPenDrawn] = createSignal(0);
-	const editor = createStageEditor({
+	const editor = createCanvasEditor({
 		scene,
 		engine: tsSeam(penLayer),
 		mode: () => props.mode,
@@ -713,7 +713,7 @@ export function Stage(props: StageProps) {
 	 */
 	probes.cardAt = (x, y) => {
 		if (!element) return undefined;
-		const at = toWorld(ctl.now(), view(), stagePoint({ clientX: x, clientY: y } as MouseEvent));
+		const at = toWorld(ctl.now(), view(), viewPoint({ clientX: x, clientY: y } as MouseEvent));
 		const id = frameUnder(at, []);
 		const card = id ? penNode(id) : undefined;
 		if (!id || !card || !isCard(card)) return undefined;
@@ -909,7 +909,7 @@ export function Stage(props: StageProps) {
 								{ label: "Properties", hint: "drawer", run: () => setPropsOpen(true) },
 								{ label: "Duplicate", run: () => selection.penDuplicate() },
 								{ label: "Bring to front", run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
-								...(props.onComment ? [{ label: "Ask the agent", hint: "→", run: () => props.onComment?.({ path: props.stageName ? `canvases/${props.stageName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? "An item", anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
+								...(props.onComment ? [{ label: "Ask the agent", hint: "→", run: () => props.onComment?.({ path: props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? "An item", anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
 								{ label: "Delete", danger: true, run: () => selection.penDeleteSelected() },
 							]
 						: [
@@ -920,10 +920,10 @@ export function Stage(props: StageProps) {
 				}}
 			</Show>
 			<Show when={props.drawing && props.onPenEdit}>
-				<StageInk
+				<CanvasInk
 					camera={props.camera}
 					view={view()}
-					toStage={(event) => toWorld(ctl.now(), view(), stagePoint(event))}
+					toView={(event) => toWorld(ctl.now(), view(), viewPoint(event))}
 					strokes={inkStrokes}
 					layer={penLayer}
 					onEdit={(ops) => penEdit(ops)}

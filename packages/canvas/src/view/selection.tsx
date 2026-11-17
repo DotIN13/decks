@@ -9,7 +9,7 @@ import { setPenBoxes } from "../edit/pen-tools.ts";
 import { firstLine } from "../look/look.ts";
 import { parseMarkdown } from "../model/markdown.ts";
 import { walk, type PenNode } from "@decks/pen";
-import type { StageEngine } from "../render/engine.ts";
+import type { CanvasEngine } from "../render/engine.ts";
 import {
 	ANCHOR_OUT,
 	ANCHOR_PX,
@@ -29,27 +29,27 @@ import {
 	selectionFrame,
 	selectionOutlines,
 	type Overlay,
-	type StageEditor,
+	type CanvasEditor,
 	type tsScene,
 } from "../edit/dom/index.ts";
-import type { StageProps } from "./Stage.tsx";
+import type { CanvasViewProps } from "./CanvasView.tsx";
 
 /** What the selection's drawing needs of the stage around it. */
 type SelectionDeps = {
-	props: StageProps;
+	props: CanvasViewProps;
 	ctl: CameraController;
 	view: () => Viewport;
-	editor: StageEditor;
+	editor: CanvasEditor;
 	scene: ReturnType<typeof tsScene>;
-	penLayer: StageEngine;
+	penLayer: CanvasEngine;
 	/** Counted up each time the engine lays the drawing out. */
 	penDrawn: Accessor<number>;
-	/** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
-	/** Send the person's edits to the drawing (`Stage.tsx`, `penEdit`). */
+	/** Send the person's edits to the drawing (`CanvasView.tsx`, `penEdit`). */
 	penEdit: (ops: unknown[]) => void;
 	freshIds: (...also: string[]) => () => string;
-	/** An item as the file has it (`Stage.tsx`, `penNode`). */
+	/** An item as the file has it (`CanvasView.tsx`, `penNode`). */
 	penNode: (id: string) => PenNode | undefined;
 	/** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
 	pressHeld: Accessor<boolean>;
@@ -58,7 +58,7 @@ type SelectionDeps = {
 /**
  * What is drawn over the selection and under the pointer: outlines, handles, anchors, the hover,
  * grip, kin and distance boxes, the overlay they make together, and the pills over a board, drawn
- * items and the lasso, with what the pills do. Made inside `Stage`, after the editor, which it reads.
+ * items and the lasso, with what the pills do. Made inside `CanvasView`, after the editor, which it reads.
  */
 export function createSelection(deps: SelectionDeps) {
 	const { props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld } = deps;
@@ -276,7 +276,7 @@ export function createSelection(deps: SelectionDeps) {
 		return distancesOf({ editing: props.mode === "edit", alt: editor.altHeld(), busy: !!editor.gesture() || !!editor.pageDrag() || panning(), selection: penFrame(), over: picked ? undefined : over });
 	});
 
-	const stagePenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
+	const canvasPenPath = () => (props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : undefined);
 	/** A dragged arrow handle's dashed route, where it sits. */
 	const routeShown = editor.route;
 	/**
@@ -376,7 +376,7 @@ export function createSelection(deps: SelectionDeps) {
 												onComment: () =>
 													props.onComment?.({
 														// A drawn item is found by its canvas's file and its id (`CardComment.items`).
-														path: stagePenPath() ?? "the canvas",
+														path: canvasPenPath() ?? "the canvas",
 														items: items().ids,
 														quote: items().words,
 														title: items().name,
@@ -389,9 +389,9 @@ export function createSelection(deps: SelectionDeps) {
 										? {
 												ink: {
 													agent: props.inkAgent,
-													onDrawing: () => props.onInk?.({ action: "drawing", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
-													onCard: () => props.onInk?.({ action: "card", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
-													onSend: () => props.onInk?.({ action: "send", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
+													onDrawing: () => props.onInk?.({ action: "drawing", ids: items().ids, canvas: props.canvasName ?? "", box: items().box }),
+													onCard: () => props.onInk?.({ action: "card", ids: items().ids, canvas: props.canvasName ?? "", box: items().box }),
+													onSend: () => props.onInk?.({ action: "send", ids: items().ids, canvas: props.canvasName ?? "", box: items().box }),
 												},
 											}
 										: {}),
@@ -414,16 +414,16 @@ export function createSelection(deps: SelectionDeps) {
 						onOpen={() => pushCamera(frame([held().box]))}
 						ink={{
 							agent: props.inkAgent ?? "the agent",
-							onDrawing: () => props.onInk?.({ action: "drawing", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
-							onCard: () => props.onInk?.({ action: "card", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
-							onSend: () => props.onInk?.({ action: "send", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
+							onDrawing: () => props.onInk?.({ action: "drawing", ids: held().ids, canvas: props.canvasName ?? "", box: held().box }),
+							onCard: () => props.onInk?.({ action: "card", ids: held().ids, canvas: props.canvasName ?? "", box: held().box }),
+							onSend: () => props.onInk?.({ action: "send", ids: held().ids, canvas: props.canvasName ?? "", box: held().box }),
 						}}
 						// The rest of a selection's pill, acting on the lasso's strokes instead of the editor's pick.
 						{...(props.onComment
 							? {
 									onComment: () =>
 										props.onComment?.({
-											path: stagePenPath() ?? "the canvas",
+											path: canvasPenPath() ?? "the canvas",
 											items: held().ids,
 											quote: "",
 											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,

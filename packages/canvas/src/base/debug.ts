@@ -50,7 +50,7 @@ export interface Probes {
 	cardLists: number;
 	/** How many surfaces were made for each card, and how many times each mounted its file. */
 	made: Record<string, { surfaces: number; mounts: number }>;
-	/** The stage engine itself (`render/engine.ts`, `StageEngine`). */
+	/** The stage engine itself (`render/engine.ts`, `CanvasEngine`). */
 	rust?: unknown;
 	/** The engine's statistics, and what a drag carries as pictures. */
 	engine?: { stats(): Record<string, unknown>; readonly carried: { paths: Set<string> } & Record<string, unknown> } | undefined;

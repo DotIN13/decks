@@ -35,7 +35,7 @@
  * and keeps the grabbing cursor, and a board can no longer be dragged because the drag
  * gives way to what it takes for a second finger.
  *
- * So the sources release what they hold (`stage/input.ts` on teardown, `Stage` when
+ * So the sources release what they hold (`stage/input.ts` on teardown, `CanvasView` when
  * the window loses focus), and this file is the net under them, because a source that
  * has died cannot release anything:
  *

@@ -1,8 +1,8 @@
 import { probes } from "../../base/debug.ts";
 import { Show, For, createMemo, createRoot } from "solid-js";
 import { render } from "solid-js/web";
-import { createEditor } from "../../stage/editor.tsx";
-import type { Editor } from "../../stage/types.ts";
+import { createEditor } from "../../view/editor.tsx";
+import type { Editor } from "../../view/types.ts";
 import type { FrameChromeView } from "../chrome.ts";
 import { AgentCursor } from "../../ui/AgentCursor.tsx";
 import { openFrame } from "./boot.ts";

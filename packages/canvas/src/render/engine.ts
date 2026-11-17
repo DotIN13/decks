@@ -16,7 +16,7 @@ import type { PageEngine } from "@decks/stage";
 import { markMissing, saysMissing } from "../base/missing.ts";
 import { baseTheme, diff, isArrow, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../look/font-files.ts";
+import { fontFiles, isFallbackFamily, canvasFontNeeds, textNeeds, type FontFile, type FontNeed } from "../look/font-files.ts";
 import { iconUrl, parseIcon } from "../look/icons.ts";
 import { pictureAddress } from "../base/host.ts";
 import { Recovery } from "./recovery.ts";
@@ -25,7 +25,7 @@ import { boundsOf } from "../model/bounds.ts";
 import { docIndex, drawnNodes } from "../model/doc-index.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
-import { setStageWords, type Words } from "./measure.ts";
+import { setCanvasWords, type Words } from "./measure.ts";
 import { glideShifts, glideStep, shiftsFrom, type Shift } from "../edit/core/glide.ts";
 import type { DocEdits } from "../model/drawing.ts";
 import type { CardGeometry, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
@@ -169,7 +169,7 @@ type RootCard = Omit<CardGeometry, "order"> & { i: number };
 type RootLaid = { base: number; items: Array<[string, number]>; cards: RootCard[] };
 
 /**
- * The stage's drawing for `Stage.tsx`, with the same calls the CanvasKit sheet it replaced had
+ * The stage's drawing for `CanvasView.tsx`, with the same calls the CanvasKit sheet it replaced had
  * so the stage chooses between the two by one setting while this one is proved.
  */
 /** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */
@@ -184,7 +184,7 @@ function glidesWanted(): boolean {
 	return typeof matchMedia !== "function" || !matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export class StageEngine {
+export class CanvasEngine {
 	private page: PageEngine | undefined;
 	private worker: Worker | undefined;
 	private disposed = false;
@@ -429,7 +429,7 @@ export class StageEngine {
 		// Fonts already here go to both engines now; those still coming (asked for before the engine
 		// was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
 		this.giveFonts(this.fonts, false);
-		setStageWords(this.words);
+		setCanvasWords(this.words);
 		this.needFonts();
 		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontsPending > 0, docDue: !this.doc, pixels: pixelsFirst() });
 		this.postFonts(this.fonts);
@@ -456,7 +456,7 @@ export class StageEngine {
 		this.dropTileQueue();
 		this.worker?.terminate();
 		this.worker = undefined;
-		setStageWords(undefined, this.words);
+		setCanvasWords(undefined, this.words);
 		this.page?.free();
 		this.page = undefined;
 		this.picturesAsked.clear();
@@ -777,7 +777,7 @@ export class StageEngine {
 	}
 
 	/**
-	 * A gesture was let go and its edit sent (`Stage.tsx`, `settleGesture`). When the drawing that
+	 * A gesture was let go and its edit sent (`CanvasView.tsx`, `settleGesture`). When the drawing that
 	 * answers it arrives, what it lifted is put down: painted back into the worker's tiles, and drawn
 	 * here until they come (`landed`). Without this an item stayed lifted after its drop, drawn by
 	 * the page every frame and holding the worker to the screen's tiles. A new gesture first cancels it.
@@ -1004,12 +1004,12 @@ export class StageEngine {
 	}
 
 	/**
-	 * The canvas sits in the world (`Stage.tsx`), after the board pages, so it is placed in stage
+	 * The canvas sits in the world (`CanvasView.tsx`), after the board pages, so it is placed in stage
 	 * units at the rectangle it was drawn for and scaled by one over the zoom: the world's transform
 	 * undone, so it covers exactly the window.
 	 */
 	/**
-	 * Hold the canvas where it is while the scale moves (`Stage`, `holdStill`): the stage leaves the world
+	 * Hold the canvas where it is while the scale moves (`CanvasView`, `holdStill`): the stage leaves the world
 	 * where it is too, so the canvas keeps covering the window, and every frame draws the window at the
 	 * camera into it as before. Setting its transform at each step, even on a promised layer, made
 	 * Chromium rebuild its paint property tree and assign every layer on the page again, a frame's
@@ -1971,7 +1971,7 @@ export class StageEngine {
 		if (this.page || this.prefetched || !this.doc) return;
 		this.prefetched = true;
 		const doc = this.doc;
-		const files = fontFiles(stageFontNeeds(doc.children ?? [], doc, baseTheme(doc, this.scheme === "dark" ? "dark" : "light")));
+		const files = fontFiles(canvasFontNeeds(doc.children ?? [], doc, baseTheme(doc, this.scheme === "dark" ? "dark" : "light")));
 		this.fetchFonts(files);
 	}
 	private prefetched = false;
@@ -2153,7 +2153,7 @@ export class StageEngine {
 	}
 
 	/**
-	 * A picture of what a drag carries, for the ghost a drag over a card shows (`Stage.tsx`): the lifted
+	 * A picture of what a drag carries, for the ghost a drag over a card shows (`CanvasView.tsx`): the lifted
 	 * items drawn alone for one frame and copied off the canvas in the same task, then the stage drawn
 	 * whole again. `rect` is where they lay on screen before the drag; they are now the drag's offset on.
 	 */
@@ -2441,7 +2441,7 @@ export class StageEngine {
 		clearTimeout(this.fastTimer);
 		this.worker?.terminate();
 		this.worker = undefined;
-		setStageWords(undefined, this.words);
+		setCanvasWords(undefined, this.words);
 		this.page?.free();
 		this.page = undefined;
 		this.hits?.replaceChildren();

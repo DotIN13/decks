@@ -12,7 +12,7 @@ const EDGE_OUT_PX = COARSE ? 16 : 8;
 const EDGE_IN_PX = COARSE ? 6 : 4;
 
 /**
- * What the stage hands the slot of one placed item (`Stage`'s `frame` prop): a card, a document or
+ * What the stage hands the slot of one placed item (`CanvasView`'s `frame` prop): a card, a document or
  * an app.
  *
  * The stage decides where it is, whether it is awake and what its gestures do; the host adds what it

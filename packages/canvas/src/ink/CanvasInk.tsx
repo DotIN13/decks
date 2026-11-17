@@ -3,7 +3,7 @@ import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "./ink.ts";
 import { inkHex, inkItem } from "../model/ink.ts";
-import type { StageEngine } from "../render/engine.ts";
+import type { CanvasEngine } from "../render/engine.ts";
 import type { LiveInk, PenPreview } from "../render/types.ts";
 import { knobs } from "../base/debug.ts";
 import { scheme } from "../base/theme.ts";
@@ -33,13 +33,13 @@ const PALM_AFTER_MS = 500;
  * (`PALM_AFTER_MS`) does nothing at all, neither drawing nor moving the canvas. iPadOS turns away a
  * resting palm by itself.
  */
-export function StageInk(props: {
+export function CanvasInk(props: {
 	camera: Camera;
 	view: { width: number; height: number };
-	toStage: (event: PointerEvent) => { x: number; y: number };
+	toView: (event: PointerEvent) => { x: number; y: number };
 	/** The ink on the stage now, each stroke in stage pixels. */
 	strokes: () => InkStroke[];
-	layer: StageEngine;
+	layer: CanvasEngine;
 	/** A new stroke's pen item; the drawing's edit defines its colour's variable when it lacks it (`withDecksColors`). */
 	onEdit: (ops: unknown[]) => void;
 	newId: () => string;
@@ -409,7 +409,7 @@ export function StageInk(props: {
 		} catch {
 			/* a nicety: the stroke still ends on the sheet's own pointerup */
 		}
-		const point = props.toStage(event);
+		const point = props.toView(event);
 		const tool = inkTool();
 		// The button on the barrel, or the other end of the pen, erases whatever tool is in hand.
 		const rubber = event.pointerType === "pen" && (event.button === 5 || (event.buttons & 32) !== 0);
@@ -452,23 +452,23 @@ export function StageInk(props: {
 				const drawn = gesture;
 				if (drawn.straight) {
 					// A straightened stroke is a line from its start to the pen.
-					const point = props.toStage(event);
+					const point = props.toView(event);
 					drawn.points.splice(3, 3, point.x, point.y, 0.5);
 					paintLive(drawn);
 					return;
 				}
 				for (const sample of events) {
-					const point = props.toStage(sample);
+					const point = props.toView(sample);
 					drawn.points.push(point.x, point.y, pressureOf(sample));
 				}
-				const last = props.toStage(event);
+				const last = props.toView(event);
 				// Resting means staying within a few screen pixels; anything more starts the wait again.
 				if (Math.hypot(last.x - drawn.still.x, last.y - drawn.still.y) * zoom() > 3) rest(drawn, last.x, last.y);
 				paintLive(drawn);
 				return;
 			}
 			case "scale": {
-				const point = props.toStage(event);
+				const point = props.toView(event);
 				const { anchor, corner } = gesture;
 				// How far along the box's diagonal the pointer is: the shape is kept, whichever way it goes.
 				const diagonal = { x: corner.x - anchor.x, y: corner.y - anchor.y };
@@ -480,13 +480,13 @@ export function StageInk(props: {
 			}
 			case "erase":
 				for (const sample of events) {
-					const point = props.toStage(sample);
+					const point = props.toView(sample);
 					erase(gesture, point.x, point.y);
 				}
 				return;
 			case "lasso": {
 				for (const sample of events) {
-					const point = props.toStage(sample);
+					const point = props.toView(sample);
 					gesture.polygon.push(point.x, point.y);
 				}
 				const polygon = gesture.polygon;
@@ -496,7 +496,7 @@ export function StageInk(props: {
 				return;
 			}
 			case "move": {
-				const point = props.toStage(event);
+				const point = props.toView(event);
 				const dx = point.x - gesture.start.x;
 				const dy = point.y - gesture.start.y;
 				if (!gesture.moved && Math.hypot(dx, dy) * zoom() < 3) return;

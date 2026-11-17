@@ -33,7 +33,7 @@ export type PressFacts = {
 	/** `PointerEvent.button`: 0 the main one, 1 the middle. */
 	button: number;
 	target: PressTarget;
-	/** Whether the drawing can be edited here at all (`Stage`'s `onPenEdit`). */
+	/** Whether the drawing can be edited here at all (`CanvasView`'s `onPenEdit`). */
 	editable: boolean;
 	/** The draw tool is out: ink has the stage. */
 	drawing: boolean;

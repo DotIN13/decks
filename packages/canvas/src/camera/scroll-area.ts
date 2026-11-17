@@ -7,7 +7,7 @@ import type { Viewport } from "./camera.ts";
  * A pan is the browser scrolling the stage, on its compositor, with nothing of ours in the frame:
  * the pages, the drawing's sheet and everything else in the world move because the world sits in
  * the scrolled content. Our code hears of it afterwards, from the scroll event, and reads the
- * camera back from the scroll (`Stage.tsx`, `camera/controller.ts`, `scrolled`).
+ * camera back from the scroll (`CanvasView.tsx`, `camera/controller.ts`, `scrolled`).
  *
  * The content is a spacer `SIZE` wide and tall, and the world is placed in it at an origin: the
  * canvas point drawn at the middle of the spacer, `MIDDLE`. The zoom stays the world's own scale.

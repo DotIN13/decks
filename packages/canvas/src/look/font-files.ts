@@ -187,7 +187,7 @@ export function fontNeeds(nodes: readonly PenNode[], doc: PenDocument, theme: Th
  * monospace face too. Read the same way, so nothing is fetched here that the engine would not ask
  * for; anything the engine finds besides it fetches itself.
  */
-export function stageFontNeeds(nodes: readonly PenNode[], doc: PenDocument, theme: ThemeState): FontNeed[] {
+export function canvasFontNeeds(nodes: readonly PenNode[], doc: PenDocument, theme: ThemeState): FontNeed[] {
 	const needs: FontNeed[] = [];
 	for (const node of walk(nodes)) {
 		if (!["text", "note", "prompt", "context"].includes(node.type) || typeof node.content !== "string") continue;

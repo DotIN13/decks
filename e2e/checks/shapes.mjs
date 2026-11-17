@@ -173,7 +173,7 @@ const second = await until(() => shapesNow().find((n) => !had2.has(n.id)));
 say("a second shape, a Process", second?.metadata?.kind === "Process");
 // Select the first again, and draw from its bottom side to the second, once the page has drawn it.
 await until(() => canvas.evaluate((id) => !!window.__decksProbes?.penBox?.(id), second?.children?.[0]?.id));
-// A shape is clicked on its outline; the page says where it draws it (`__decksProbes.penBox`, `Stage.tsx`).
+// A shape is clicked on its outline; the page says where it draws it (`__decksProbes.penBox`, `CanvasView.tsx`).
 const first = await canvas.evaluate((id) => {
 	const r = window.__decksProbes?.penBox?.(id);
 	return r ? { x: r.x + r.width / 2, y: r.y + r.height / 3 } : undefined;

@@ -1,7 +1,7 @@
 /**
  * A slow two-finger diagonal pans along the fingers' line, not as a staircase.
  *
- * The stage pans by the wheel's own deltas (`Stage.tsx`, `onWheel`), and the browser keeps whole
+ * The stage pans by the wheel's own deltas (`CanvasView.tsx`, `onWheel`), and the browser keeps whole
  * pixels of each `scrollBy`: a trackpad's small steps (1.3 right and 0.9 down) lost their smaller
  * direction every step, so the pan went straight sideways until a step was big enough to move it.
  * The part below a pixel is carried to the next step now.

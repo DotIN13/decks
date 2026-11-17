@@ -1,5 +1,5 @@
 /**
- * The editor, as the stage (`canvas/Stage.tsx`) uses it: the one way in. `createStageEditor` puts
+ * The editor, as the stage (`view/CanvasView.tsx`) uses it: the one way in. `createCanvasEditor` puts
  * the state (`dom/controller.ts`), the pointer (`dom/pointer.ts`), the keys (`dom/keys.ts`), the
  * typing (`dom/TextEditing.tsx`) and the adding (`dom/InsertMenu.tsx`) together as one object; the
  * rest is what the stage still does with the editor's pieces itself (the overlay's parts, the ops
@@ -11,7 +11,7 @@ import { createKeys, type KeysHost } from "./keys.ts";
 import { createPointer, type Pointer, type PointerHost } from "./pointer.ts";
 import { createTextEditing, type TextHost } from "./TextEditing.tsx";
 
-export type StageEditorHost = Omit<EditorHost, "effects"> & {
+export type CanvasEditorHost = Omit<EditorHost, "effects"> & {
 	/** The page's side of the effects, but for the camera having been dragged, which the pointer keeps. */
 	effects: Omit<EditorHost["effects"], "panned">;
 	/** The pointer's host, but for what the typing and the adding answer themselves. */
@@ -22,7 +22,7 @@ export type StageEditorHost = Omit<EditorHost, "effects"> & {
 };
 
 /** The stage's editor: its state and what reads it, the pointer's handlers, the drawing's keys (`key`), the typing (`textEditing`) and the adding (`insert`). */
-export function createStageEditor(host: StageEditorHost) {
+export function createCanvasEditor(host: CanvasEditorHost) {
 	let pointer: Pointer | undefined;
 	const editor = createEditor({ ...host, effects: { ...host.effects, panned: () => pointer?.panned() } });
 	const text = createTextEditing(editor, { ...host.text, scene: host.scene, engine: host.engine, edit: host.onPenEdit, nextIds: host.nextIds });
@@ -47,7 +47,7 @@ export function createStageEditor(host: StageEditorHost) {
 	const keys = createKeys(editor, { ...host.keys, scene: host.scene, nextIds: host.nextIds, edit: host.onPenEdit });
 	return { ...editor, ...pointer, key: keys.key, textEditing: text, insert };
 }
-export type StageEditor = ReturnType<typeof createStageEditor>;
+export type CanvasEditor = ReturnType<typeof createCanvasEditor>;
 
 export type { Openers } from "./pointer.ts";
 export type { PageView } from "../../items/page-view.ts";

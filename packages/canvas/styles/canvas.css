@@ -15,7 +15,7 @@
 	 * the browser scrolling it on its compositor, with no frame of ours in the way. It used to be
 	 * `clip`, which cannot scroll, because the browser scrolls a scroll container to show a focused
 	 * caret and the camera did not know: a card opened for typing slid the stage up for good. Now
-	 * such a scroll is a scroll like any other, and the camera follows it (`Stage.tsx`, `onScroll`).
+	 * such a scroll is a scroll like any other, and the camera follows it (`CanvasView.tsx`, `onScroll`).
 	 * No bars, no rubber band, and no swipe back a page at an edge.
 	 */
 	overflow: scroll;
@@ -71,7 +71,7 @@
  * differ, at the edges of letters, because the layer is redrawn once the scale settles.
  *
  * Only while it is moving. A layer is a texture that has to be kept, and a deck of them
- * held forever is memory nobody asked for — `Stage.tsx` turns the attribute off 300ms
+ * held forever is memory nobody asked for — `CanvasView.tsx` turns the attribute off 300ms
  * after the last change of scale.
  *
  * Not in WebKit: `data-scaling` and `data-sliding` below are set only where `LAYERS` in
@@ -556,7 +556,7 @@
 	touch-action: none;
 }
 	/*
-	 * An SVG shown live (`Stage.tsx`, `liveFiles`): under the sheet, which draws a hole where it is. It
+	 * An SVG shown live (`CanvasView.tsx`, `liveFiles`): under the sheet, which draws a hole where it is. It
 	 * never takes the pointer: the stage picks, moves and sizes it as a drawn item.
 	 */
 	.world > .file-live {
@@ -656,7 +656,7 @@
 	pointer-events: none;
 }
 	/*
-	 * What the pointer is over, before a press (`Stage.tsx`): a thin line, thinner than a selection's,
+	 * What the pointer is over, before a press (`CanvasView.tsx`): a thin line, thinner than a selection's,
 	 * the way a design tool answers "what would I pick here". What an arrow's end would join, while it
 	 * is carried, is the same box drawn heavier with a wash inside.
 	 */
@@ -669,7 +669,7 @@
 	background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
 }
 	/* Where in a frame that stacks its children a drop would land: a line on that boundary. */
-	/* A card's block's grip, in the card's margin, to drag the block by (`Stage.tsx`, `gripBox`). */
+	/* A card's block's grip, in the card's margin, to drag the block by (`CanvasView.tsx`, `gripBox`). */
 	.world > .pen-grip {
 	position: absolute;
 	z-index: 3;
@@ -754,7 +754,7 @@
 	font-variant-numeric: tabular-nums;
 	pointer-events: none;
 }
-	/* The drawn item picked up in edit mode, and the box its words are edited in (`Stage.tsx`). */
+	/* The drawn item picked up in edit mode, and the box its words are edited in (`CanvasView.tsx`). */
 	.world > .pen-selection {
 	position: absolute;
 	border-radius: 4px;
@@ -825,7 +825,7 @@
 	}
 }
 	/*
-	 * The one film or sound playing, laid over the item it belongs to (`Stage.tsx`, `playingBox`).
+	 * The one film or sound playing, laid over the item it belongs to (`CanvasView.tsx`, `playingBox`).
 	 *
 	 * Over the sheet, under the selection outline and handles, so the item can still be moved and
 	 * sized while it plays. A sound keeps the item's own paper behind its controls; a film is black,
@@ -1027,7 +1027,7 @@
 	pointer-events: none;
 }
 	/*
-	 * The editor over a drawn item's words (`Stage.tsx`, `textLookOf`): its font, size, spacing,
+	 * The editor over a drawn item's words (`CanvasView.tsx`, `textLookOf`): its font, size, spacing,
 	 * padding and colours come from the item, so the words stay exactly where the canvas set them.
 	 * It grows with what is typed, the way the item will: a text across, a note or a card's title down.
 	 */
@@ -1330,7 +1330,7 @@
 	.pen-card-editor .pce-piece[data-kind="img"]:not(:has(img)) > span::before { content: "🖼 "; }
 	.pen-card-editor .pce-piece.pce-dragging { opacity: 0.3; }
 	/*
-	 * What a drag carries, over a card (`Stage.tsx`, `ghostShow`): a picture of it beside the pointer,
+	 * What a drag carries, over a card (`CanvasView.tsx`, `ghostShow`): a picture of it beside the pointer,
 	 * tilted, with the shadow a lifted thing has, as the card's own pieces ride (`.pce-ghost`). While it
 	 * shows, the selection's outline and handles stand aside.
 	 */

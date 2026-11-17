@@ -467,7 +467,7 @@ export class CanvasService {
 
 	/**
 	 * Whether an agent may move its own conversation to a canvas now (`view.goto`, `agent.update --canvas`),
-	 * as the browser says (`stage-ops.ts`, `goto`): in the background, or with nobody watching, it may; on
+	 * as the browser says (`view-ops.ts`, `goto`): in the background, or with nobody watching, it may; on
 	 * screen it may and the screen goes with it, unless the person is using the canvas, who is offered a
 	 * button instead (`offered`), which moves it when pressed. The move itself is the caller's to make.
 	 */

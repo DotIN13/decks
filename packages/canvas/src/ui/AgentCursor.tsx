@@ -12,7 +12,7 @@ import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
  *   working, and a dead arrow says it is not.
  * - **Act, 520 ms.** One ring out of the tip when it arrives somewhere — the only loud thing it
  *   does, so it means something.
- * - **Stay.** It is drawn one level up, on the stage (`Stage.tsx`), for as long as the agent is
+ * - **Stay.** It is drawn one level up, on the stage (`CanvasView.tsx`), for as long as the agent is
  *   working, so it glides from one board or drawn item to the next instead of leaving one and
  *   appearing on the other, and its name stays beside it.
  *

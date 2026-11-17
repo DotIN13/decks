@@ -2,7 +2,7 @@ import { life } from "./life.ts";
 import { baseTheme, CLIP_TYPE, clipFromHtml, clipHtml, clipItems, clipText, ids as idsOf, isArrow, parseClip, pastedItems, placements, walk, type Clip, type PenNode } from "@decks/pen";
 import { toWorld } from "../../camera/camera.ts";
 import { wordsSelectedInCards } from "../../items/card.ts";
-import type { CanvasHandle } from "../../stage/types.ts";
+import type { CanvasHandle } from "../../view/types.ts";
 
 /**
  * Copy, cut and paste of the canvas's items, in the canvas frame.

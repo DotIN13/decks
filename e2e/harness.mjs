@@ -374,7 +374,7 @@ export async function highlightMode(page) {
  */
 export async function liveZoom(page, { tries = 12 } = {}) {
 	const canvas = await canvasFrame(page);
-	// Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
+	// Below the live zoom a board has no node, only its picture (`CanvasView.tsx`): the stage lists them.
 	const boards = () => canvas.evaluate(() => window.__decksProbes?.cards?.().length ?? document.querySelectorAll(".card-node").length);
 	await canvas.waitForFunction(() => (window.__decksProbes?.cards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {

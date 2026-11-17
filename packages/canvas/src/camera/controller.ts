@@ -15,7 +15,7 @@ import { springCurve } from "./spring.ts";
  * signal once a frame. What the step is never does is reach anything else in the stage: whatever
  * reads the camera reads it from here.
  *
- * Moved out of `Stage.tsx` whole, its comments with it, so the stage keeps the drawing and the
+ * Moved out of `CanvasView.tsx` whole, its comments with it, so the stage keeps the drawing and the
  * boards and asks this for the camera.
  */
 interface CameraHost {

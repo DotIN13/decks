@@ -7,7 +7,7 @@ import { dismissMenus } from "@decks/ui";
 import type { Page, Camera, StageCall } from "@decks/protocol";
 import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
-import { runStageCall } from "../../camera/stage-ops.ts";
+import { runViewCall } from "../../camera/view-ops.ts";
 import { cardShot } from "../../items/card-surface.tsx";
 import { handsOn } from "../../camera/touched.ts";
 import { drawingFollower } from "./backend.ts";
@@ -106,17 +106,17 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
 	/*
 	 * An agent's `decks view …` on this canvas, from the stream: carried out as the page carries it out
-	 * for a canvas it holds (`stage-ops.ts`), and answered to the harness.
+	 * for a canvas it holds (`view-ops.ts`), and answered to the harness.
 	 */
-	const stageCall = (call: StageCall) => {
+	const viewCall = (call: StageCall) => {
 		if (call.op === "shot") return void shootCard(call);
 		let value: unknown;
 		try {
-			value = runStageCall(call, {
+			value = runViewCall(call, {
 				boards: () => untrack(pages) as Page[],
 				viewport: () => ({ width: innerWidth, height: innerHeight }),
 				focused: () => untrack(agent),
-				stageOnScreen: () => start.canvas.name,
+				canvasOnScreen: () => start.canvas.name,
 				setCamera: (to, options) => moveTo(to, options?.animate),
 				handsOn,
 				offerView: (from, to, selected, what) => ctx.setOffer({ agent: from, what, go: () => {
@@ -190,7 +190,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 			(message) => void ctx.presence?.hear(message),
 		);
 	else backend.follow((message) => {
-		if (message.type === "view.called") return stageCall(message.call);
+		if (message.type === "view.called") return viewCall(message.call);
 		if (message.type === "presence.changed") return void ctx.presence?.hear(message);
 		// An agent at work on a card: its cursor and outline, from the card's place on the drawing. What it
 		// draws on the canvas is marked from the drawing's own change instead (`edits` above).

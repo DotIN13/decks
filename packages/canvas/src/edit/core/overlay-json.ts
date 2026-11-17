@@ -6,7 +6,7 @@ import { anchorAt, draftBox, draftCurve, handleAt, pageHandleList, radiusInset, 
  * The overlay as the engine paints it (`stage_paint::overlay`): every outline, handle, guide, slot
  * and draft of `Overlay` as boxes, lines, paths and dots in canvas units, with the sizes the screen
  * needs in pixels (a handle is as big at 5% as at 400%). Written whenever the overlay or the zoom
- * changes, and handed to the engine as one JSON string (`StageEngine.setOverlay`); the DOM keeps
+ * changes, and handed to the engine as one JSON string (`CanvasEngine.setOverlay`); the DOM keeps
  * only the hit areas (`dom/OverlayLayer.tsx`, invisible under `[data-engine-overlays]`).
  */
 type OverlayStyle = {

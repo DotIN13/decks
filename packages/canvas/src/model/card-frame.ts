@@ -73,7 +73,7 @@ export const FILE_CARD_W = 320;
  * A file on the canvas as an item of its own, the way a file looks in a file browser: a picture of
  * it on top (a PDF's first page, an SVG, a web page as it opens), and under it a tile with its
  * kind's icon, its name and what it is. pen's own frames, rectangle, icon and text, marked as a
- * file (`FILE`), so pen.dev shows the same card, and a click opens the file (`Stage.tsx`).
+ * file (`FILE`), so pen.dev shows the same card, and a click opens the file (`CanvasView.tsx`).
  */
 export function fileCard(path: string, fresh: () => string, facts: { preview?: string; w?: number; h?: number; pages?: number; title?: string; url?: (path: string) => string } = {}): PenNode {
 	const name = path.split("/").pop() || path;
@@ -107,7 +107,7 @@ export function fileCard(path: string, fresh: () => string, facts: { preview?: s
  * An SVG shown live on the canvas, as itself, animations and all. In the stage file it is pen's own
  * rectangle filled with a picture of the file the server made, marked `decks.live-file` with the
  * file's deck path, so pen.dev and a zoomed-out canvas show the still, and the stage puts the real
- * image under a hole in the sheet where it is (`Stage.tsx`, file items). A web page is a board.
+ * image under a hole in the sheet where it is (`CanvasView.tsx`, file items). A web page is a board.
  */
 export { LIVE_FILE, isLiveFile };
 /** How wide an SVG lands on the canvas. */

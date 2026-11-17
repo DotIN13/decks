@@ -28,7 +28,7 @@ import type { PageView } from "../../items/page-view.ts";
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };
 
-/** What a double-click or a double tap opens, the page's (`Stage.tsx`): each answers whether it was one. */
+/** What a double-click or a double tap opens, the page's (`CanvasView.tsx`): each answers whether it was one. */
 export type Openers = {
 	/** A file shown live: a web page taken into, an SVG opened in a tab. */
 	liveFile: (id: string) => boolean;
@@ -51,7 +51,7 @@ export type PointerHost = {
 	element: () => HTMLElement;
 	/** Where a screen point is on the stage, from the camera now. */
 	worldAt: (event: Client) => Pt;
-	/** Whether the drawing can be edited here (`Stage`'s `onPenEdit`). */
+	/** Whether the drawing can be edited here (`CanvasView`'s `onPenEdit`). */
 	editable: () => boolean;
 	/** The draw tool is out. */
 	drawing: () => boolean;
@@ -82,7 +82,7 @@ export type PointerHost = {
 	keepTouch?: (event: PointerEvent) => void;
 	/** The camera dragged from this press (`decidePress`, `pan`). */
 	pan: (event: PointerEvent, how: { deselect: boolean; middle: boolean }) => void;
-	/** A tool armed: the item made from this press (`Stage`'s `penCreate`). */
+	/** A tool armed: the item made from this press (`CanvasView`'s `penCreate`). */
 	make: (event: PointerEvent, tool: Exclude<PenTool, "select">, at: Pt) => void;
 	/** When a tool last made an item. */
 	madeAt: () => number;

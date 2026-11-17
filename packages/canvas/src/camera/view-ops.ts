@@ -15,13 +15,13 @@ import { boxOf, fit } from "./camera.ts";
  * three lines.
  */
 
-export interface StageOpsHost {
+export interface ViewOpsHost {
 	boards(): Page[];
 	viewport(): { width: number; height: number };
 	/** Which conversation is on screen, so an op that moves the view can tell whose it is. */
 	focused(): string | undefined;
 	/** The canvas on this screen, by folder name. */
-	stageOnScreen?(): string | undefined;
+	canvasOnScreen?(): string | undefined;
 	/** Offer a button that moves that conversation to the canvas, and the screen with it (`view.goto` while the person is using the canvas). */
 	offerGoto?(agentId: string, stage: string): void;
 	/**
@@ -63,7 +63,7 @@ export interface StageOpsHost {
  * it to you when you open that chat. Returns the sentence to put in the agent's result, or
  * nothing when the agent asking is the one on screen and the op should simply happen.
  */
-function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string, what: "card" | "view" = "view"): { deferred: string } | undefined {
+function defer(call: StageCall, host: ViewOpsHost, camera: Camera, selected?: string, what: "card" | "view" = "view"): { deferred: string } | undefined {
 	/*
 	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
 	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
@@ -78,13 +78,13 @@ function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: s
 	return { deferred: "you are not the conversation on screen, so this view is waiting in your chat rather than moving the canvas" };
 }
 
-export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
+export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 	const args = (call.args ?? {}) as Record<string, unknown>;
 
 	switch (call.op) {
 		case "show": {
 			// A canvas named (`view.focus`) that is not the one on this screen: nothing here to move to.
-			if (typeof args.stage === "string" && host.stageOnScreen && host.stageOnScreen() !== args.stage) {
+			if (typeof args.stage === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.stage) {
 				return { shown: [], deferred: "the person's screen shows another canvas; decks view goto brings it to this one first" };
 			}
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
@@ -131,7 +131,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			if (typeof args.path !== "string") return { error: "reload needs a path" };
 			// Counted (`view.reload`): this page reloads the board only if its canvas shows it.
 			if (args.count === true) {
-				if (typeof args.stage === "string" && host.stageOnScreen && host.stageOnScreen() !== args.stage) return { pages: 0 };
+				if (typeof args.stage === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.stage) return { pages: 0 };
 				if (!host.boards().some((board) => board.path === args.path)) return { pages: 0 };
 				host.reload(args.path);
 				return { reloaded: args.path, pages: 1 };
@@ -152,7 +152,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			if (!call.agentId || call.agentId !== host.focused()) return { apply: true };
 			// The person moving it themselves (a call with their own token): nobody to ask.
 			if (args.person === true) return { apply: true, onScreen: true };
-			if (host.stageOnScreen?.() !== stage && host.handsOn?.()) {
+			if (host.canvasOnScreen?.() !== stage && host.handsOn?.()) {
 				host.offerGoto?.(call.agentId, stage);
 				return { offered: "the person is using the canvas, so they were offered a button to go to that one" };
 			}

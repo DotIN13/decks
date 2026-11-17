@@ -4,11 +4,11 @@
  */
 import type { PenDocument } from "@decks/pen";
 import { docIndex } from "../../model/doc-index.ts";
-import type { StageEngine } from "../../render/engine.ts";
+import type { CanvasEngine } from "../../render/engine.ts";
 import type { PageBox } from "../core/model.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 
-export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll" | "onLine" | "pageIdOf">, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
+export function tsScene(engine: Pick<CanvasEngine, "placed" | "bounds" | "pickAll" | "onLine" | "pageIdOf">, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
 	const found = (id: string) => {
 		const current = doc();
 		return current ? docIndex(current).get(id) : undefined;
@@ -28,7 +28,7 @@ export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll
 }
 
 /** What the editor tells the engine (`core/scene.ts`, `EngineSeam`), said to the TypeScript side of it. */
-export function tsSeam(engine: Pick<StageEngine, "preview" | "settle" | "carry" | "mark" | "shows" | "linkAt" | "muteText" | "setDoc">): EngineSeam {
+export function tsSeam(engine: Pick<CanvasEngine, "preview" | "settle" | "carry" | "mark" | "shows" | "linkAt" | "muteText" | "setDoc">): EngineSeam {
 	return {
 		preview: (changes) => engine.preview(changes),
 		settle: (landing) => engine.settle(landing),

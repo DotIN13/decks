@@ -9,18 +9,18 @@ import type { PenTool } from "../edit/pen-tools.ts";
 
 /*
  * The editor's types, apart from the code that makes it: what a host gives it and gets back
- * (`editor.tsx`, `createEditor`), and what the stage reports (`stage/Stage.tsx`).
+ * (`editor.tsx`, `createEditor`), and what the stage reports (`view/CanvasView.tsx`).
  * The frame's protocol and an app's chrome read these without importing either.
  */
 
-/** Where the stage's pictures of boards come from (`Stage`'s `shots`). */
+/** Where the stage's pictures of boards come from (`CanvasView`'s `shots`). */
 export interface CanvasShots {
 	/** The picture of a board or a card, as an address the sheet can fetch. */
 	picture(board: Pick<Page, "path" | "rev">, scheme: "light" | "dark"): string;
 }
 
-/** What a comment is about (`Stage`'s `onComment`). */
-export interface StageComment {
+/** What a comment is about (`CanvasView`'s `onComment`). */
+export interface CanvasComment {
 	path: string;
 	title: string;
 	quote: string;
@@ -124,7 +124,7 @@ export interface CanvasOptions {
 	/** The board selected on the canvas, or none. */
 	onSelect?: (path: string | undefined) => void;
 	/** Comment on a board or on drawn items (the comment buttons; absent: none). */
-	onComment?: (comment: StageComment) => void;
+	onComment?: (comment: CanvasComment) => void;
 	/** Export drawn items as a picture (the properties panel's export; absent: nothing happens). */
 	onExport?: (ids: string[], format?: "png" | "pdf") => void;
 	/**
@@ -138,7 +138,7 @@ export interface CanvasOptions {
 	 */
 	onDeleteCard?: (path: string) => boolean | void | Promise<boolean | void>;
 	/**
-	 * Ink selected, and the pill's Make a drawing, Make a card or Send pressed (`Stage`'s `onInk`): the host
+	 * Ink selected, and the pill's Make a drawing, Make a card or Send pressed (`CanvasView`'s `onInk`): the host
 	 * hands it to `inkAgent`, the agent on screen, by name; without either, the pill has no such actions.
 	 */
 	onInk?: (request: InkRequest) => void;

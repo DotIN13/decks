@@ -7,16 +7,16 @@ import { topBoxes } from "../model/boxes.ts";
 import { viewToPark } from "../camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "../camera/agent-views.ts";
 import { canvasBox } from "../camera/insets.ts";
-import type { StageEngine } from "../render/engine.ts";
+import type { CanvasEngine } from "../render/engine.ts";
 import { pagesAhead, pagesOf, createDrawing } from "../model/drawing.ts";
-import { stageMeasure } from "../render/measure.ts";
+import { canvasMeasure } from "../render/measure.ts";
 import type { DocEdits } from "../model/drawing.ts";
 import type { DrawingWriter } from "../render/types.ts";
 import { InkBar } from "../ui/InkBar.tsx";
 import { setCanvasScheme } from "../base/theme.ts";
 import { PenBar } from "../ui/PenBar.tsx";
 import { ItemSlot } from "../items/item-slot.tsx";
-import { Stage, type InkRequest, type StageComment } from "./Stage.tsx";
+import { CanvasView, type InkRequest, type CanvasComment } from "./CanvasView.tsx";
 import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "../ink/ink.ts";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../edit/pen-tools.ts";
 
@@ -85,7 +85,7 @@ export function createEditor(
 	paintScheme();
 
 	// Laid out with the stage engine's words, as the server lays its drawing out, so an edit shown ahead of it routes its arrows where the server will.
-	const drawing = createDrawing(first, { look, measure: stageMeasure, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
+	const drawing = createDrawing(first, { look, measure: canvasMeasure, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
 	/** What the drawing's own addresses are read against; a host that moves between canvases says so with `setDocument`. */
 	const [penBase, setPenBase] = createSignal(base);
 	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */
@@ -93,8 +93,8 @@ export function createEditor(
 	let glides = 0;
 	const { doc, edit, step, movePage, resizePage, removePage } = drawing;
 
-	/** The stage's engine, once the stage is made (`Stage` `onEngine`): the layout the handle answers from. */
-	let engine: StageEngine | undefined;
+	/** The stage's engine, once the stage is made (`CanvasView` `onEngine`): the layout the handle answers from. */
+	let engine: CanvasEngine | undefined;
 	const setCamera = (next: Camera) => {
 		setCameraSignal(next);
 		options.onCamera?.(next);
@@ -217,8 +217,8 @@ export function createEditor(
 	});
 	/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
-	const stageView = () => (
-		<Stage
+	const viewNode = () => (
+		<CanvasView
 			mode={mode()}
 			{...(options.pages?.onExtent ? { onExtent: options.pages.onExtent } : {})}
 			{...(options.pages?.onOpenLink ? { onOpenPage: options.pages.onOpenLink } : {})}
@@ -230,7 +230,7 @@ export function createEditor(
 			opening={{ get camera() {
 				return asked ?? opening;
 			} }}
-			{...(options.canvasName ? { stageName: options.canvasName() } : {})}
+			{...(options.canvasName ? { canvasName: options.canvasName() } : {})}
 			onTool={() => setPenTool("select")}
 			boards={pages}
 			pen={pen()}
@@ -261,13 +261,13 @@ export function createEditor(
 			onEngine={(made) => (engine = made)}
 		/>
 	);
-	const surface = () => stageView();
+	const surface = () => viewNode();
 	const root = () => (
 		<div class="decks-canvas app" data-mode={mode()}>
 			<div class="work">
 				<div class="surface" data-surface="stage">
 					<div class="surface-layer" data-layer="stage">
-						{stageView()}
+						{viewNode()}
 					</div>
 				</div>
 			</div>

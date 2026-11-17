@@ -4,7 +4,7 @@
  * A card is news when something changed it that the person has not read since (`items/news.ts`):
  * here, the person's own resize names them its writer, and the file changing after that, as an agent
  * or a script writing it would, makes it news. Selecting it in the canvas frame says it was read
- * (`Stage`'s `onRead`, the frame's `card.seen` on its line); the harness stamps it read and the frame's dot for it
+ * (`CanvasView`'s `onRead`, the frame's `card.seen` on its line); the harness stamps it read and the frame's dot for it
  * goes. Said once: a second selection of the same unchanged card sends nothing more.
  */
 import { API, asPerson, canvasFrame, deckState, open, read, resetStage, say, selectCard, settle, socket, write } from "../harness.mjs";

@@ -16,7 +16,7 @@
  *
  * - a **file** in the deck, attached with the paperclip or dropped on the bar, whose id is its path.
  *
- * Boards and items arrive by dragging the thing onto the input bar (`canvas/Stage.tsx`). They are
+ * Boards and items arrive by dragging the thing onto the input bar (`view/CanvasView.tsx`). They are
  * pills rather than typed text for the reason the comment is: what a mention stands for should
  * not have to be guessed back out of its label, and a thing you dragged is a thing you pointed
  * at, not a path you typed. A file was spelled `@path` in plain text; it is a pill now too, so

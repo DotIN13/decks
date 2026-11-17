@@ -125,7 +125,7 @@ behaviour Studio may now lean on.
   (`edited`, `pushEdits`). Studio's `harness-sync.test.ts` runs it against Studio's API and passes.
 - **`@decks/canvas`**: `FrameHostOptions.sheet` (the frame says a drawer opened over its foot, so
   the page's composer can make way), `CanvasOptions.world`, `CanvasHandle.itemBox`, and `tiles`
-  among the address parameters the frame passes on. `@decks/canvas/host` exports `StageEngine` by
+  among the address parameters the frame passes on. `@decks/canvas/host` exports `CanvasEngine` by
   name instead of the engine's whole surface; `PenBar` and `InkBar`, which Studio takes from it, are
   there as before. Inside the package `render/` split into `render/` and `look/`, `CardEditor` is in
   `cards/`, ink in `ink/`, `theme.ts` is at the root, and the 33 `__decks*` globals are two

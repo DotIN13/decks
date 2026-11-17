@@ -12,7 +12,7 @@ import { mode, selected, setMode, setSelected } from "../state/selection.ts";
 import { reportCameraSoon } from "./camera-report.ts";
 import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "./frame-handoffs.ts";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
-import type { StageComment } from "@decks/canvas";
+import type { CanvasComment } from "@decks/canvas";
 import type { createFileDrops } from "./files/drops.ts";
 import { rememberView } from "./heard/view.ts";
 import { openLinkedPage } from "./links.ts";
@@ -60,7 +60,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 	 * hands over: drafts for the composer, a card's agent calls, apps, uploads, views for other agents.
 	 */
 	/** The comment box, drawn here on the page where the frame says (`onComment`): its Send now is yours to send. */
-	const [commenting, setCommenting] = createSignal<StageComment>();
+	const [commenting, setCommenting] = createSignal<CanvasComment>();
 	/*
 	 * What the frame says is quoted and named is the frame's, so a card's script can write it: it is cut short
 	 * here, and the box shows the whole of what is left (`.comment-quote` scrolls rather than clamps), so what
