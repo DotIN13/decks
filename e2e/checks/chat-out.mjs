@@ -235,6 +235,23 @@ await drag(await gripOf(), { x: 700, y: 300 });
 	say("…and lands in it: the conversation is in the panel again, in the box it had", same(landed.docked, home) && !landed.float && !landed.slot && landed.out === "0", JSON.stringify({ docked: landed.docked, float: landed.float }));
 }
 
+// --- thrown from the far side of the canvas, down and to the left, it still goes home ------------------
+await drag(await gripOf(), { x: 1180, y: 160 });
+{
+	const there = await look();
+	const grip = await gripOf();
+	await page.mouse.move(grip.x, grip.y);
+	await page.mouse.down();
+	// Hard, towards the slot at the panel's foot, and let go at once: too far for a throw's carry to reach the panel.
+	for (let i = 1; i <= 4; i++) await page.mouse.move(grip.x - i * 45, grip.y + i * 18);
+	await page.mouse.up();
+	const flying = await look();
+	say("thrown hard at the panel from the far side of the canvas, it is not put away behind the edge: it glides to its slot", there.float.x > 900 && flying.stowed === null && !!flying.float && flying.snapping && same(flying.slot, home), JSON.stringify({ from: there.float.x, stowed: flying.stowed, snapping: flying.snapping, slot: flying.slot }));
+	await settle(page, 1200);
+	const landed = await look();
+	say("…and lands in it", same(landed.docked, home) && !landed.float && landed.out === "0", JSON.stringify({ docked: landed.docked, float: landed.float }));
+}
+
 // --- a double-click on the grip sends it home ------------------------------------------------------
 await drag(await gripOf(), { x: 900, y: 300 });
 say("taken out again", !!(await look()).float);

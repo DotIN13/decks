@@ -42,6 +42,14 @@ const LEAST = { w: 300, h: 220 };
 const MOST_W = 760;
 /** Where it stands when nothing says where it was put: under the top bar, a margin in from the canvas's right edge. */
 const HOME = { top: 68, right: 12 };
+/**
+ * A throw towards the side panel, from anywhere, goes home: leftwards at this many pixels a
+ * millisecond or more (under the 1.2 a throw at an edge takes, so none of those is left to put it
+ * away behind the panel), and no steeper than two down or up for one across, the slot being low in
+ * the panel.
+ */
+const HOME_THROW = 0.9;
+const HOME_SLOPE = 0.5;
 /** How much of it shows when it is put away behind an edge: its tab. */
 const STOW_TAB = 28;
 const SIZE_KEY = "decks.chatFloatSize";
@@ -127,13 +135,18 @@ export function createChatFloat(layout: ChatFloatLayout, { workBox, mountFloat }
 			return { x, y: top, w: canvas.x + canvas.w - x, h: canvas.h - top };
 		};
 		/*
-		 * A release goes home when the float, carried on by its throw, would rest with its grip over the
-		 * open side panel: let go there, or thrown at it from the canvas. The panel shows the slot, and
-		 * the float takes the slot's size as it glides in, so what arrives is what the panel then holds.
+		 * A release goes home, while the side panel is open, when the float would rest with its grip over
+		 * the panel (let go there, or carried there by its throw), and when it is thrown towards the
+		 * panel at all, from however far: a throw's carry is capped, so a hard one from across the canvas
+		 * fell short of the panel and was taken for a throw at the edge, which put it away behind the
+		 * panel's edge instead. The panel shows the slot, and the float takes the slot's size as it
+		 * glides in, so what arrives is what the panel then holds.
 		 */
-		const homeward = (thrown: Point) => {
+		const homeward = (thrown: Point, velocity: { vx: number; vy: number }) => {
 			const panel = panelOpen() ? shell()?.getBoundingClientRect() : undefined;
-			const go = !!panel && thrown.x + (work()?.left ?? 0) + el.offsetWidth / 2 < panel.right;
+			const lands = !!panel && thrown.x + (work()?.left ?? 0) + el.offsetWidth / 2 < panel.right;
+			const thrownAt = !!panel && -velocity.vx >= HOME_THROW && -velocity.vx >= Math.abs(velocity.vy) * HOME_SLOPE;
+			const go = lands || thrownAt;
 			setLanding(go);
 			if (go) wearSlot(el);
 			return go;

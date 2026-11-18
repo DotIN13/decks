@@ -74,7 +74,7 @@ export function createFloats() {
 	 * dock's own CSS does at home. `read` is what a drag then starts from, because the top
 	 * the float remembers is stale the moment the height changes.
 	 */
-	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }, disabled?: () => boolean, own: { box?: () => { x: number; y: number; w: number; h: number }; homeward?: (thrown: { x: number; y: number }) => boolean; onHome?: () => void } = {}) => {
+	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }, disabled?: () => boolean, own: { box?: () => { x: number; y: number; w: number; h: number }; homeward?: (thrown: { x: number; y: number }, velocity: { vx: number; vy: number }) => boolean; onHome?: () => void } = {}) => {
 		/* How tall the tab is (`--stowtab-h`, `shell.css`): a tucked float is only its tab. */
 		const tabHeight = () => parseFloat(getComputedStyle(el).getPropertyValue("--stowtab-h")) || 48;
 		let sized: { w: number; h: number } | undefined;
