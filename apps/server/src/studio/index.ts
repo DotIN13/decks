@@ -83,11 +83,20 @@ export function studioLink(deck: string, env: NodeJS.ProcessEnv = process.env): 
 
 /**
  * Sign out of Studio, from this harness's Settings: its key deleted, so the deck stops syncing and Studio
- * can ask for no more tokens, and every token given through it taken back at once. A key set by
+ * can ask for no more tokens, every token given through it taken back at once, and Studio told to
+ * forget this harness. A key set by
  * `DECKS_STUDIO_KEY` is not this harness's to delete: that throws, after the tokens are taken back.
  */
 export function unpairStudio(deck: string, tokens: TokenStore, env: NodeJS.ProcessEnv = process.env): { revoked: number } {
-	rmSync(join(deck, ".decks", "studio.json"), { force: true });
+	const file = join(deck, ".decks", "studio.json");
+	// Studio is told, with the key while it is still here: it forgets this harness, so one that signs in again is not listed twice, once dead. Not waited for, and not needed: signed out here is signed out.
+	try {
+		const saved = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { url?: string; key?: string }) : {};
+		if (saved.url && saved.key) void fetch(`${saved.url}/sync/v1/harness`, { method: "DELETE", headers: { Authorization: `Bearer ${saved.key}` }, signal: AbortSignal.timeout(5000) }).catch(() => undefined);
+	} catch {
+		// A file that does not read holds no key to say it with.
+	}
+	rmSync(file, { force: true });
 	const revoked = revokeStudioTokens(tokens, { paired: true });
 	if (env.DECKS_STUDIO_KEY) throw new Error("This harness's Studio key is set by DECKS_STUDIO_KEY: remove it there and restart to unpair.");
 	return { revoked };

@@ -146,6 +146,8 @@ export class CanvasService {
 	/** Sign the harness in to Decks Studio by a short code (`studio/login.ts`), and the code a sign-in is waiting on; set by the app. */
 	studioLogin: ((url?: string) => Promise<{ code: string; verify: string; expires: number }>) | undefined;
 	studioShowing: (() => { code?: { code: string; verify: string; expires: number }; failed?: string }) | undefined;
+	/** Sign the harness out of Studio as Settings does (`studio/index.ts`, `unpairStudio`); set by the app. */
+	studioSignOut: (() => void) | undefined;
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`canvas/shots.ts`). */

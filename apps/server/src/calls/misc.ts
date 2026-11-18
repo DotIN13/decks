@@ -90,7 +90,9 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 			},
 			disconnect: async () => {
 				if (!agent.person) throw new Error("Only the person can sign this harness out of Decks Studio.");
-				rmSync(join(service.deckPath(), ".decks", "studio.json"), { force: true });
+				// As Settings signs out: the key deleted, what Studio was given through it taken back, and Studio told.
+				if (service.studioSignOut) service.studioSignOut();
+				else rmSync(join(service.deckPath(), ".decks", "studio.json"), { force: true });
 				return { connected: false };
 			},
 		},

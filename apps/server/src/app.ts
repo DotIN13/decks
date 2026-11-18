@@ -19,7 +19,7 @@ import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { hostname } from "node:os";
-import { saveStudioLink, studioLink } from "./studio/index.ts";
+import { saveStudioLink, studioLink, unpairStudio } from "./studio/index.ts";
 import { Addresses } from "./studio/addresses.ts";
 import { StudioLogin, studioAddress } from "./studio/login.ts";
 import { CanvasShots } from "./canvas/shots.ts";
@@ -411,6 +411,14 @@ export class App {
 			return this.studioLogin.code(studioAddress(url));
 		};
 		this.stage.studioShowing = () => this.studioLogin.showing();
+		this.stage.studioSignOut = () => {
+			this.studioLogin.stop();
+			try {
+				unpairStudio(this.deck.path, this.tokens);
+			} finally {
+				this.send(this.pairingMessage());
+			}
+		};
 		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "harness.notice", level: "warn", text }));
 		this.acts = new Acts({
 			emit: (message) => this.send(message),

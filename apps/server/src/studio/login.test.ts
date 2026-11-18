@@ -30,6 +30,7 @@ async function fakeStudio() {
 	const devices = new Map<string, { challenge: string; typed: boolean }>();
 	const grants = new Map<string, string>();
 	const asked: { path: string; body: Record<string, unknown> }[] = [];
+	const signedOut: string[] = [];
 	const server: Server = createServer((req, res) => {
 		let text = "";
 		req.on("data", (chunk) => (text += chunk));
@@ -41,6 +42,10 @@ async function fakeStudio() {
 				res.end(JSON.stringify(value));
 			};
 			const proves = (challenge: string | undefined) => !!challenge && createHash("sha256").update(body.verifier ?? "").digest("base64url") === challenge;
+			if (req.url === "/sync/v1/harness" && req.method === "DELETE") {
+				signedOut.push(String(req.headers.authorization));
+				return say(200, {});
+			}
 			if (req.url === "/api/connect/device") {
 				const device = `dev-${devices.size + 1}`;
 				devices.set(device, { challenge: body.challenge!, typed: false });
@@ -66,6 +71,7 @@ async function fakeStudio() {
 	return {
 		base,
 		asked,
+		signedOut,
 		/** The person, signed in to Studio, whose page asks for a redirect's code for a challenge. */
 		grant: (challenge: string) => {
 			const code = `code-${grants.size + 1}`;
@@ -233,6 +239,8 @@ test("in the harness: Sign in to Studio from a tab on this machine answers an ad
 		// Signed out, then in again from a tab on another device: no redirect can come back here, so a short code.
 		assert.ok((await person("harness.unpair", [])).answer.ok);
 		assert.ok(!existsSync(file));
+		await until(() => studio.signedOut.length === 1);
+		assert.deepEqual(studio.signedOut, [`Bearer ${KEY}`], "Studio is told, with the key, so it forgets this harness");
 		const away = await person("harness.studioSignIn", [{ studio: studio.base, back: "https://mac.tail1.ts.net:8443" }]);
 		const code2 = (away.answer as { value: { shown: { code: string; verify: string } } }).value.shown;
 		assert.equal(code2.code, "ACDE-FGHJ");

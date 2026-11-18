@@ -503,9 +503,9 @@ export interface Verbs {
 	};
 	pair: {
 		/**
-		 * A pairing code for another Decks front end, such as Studio, or a terminal elsewhere (decks login
-		 * <code>), to connect to this harness with: six digits, ten minutes, once. Only on the harness's
-		 * own machine, where a terminal logs in with decks login and no code; Settings never shows one.
+		 * A pairing code for a Decks page on another site, or a terminal elsewhere (decks login <code>), to
+		 * connect to this harness with: six digits, ten minutes, once. Only on the harness's own machine,
+		 * where a terminal logs in with decks login and no code; Settings never shows one.
 		 */
 		code(): Promise<{ code: string; expires: number }>;
 	};

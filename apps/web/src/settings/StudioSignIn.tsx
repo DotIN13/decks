@@ -106,7 +106,7 @@ export function StudioGroup() {
 					<SetRow
 						lead={mark}
 						title={studio().account?.email ? `Signed in to Decks Studio as ${studio().account!.email}` : "Signed in to Decks Studio"}
-						sub={<span class="truncate">{studio().env ? `${hostOf(studio().url)} · its key is set by DECKS_STUDIO_KEY` : `${hostOf(studio().url)} · this deck syncs there, and its browsers are given an hour's token at a time`}</span>}
+						sub={studio().env ? `${hostOf(studio().url)} · its key is set by DECKS_STUDIO_KEY` : `${hostOf(studio().url)} · this deck syncs there`}
 					>
 						<Show when={!studio().env}>
 							<button class="sw-btn" type="button" data-tone="danger" data-studio="sign-out" title="Delete this harness's Studio key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("harness.unpair").then(warnIfFailed)}>
