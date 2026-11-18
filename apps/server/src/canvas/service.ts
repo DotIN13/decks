@@ -147,6 +147,8 @@ export class CanvasService {
 	studioLogin: ((url?: string) => Promise<{ url: string; studio: string; expires: number }>) | undefined;
 	studioCode: ((code: string) => Promise<{ url: string; account?: string }>) | undefined;
 	studioShowing: (() => { open?: { url: string; studio: string; expires: number }; failed?: string }) | undefined;
+	/** How far the deck is in step with Studio, as its sync last said; set by the app. */
+	studioSync: (() => import("@decks/protocol").StudioSyncRow | undefined) | undefined;
 	/** Sign the harness out of Studio as Settings does (`studio/index.ts`, `unpairStudio`); set by the app. */
 	studioSignOut: (() => void) | undefined;
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */

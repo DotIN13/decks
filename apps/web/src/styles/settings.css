@@ -607,6 +607,63 @@
 	.sw-studio-failed {
 		color: var(--v3-danger);
 	}
+	/* How far the deck is in step with Studio (`SyncRow`): a state, one line, a bar while files move, and the file moving now. */
+	.sw-sync-title::before {
+		content: "";
+		display: inline-block;
+		width: 7px;
+		height: 7px;
+		margin: 0 7px 1px 0;
+		border-radius: 50%;
+		background: var(--v3-fg3);
+		vertical-align: middle;
+	}
+	.sw-sync-title[data-state="synced"]::before {
+		background: #2f9e5b;
+	}
+	.sw-sync-title[data-state="syncing"]::before,
+	.sw-sync-title[data-state="connecting"]::before {
+		background: var(--v3-accent);
+		animation: sw-sync-pulse 1.2s ease-in-out infinite;
+	}
+	.sw-sync-title[data-state="held"]::before {
+		background: #d08a1e;
+	}
+	.sw-sync-title[data-state="offline"]::before {
+		background: var(--v3-danger);
+	}
+	@keyframes sw-sync-pulse {
+		50% {
+			opacity: 0.35;
+		}
+	}
+	.sw-sync-sub {
+		display: block;
+	}
+	.sw-sync-bar {
+		display: block;
+		height: 4px;
+		margin: 7px 0 2px;
+		overflow: hidden;
+		border-radius: 2px;
+		background: var(--v3-bg3);
+	}
+	.sw-sync-bar > span {
+		display: block;
+		height: 100%;
+		border-radius: 2px;
+		background: var(--v3-accent);
+		transition: width 0.3s var(--v3-ease);
+	}
+	.sw-sync-now {
+		display: block;
+		overflow: hidden;
+		color: var(--v3-fg3);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.sw-btn[data-tone="danger"]:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--v3-danger) 12%, transparent);
 		box-shadow: none;

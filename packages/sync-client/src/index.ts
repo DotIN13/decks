@@ -3,4 +3,5 @@
  * then `start()`. Nothing else in the harness needs to know; it reads and writes its folder as before.
  */
 export { conflictName, FULL_PASS_MS, HarnessSync, landingFor, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncOptions } from "./sync.ts";
+export type { SyncProgress } from "@decks/sync-protocol";
 export { HashCache, RECHECK_MS, sha256 } from "./hash-cache.ts";

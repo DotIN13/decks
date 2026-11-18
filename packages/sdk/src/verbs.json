@@ -4056,9 +4056,9 @@
   "group": "misc",
   "touches": "outside",
   "effect": "read",
-  "summary": "Whether this harness syncs with Decks Studio, with which, and as whom; or the address of the sign-in under way.",
+  "summary": "Whether this harness syncs with Decks Studio, with which, and as whom, and how far the deck is in step (`sync`, a sentence: syncing with what is done of what is due, in step since when, held, or not syncing and why); or the address of the sign-in under way.",
   "signature": "studio.status()",
-  "returns": "{ connected: boolean; url?: string; account?: string; signingIn?: string }",
+  "returns": "{ connected: boolean; url?: string; account?: string; sync?: string; signingIn?: string }",
   "params": []
  },
  {

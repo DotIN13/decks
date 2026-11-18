@@ -31,6 +31,28 @@ export interface StudioLinkRow {
 	url: string;
 	env?: true;
 	account?: { name: string; email: string };
+	/** How far the deck is in step with Studio, as the harness's sync last said (`@decks/sync-protocol` SyncProgress). */
+	sync?: StudioSyncRow;
+}
+
+/**
+ * How far a deck is in step with Studio (`@decks/sync-protocol`'s SyncProgress, repeated here so the page
+ * needs nothing of the sync's): the state, the work this pass found due and what of it is done, both
+ * ways, what is moving, and when everything was last in step.
+ */
+export interface StudioSyncRow {
+	state: "connecting" | "syncing" | "synced" | "held" | "offline";
+	canvases: { done: number; total: number };
+	files: { done: number; total: number };
+	bytes: { done: number; total: number };
+	sent: number;
+	received: number;
+	now?: { canvas: string; path?: string; up?: boolean };
+	syncedAt?: number;
+	heldUntil?: number;
+	error?: string;
+	skipped: number;
+	at: number;
 }
 
 /**

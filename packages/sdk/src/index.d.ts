@@ -499,10 +499,11 @@ export interface Verbs {
 		 */
 		code(code: string): Promise<{ connected: boolean; url: string; account?: string }>;
 		/**
-		 * Whether this harness syncs with Decks Studio, with which, and as whom; or the address of the
-		 * sign-in under way.
+		 * Whether this harness syncs with Decks Studio, with which, and as whom, and how far the deck is in
+		 * step (`sync`, a sentence: syncing with what is done of what is due, in step since when, held, or
+		 * not syncing and why); or the address of the sign-in under way.
 		 */
-		status(): Promise<{ connected: boolean; url?: string; account?: string; signingIn?: string }>;
+		status(): Promise<{ connected: boolean; url?: string; account?: string; sync?: string; signingIn?: string }>;
 		/** Sign out of Decks Studio: stop syncing and forget the key. Only the person can call it. */
 		disconnect(): Promise<{ connected: boolean }>;
 	};

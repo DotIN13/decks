@@ -158,3 +158,31 @@ export type HarnessSend = z.infer<typeof HarnessSend>;
 /** What a browser may send on its live socket: where its pointer is on a canvas (`cursor`, the older form), or where it is (`presence`). */
 export const LiveSend = z.union([z.object({ type: z.literal("cursor"), canvas: z.string(), x: z.number(), y: z.number() }), Presence.extend({ type: z.literal("presence") })]);
 export type LiveSend = z.infer<typeof LiveSend>;
+
+/**
+ * How far a harness's deck is in step with Studio, as the harness's sync says it (`HarnessSync.progress`):
+ * shown in the harness's Settings and, sent to `PUT /sync/v1/progress`, beside the harness in Studio.
+ *
+ * `state`: `connecting` before the first answer; `syncing` while a pass runs; `synced` when the last pass
+ * ended with nothing left to send; `held` while Studio asked for a wait (`heldUntil`); `offline` when
+ * Studio could not be reached or refused the key (`error` says which). `bytes` and `files` count the work
+ * this pass found due, both ways: done once a file is sent, taken, or found the same on both sides;
+ * `sent` and `received` are the bytes that moved. `canvases` counts the canvases this pass has finished.
+ * `now` is what is moving, `syncedAt` when everything was last in step, `skipped` the files left out
+ * (too big, or refused).
+ */
+export const SyncProgress = z.object({
+	state: z.enum(["connecting", "syncing", "synced", "held", "offline"]),
+	canvases: z.object({ done: z.number().int().min(0), total: z.number().int().min(0) }),
+	files: z.object({ done: z.number().int().min(0), total: z.number().int().min(0) }),
+	bytes: z.object({ done: z.number().min(0), total: z.number().min(0) }),
+	sent: z.number().min(0),
+	received: z.number().min(0),
+	now: z.object({ canvas: z.string().max(300), path: z.string().max(1000).optional(), up: z.boolean().optional() }).optional(),
+	syncedAt: z.number().optional(),
+	heldUntil: z.number().optional(),
+	error: z.string().max(500).optional(),
+	skipped: z.number().int().min(0),
+	at: z.number(),
+});
+export type SyncProgress = z.infer<typeof SyncProgress>;

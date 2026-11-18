@@ -1,5 +1,6 @@
 import Cloud from "lucide-solid/icons/cloud";
 import { createSignal, Show } from "solid-js";
+import type { StudioSyncRow } from "@decks/protocol";
 import { Icon } from "@decks/ui";
 import { pairing } from "../connections/backend.ts";
 import { notice } from "../state/notices.ts";
@@ -133,19 +134,98 @@ export function StudioGroup() {
 				}
 			>
 				{(studio) => (
-					<SetRow
-						lead={mark}
-						title={studio().account?.email ? `Signed in to Decks Studio as ${studio().account!.email}` : "Signed in to Decks Studio"}
-						sub={studio().env ? `${hostOf(studio().url)} · its key is set by DECKS_STUDIO_KEY` : `${hostOf(studio().url)} · this deck syncs there`}
-					>
-						<Show when={!studio().env}>
-							<button class="sw-btn" type="button" data-tone="danger" data-studio="sign-out" title="Delete this harness's Studio key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("harness.unpair").then(warnIfFailed)}>
-								Sign out
-							</button>
-						</Show>
-					</SetRow>
+					<>
+						<SetRow
+							lead={mark}
+							title={studio().account?.email ? `Signed in to Decks Studio as ${studio().account!.email}` : "Signed in to Decks Studio"}
+							sub={studio().env ? `${hostOf(studio().url)} · its key is set by DECKS_STUDIO_KEY` : `${hostOf(studio().url)} · this deck syncs there`}
+						>
+							<Show when={!studio().env}>
+								<button class="sw-btn" type="button" data-tone="danger" data-studio="sign-out" title="Delete this harness's Studio key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("harness.unpair").then(warnIfFailed)}>
+									Sign out
+								</button>
+							</Show>
+						</SetRow>
+						<Show when={studio().sync}>{(sync) => <SyncRow sync={sync()} />}</Show>
+					</>
 				)}
 			</Show>
 		</SetGroup>
+	);
+}
+
+/** "312 KB", "48 MB", "1.24 GB". */
+export function bytesWords(bytes: number): string {
+	if (bytes < 1e6) return `${Math.max(0, Math.round(bytes / 1e3))} KB`;
+	if (bytes < 1e9) return `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`;
+	return `${(bytes / 1e9).toFixed(2)} GB`;
+}
+
+const clock = (at: number) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+/**
+ * How far this deck is in step with Studio, under the signed-in row (`HarnessSync.progress`, told as it
+ * changes): syncing, with a bar for the work this pass found due and the file moving now; in step, and
+ * since when; held by Studio until a time; or not syncing, and why.
+ */
+export function SyncRow(props: { sync: StudioSyncRow }) {
+	const p = () => props.sync;
+	const share = () => (p().bytes.total > 0 ? Math.min(1, p().bytes.done / p().bytes.total) : p().files.total > 0 ? p().files.done / p().files.total : 0);
+	const moving = () => p().state === "syncing" || p().state === "held";
+	const title = () => {
+		switch (p().state) {
+			case "connecting":
+				return "Reaching Studio";
+			case "syncing":
+				// Every file due is done, and the cards' pictures are going up: they are not counted, so 100% would sit there.
+				return !p().files.total ? "Syncing: checking what changed" : share() >= 1 ? "Syncing: finishing" : `Syncing, ${Math.floor(share() * 100)}%`;
+			case "held":
+				return "Studio asked for a wait";
+			case "offline":
+				return "Not syncing";
+			case "synced":
+				return "In step with Studio";
+		}
+	};
+	const left = () => (p().skipped ? ` · ${p().skipped} ${p().skipped === 1 ? "file" : "files"} over 50 MB or refused, left out` : "");
+	const sub = () => {
+		const x = p();
+		if (x.state === "offline") return `${x.error ?? "Studio could not be reached."}${x.syncedAt ? ` Last in step at ${clock(x.syncedAt)}.` : ""} It tries again by itself.`;
+		if (x.state === "synced") return `${x.syncedAt ? `Since ${clock(x.syncedAt)}` : "Every canvas"}${x.canvases.total ? ` · ${x.canvases.total} ${x.canvases.total === 1 ? "canvas" : "canvases"} checked` : ""}${left()}`;
+		if (x.state === "connecting") return "The first pass starts once Studio answers.";
+		const done = x.files.total ? `${bytesWords(x.bytes.done)} of ${bytesWords(x.bytes.total)} · ${x.files.done} of ${x.files.total} files` : "";
+		const canvases = x.canvases.total ? `${x.canvases.done} of ${x.canvases.total} canvases` : "";
+		const until = x.state === "held" && x.heldUntil ? `The rest go at ${clock(x.heldUntil)}` : "";
+		return [done, canvases, until].filter(Boolean).join(" · ") + left();
+	};
+	const now = () => {
+		const at = p().now;
+		if (p().state !== "syncing" || !at) return "";
+		return at.path ? `${at.up === false ? "Taking" : "Sending"} ${at.canvas}/${at.path}` : `Comparing ${at.canvas}`;
+	};
+	return (
+		<SetRow
+			lead={<span class="sw-mark" data-empty />}
+			title={
+				<span class="sw-sync-title" data-state={p().state}>
+					{title()}
+				</span>
+			}
+			sub={
+				<>
+					<span class="sw-sync-sub">{sub()}</span>
+					<Show when={moving() && p().files.total > 0}>
+						<span class="sw-sync-bar" role="progressbar" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(share() * 100)}>
+							<span style={{ width: `${share() * 100}%` }} />
+						</span>
+					</Show>
+					<Show when={now()}>
+						<span class="sw-sync-now" title={now()}>
+							{now()}
+						</span>
+					</Show>
+				</>
+			}
+		/>
 	);
 }

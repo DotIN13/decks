@@ -4,7 +4,7 @@ import { closeOldShapes } from "./deck/old-shapes.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
-import type { Page, DeckState, RuntimeInfo, ServerMessage } from "@decks/protocol";
+import type { Page, DeckState, RuntimeInfo, ServerMessage, StudioSyncRow } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
 import { CardService } from "./cards/service.ts";
@@ -78,6 +78,8 @@ export class App {
 	readonly google: GoogleDocs;
 	/** This harness signing in to Decks Studio (`studio/login.ts`). */
 	readonly studioLogin: StudioLogin;
+	/** How far the deck is in step with Studio, as its sync last said; none while not signed in (`studio/index.ts`). */
+	private studioSync: StudioSyncRow | undefined;
 	/** Where this harness can be reached, for Studio's pages (`studio/addresses.ts`); `addressesChanged` says a new one to Studio. */
 	readonly addresses: Addresses;
 	addressesChanged?: () => void;
@@ -416,6 +418,7 @@ export class App {
 			return { url: got.url, ...(got.account.email ? { account: got.account.email } : {}) };
 		};
 		this.stage.studioShowing = () => this.studioLogin.showing();
+		this.stage.studioSync = () => this.studioSync;
 		this.stage.studioSignOut = () => {
 			this.studioLogin.stop();
 			try {
@@ -543,6 +546,12 @@ export class App {
 		this.accountList.startLimits();
 	}
 
+	/** The sync said how far the deck is in step with Studio: every Settings page hears it. */
+	studioSynced(progress: StudioSyncRow | undefined): void {
+		this.studioSync = progress;
+		this.send(this.pairingMessage());
+	}
+
 	/** The code on show and every front end holding a token, for Settings. */
 	pairingMessage(): ServerMessage {
 		// The code itself never goes to a browser: it is made and shown only by decks pair code.
@@ -554,7 +563,8 @@ export class App {
 		} catch {
 			// An address in the environment that is none: Settings shows no default, and a sign-in says what is wrong.
 		}
-		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio } : {}), ...(signIn.open || signIn.failed ? { studioSignIn: signIn } : {}), ...(studioAt ? { studioAt } : {}) };
+		const sync = studio && this.studioSync ? { sync: this.studioSync } : {};
+		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio: { ...studio, ...sync } } : {}), ...(signIn.open || signIn.failed ? { studioSignIn: signIn } : {}), ...(studioAt ? { studioAt } : {}) };
 	}
 
 	/**

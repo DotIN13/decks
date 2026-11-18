@@ -644,7 +644,7 @@ export const VERBS: readonly Verb[] = [
 		params: [],
 		result: obj({ code: str(), expires: num() }),
 	},
-	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, with which, and as whom; or the address of the sign-in under way.", params: [], result: obj({ connected: bool(), url: opt(str()), account: opt(str()), signingIn: opt(str()) }) },
+	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, with which, and as whom, and how far the deck is in step (`sync`, a sentence: syncing with what is done of what is due, in step since when, held, or not syncing and why); or the address of the sign-in under way.", params: [], result: obj({ connected: bool(), url: opt(str()), account: opt(str()), sync: opt(str()), signingIn: opt(str()) }) },
 	{ name: "studio.disconnect", group: "misc", ...outsideChange, summary: "Sign out of Decks Studio: stop syncing and forget the key. Only the person can call it.", params: [], result: obj({ connected: bool() }) },
 	{ name: "now", card: "frame", group: "misc", ...outsideRead, summary: "The time where the person is.", params: [], result: obj({ iso: str(), timezone: str(), words: str(), epoch: num() }, true) },
 ];

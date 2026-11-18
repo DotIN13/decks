@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
+import { syncWords } from "../studio/index.ts";
 
 /** Forwarded ports, the clock, and the link to Decks Studio. */
 export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "studio" | "pair"> {
@@ -87,11 +88,15 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 				const open = service.studioShowing?.().open;
 				const signingIn = open ? { signingIn: open.url } : {};
 				const file = join(service.deckPath(), ".decks", "studio.json");
-				if (process.env.DECKS_STUDIO_KEY) return { connected: true, url: process.env.DECKS_STUDIO_URL };
+				if (process.env.DECKS_STUDIO_KEY) {
+					const progress = service.studioSync?.();
+					return { connected: true, url: process.env.DECKS_STUDIO_URL, ...(progress ? { sync: syncWords(progress) } : {}) };
+				}
 				if (!existsSync(file)) return { connected: false, ...signingIn };
 				try {
 					const saved = JSON.parse(readFileSync(file, "utf8")) as { url?: string; key?: string; account?: { email?: string } };
-					return { connected: Boolean(saved.key), url: saved.url, ...(saved.account?.email ? { account: saved.account.email } : {}), ...signingIn };
+					const progress = saved.key ? service.studioSync?.() : undefined;
+					return { connected: Boolean(saved.key), url: saved.url, ...(saved.account?.email ? { account: saved.account.email } : {}), ...(progress ? { sync: syncWords(progress) } : {}), ...signingIn };
 				} catch {
 					return { connected: false, ...signingIn };
 				}

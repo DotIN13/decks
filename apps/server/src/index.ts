@@ -61,6 +61,8 @@ const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${confi
 	},
 	// Where this harness can be reached, said to Studio at each link and when a tab loads from somewhere new.
 	addresses: () => app.addresses.list(),
+	// How far the deck is in step with Studio: Settings shows it (`harness.paired`), as it changes.
+	progress: (progress) => app.studioSynced(progress),
 	// A drawing from Studio is written through the canvas store, as Studio's: every frame hears it at once, and it is not sent back up.
 	remote: {
 		write: (name, text, by) => {

@@ -67,6 +67,22 @@ export class HashCache {
 		return { hash, size: bytes.length, bytes };
 	}
 
+	/**
+	 * A file's size, and its hash when the cache still has it for that size and time, without reading it:
+	 * what a pass's plan counts its work by. Undefined when the file is not there.
+	 */
+	peek(full: string): { size: number; hash?: string } | undefined {
+		let st;
+		try {
+			st = statSync(full);
+		} catch {
+			return undefined;
+		}
+		if (!st.isFile()) return undefined;
+		const known = this.entries.get(full);
+		return known && known.size === st.size && known.mtimeMs === st.mtimeMs ? { size: st.size, hash: known.hash } : { size: st.size };
+	}
+
 	/** Remember a file sync has just written itself, so it is not read back to be hashed. */
 	wrote(full: string, hash: string) {
 		try {

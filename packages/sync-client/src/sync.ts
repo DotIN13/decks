@@ -6,7 +6,7 @@ import WebSocket from "ws";
 import { canvasFolder, ownerFolderBase, plainSegment, servedAs, SHARED_CANVASES, sharedName, sharedParts } from "@decks/hub/layout";
 import { HashCache, RECHECK_MS, sha256 as hashOf } from "./hash-cache.ts";
 
-import { LiveEvent, OWN_PARTS, type TokenGiven, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
+import { LiveEvent, OWN_PARTS, type SyncProgress, type TokenGiven, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
 
 // The rules a harness checks what a service sends against, from @decks/sync-protocol.
 export { safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking };
@@ -88,6 +88,11 @@ export interface SyncOptions {
 	 * another harness (`by.harness`). Said as Studio says it, by the canvas's name here.
 	 */
 	presence?: (name: string, event: Extract<LiveEvent, { type: "presence" }>) => void;
+	/**
+	 * How far the deck is in step with Studio, each time that changes (at most four times a second while
+	 * files move, at once when the state does): for Settings, and for Studio (`SyncProgress`).
+	 */
+	progress?: (progress: SyncProgress) => void;
 }
 
 interface CanvasState {
@@ -247,6 +252,15 @@ export class HarnessSync {
 	/** Which canvas a board picture in `.decks/thumbs` belongs to, by its file name's prefix. */
 	private thumbOwner = new Map<string, string>();
 
+	/** How far the deck is in step, said through `progress` (`SyncProgress`). */
+	private told: SyncProgress = { state: "connecting", canvases: { done: 0, total: 0 }, files: { done: 0, total: 0 }, bytes: { done: 0, total: 0 }, sent: 0, received: 0, skipped: 0, at: Date.now() };
+	/** The files this pass found due, by `<canvas>:<path>`, with their size: each counted done once, when it is dealt with. */
+	private due = new Map<string, number>();
+	/** Each canvas's bundle as the plan read it, so the pass that follows does not walk it again. */
+	private planned = new Map<string, Map<string, string>>();
+	private telling?: NodeJS.Timeout;
+	private toldAt = 0;
+
 	constructor(private readonly o: SyncOptions) {
 		this.file = join(o.deck, ".decks", "studio-sync.json");
 		this.bases = join(o.deck, ".decks", "sync");
@@ -303,6 +317,7 @@ export class HarnessSync {
 		const ms = Math.min(Math.max(seconds, 1), 3600) * 1000;
 		if (!this.holding(kind)) this.log(`Studio asked for no more ${kind} for ${Math.round(ms / 1000)} s: the rest go up then`);
 		this.held[kind] = Math.max(this.held[kind], Date.now() + ms);
+		this.say({ state: "held", heldUntil: Math.max(this.held.files, this.held.edits) }, true);
 		const at = Math.max(this.held.files, this.held.edits) - Date.now();
 		clearTimeout(this.resume);
 		this.resume = setTimeout(() => {
@@ -321,8 +336,10 @@ export class HarnessSync {
 		const key = `${name}:${path}`;
 		if (this.holding("files") || this.refusedFiles.get(key) === hash) return undefined;
 		try {
+			this.say({ now: { canvas: name, path, up: true } });
 			const answer = await this.call("PUT", `/sync/v1/canvases/${id}/files?path=${encodeURIComponent(path)}${base !== undefined ? `&base=${base}` : ""}`, undefined, bytes);
 			this.refusedFiles.delete(key);
+			this.say({ sent: this.told.sent + bytes.length });
 			return answer;
 		} catch (error) {
 			const { status, retryAfter } = error as { status?: number; retryAfter?: number };
@@ -368,7 +385,13 @@ export class HarnessSync {
 	}
 
 	private queue(work: () => Promise<void>): Promise<void> {
-		this.running = this.running.then(() => this.measured(work)).catch((error) => this.log(`pass failed: ${(error as Error).message}`));
+		this.running = this.running
+			.then(() => this.measured(work))
+			.then(() => this.settled())
+			.catch((error) => {
+				this.log(`pass failed: ${(error as Error).message}`);
+				this.say({ state: "offline", error: offlineWhy(error as Error), now: undefined }, true);
+			});
 		return this.running;
 	}
 
@@ -402,6 +425,7 @@ export class HarnessSync {
 
 	/** Everything: every canvas both ways, its files, pictures and the app list. */
 	private async pass() {
+		this.begin();
 		await this.hello();
 		this.fullDue = false;
 		const fresh = Date.now() - this.checkedAt >= RECHECK_MS;
@@ -427,6 +451,7 @@ export class HarnessSync {
 	/** Only what changed: the canvases Studio named, and those whose folder changed here. */
 	private async targeted() {
 		if (this.fullDue || !this.me) return this.pass();
+		this.begin();
 		const byId = new Map(Object.entries(this.state.canvases).map(([name, s]) => [s.id, name]));
 		const pens = new Set(this.dirtyPens);
 		const files = new Set(this.dirtyFiles);
@@ -455,12 +480,93 @@ export class HarnessSync {
 			if (!c) return this.pass();
 			if (pens.has(name)) await this.syncCanvas(name, c);
 			if (files.has(name)) {
+				this.plan([[name, c]]);
 				const remote = await this.syncCanvasFiles(name, c, false);
 				if (remote && c.role !== "view") await this.syncPictures(name, s.id, remote);
 			} else if (pictures.has(name) && c.role !== "view") await this.syncPictures(name, s.id);
 		}
 		await this.syncCanvasPictures();
 		this.save();
+	}
+
+	// ---- how far it is ----
+
+	/** How far the deck is in step with Studio, as last said. */
+	progress(): SyncProgress {
+		return { ...this.told, canvases: { ...this.told.canvases }, files: { ...this.told.files }, bytes: { ...this.told.bytes } };
+	}
+
+	/**
+	 * A pass starts: the counts start again from nothing. A pass held by Studio stays held until the
+	 * wait is over; one after a failure says syncing again at once.
+	 */
+	private begin() {
+		this.due.clear();
+		this.planned.clear();
+		const held = this.holding("files") || this.holding("edits");
+		// The deck not yet in step (a wait, a failure): what was done counts on, so the bar goes on from where it was rather than from nothing.
+		const on = this.told.state === "held" || this.told.state === "offline" || this.told.state === "syncing";
+		const files = on ? { done: this.told.files.done, total: this.told.files.done } : { done: 0, total: 0 };
+		const bytes = on ? { done: this.told.bytes.done, total: this.told.bytes.done } : { done: 0, total: 0 };
+		this.say({ state: held ? "held" : "syncing", canvases: { done: 0, total: 0 }, files, bytes, ...(on ? {} : { sent: 0, received: 0 }), now: undefined, error: undefined, ...(held ? {} : { heldUntil: undefined }) }, true);
+	}
+
+	/**
+	 * What the files of these canvases will cost this pass: every file of a canvas you may write whose
+	 * size or time differs from what was last agreed (by the hash cache, without reading it), or that
+	 * Studio has not agreed on at all. Read once here, and the pass takes the same bundle.
+	 */
+	private plan(canvases: [string, SyncCanvas][]) {
+		for (const [name, c] of canvases) {
+			const s = this.state.canvases[name];
+			if (!s || c.role === "view") continue;
+			const local = this.bundle(name);
+			this.planned.set(name, local);
+			for (const [path, deckPath] of local) {
+				const seen = this.hashes.peek(join(this.o.deck, deckPath));
+				if (!seen || seen.size > MAX_BYTES) continue;
+				if (seen.hash && s.files[path]?.hash === seen.hash) continue;
+				this.owe(`${name}:${path}`, seen.size);
+			}
+		}
+	}
+
+	/** A file joins the work due. */
+	private owe(key: string, size: number) {
+		if (this.due.has(key)) return;
+		this.due.set(key, size);
+		this.say({ files: { done: this.told.files.done, total: this.told.files.total + 1 }, bytes: { done: this.told.bytes.done, total: this.told.bytes.total + size } });
+	}
+
+	/** A file due is dealt with: sent, taken, found the same, or left out. */
+	private paid(key: string) {
+		const size = this.due.get(key);
+		if (size === undefined) return;
+		this.due.delete(key);
+		this.say({ files: { done: this.told.files.done + 1, total: this.told.files.total }, bytes: { done: this.told.bytes.done + size, total: this.told.bytes.total } });
+	}
+
+	/** A pass ended without failing: in step, unless Studio asked for a wait and something waits for it. */
+	private settled() {
+		if (this.holding("files") || this.holding("edits")) return this.say({ state: "held", now: undefined, heldUntil: Math.max(this.held.files, this.held.edits) }, true);
+		this.say({ state: "synced", now: undefined, heldUntil: undefined, error: undefined, syncedAt: Date.now(), skipped: this.skipped.size }, true);
+	}
+
+	/** Change what is said; told through `progress` at once when the state changes, else at most every 250 ms. */
+	private say(change: Partial<SyncProgress>, now = false) {
+		const before = this.told.state;
+		const next = { ...this.told, ...change, at: Date.now() };
+		for (const key of Object.keys(change) as (keyof SyncProgress)[]) if (change[key] === undefined) delete next[key];
+		this.told = next;
+		if (!this.o.progress || this.stopped) return;
+		const tell = () => {
+			clearTimeout(this.telling);
+			this.telling = undefined;
+			this.toldAt = Date.now();
+			this.o.progress?.(this.progress());
+		};
+		if (now || next.state !== before || Date.now() - this.toldAt >= 250) return tell();
+		this.telling ??= setTimeout(tell, 250 - (Date.now() - this.toldAt));
 	}
 
 	// ---- where things are ----
@@ -631,6 +737,7 @@ export class HarnessSync {
 			// One of yours that someone else may edit too: the harness runs no app inside it (`canvas/pens.ts`, `yoursAlone`).
 			else this.writeMeta(name, { othersEdit: c.othersEdit === true });
 			this.latest.set(c.id, Math.max(this.latest.get(c.id) ?? 0, c.rev));
+			this.say({ now: { canvas: name } });
 			await this.syncCanvas(name, c);
 			synced.push([name, c]);
 		}
@@ -641,8 +748,11 @@ export class HarnessSync {
 		 * a canvas in Studio takes from the harness while one is in reach).
 		 */
 		const lists = new Map<string, Map<string, SyncFile>>();
+		this.plan(synced);
+		this.say({ canvases: { done: 0, total: synced.length } }, true);
 		for (const [name, c] of synced) {
 			const remote = await this.syncCanvasFiles(name, c, fresh);
+			this.say({ canvases: { done: this.told.canvases.done + 1, total: synced.length } });
 			if (!remote) continue;
 			lists.set(name, remote);
 			if (c.role !== "view" && !remote.has(`${PICTURES}/canvas.light.jpg`)) this.pictureDue.add(name);
@@ -1005,8 +1115,14 @@ export class HarnessSync {
 		if (!s) return undefined;
 		const writable = c.role !== "view";
 		const remote = new Map<string, SyncFile>(((await this.call("GET", `/sync/v1/canvases/${s.id}/files`)).files as SyncFile[]).map((f) => [f.path, f]));
-		const local = this.bundle(name);
+		const local = this.planned.get(name) ?? this.bundle(name);
+		this.planned.delete(name);
 		const known = s.files;
+		// What comes down is known only now, from Studio's list: it joins the work due.
+		for (const [path, f] of remote) {
+			if (path.startsWith(`${PICTURES}/`) || local.has(path) || f.size > MAX_BYTES || known[path]?.hash === f.hash) continue;
+			this.owe(`${name}:${path}`, f.size);
+		}
 		/*
 		 * Deleted on one side, from a file both last agreed on: gone from the folder, it is deleted in
 		 * Studio (unless Studio's copy is newer, which then comes back); gone from Studio and unchanged
@@ -1040,38 +1156,13 @@ export class HarnessSync {
 			}
 		}
 		for (const [path, deckPath] of local) {
-			const full = join(this.o.deck, deckPath);
-			const got = this.hashes.hash(full, fresh);
-			if (!got) continue;
-			const hash = got.hash;
-			const was = known[path];
-			const there = remote.get(path);
-			if (was?.hash === hash && (!there || there.version === was.version)) continue;
-			if (there && there.hash === hash) {
-				known[path] = { version: there.version, hash };
-				continue;
+			// A file Studio's wait kept back is still due: the pass after the wait sends it, and counts it then.
+			let dealt = true;
+			try {
+				dealt = await this.syncLocalFile(name, s, path, deckPath, remote, known, writable, fresh);
+			} finally {
+				if (dealt) this.paid(`${name}:${path}`);
 			}
-			// Unchanged here and newer there, or a canvas only shared with you to view: Studio's copy comes down.
-			if (there && (was?.hash === hash || !writable)) {
-				await this.download(name, path, there);
-				continue;
-			}
-			if (!writable) continue;
-			if (got.size > MAX_BYTES) {
-				this.skipped.add(`${name}:${path}`);
-				continue;
-			}
-			const bytes = got.bytes ?? readFileSync(full);
-			/*
-			 * Both have the file, differently, and no version was agreed on (a folder adopted, a state lost):
-			 * a conflict before anything is sent, Studio's copy staying current. With a base, the put says
-			 * whether Studio moved on since: current when not, a conflict when it did.
-			 */
-			const base = was?.version ?? (there ? 0 : undefined);
-			const put = await this.upload(name, s.id, path, bytes, hash, base);
-			if (!put) continue;
-			if (put.current) known[path] = { version: put.version, hash };
-			else await this.conflicted(name, s, path, full, bytes, hash, put.version, remote.get(path)!);
 		}
 		for (const [path, f] of remote) {
 			if (path.startsWith(`${PICTURES}/`) || local.has(path)) continue;
@@ -1079,9 +1170,51 @@ export class HarnessSync {
 				this.skipped.add(`${name}:${path}`);
 				continue;
 			}
-			await this.download(name, path, f);
+			try {
+				await this.download(name, path, f);
+			} finally {
+				this.paid(`${name}:${path}`);
+			}
 		}
+		this.say({ skipped: this.skipped.size });
 		return remote;
+	}
+
+	/** One file of a canvas's folder against Studio's list: agreed, taken from Studio, sent, or a conflict; false when Studio's wait kept it back. */
+	private async syncLocalFile(name: string, s: CanvasState, path: string, deckPath: string, remote: Map<string, SyncFile>, known: CanvasState["files"], writable: boolean, fresh: boolean): Promise<boolean> {
+		const full = join(this.o.deck, deckPath);
+		const got = this.hashes.hash(full, fresh);
+		if (!got) return true;
+		const hash = got.hash;
+		const was = known[path];
+		const there = remote.get(path);
+		if (was?.hash === hash && (!there || there.version === was.version)) return true;
+		if (there && there.hash === hash) {
+			known[path] = { version: there.version, hash };
+			return true;
+		}
+		// Unchanged here and newer there, or a canvas only shared with you to view: Studio's copy comes down.
+		if (there && (was?.hash === hash || !writable)) {
+			await this.download(name, path, there);
+			return true;
+		}
+		if (!writable) return true;
+		if (got.size > MAX_BYTES) {
+			this.skipped.add(`${name}:${path}`);
+			return true;
+		}
+		const bytes = got.bytes ?? readFileSync(full);
+		/*
+		 * Both have the file, differently, and no version was agreed on (a folder adopted, a state lost):
+		 * a conflict before anything is sent, Studio's copy staying current. With a base, the put says
+		 * whether Studio moved on since: current when not, a conflict when it did.
+		 */
+		const base = was?.version ?? (there ? 0 : undefined);
+		const put = await this.upload(name, s.id, path, bytes, hash, base);
+		if (!put) return !this.holding("files");
+		if (put.current) known[path] = { version: put.version, hash };
+		else await this.conflicted(name, s, path, full, bytes, hash, put.version, remote.get(path)!);
+		return true;
 	}
 
 	/**
@@ -1116,7 +1249,9 @@ export class HarnessSync {
 			this.skipped.add(`${name}:${path}`);
 			return;
 		}
+		this.say({ now: { canvas: name, path, up: false } });
 		const bytes = await this.call("GET", `/sync/v1/blobs/${encodeURIComponent(f.hash)}`);
+		this.say({ received: this.told.received + bytes.length });
 		mkdirSync(dirname(landing.full), { recursive: true });
 		writeFileSync(landing.full, bytes);
 		this.hashes.wrote(landing.full, hashOf(bytes));
@@ -1466,6 +1601,7 @@ export class HarnessSync {
 		clearTimeout(this.pending);
 		clearInterval(this.timer);
 		clearTimeout(this.resume);
+		clearTimeout(this.telling);
 		for (const w of this.watchers) w.close();
 		this.ws?.close();
 		await this.running;
@@ -1503,4 +1639,11 @@ function loosely(doc: PenDocument, edits: readonly PenEdit[]): PenDocument {
 		}
 		return out;
 	}
+}
+
+/** Why a pass failed, in words for Settings and Studio: Studio not reached, the key refused, or what Studio said. */
+function offlineWhy(error: Error & { status?: number }): string {
+	if (error.status === 401) return "Studio refused this harness's key: sign in again.";
+	if (error.status === undefined) return "Studio could not be reached.";
+	return `Studio answered ${error.status}.`.slice(0, 500);
 }

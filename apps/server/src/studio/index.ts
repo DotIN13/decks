@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import type { PenEdit } from "@decks/pen";
-import { HarnessSync, type SyncOptions } from "@decks/sync-client";
+import { HarnessSync, type SyncOptions, type SyncProgress } from "@decks/sync-client";
 import type { TokenStore } from "../auth/tokens.ts";
 import { DEFAULT_STUDIO, type StudioAccount } from "./login.ts";
 
@@ -18,8 +18,8 @@ import { DEFAULT_STUDIO, type StudioAccount } from "./login.ts";
  */
 export interface StudioLink {
 	stop(): Promise<void>;
-	/** Whether a sync is running, and to where. */
-	status(): { connected: boolean; url?: string };
+	/** Whether a sync is running, to where, and how far the deck is in step. */
+	status(): { connected: boolean; url?: string; sync?: SyncProgress };
 	/** An edit made here, as the canvas store logged it: sent up at once for a canvas on Studio (`HarnessSync.edited`). */
 	edited(name: string, change: { edits: readonly PenEdit[]; by: { kind: string; id?: string } }): void;
 	/** Where someone on this harness is on a canvas, for everyone else on it through Studio (`HarnessSync.presence`). */
@@ -139,7 +139,7 @@ export function startStudio(
 	harness?: string,
 	inventory?: SyncOptions["inventory"],
 	harnessToken?: SyncOptions["harnessToken"],
-	link: Pick<SyncOptions, "issueToken" | "unlinked" | "remote" | "presence"> & { addresses?: () => string[] } = {},
+	link: Pick<SyncOptions, "issueToken" | "unlinked" | "remote" | "presence"> & { addresses?: () => string[]; progress?: (progress: SyncProgress | undefined) => void } = {},
 ): StudioLink {
 	const file = join(deck, ".decks", "studio.json");
 	let sync: HarnessSync | undefined;
@@ -166,9 +166,17 @@ export function startStudio(
 		current = id;
 		await sync?.stop();
 		sync = undefined;
+		told.stop();
+		link.progress?.(undefined);
 		if (!want) return;
-		const { addresses: _addresses, ...syncLink } = link;
-		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}), ...(inventory ? { inventory } : {}), ...(harnessToken ? { harnessToken } : {}), ...syncLink });
+		const { addresses: _addresses, progress: _progress, ...syncLink } = link;
+		const linked = want;
+		// How far the deck is in step: to Settings at once, and to Studio by the key (`progressTeller`).
+		const progress = (now: SyncProgress) => {
+			link.progress?.(now);
+			told.tell(linked, now);
+		};
+		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}), ...(inventory ? { inventory } : {}), ...(harnessToken ? { harnessToken } : {}), ...syncLink, progress });
 		sync.start().catch((error) => console.error(`[decks] studio: ${(error as Error).message}`));
 		void report();
 	};
@@ -196,6 +204,7 @@ export function startStudio(
 		}
 	};
 
+	const told = progressTeller();
 	void apply();
 	if (!env.DECKS_STUDIO_KEY) {
 		try {
@@ -213,11 +222,82 @@ export function startStudio(
 		async stop() {
 			watcher?.close();
 			clearTimeout(reporting);
+			told.stop();
 			await sync?.stop();
 		},
 		report: () => void report(),
-		status: () => ({ connected: Boolean(sync), url: current ? current.split(" ")[0] : undefined }),
+		status: () => ({ connected: Boolean(sync), url: current ? current.split(" ")[0] : undefined, ...(sync ? { sync: sync.progress() } : {}) }),
 		edited: (name, change) => sync?.edited(name, change),
 		presence: (name, message) => sync?.presence(name, message),
 	};
+}
+
+/**
+ * How far the deck is in step, told to Studio by the key (`PUT /sync/v1/progress`), so Studio can show it
+ * beside the harness: at once when the state changes, else at most every two seconds while files move,
+ * the last word always sent. A Studio from before it kept progress answers 404, and is told nothing more
+ * on that link; one out of reach hears the next change.
+ */
+export const PROGRESS_EVERY_MS = 2_000;
+
+function progressTeller() {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let lastAt = 0;
+	let lastState = "";
+	let waiting: { link: { url: string; key: string }; progress: SyncProgress } | undefined;
+	const deaf = new Set<string>();
+	const send = () => {
+		clearTimeout(timer);
+		timer = undefined;
+		const one = waiting;
+		waiting = undefined;
+		if (!one || deaf.has(one.link.key)) return;
+		lastAt = Date.now();
+		lastState = one.progress.state;
+		void fetch(`${one.link.url}/sync/v1/progress`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${one.link.key}` }, body: JSON.stringify(one.progress) })
+			.then(async (response) => {
+				await response.arrayBuffer().catch(() => undefined);
+				if (response.status === 404) deaf.add(one.link.key);
+			})
+			.catch(() => {
+				/* Studio out of reach: the sync says offline itself, and the next change is told */
+			});
+	};
+	return {
+		tell(link: { url: string; key: string }, progress: SyncProgress) {
+			waiting = { link, progress };
+			if (progress.state !== lastState || Date.now() - lastAt >= PROGRESS_EVERY_MS) return send();
+			timer ??= setTimeout(send, PROGRESS_EVERY_MS - (Date.now() - lastAt));
+			timer.unref?.();
+		},
+		stop() {
+			clearTimeout(timer);
+			timer = undefined;
+			waiting = undefined;
+			lastState = "";
+		},
+	};
+}
+
+/** How far the deck is in step, as a sentence: for `decks studio status`, read by agents and people at a terminal. */
+export function syncWords(p: SyncProgress, now = Date.now()): string {
+	const mb = (bytes: number) => (bytes < 1e6 ? `${Math.max(0, Math.round(bytes / 1e3))} KB` : bytes < 1e9 ? `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB` : `${(bytes / 1e9).toFixed(2)} GB`);
+	const clock = (at: number) => new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+	const left = p.skipped ? `; ${p.skipped} ${p.skipped === 1 ? "file is" : "files are"} left out (over 50 MB, or refused)` : "";
+	switch (p.state) {
+		case "connecting":
+			return "Reaching Studio.";
+		case "offline":
+			return `Not syncing: ${p.error ?? "Studio could not be reached."}${p.syncedAt ? ` Last in step at ${clock(p.syncedAt)}.` : ""}`;
+		case "held":
+			return `Studio asked for a wait${p.heldUntil && p.heldUntil > now ? ` until ${clock(p.heldUntil)}` : ""}: ${mb(p.bytes.done)} of ${mb(p.bytes.total)} done, the rest go then${left}.`;
+		case "synced":
+			return `In step with Studio${p.syncedAt ? ` since ${clock(p.syncedAt)}` : ""}${left}.`;
+		case "syncing": {
+			const moving = p.now?.path ? `, now ${p.now.up === false ? "taking" : "sending"} ${p.now.canvas}/${p.now.path}` : p.now ? `, now ${p.now.canvas}` : "";
+			const files = !p.files.total ? "checking what changed" : p.files.done >= p.files.total ? `finishing, every file of ${mb(p.bytes.total)} done` : `${mb(p.bytes.done)} of ${mb(p.bytes.total)}, ${p.files.done} of ${p.files.total} files`;
+			const canvases = p.canvases.total ? `; ${p.canvases.done} of ${p.canvases.total} canvases` : "";
+			return `Syncing: ${files}${canvases}${moving}${left}.`;
+		}
+	}
 }
