@@ -17,6 +17,12 @@ import type { NextFunction, Request, Response } from "express";
  * noticed and nothing is compressed twice. Anything not handled here — an image, a client
  * that asks for no encoding — falls through to `express.static`, which gets the same cache
  * headers from `cacheControlFor`.
+ *
+ * The same squeeze serves what the canvas's frames load beyond the built UI: a card's own text
+ * files (`squeezedFile`, from `routes/shared.ts`) and a drawing as JSON (`sendSqueezedJson`). A
+ * sandboxed frame has no cache in the browser, so each of these is fetched whole every time a
+ * frame starts, and from another device every byte is time: the drawing engine's module is 4 MB
+ * as built and 1.3 MB squeezed, a large canvas's drawing 865 KB and under 200.
  */
 
 const TYPES: Record<string, string> = {
@@ -29,7 +35,20 @@ const TYPES: Record<string, string> = {
 	".map": "application/json; charset=utf-8",
 	".txt": "text/plain; charset=utf-8",
 	".webmanifest": "application/manifest+json",
+	// The drawing engine's module: named for streaming compilation, which asks for exactly this type.
+	".wasm": "application/wasm",
+	".md": "text/markdown; charset=utf-8",
+	".tex": "text/plain; charset=utf-8",
 };
+
+/** How hard brotli works: all it has on a small file, less on a large one, where it would hold the server's one thread for seconds. */
+const qualityFor = (bytes: number): number => (bytes > 1_000_000 ? 6 : 9);
+
+/** A buffer squeezed for an encoding. `fast` for what is squeezed while a request waits and may never be asked for again. */
+export function squeeze(raw: Buffer, encoding: "br" | "gzip", fast = false): Buffer {
+	if (encoding === "gzip") return gzipSync(raw, { level: fast ? 6 : 9 });
+	return brotliCompressSync(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: fast ? 4 : qualityFor(raw.length), [constants.BROTLI_PARAM_SIZE_HINT]: raw.length } });
+}
 
 /** A year for a file named by its hash; revalidate everything else. */
 export function cacheControlFor(path: string): string {
@@ -92,7 +111,7 @@ export function compressedStatic(root: string) {
 		let body = entry[encoding];
 		if (!body) {
 			const raw = readFileSync(file);
-			body = encoding === "br" ? brotliCompressSync(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: 9 } }) : gzipSync(raw, { level: 9 });
+			body = squeeze(raw, encoding);
 			entry[encoding] = body;
 		}
 
@@ -113,4 +132,59 @@ export function compressedStatic(root: string) {
 		}
 		res.end(body);
 	};
+}
+
+/** The least a body is before squeezing it is worth the work: under this the headers weigh as much. */
+const WORTH = 1024;
+
+/**
+ * A deck's own text file, squeezed for a browser that takes it: a card's page, its stylesheet, its
+ * module, its data. Kept by path, size and mtime, the copies together held under a ceiling, the
+ * oldest let go first. Answers nothing for a file that is no text (a picture, a font, which are
+ * squeezed already), is small, or is asked for in part.
+ */
+const keptFiles = new Map<string, { key: string; encoding: "br" | "gzip"; body: Buffer }>();
+let keptBytes = 0;
+const KEPT_MOST = 48 * 1024 * 1024;
+
+export function squeezedFile(file: string, accept: string | undefined, range: string | undefined): { body: Buffer; encoding: "br" | "gzip"; type: string; etag: string } | undefined {
+	const type = TYPES[extname(file).toLowerCase()];
+	const encoding = pickEncoding(accept);
+	if (!type || !encoding || range) return undefined;
+	let stat: ReturnType<typeof statSync>;
+	try {
+		stat = statSync(file);
+	} catch {
+		return undefined;
+	}
+	if (!stat.isFile() || stat.size < WORTH) return undefined;
+	const key = `${stat.size}-${stat.mtimeMs}`;
+	const name = `${encoding}:${file}`;
+	let entry = keptFiles.get(name);
+	if (!entry || entry.key !== key) {
+		if (entry) keptBytes -= entry.body.length;
+		entry = { key, encoding, body: squeeze(readFileSync(file), encoding, true) };
+		keptFiles.delete(name);
+		keptFiles.set(name, entry);
+		keptBytes += entry.body.length;
+		for (const [old, one] of keptFiles) {
+			if (keptBytes <= KEPT_MOST) break;
+			keptFiles.delete(old);
+			keptBytes -= one.body.length;
+		}
+	}
+	return { body: entry.body, encoding, type, etag: `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}-${encoding}"` };
+}
+
+/** JSON, squeezed when the browser takes it and there is enough of it: a canvas's drawing, which a frame reads whole each time it starts. */
+export function sendSqueezedJson(req: Request, res: Response, value: unknown): void {
+	const raw = Buffer.from(JSON.stringify(value));
+	const encoding = raw.length < WORTH ? undefined : pickEncoding(req.headers["accept-encoding"]);
+	res.setHeader("Content-Type", "application/json; charset=utf-8");
+	res.setHeader("Vary", "Accept-Encoding");
+	if (!encoding) return void res.end(raw);
+	const body = squeeze(raw, encoding, true);
+	res.setHeader("Content-Encoding", encoding);
+	res.setHeader("Content-Length", String(body.length));
+	res.end(body);
 }

@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import { SHARED_SANDBOX } from "@decks/hub/layout";
 import type { App } from "../../app.ts";
 import type { Relay } from "../../share/relay.ts";
+import { squeezedFile } from "../static.ts";
 
 /** What a route module is given: the app, and the relay its `/c/<id>/` connections go through. */
 export interface RouteDeps {
@@ -33,7 +34,29 @@ export function wildcard(req: Request): string {
 	return Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
 }
 
+/**
+ * Send a file of the deck. A text file (a card's page, stylesheet, module or data) goes squeezed to a
+ * browser that takes it (`connections/static.ts`, `squeezedFile`): a frame fetches a card's files whole
+ * every time it starts, with no cache to ask. Everything else, and a request for part of a file, goes
+ * as it is on disk.
+ */
 export function sendFile(res: Response, target: string): Promise<void> {
+	const req = res.req;
+	const small = req?.method === "GET" ? squeezedFile(target, req.headers["accept-encoding"] as string | undefined, req.headers.range) : undefined;
+	if (small) {
+		res.setHeader("Vary", "Accept-Encoding");
+		res.setHeader("ETag", small.etag);
+		if (!res.getHeader("Cache-Control")) res.setHeader("Cache-Control", "no-cache");
+		if (req.headers["if-none-match"] === small.etag) {
+			res.status(304).end();
+			return Promise.resolve();
+		}
+		if (!res.getHeader("Content-Type")) res.setHeader("Content-Type", small.type);
+		res.setHeader("Content-Encoding", small.encoding);
+		res.setHeader("Content-Length", String(small.body.length));
+		res.end(small.body);
+		return Promise.resolve();
+	}
 	return new Promise((ok, fail) => {
 		res.sendFile(target, { acceptRanges: true, dotfiles: "allow" }, (error) => (error ? fail(error) : ok()));
 	});

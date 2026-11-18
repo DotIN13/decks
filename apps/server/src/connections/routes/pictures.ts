@@ -12,6 +12,7 @@ import type { AppPage } from "../../pictures/service.ts";
 import type { Page as DeckPage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "../../share/bundle.ts";
 import { actsAsPerson } from "../../auth/principal.ts";
+import { sendSqueezedJson } from "../static.ts";
 import { asyncRoute, wildcard, sendFile, harnessId, type RouteDeps } from "./shared.ts";
 import express, { type Router } from "express";
 
@@ -235,7 +236,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const board = app.deck.board(path);
 			return board ? [{ ...board, x, y, w, h }] : [];
 		});
-		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.cards.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
+// Squeezed: a frame reads this whole each time it starts, and a large canvas's is most of a megabyte as it stands.
+		sendSqueezedJson(req, res, { doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.cards.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
 	});
 
 	/**
