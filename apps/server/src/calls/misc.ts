@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { saveStudioLink } from "../studio/index.ts";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
@@ -48,12 +47,6 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 		},
 
 		/**
-		 * Decks Studio's key for this harness, handed over by the person's browser once it has paired
-		 * (decks-studio). Written to `.decks/studio.json`, which `studio/index.ts` watches: the deck
-		 * starts syncing at once, and a later key replaces it. Only the person: an agent or a board
-		 * that could set it could send the whole deck to an address of its choosing.
-		 */
-		/**
 		 * A pairing code for another Decks front end, such as Studio, to connect with
 		 * (`auth/issue.ts`): the same code Settings, Other Decks makes, for a harness with no
 		 * screen. Not a board's: its page could make one and hand it to anyone.
@@ -68,23 +61,35 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 			},
 		},
 
+		/*
+		 * Decks Studio (`studio/`). The harness signs in itself: from a terminal that is a short code,
+		 * typed on Studio from any device, since a machine with no screen has no browser to send back.
+		 * Only the person: an agent or a card that could sign the harness in could send the whole deck to
+		 * an account of its choosing.
+		 */
 		studio: {
-			connect: async (url: string, key: string) => {
-				if (!agent.person) throw new Error("Only the person can connect this harness to Decks Studio, from a browser paired with it.");
-				return saveStudioLink(service.deckPath(), url, key);
+			login: async (url?: string) => {
+				if (!agent.person) throw new Error("Only the person can sign this harness in to Decks Studio.");
+				if (!service.studioLogin) throw new Error("This server signs in to no Studio.");
+				const shown = await service.studioLogin(typeof url === "string" ? url : undefined);
+				ctx.notes.push(`Open ${shown.verify} on any device signed in to Studio and type ${shown.code}, within ${Math.max(1, Math.round((shown.expires - Date.now()) / 60_000))} minutes. decks studio status says when it is done.`);
+				return shown;
 			},
 			status: async () => {
+				const waiting = service.studioShowing?.().code;
+				const signingIn = waiting ? { code: waiting.code, verify: waiting.verify } : {};
 				const file = join(service.deckPath(), ".decks", "studio.json");
 				if (process.env.DECKS_STUDIO_KEY) return { connected: true, url: process.env.DECKS_STUDIO_URL };
-				if (!existsSync(file)) return { connected: false };
+				if (!existsSync(file)) return { connected: false, ...signingIn };
 				try {
-					return { connected: true, url: (JSON.parse(readFileSync(file, "utf8")) as { url?: string }).url };
+					const saved = JSON.parse(readFileSync(file, "utf8")) as { url?: string; key?: string; account?: { email?: string } };
+					return { connected: Boolean(saved.key), url: saved.url, ...(saved.account?.email ? { account: saved.account.email } : {}), ...signingIn };
 				} catch {
-					return { connected: false };
+					return { connected: false, ...signingIn };
 				}
 			},
 			disconnect: async () => {
-				if (!agent.person) throw new Error("Only the person can disconnect this harness from Decks Studio.");
+				if (!agent.person) throw new Error("Only the person can sign this harness out of Decks Studio.");
 				rmSync(join(service.deckPath(), ".decks", "studio.json"), { force: true });
 				return { connected: false };
 			},

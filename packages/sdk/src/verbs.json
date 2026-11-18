@@ -3989,27 +3989,21 @@
   ]
  },
  {
-  "name": "studio.connect",
+  "name": "studio.login",
   "command": [
    "studio",
-   "connect"
+   "login"
   ],
   "group": "misc",
   "touches": "outside",
   "effect": "change",
-  "summary": "Connect this harness to Decks Studio with the key Studio made for it: the deck then syncs there in the background. Only the person can call it, from a browser paired with this harness.",
-  "signature": "studio.connect(url: string, key: string)",
-  "returns": "{ connected: boolean; url: string }",
+  "summary": "Sign this harness in to Decks Studio from a terminal: answers a short code and the address to type it at, on any device signed in to Studio. Once it is typed the deck syncs there in the background; studio.status says when. `url` is Studio's address, when it is not the usual one. Only the person can call it.",
+  "signature": "studio.login(url?: string)",
+  "returns": "{ code: string; verify: string; expires: number }",
   "params": [
    {
     "name": "url",
-    "type": "string",
-    "schema": {
-     "type": "string"
-    }
-   },
-   {
-    "name": "key",
+    "optional": true,
     "type": "string",
     "schema": {
      "type": "string"
@@ -4040,9 +4034,9 @@
   "group": "misc",
   "touches": "outside",
   "effect": "read",
-  "summary": "Whether this harness syncs with Decks Studio, and with which.",
+  "summary": "Whether this harness syncs with Decks Studio, with which, and as whom; or the short code a sign-in is waiting on.",
   "signature": "studio.status()",
-  "returns": "{ connected: boolean; url?: string }",
+  "returns": "{ connected: boolean; url?: string; account?: string; code?: string; verify?: string }",
   "params": []
  },
  {
@@ -4054,7 +4048,7 @@
   "group": "misc",
   "touches": "outside",
   "effect": "change",
-  "summary": "Stop syncing with Decks Studio and forget the key. Only the person can call it.",
+  "summary": "Sign out of Decks Studio: stop syncing and forget the key. Only the person can call it.",
   "signature": "studio.disconnect()",
   "returns": "{ connected: boolean }",
   "params": []

@@ -587,6 +587,19 @@
 		opacity: 0.45;
 		cursor: default;
 	}
+	/* Decks Studio's row (`settings/StudioSignIn.tsx`): Studio's address, the short code on show, and why a sign-in ended. */
+	.sw-studio-at {
+		width: 190px;
+	}
+	.sw-studio-code {
+		font: 600 20px/1.2 var(--font-mono);
+		letter-spacing: 0.14em;
+		font-variant-numeric: tabular-nums;
+		user-select: all;
+	}
+	.sw-studio-failed {
+		color: var(--v3-danger);
+	}
 	.sw-btn[data-tone="danger"]:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--v3-danger) 12%, transparent);
 		box-shadow: none;

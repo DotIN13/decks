@@ -12,6 +12,7 @@ import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import User from "lucide-solid/icons/user";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js";
+import { StudioGroup } from "./StudioSignIn.tsx";
 import { SetGroup, SetRow, SetSegments, SetSelect } from "./rows.tsx";
 import { browserZone, clockTime, Icon } from "@decks/ui";
 import { usageLevel } from "../lib/context-usage.ts";
@@ -425,8 +426,9 @@ function foldPaired(rows: PairedRow[]): { label: string; origin: string; ids: st
 }
 
 /**
- * Who reaches this deck: its own address, Decks Studio when it is paired (Unpair deletes its key and
- * takes back every token given through it), and every other Decks signed in with a token. A code is
+ * Who reaches this deck: its own address, Decks Studio (`StudioSignIn.tsx`: this harness signs in to
+ * it, and Sign out deletes its key and takes back every token given through it), and every other
+ * Decks signed in with a token. A code is
  * never made here (`decks pair code`, on this machine). Revoke takes every token of the row back.
  */
 function Connections() {
@@ -446,26 +448,8 @@ function Connections() {
 					}
 				/>
 			</SetGroup>
-			<Show when={can("share") && pairing().studio}>
-				{(studio) => (
-					<SetGroup label="Decks Studio" group="studio">
-						<SetRow
-							lead={
-								<span class="sw-mark">
-									<Icon of={Cloud} size={14} />
-								</span>
-							}
-							title="Paired with Decks Studio"
-							sub={<span class="truncate">{`${studio().url} · its browsers are given an hour's token at a time through its key`}</span>}
-						>
-							<Show when={!studio().env}>
-								<Btn tone="danger" title="Delete Studio's key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("harness.unpair").then(warnIfFailed)}>
-									Unpair
-								</Btn>
-							</Show>
-						</SetRow>
-					</SetGroup>
-				)}
+			<Show when={can("share")}>
+				<StudioGroup />
 			</Show>
 			<Show when={can("share")}>
 				<SetGroup label="Signed in here" group="other-decks">

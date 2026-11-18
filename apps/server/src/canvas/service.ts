@@ -143,6 +143,9 @@ export class CanvasService {
 	apps: Apps | undefined;
 	/** A fresh pairing code for another Decks front end (`auth/issue.ts`), for `decks pair code`. */
 	pairCode: (() => { code: string; expires: number }) | undefined;
+	/** Sign the harness in to Decks Studio by a short code (`studio/login.ts`), and the code a sign-in is waiting on; set by the app. */
+	studioLogin: ((url?: string) => Promise<{ code: string; verify: string; expires: number }>) | undefined;
+	studioShowing: (() => { code?: { code: string; verify: string; expires: number }; failed?: string }) | undefined;
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`canvas/shots.ts`). */
@@ -188,7 +191,7 @@ export class CanvasService {
 		return name;
 	}
 
-	/** The deck folder, for verbs that keep a file of their own there (`studio.connect`). */
+	/** The deck folder, for verbs that read a file of their own there (`studio.status`). */
 	deckPath(): string {
 		return this.deck.path;
 	}

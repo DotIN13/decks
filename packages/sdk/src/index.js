@@ -19,8 +19,8 @@
  * one passed as `{ token }`. An app server's is an app pass, good while that run of it goes.
  * The `decks` command (`bin/decks.mjs`) and the MCP server (`mcp/server.mjs`) are this file.
  *
- * A page on another site (Decks Studio) talks to a harness with this file alone: `connectStudio` or
- * `pairSite` for its site token, the verbs, `request` for the harness's other doors, `events` for its
+ * A page on another site talks to a harness with this file alone: `pairSite` for its site token
+ * (Decks Studio's pages are given theirs through the harness's own line to Studio), the verbs, `request` for the harness's other doors, `events` for its
  * changes, `canvasPass` for each canvas frame it shows, and `appUrl`/`pageUrl` for the tabs it opens
  * on the harness's own address. The token only ever goes in a header; a frame or a tab carries a pass
  * instead.
@@ -124,7 +124,7 @@ export const VERBS = [
 	["web.submit",["what?","options?"]],
 	["web.stop",[]],
 	["ports",["change?"]],
-	["studio.connect",["url","key"]],
+	["studio.login",["url?"]],
 	["pair.code",[]],
 	["studio.status",[]],
 	["studio.disconnect",[]],
@@ -377,14 +377,6 @@ export function connect(options = {}) {
 		 */
 		pairSite(given = {}) {
 			return request("/api/pair", { body: { label: given.label ?? "Another Decks", ...(given.code ? { code: given.code } : {}) } });
-		},
-		/**
-		 * Decks Studio connecting this harness in one call, at the one pairing door (`POST /api/pair`):
-		 * Studio's address and the key to sync with, and a harness token as that site back. `needsCode` as
-		 * for `pairSite`.
-		 */
-		connectStudio(given) {
-			return request("/api/pair", { body: { studio: given.studio, key: given.key, label: given.label ?? "Decks Studio", ...(given.code ? { code: given.code } : {}) } });
 		},
 		canvasPass,
 		/**

@@ -24,12 +24,22 @@ import type { ActBox, ActKind, StageCall, StageResult, Camera } from "./stage.ts
  * opened is still a stage and has to be listed.
  */
 /**
- * The link to Decks Studio, when this harness has one: Studio's address, and whether its key came by
- * environment (`DECKS_STUDIO_KEY`), which Settings cannot unpair.
+ * The link to Decks Studio, when this harness has one: Studio's address, the account it signed in as,
+ * and whether its key came by environment (`DECKS_STUDIO_KEY`), which Settings cannot sign out of.
  */
 export interface StudioLinkRow {
 	url: string;
 	env?: true;
+	account?: { name: string; email: string };
+}
+
+/**
+ * This harness signing in to Decks Studio by a short code (`server/src/studio/login.ts`): the code to
+ * type on Studio, where, and until when; or why the last such sign-in ended without a key.
+ */
+export interface StudioSignIn {
+	code?: { code: string; verify: string; expires: number };
+	failed?: string;
 }
 
 /** Another Decks front end this server has given a token to (`server/src/auth/issue.ts`). */
@@ -312,7 +322,7 @@ export type ServerMessage =
 	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
 	| { type: "harness.settings"; settings: DeckSettings; machineZone: string; sttKey?: boolean }
 	/** The code being shown, if any, and every front end holding a token. */
-	| { type: "harness.paired"; code?: string; expires?: number; paired: PairedRow[]; studio?: StudioLinkRow }
+	| { type: "harness.paired"; code?: string; expires?: number; paired: PairedRow[]; studio?: StudioLinkRow; /** A sign-in to Studio under way, or just ended. */ studioSignIn?: StudioSignIn; /** Studio's address, as this harness would sign in to it. */ studioAt?: string }
 	/** Who is answering, and what it can do: the first frame of every greeting. */
 	| { type: "harness.hello"; backend: BackendInfo }
 	/** A document page's answers and news (`@decks/docs`); its `notice` is this union's own. */

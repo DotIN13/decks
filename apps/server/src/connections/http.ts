@@ -24,8 +24,29 @@ import { register as registerCardPath } from "./routes/card-path.ts";
 import { register as registerDeck } from "./routes/deck.ts";
 import { register as registerFiles } from "./routes/files.ts";
 import { register as registerGoogle } from "./routes/google.ts";
+import { register as registerStudio } from "./routes/studio.ts";
 import { register as registerHarness } from "./routes/harness.ts";
 import { register as registerPictures } from "./routes/pictures.ts";
+
+/**
+ * The Decks page itself, with a fresh person token in it for a tab the person opened
+ * (`auth/issue.ts`): a frame or a script's fetch of the same page gets it without. Never stored, so
+ * a later fetch cannot be answered from a cache with the token in it; and alone in its browsing
+ * context group (`Cross-Origin-Opener-Policy`), so a page that opened it in a new window cannot
+ * reach into it. Where a tab reached this harness is where Studio's pages may too
+ * (`studio/addresses.ts`): the name is one this server answers to, checked before any route.
+ */
+function pageShell(app: App, webDist: string) {
+	return async (req: Request, res: Response) => {
+		const html = await readFile(join(webDist, "index.html"), "utf8");
+		res.setHeader("Cache-Control", "no-store");
+		res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+		res.setHeader("Vary", "Sec-Fetch-Dest, Sec-Fetch-Mode");
+		const tab = isTopNavigation(req.headers);
+		if (tab && app.addresses.seen(`${String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim() || req.protocol}://${String(req.headers.host ?? "")}`)) app.addressesChanged?.();
+		res.type("html").send(tab ? withSession(html, tabToken(app.tokens)) : html);
+	};
+}
 
 /**
  * The HTTP surface: reading files, writing one kind of file, and the built UI.
@@ -114,6 +135,7 @@ export function createHttpApp(app: App): Express {
 	registerPictures(api, deps);
 	registerFiles(api, deps);
 	registerGoogle(api, deps);
+	registerStudio(api, deps);
 	registerApps(api, deps);
 	// Decks as an MCP server at a web address (`routes/mcp.ts`): `/api/mcp`, and `/mcp` for short.
 	const mcpShort = express.Router();
@@ -125,20 +147,7 @@ export function createHttpApp(app: App): Express {
 	// The built UI, when there is one. In development Vite serves it instead and
 	// proxies here, so a missing dist is normal rather than an error.
 	const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../../web/dist");
-	/**
-	 * The Decks page itself, with a fresh person token in it for a tab the person opened
-	 * (`auth/issue.ts`): a frame or a script's fetch of the same page gets it without. Never stored, so
-	 * a later fetch cannot be answered from a cache with the token in it; and alone in its browsing
-	 * context group (`Cross-Origin-Opener-Policy`), so a page that opened it in a new window cannot
-	 * reach into it.
-	 */
-	const shell = async (req: Request, res: Response) => {
-		const html = await readFile(join(webDist, "index.html"), "utf8");
-		res.setHeader("Cache-Control", "no-store");
-		res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-		res.setHeader("Vary", "Sec-Fetch-Dest, Sec-Fetch-Mode");
-		res.type("html").send(isTopNavigation(req.headers) ? withSession(html, tabToken(app.tokens)) : html);
-	};
+	const shell = pageShell(app, webDist);
 	if (existsSync(webDist)) {
 		server.get(["/", "/index.html"], (req, res, next) => void shell(req, res).catch(next));
 		// Compressed and cached by name first (`static.ts`); anything it passes on is sent plain,

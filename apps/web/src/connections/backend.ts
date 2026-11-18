@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import type { BackendInfo, PairedRow, StudioLinkRow } from "@decks/protocol";
+import type { BackendInfo, PairedRow, StudioLinkRow, StudioSignIn } from "@decks/protocol";
 
 /**
  * What the backend on the other end can do, from the first frame of its greeting (`backend`).
@@ -22,6 +22,10 @@ interface PairingState {
 	paired: PairedRow[];
 	/** The link to Decks Studio, its key, when this harness has one. */
 	studio?: StudioLinkRow;
+	/** A sign-in to Studio by short code under way, or why the last one ended. */
+	studioSignIn?: StudioSignIn;
+	/** Studio's address, as this harness would sign in to it. */
+	studioAt?: string;
 }
 
 const [pairing, setPairing] = createSignal<PairingState>({ paired: [] });

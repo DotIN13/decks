@@ -12,7 +12,8 @@ import { joinSpot } from "../deck/place.ts";
 import { putOn } from "../canvas/canvas-ops.ts";
 import { penEditBy } from "../canvas/pens.ts";
 import { deleteCanvas, titleCanvas } from "../canvas/admin.ts";
-import { unpairStudio } from "../studio/index.ts";
+import { unpairStudio, studioLink } from "../studio/index.ts";
+import { isLoopbackOrigin, studioAddress } from "../studio/login.ts";
 import { personAgent } from "./person.ts";
 
 /**
@@ -461,6 +462,21 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"harness.unpair": async () => {
 			unpairStudioHere(app);
 		},
+		/*
+		 * Sign this harness in to Studio (`studio/login.ts`). From a tab on this machine (`back`, its
+		 * loopback origin) the answer is an address on Studio to open, which sends the tab back with a code;
+		 * from anywhere else it is a short code to type on Studio, which Settings then shows.
+		 */
+		"harness.studioSignIn": async ([given]) => {
+			const asked = (given ?? {}) as { studio?: unknown; back?: unknown };
+			const studio = studioAddress(typeof asked.studio === "string" ? asked.studio : undefined);
+			if (studioLink(app.deck.path)?.env) throw new Error("This harness's Studio key is set by DECKS_STUDIO_KEY: remove it there to sign in another way.");
+			if (isLoopbackOrigin(typeof asked.back === "string" ? asked.back : undefined)) return app.studioLogin.start(studio, asked.back as string);
+			return { shown: await app.studioLogin.code(studio) };
+		},
+		"harness.studioCancel": async () => {
+			app.studioLogin.cancel();
+		},
 		"web.answer": async ([id, ok], call) => {
 			if (!app.web.answer(String(id), ok === true)) notice(call, "info", "That question has already been answered.");
 		},
@@ -476,6 +492,7 @@ export function renameCanvas(app: App, name: string, to: string): void {
 }
 
 export function unpairStudioHere(app: App): void {
+	app.studioLogin.stop();
 	unpairStudio(app.deck.path, app.tokens);
 	app.send(app.pairingMessage());
 }

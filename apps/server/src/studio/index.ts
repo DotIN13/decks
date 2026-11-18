@@ -3,15 +3,18 @@ import { join } from "node:path";
 import type { PenEdit } from "@decks/pen";
 import { HarnessSync, type SyncOptions } from "@decks/sync-client";
 import type { TokenStore } from "../auth/tokens.ts";
+import { DEFAULT_STUDIO, type StudioAccount } from "./login.ts";
 
 /**
  * Decks Studio, from the harness's side: when this harness has a Studio key, its deck syncs with
  * Studio in the background (`sync.ts`); without one, nothing here runs.
  *
- * The key comes from `DECKS_STUDIO_KEY` (and `DECKS_STUDIO_URL`, Studio's address), or from
- * `<deck>/.decks/studio.json`, `{ "url": "…", "key": "dsk_…" }`, which is watched: writing it
- * connects, changing it reconnects, and removing it stops. The key is also the pairing with Studio:
- * Studio's browsers get their tokens through it (below).
+ * The key comes from the harness signing in to Studio (`login.ts`), which writes it with Studio's
+ * address and the account to `<deck>/.decks/studio.json`, `{ "url": "…", "key": "dsk_…", "account":
+ * … }`; or from `DECKS_STUDIO_KEY` (and `DECKS_STUDIO_URL`), for a deployment that is handed one. The
+ * file is watched: writing it connects, changing it reconnects, and removing it stops. The key is
+ * also the link with Studio: Studio's browsers get their tokens through it (below), and the harness
+ * says where it can be reached with it (`addresses.ts`).
  */
 export interface StudioLink {
 	stop(): Promise<void>;
@@ -21,17 +24,19 @@ export interface StudioLink {
 	edited(name: string, change: { edits: readonly PenEdit[]; by: { kind: string; id?: string } }): void;
 	/** Where someone on this harness is on a canvas, for everyone else on it through Studio (`HarnessSync.presence`). */
 	presence(name: string, message: Parameters<HarnessSync["presence"]>[1]): void;
+	/** Say again where this harness can be reached: the list changed. */
+	report(): void;
 }
 
-const DEFAULT_URL = "https://studio.decks.app";
+const DEFAULT_URL = DEFAULT_STUDIO;
 
 /*
- * The pairing with Studio is its key. The harness keeps the key and a socket open to Studio with it;
+ * The link with Studio is its key. The harness keeps the key and a socket open to Studio with it;
  * a browser signed in to Studio is never paired itself. When it needs this harness, Studio asks, on
  * that socket, for a harness token for the person signed in there (`token.ask`), and the harness gives
  * one (`studioToken`): an ordinary harness token as a site, bound to Studio's origin, that lapses after
  * an hour unused, marked as Studio's. Studio asks only for someone who may use the harness there, and
- * the browser asks again, through Studio, before its token lapses. Unpairing in Settings deletes the key
+ * the browser asks again, through Studio, before its token lapses. Signing out in Settings deletes the key
  * and takes back every token given through it (`unpairStudio`), as does Studio revoking the key.
  */
 
@@ -63,21 +68,21 @@ export function revokeStudioTokens(tokens: TokenStore, options: { paired?: boole
 	return tokens.revokeWhere((principal) => principal.kind === "site" && (principal.studio === true || (options.paired === true && principal.label === "Decks Studio")));
 }
 
-/** The link to Studio as Settings shows it, if there is one: from the environment, or `.decks/studio.json`. */
-export function studioLink(deck: string, env: NodeJS.ProcessEnv = process.env): { url: string; env?: true } | undefined {
+/** The link to Studio as Settings shows it, if there is one: from the environment, or `.decks/studio.json`, with the account it was signed in as. */
+export function studioLink(deck: string, env: NodeJS.ProcessEnv = process.env): { url: string; env?: true; account?: StudioAccount } | undefined {
 	if (env.DECKS_STUDIO_KEY) return { url: env.DECKS_STUDIO_URL ?? DEFAULT_URL, env: true };
 	const file = join(deck, ".decks", "studio.json");
 	if (!existsSync(file)) return undefined;
 	try {
-		const saved = JSON.parse(readFileSync(file, "utf8")) as { url?: string; key?: string };
-		return saved.key ? { url: saved.url ?? DEFAULT_URL } : undefined;
+		const saved = JSON.parse(readFileSync(file, "utf8")) as { url?: string; key?: string; account?: StudioAccount };
+		return saved.key ? { url: saved.url ?? DEFAULT_URL, ...(saved.account?.email ? { account: { name: String(saved.account.name ?? ""), email: String(saved.account.email) } } : {}) } : undefined;
 	} catch {
 		return undefined;
 	}
 }
 
 /**
- * Unpair Studio, from this harness's Settings: its key deleted, so the deck stops syncing and Studio
+ * Sign out of Studio, from this harness's Settings: its key deleted, so the deck stops syncing and Studio
  * can ask for no more tokens, and every token given through it taken back at once. A key set by
  * `DECKS_STUDIO_KEY` is not this harness's to delete: that throws, after the tokens are taken back.
  */
@@ -89,15 +94,15 @@ export function unpairStudio(deck: string, tokens: TokenStore, env: NodeJS.Proce
 }
 
 /**
- * Save Studio's address and this harness's key to `.decks/studio.json`, which `startStudio` watches,
- * so the deck starts syncing at once. Both the `studio.connect` verb and `POST /api/pair` with Studio's key
- * come here; neither checks the key with Studio first.
+ * Save Studio's address, this harness's key and the account it signed in as to `.decks/studio.json`,
+ * which `startStudio` watches, so the deck starts syncing at once. A finished sign-in comes here
+ * (`login.ts`), and nothing else: no page hands this harness a key.
  */
-export function saveStudioLink(deck: string, url: string, key: string): { connected: true; url: string } {
+export function saveStudioLink(deck: string, url: string, key: string, account?: StudioAccount): { connected: true; url: string } {
 	const origin = studioOrigin(url, key);
 	const dir = join(deck, ".decks");
 	mkdirSync(dir, { recursive: true });
-	writeFileSync(join(dir, "studio.json"), JSON.stringify({ url: origin, key }), { mode: 0o600 });
+	writeFileSync(join(dir, "studio.json"), JSON.stringify({ url: origin, key, ...(account?.email ? { account } : {}) }), { mode: 0o600 });
 	return { connected: true, url: origin };
 }
 
@@ -125,7 +130,7 @@ export function startStudio(
 	harness?: string,
 	inventory?: SyncOptions["inventory"],
 	harnessToken?: SyncOptions["harnessToken"],
-	link: Pick<SyncOptions, "issueToken" | "unlinked" | "remote" | "presence"> = {},
+	link: Pick<SyncOptions, "issueToken" | "unlinked" | "remote" | "presence"> & { addresses?: () => string[] } = {},
 ): StudioLink {
 	const file = join(deck, ".decks", "studio.json");
 	let sync: HarnessSync | undefined;
@@ -153,8 +158,33 @@ export function startStudio(
 		await sync?.stop();
 		sync = undefined;
 		if (!want) return;
-		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}), ...(inventory ? { inventory } : {}), ...(harnessToken ? { harnessToken } : {}), ...link });
+		const { addresses: _addresses, ...syncLink } = link;
+		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}), ...(inventory ? { inventory } : {}), ...(harnessToken ? { harnessToken } : {}), ...syncLink });
 		sync.start().catch((error) => console.error(`[decks] studio: ${(error as Error).message}`));
+		void report();
+	};
+
+	/*
+	 * Where this harness can be reached, said to Studio by its key: at each link, and whenever the
+	 * list changes (`report`). Studio not reached is tried again in a minute, while the link is the same.
+	 */
+	let reporting: ReturnType<typeof setTimeout> | undefined;
+	const report = async () => {
+		clearTimeout(reporting);
+		const want = read();
+		const urls = link.addresses?.();
+		if (!want || !urls) return;
+		const linked = current;
+		try {
+			const response = await fetch(`${want.url}/sync/v1/addresses`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${want.key}` }, body: JSON.stringify({ urls }) });
+			// A Studio from before it kept addresses answers 404: nothing to try again for.
+			if (!response.ok && response.status !== 404) throw new Error(`Studio answered ${response.status}`);
+		} catch {
+			if (current === linked) {
+				reporting = setTimeout(() => void report(), 60_000);
+				reporting.unref?.();
+			}
+		}
 	};
 
 	void apply();
@@ -173,8 +203,10 @@ export function startStudio(
 	return {
 		async stop() {
 			watcher?.close();
+			clearTimeout(reporting);
 			await sync?.stop();
 		},
+		report: () => void report(),
 		status: () => ({ connected: Boolean(sync), url: current ? current.split(" ")[0] : undefined }),
 		edited: (name, change) => sync?.edited(name, change),
 		presence: (name, message) => sync?.presence(name, message),

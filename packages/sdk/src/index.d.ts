@@ -487,13 +487,18 @@ export interface Verbs {
 	};
 	studio: {
 		/**
-		 * Connect this harness to Decks Studio with the key Studio made for it: the deck then syncs there
-		 * in the background. Only the person can call it, from a browser paired with this harness.
+		 * Sign this harness in to Decks Studio from a terminal: answers a short code and the address to
+		 * type it at, on any device signed in to Studio. Once it is typed the deck syncs there in the
+		 * background; studio.status says when. `url` is Studio's address, when it is not the usual one.
+		 * Only the person can call it.
 		 */
-		connect(url: string, key: string): Promise<{ connected: boolean; url: string }>;
-		/** Whether this harness syncs with Decks Studio, and with which. */
-		status(): Promise<{ connected: boolean; url?: string }>;
-		/** Stop syncing with Decks Studio and forget the key. Only the person can call it. */
+		login(url?: string): Promise<{ code: string; verify: string; expires: number }>;
+		/**
+		 * Whether this harness syncs with Decks Studio, with which, and as whom; or the short code a
+		 * sign-in is waiting on.
+		 */
+		status(): Promise<{ connected: boolean; url?: string; account?: string; code?: string; verify?: string }>;
+		/** Sign out of Decks Studio: stop syncing and forget the key. Only the person can call it. */
 		disconnect(): Promise<{ connected: boolean }>;
 	};
 	pair: {
@@ -560,8 +565,6 @@ export interface Decks extends Verbs {
 	hello(): Promise<Hello>;
 	/** Pair a page on another site (`POST /api/pair`): a site token bound to the page's origin. `needsCode` on the error wants a code. */
 	pairSite(options?: { code?: string; label?: string }): Promise<{ token: string; name: string }>;
-	/** Decks Studio connecting this harness (`POST /api/pair` with its address and key): a harness token as that site back, the key kept for syncing. */
-	connectStudio(options: { studio: string; key: string; code?: string; label?: string }): Promise<{ token: string; name: string; [key: string]: unknown }>;
 	/**
 	 * A canvas pass for one canvas (`POST /api/passes`): an hour, bound to this connection's token, with
 	 * your role there. A frame's calls send it as the bearer; its files are read at

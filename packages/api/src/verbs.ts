@@ -621,12 +621,12 @@ export const VERBS: readonly Verb[] = [
 		result: arr(obj({ port: num(), label: opt(str()), by: opt(str()), at: num(), node: str(), rnode: str() })),
 	},
 	{
-		name: "studio.connect",
+		name: "studio.login",
 		group: "misc",
 		...outsideChange,
-		summary: "Connect this harness to Decks Studio with the key Studio made for it: the deck then syncs there in the background. Only the person can call it, from a browser paired with this harness.",
-		params: [p("url", str()), p("key", str())],
-		result: obj({ connected: bool(), url: str() }),
+		summary: "Sign this harness in to Decks Studio from a terminal: answers a short code and the address to type it at, on any device signed in to Studio. Once it is typed the deck syncs there in the background; studio.status says when. `url` is Studio's address, when it is not the usual one. Only the person can call it.",
+		params: [o("url", str())],
+		result: obj({ code: str(), verify: str(), expires: num() }),
 	},
 	{
 		name: "pair.code",
@@ -636,8 +636,8 @@ export const VERBS: readonly Verb[] = [
 		params: [],
 		result: obj({ code: str(), expires: num() }),
 	},
-	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, and with which.", params: [], result: obj({ connected: bool(), url: opt(str()) }) },
-	{ name: "studio.disconnect", group: "misc", ...outsideChange, summary: "Stop syncing with Decks Studio and forget the key. Only the person can call it.", params: [], result: obj({ connected: bool() }) },
+	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, with which, and as whom; or the short code a sign-in is waiting on.", params: [], result: obj({ connected: bool(), url: opt(str()), account: opt(str()), code: opt(str()), verify: opt(str()) }) },
+	{ name: "studio.disconnect", group: "misc", ...outsideChange, summary: "Sign out of Decks Studio: stop syncing and forget the key. Only the person can call it.", params: [], result: obj({ connected: bool() }) },
 	{ name: "now", card: "frame", group: "misc", ...outsideRead, summary: "The time where the person is.", params: [], result: obj({ iso: str(), timezone: str(), words: str(), epoch: num() }, true) },
 ];
 

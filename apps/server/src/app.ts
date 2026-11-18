@@ -18,7 +18,10 @@ import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
-import { studioLink } from "./studio/index.ts";
+import { hostname } from "node:os";
+import { saveStudioLink, studioLink } from "./studio/index.ts";
+import { Addresses } from "./studio/addresses.ts";
+import { StudioLogin, studioAddress } from "./studio/login.ts";
 import { CanvasShots } from "./canvas/shots.ts";
 import { CanvasService } from "./canvas/service.ts";
 import { PageCalls } from "./canvas/page-calls.ts";
@@ -73,6 +76,11 @@ export class App {
 	readonly docs: DocService;
 	/** Google Docs opened as document pages, kept in step through a markdown mirror (`google/docs.ts`). */
 	readonly google: GoogleDocs;
+	/** This harness signing in to Decks Studio (`studio/login.ts`). */
+	readonly studioLogin: StudioLogin;
+	/** Where this harness can be reached, for Studio's pages (`studio/addresses.ts`); `addressesChanged` says a new one to Studio. */
+	readonly addresses: Addresses;
+	addressesChanged?: () => void;
 	/** An agent's name as it says it, for crediting its edits; its id when it has said none. */
 	agentName(agentId: string): string {
 		return this.agents.get(agentId)?.who()?.name ?? agentId;
@@ -301,6 +309,17 @@ export class App {
 		});
 		this.google = new GoogleDocs({ dataDir: config.dataDir, library: () => this.docLibrary(), docs: this.docs, send: (message) => this.send(message) });
 		this.google.start();
+		this.addresses = new Addresses(deck.path, config.port ? `http://127.0.0.1:${config.port}` : undefined);
+		this.studioLogin = new StudioLogin({
+			// The machine's name, as its owner knows it: what Studio lists this harness as.
+			name: () => hostname().replace(/\.(?:local|lan|home)$/i, "") || this.deck.name,
+			// The file is watched (`studio/index.ts`): written, the deck starts syncing.
+			signedIn: (got) => {
+				saveStudioLink(this.deck.path, got.url, got.key, got.account);
+				this.send(this.pairingMessage());
+			},
+			changed: () => this.send(this.pairingMessage()),
+		});
 		/*
 		 * The Claude subscriptions this install can use (`claude/accounts.ts`).
 		 *
@@ -387,6 +406,11 @@ export class App {
 			this.send(this.pairingMessage());
 			return made;
 		};
+		this.stage.studioLogin = async (url) => {
+			if (studioLink(this.deck.path)?.env) throw new Error("This harness's Studio key is set by DECKS_STUDIO_KEY: remove it there to sign in another way.");
+			return this.studioLogin.code(studioAddress(url));
+		};
+		this.stage.studioShowing = () => this.studioLogin.showing();
 		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "harness.notice", level: "warn", text }));
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
@@ -510,7 +534,14 @@ export class App {
 	pairingMessage(): ServerMessage {
 		// The code itself never goes to a browser: it is made and shown only by decks pair code.
 		const studio = studioLink(this.deck.path);
-		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio } : {}) };
+		const signIn = this.studioLogin.showing();
+		let studioAt: string | undefined;
+		try {
+			studioAt = studioAddress(undefined);
+		} catch {
+			// An address in the environment that is none: Settings shows no default, and a sign-in says what is wrong.
+		}
+		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio } : {}), ...(signIn.code || signIn.failed ? { studioSignIn: signIn } : {}), ...(studioAt ? { studioAt } : {}) };
 	}
 
 	/**
@@ -631,6 +662,7 @@ export class App {
 		this.unwatch?.();
 		this.unwatch = undefined;
 		this.accountList.dispose();
+		this.studioLogin.stop();
 		this.web.dispose();
 		this.thumbs.dispose();
 		this.nativeShots.stop();

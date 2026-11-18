@@ -74,7 +74,7 @@ A front end such as Decks Studio needs nothing but this file to talk to a harnes
 ```js
 import { connect } from "@decks/sdk";
 const harness = connect({ url: "http://127.0.0.1:4329" });
-const { token } = await harness.connectStudio({ studio: location.origin, key }); // or pairSite({ code })
+const { token } = await harness.pairSite({ code });      // a site token, for a pairing code
 const decks = connect({ url: "http://127.0.0.1:4329", token });
 await decks.hello();                                     // its name, and whether the token works
 const { pass } = await decks.canvasPass("plan");         // a canvas frame's pass, an hour

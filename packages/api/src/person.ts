@@ -116,7 +116,15 @@ export const PERSON_VERBS: readonly Verb[] = [
 	// --- the harness and the outside --------------------------------------------------------
 	{ name: "harness.configure", group: "misc", ...outside, summary: "The harness's settings: the person's timezone, the speech-to-text model (null for the default), whether another front end needs a pairing code.", params: [{ name: "settings", schema: obj({ timezone: opt(union(str(), nul)), sttModel: opt(union(str(), nul)), requireCode: opt(bool()) }) }] },
 	{ name: "harness.revoke", group: "misc", ...outside, summary: "Take back a paired front end's token.", params: [{ name: "id", schema: str() }] },
-	{ name: "harness.unpair", group: "misc", ...outside, summary: "Delete Studio's key: the deck stops syncing, and every browser signed in to Studio loses its way here.", params: [] },
+	{ name: "harness.unpair", group: "misc", ...outside, summary: "Sign out of Studio: its key is deleted, the deck stops syncing, and every browser signed in to Studio loses its way here.", params: [] },
+	{
+		name: "harness.studioSignIn",
+		group: "misc",
+		...outside,
+		summary: "Sign this harness in to Decks Studio. From a tab on the harness's own machine (`back`, its loopback origin): an address on Studio to open, which sends the tab back. From anywhere else: a short code to type on Studio (`shown`).",
+		params: [{ name: "how", schema: obj({ studio: opt(str()), back: opt(str()) }), optional: true }],
+	},
+	{ name: "harness.studioCancel", group: "misc", ...outside, summary: "Give up the sign-in to Studio that is under way.", params: [] },
 	{ name: "web.answer", group: "web", ...outside, summary: "Answer the shared browser's question: yes or no.", params: [{ name: "id", schema: str() }, { name: "ok", schema: bool() }] },
 	// --- added with the side routes (step 4): what Studio and a terminal asked of /api/agents, /api/harness, /api/deck, /api/google ---
 	{ name: "agent.dialogs", group: "agent", ...agentsRead, summary: "The questions an agent's runtime has up, waiting for an answer.", params: [{ name: "id", schema: str() }], result: obj({ dialogs: arr(any()) }) },

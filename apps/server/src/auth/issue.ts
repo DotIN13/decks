@@ -1,7 +1,6 @@
 import { randomInt, timingSafeEqual } from "node:crypto";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
-import { saveStudioLink, studioOrigin } from "../studio/index.ts";
 import { CLI_TOKEN_LABEL } from "./cli-token.ts";
 import { actsAsPerson } from "./principal.ts";
 import type { TokenStore } from "./tokens.ts";
@@ -20,7 +19,7 @@ import { bearerOf, originOf } from "./guard.ts";
  * - **Agents**: made when the agent first starts and taken back when it stops (`canvas/bridge.ts`); no
  *   request asks for one.
  * - **Pairing**: `POST /api/pair` trades a code, or a site this harness can place, for a harness token
- *   as that site, bound to the page's site, lasting a day unused; Decks Studio sends its key with it.
+ *   as that site, bound to the page's site, lasting a day unused.
  * - **A canvas pass**: `POST /api/passes { canvas }`, asked by the person or a site for the sandboxed
  *   editor it is about to show, and again at half its hour to renew it (`passes.ts`).
  * - **An app pass**: an app's server is given one when it starts (`apps/service.ts`); a tab another site
@@ -115,14 +114,14 @@ export function fromThisMachine(remote: string | undefined, headers: Record<stri
 }
 
 /**
- * Whether a Studio may pair with this harness without a code (`POST /api/pair` with its key): a page
- * served by the same machine or tailnet name the request was addressed to (Studio beside the
+ * Whether a page's site is one this harness can place, so it may pair without a code: a page served
+ * by the same machine or tailnet name the request was addressed to (another Decks beside the
  * harness), one on loopback, or one whose origin the owner lists in `DECKS_STUDIO_ORIGINS`
- * (comma-separated, `https://studio.example.com`). A call with no `Origin` is not a page, and is let
- * through only from this machine itself. Any other site asks for a code: otherwise any page the
- * person opened could link the harness to a Studio of its own and be sent the deck.
+ * (comma-separated, `https://decks.example.com`; named from when Studio's pages paired here). A call
+ * with no `Origin` is not a page, and is let through only from this machine itself. Any other site
+ * asks for a code: reaching the harness proves nothing about the page that did.
  */
-function studioWithoutCode(remote: string | undefined, headers: Record<string, string | string[] | undefined>, env: NodeJS.ProcessEnv = process.env): boolean {
+function placedSite(remote: string | undefined, headers: Record<string, string | string[] | undefined>, env: NodeJS.ProcessEnv = process.env): boolean {
 	const origin = headers.origin;
 	if (typeof origin !== "string" || origin === "") return fromThisMachine(remote, headers);
 	let from: URL;
@@ -158,8 +157,8 @@ function studioWithoutCode(remote: string | undefined, headers: Record<string, s
 
 /**
  * Whether `POST /api/pair` may hand out a token without a code: only on this machine or a private
- * network (`fromPrivateNetwork`), and then a web page only if it is one a Studio may be
- * (`studioWithoutCode`). Reaching 127.0.0.1 proves nothing about a page, since any site the person
+ * network (`fromPrivateNetwork`), and then a web page only if its site is one this harness can
+ * place (`placedSite`). Reaching 127.0.0.1 proves nothing about a page, since any site the person
  * opens is let reach it by their browser. A call with no `Origin` is not a page (the iOS app, a
  * script) and keeps the old rule.
  */
@@ -167,7 +166,7 @@ export function pairWithoutCode(remote: string | undefined, headers: Record<stri
 	if (!fromPrivateNetwork(remote, headers)) return false;
 	const origin = headers.origin;
 	if (typeof origin !== "string" || origin === "") return true;
-	return studioWithoutCode(remote, headers, env);
+	return placedSite(remote, headers, env);
 }
 
 /** Loopback, the private ranges, link-local, and the 100.64/10 block Tailscale's addresses are in; IPv6 alike. */
@@ -250,52 +249,39 @@ export function doorRoutes(app: App): express.Router {
 	 * origin, for a pairing code or, without one, from where this harness can place it. Answered with the
 	 * deck's name, which is what the other front end will call this server.
 	 *
-	 * Decks Studio connects here too, sending its address and this harness's Studio key (`studio`,
-	 * `key`), which are kept for syncing (`saveStudioLink`). Without a code, a page may pair only from
-	 * this machine or a private network and only from a site a Studio may be (`pairWithoutCode`); a
-	 * Studio sending its key may from wherever it is placed (`studioWithoutCode`): on this machine, on the
-	 * address the harness was reached at, or listed in `DECKS_STUDIO_ORIGINS`. A harness deployed where
-	 * others can reach it sets `DECKS_REQUIRE_PAIR_CODE=1`, and then nothing pairs without a working code.
+	 * Without a code, a page may pair only from this machine or a private network and only from a site
+	 * this harness can place (`pairWithoutCode`). A harness deployed where others can reach it sets
+	 * `DECKS_REQUIRE_PAIR_CODE=1`, and then nothing pairs without a working code.
+	 *
+	 * Decks Studio no longer comes here. It used to send its address and a key for this harness with
+	 * the pairing, and the harness kept them: a page handing a harness the key to send its deck with.
+	 * The harness signs in to Studio itself now (`studio/login.ts`), and a body that carries a key is
+	 * refused, so an old Studio's page says why.
 	 */
 	api.post("/pair", (req, res) => {
 		const body = (req.body ?? {}) as { code?: unknown; label?: unknown; studio?: unknown; key?: unknown };
 		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
 		const origin = String(req.headers.origin ?? "");
-		const studio = body.studio !== undefined || body.key !== undefined;
-		const label = typeof body.label === "string" && body.label.trim() ? body.label : studio ? "Decks Studio" : "Another Decks";
-		if (studio && (typeof body.studio !== "string" || typeof body.key !== "string")) {
-			res.status(400).json({ error: "Send Studio's address as studio and this harness's key as key." });
+		const label = typeof body.label === "string" && body.label.trim() ? body.label : "Another Decks";
+		if (body.studio !== undefined || body.key !== undefined) {
+			res.status(400).json({ error: "Studio no longer hands a harness its key. Sign in from the harness: Settings, Sign in to Studio, or decks studio login in a terminal there." });
 			return;
 		}
 		if (!code && app.codes.required) {
 			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
 			return;
 		}
-		if (!code && !(studio ? studioWithoutCode(req.socket.remoteAddress, req.headers) : pairWithoutCode(req.socket.remoteAddress, req.headers))) {
-			res.status(403).json({
-				needsCode: true,
-				error: studio
-					? "Only a Studio on this machine, on the address you reached the harness at, or listed in DECKS_STUDIO_ORIGINS connects without a code. Run decks pair code in a shell on the harness's machine."
-					: "This page is on another site or reaches the server over the internet, so it needs a pairing code. Run decks pair code in a shell on the server's machine.",
-			});
+		if (!code && !pairWithoutCode(req.socket.remoteAddress, req.headers)) {
+			res.status(403).json({ needsCode: true, error: "This page is on another site or reaches the server over the internet, so it needs a pairing code. Run decks pair code in a shell on the server's machine." });
 			return;
-		}
-		if (studio) {
-			try {
-				studioOrigin(body.studio as string, body.key as string);
-			} catch (error) {
-				res.status(400).json({ error: (error as Error).message });
-				return;
-			}
 		}
 		if (code && !app.codes.redeem(code)) {
 			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one with decks pair code on the harness's machine." });
 			return;
 		}
 		const { token } = app.tokens.issue({ kind: "site", label, ...(origin ? { origin } : {}) });
-		const linked = studio ? saveStudioLink(app.deck.path, body.studio as string, body.key as string) : {};
 		app.send(app.pairingMessage());
-		res.json({ token, name: app.deck.name, ...linked });
+		res.json({ token, name: app.deck.name });
 	});
 
 	/**

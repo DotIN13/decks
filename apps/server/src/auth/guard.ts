@@ -20,7 +20,8 @@ import { decodedPath, HARNESS_ID, isAppPass, isCanvasPass, passCovers, splitPath
  * What is let in without one:
  * - the doors (`issue.ts`), where tokens are handed out: `/api/hello`, `/api/pair`, `/api/login`; the
  *   opencode plugin's `/api/tokens/session` and the Google Docs tools' `/api/gdocs/call`, which check
- *   opencode's own secret themselves; Google's sign-in coming back (`/api/google/callback`); and the
+ *   opencode's own secret themselves; Google's sign-in coming back (`/api/google/callback`) and
+ *   Studio's (`/api/studio/callback`), each let in by a `state` only this harness started; and the
  *   Decks extension (`/api/web/`), which has its own pairing;
  * - the Decks page and its files, `lib/` and the SDK file: the same for everyone, and the page is
  *   given a harness token only when it is a tab of its own (`issue.ts`).
@@ -74,7 +75,7 @@ export function fromAnotherSite(headers: Record<string, string | string[] | unde
 }
 
 /** The routes a caller with no token yet must reach to get one, or that check a secret of their own. */
-const DOORS = new Set(["/api/hello", "/api/pair", "/api/login", "/api/tokens/session", "/api/gdocs/call", "/api/google/callback"]);
+const DOORS = new Set(["/api/hello", "/api/pair", "/api/login", "/api/tokens/session", "/api/gdocs/call", "/api/google/callback", "/api/studio/callback"]);
 
 export function isDoor(path: string): boolean {
 	return DOORS.has(path) || path.startsWith("/api/web/");
