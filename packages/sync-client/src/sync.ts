@@ -531,6 +531,11 @@ export class HarnessSync {
 		}
 	}
 
+	/** The files left out, `<canvas>/<path>`, the first hundred. */
+	private leftOut(): string[] {
+		return [...this.skipped].slice(0, 100).map((key) => key.replace(":", "/"));
+	}
+
 	/** A file joins the work due. */
 	private owe(key: string, size: number) {
 		if (this.due.has(key)) return;
@@ -549,7 +554,7 @@ export class HarnessSync {
 	/** A pass ended without failing: in step, unless Studio asked for a wait and something waits for it. */
 	private settled() {
 		if (this.holding("files") || this.holding("edits")) return this.say({ state: "held", now: undefined, heldUntil: Math.max(this.held.files, this.held.edits) }, true);
-		this.say({ state: "synced", now: undefined, heldUntil: undefined, error: undefined, syncedAt: Date.now(), skipped: this.skipped.size }, true);
+		this.say({ state: "synced", now: undefined, heldUntil: undefined, error: undefined, syncedAt: Date.now(), skipped: this.skipped.size, leftOut: this.leftOut() }, true);
 	}
 
 	/** Change what is said; told through `progress` at once when the state changes, else at most every 250 ms. */
@@ -1176,7 +1181,7 @@ export class HarnessSync {
 				this.paid(`${name}:${path}`);
 			}
 		}
-		this.say({ skipped: this.skipped.size });
+		this.say({ skipped: this.skipped.size, leftOut: this.leftOut() });
 		return remote;
 	}
 

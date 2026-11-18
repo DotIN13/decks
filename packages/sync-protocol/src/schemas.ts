@@ -183,6 +183,8 @@ export const SyncProgress = z.object({
 	heldUntil: z.number().optional(),
 	error: z.string().max(500).optional(),
 	skipped: z.number().int().min(0),
+	/** The files left out, as `<canvas>/<path>`, the first hundred: what Settings lists when asked. */
+	leftOut: z.array(z.string().max(1000)).max(100).optional(),
 	at: z.number(),
 });
 export type SyncProgress = z.infer<typeof SyncProgress>;

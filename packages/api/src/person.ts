@@ -126,6 +126,7 @@ export const PERSON_VERBS: readonly Verb[] = [
 	},
 	{ name: "harness.studioCode", group: "misc", ...outside, summary: "The code Studio showed, pasted: the sign-in under way trades it for this harness's key.", params: [{ name: "code", schema: str() }] },
 	{ name: "harness.studioCancel", group: "misc", ...outside, summary: "Give up the sign-in to Studio that is under way.", params: [] },
+	{ name: "harness.studioSync", group: "misc", ...outside, summary: "Sync with Studio now: a full pass, as after a reconnect (Settings' Try again).", params: [] },
 	{ name: "web.answer", group: "web", ...outside, summary: "Answer the shared browser's question: yes or no.", params: [{ name: "id", schema: str() }, { name: "ok", schema: bool() }] },
 	// --- added with the side routes (step 4): what Studio and a terminal asked of /api/agents, /api/harness, /api/deck, /api/google ---
 	{ name: "agent.dialogs", group: "agent", ...agentsRead, summary: "The questions an agent's runtime has up, waiting for an answer.", params: [{ name: "id", schema: str() }], result: obj({ dialogs: arr(any()) }) },

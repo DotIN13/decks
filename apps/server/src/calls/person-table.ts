@@ -480,6 +480,9 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"harness.studioCancel": async () => {
 			app.studioLogin.cancel();
 		},
+		"harness.studioSync": async () => {
+			app.studioSyncNow?.();
+		},
 		"web.answer": async ([id, ok], call) => {
 			if (!app.web.answer(String(id), ok === true)) notice(call, "info", "That question has already been answered.");
 		},

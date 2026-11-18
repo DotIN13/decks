@@ -607,43 +607,51 @@
 	.sw-studio-failed {
 		color: var(--v3-danger);
 	}
-	/* How far the deck is in step with Studio (`SyncRow`): a state, one line, a bar while files move, and the file moving now. */
-	.sw-sync-title::before {
-		content: "";
-		display: inline-block;
-		width: 7px;
-		height: 7px;
-		margin: 0 7px 1px 0;
-		border-radius: 50%;
-		background: var(--v3-fg3);
-		vertical-align: middle;
+	/*
+	 * How far the deck is in step with Studio (`SyncRow`): rows that hang from their first line, so the
+	 * icon, the name and what sits at the right share one 28 px line. Still: no pulse, no sheen.
+	 */
+	.sw-sync {
+		display: flex;
+		align-items: flex-start;
+		gap: 14px;
+		padding: 10px 0;
 	}
-	.sw-sync-title[data-state="synced"]::before {
-		background: #2f9e5b;
+	.sw-sync .sw-mark.sw-sync-mark {
+		color: var(--sw-tone, var(--v3-fg2));
 	}
-	.sw-sync-title[data-state="syncing"]::before,
-	.sw-sync-title[data-state="connecting"]::before {
-		background: var(--v3-accent);
-		animation: sw-sync-pulse 1.2s ease-in-out infinite;
+	.sw-sync[data-tone="accent"] { --sw-tone: var(--v3-accent); }
+	.sw-sync[data-tone="warn"] { --sw-tone: #d4891a; }
+	.sw-sync[data-tone="ok"] { --sw-tone: #1f9d55; }
+	.sw-sync[data-tone="danger"] { --sw-tone: var(--v3-danger); }
+	.sw-sync-words {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
 	}
-	.sw-sync-title[data-state="held"]::before {
-		background: #d08a1e;
+	.sw-sync-line {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		min-height: 28px;
 	}
-	.sw-sync-title[data-state="offline"]::before {
-		background: var(--v3-danger);
+	.sw-sync-figure {
+		flex: none;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
 	}
-	@keyframes sw-sync-pulse {
-		50% {
-			opacity: 0.35;
-		}
-	}
-	.sw-sync-sub {
-		display: block;
+	.sw-sync-when {
+		flex: none;
+		color: var(--v3-fg2);
+		font-size: 12px;
 	}
 	.sw-sync-bar {
 		display: block;
 		height: 4px;
-		margin: 7px 0 2px;
+		margin: 4px 0 6px;
 		overflow: hidden;
 		border-radius: 2px;
 		background: var(--v3-bg3);
@@ -652,15 +660,31 @@
 		display: block;
 		height: 100%;
 		border-radius: 2px;
-		background: var(--v3-accent);
-		transition: width 0.3s var(--v3-ease);
+		background: var(--sw-tone);
 	}
-	.sw-sync-now {
-		display: block;
+	.sw-sync .sw-sub {
+		font-variant-numeric: tabular-nums;
+	}
+	.sw-sync-file {
 		overflow: hidden;
 		color: var(--v3-fg3);
 		font-family: var(--font-mono);
 		font-size: 11px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.sw-sync-list {
+		display: flex;
+		flex-direction: column;
+		max-height: 160px;
+		margin-top: 6px;
+		overflow-y: auto;
+		color: var(--v3-fg2);
+		font-family: var(--font-mono);
+		font-size: 11px;
+	}
+	.sw-sync-list > span {
+		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}

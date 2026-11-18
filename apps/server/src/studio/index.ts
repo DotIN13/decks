@@ -26,6 +26,8 @@ export interface StudioLink {
 	presence(name: string, message: Parameters<HarnessSync["presence"]>[1]): void;
 	/** Say again where this harness can be reached: the list changed. */
 	report(): void;
+	/** A full pass now, not at the next five minutes (Settings' Try again). */
+	syncNow(): void;
 }
 
 const DEFAULT_URL = DEFAULT_STUDIO;
@@ -226,6 +228,7 @@ export function startStudio(
 			await sync?.stop();
 		},
 		report: () => void report(),
+		syncNow: () => void sync?.sync(),
 		status: () => ({ connected: Boolean(sync), url: current ? current.split(" ")[0] : undefined, ...(sync ? { sync: sync.progress() } : {}) }),
 		edited: (name, change) => sync?.edited(name, change),
 		presence: (name, message) => sync?.presence(name, message),

@@ -85,6 +85,7 @@ line.onPresence = (message) => {
 // They go as the file has them, cards named from the canvas's folder, since what Studio sends back is written as the file (`editsToDisk`).
 app.pens.log.wrote = (name, change) => studio.edited(name, { ...change, edits: editsToDisk(name, change.edits) });
 app.addressesChanged = () => studio.report();
+app.studioSyncNow = () => studio.syncNow();
 
 /*
  * One upgrade listener, several websockets.

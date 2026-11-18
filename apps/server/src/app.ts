@@ -546,6 +546,9 @@ export class App {
 		this.accountList.startLimits();
 	}
 
+	/** A full pass with Studio now, when signed in (`studio/index.ts`); set by index.ts. */
+	studioSyncNow: (() => void) | undefined;
+
 	/** The sync said how far the deck is in step with Studio: every Settings page hears it. */
 	studioSynced(progress: StudioSyncRow | undefined): void {
 		this.studioSync = progress;

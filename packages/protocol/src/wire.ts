@@ -52,6 +52,8 @@ export interface StudioSyncRow {
 	heldUntil?: number;
 	error?: string;
 	skipped: number;
+	/** The files left out, `<canvas>/<path>`, the first hundred. */
+	leftOut?: string[];
 	at: number;
 }
 
