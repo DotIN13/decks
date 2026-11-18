@@ -400,8 +400,7 @@ export class DeckAgent {
 	}
 
 	/** What the canvas extension is allowed to reach on this agent (§6.2). */
-	/** `byPerson`: the hooks a person's acts go through (`personTool`), so a move they make is told to the agent. */
-	private stageHooks(byPerson = false) {
+	private stageHooks() {
 		return {
 			id: this.id,
 			identity: () => this.identity,
@@ -434,9 +433,9 @@ export class DeckAgent {
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
 			stageName: () => this.seat.stageName(true),
 
-			openStage: (name: string) => this.seat.openStage(name, byPerson ? "other" : "itself"),
-			newStage: (title: string) => this.seat.newStage(title, { by: byPerson ? "other" : "itself" }),
-			setHome: (name: string) => this.seat.openStage(name, byPerson ? "other" : "itself"),
+			openStage: (name: string) => this.seat.openStage(name),
+			newStage: (title: string) => this.seat.newStage(title),
+			setHome: (name: string) => this.seat.openStage(name),
 			deliver: (target: string, spec: { task: string; boards?: string[] }) => {
 				if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 				return this.host.deliver(this.id, target, spec);
@@ -550,7 +549,7 @@ export class DeckAgent {
 		this.personal ??= createDecksTool({
 			stage: this.stage,
 			agent: {
-				...this.stageHooks(true),
+				...this.stageHooks(),
 				person: true,
 				acted: undefined,
 				worked: undefined,

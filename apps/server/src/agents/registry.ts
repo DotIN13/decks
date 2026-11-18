@@ -570,8 +570,8 @@ export class Registry {
 		 * (the old send's { name, kind }), it joins its workspace's latest canvas on first use.
 		 */
 		// Where it starts is where it was made, not a move: nothing to tell it.
-		if (spec.canvas) made.seat.openStage(spec.canvas, "itself");
-		else if (spec.newCanvas && this.stage.pens) made.seat.newStage("", { by: "itself" });
+		if (spec.canvas) made.seat.openStage(spec.canvas);
+		else if (spec.newCanvas && this.stage.pens) made.seat.newStage("");
 		this.publish();
 		const model = made.conversation.model;
 		const mode = made.conversation.mode;

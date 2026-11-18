@@ -279,23 +279,20 @@ export class Seat {
 	}
 
 	/**
-	 * Work on another stage: the browser is sent its drawing, and its boards are the ones this agent sees.
+	 * Put the chat's camera on another canvas: the browser is sent its drawing, and its boards are the ones this agent sees.
 	 *
-	 * `by`: who moved it. An agent that opened a canvas itself knows; one moved by someone else (a person
-	 * in Decks or Studio, or its canvas deleted) is told with its next message, so its next call that
-	 * names no canvas does not land somewhere it does not expect.
+	 * The agent is told nothing of it. An agent has no home canvas and names the canvas in every call
+	 * (`calls/context.ts`), so a move changes nothing about where its work lands, and every message the
+	 * person writes says what they were looking at (`looking-at.ts`). It was told, in a note that called
+	 * the canvas its home and said calls would act there, once for every tab the person looked at
+	 * between two messages. Only a canvas deleted from under it is still said (`stageDeleted`).
 	 */
-	openStage(name: string, by: "itself" | "other" = "other"): void {
+	openStage(name: string): void {
 		const pens = this.of.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". decks canvas list lists them; decks canvas create <title> makes one.`);
 		if (name === this.folder) return;
-		const from = this.folder;
 		this.folder = name;
-		if (by === "other") {
-			const title = pens.titleOf(name);
-			this.of.tell(`[You were moved ${from ? `from the canvas "${pens.names().includes(from) ? pens.titleOf(from) : from}" ` : ""}to the canvas "${title}" (decks … --canvas ${name}). It is your home canvas now: a call that names no canvas acts on it. Read it before you change it.]`);
-		}
 		this.of.save();
 		for (const path of [...this.playing].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		this.of.arranged?.();
@@ -319,8 +316,9 @@ export class Seat {
 	}
 
 	/**
-	 * A canvas was deleted. If it was this agent's, it moves to a fresh, empty canvas of its own; the
-	 * cards it held there are gone with the canvas's folder.
+	 * A canvas was deleted. If this agent's camera was on it, the camera goes to a fresh, empty canvas;
+	 * the cards it held there are gone with the canvas's folder. It is told so with its next message,
+	 * by the canvas's name, since a call that names that canvas would now be refused.
 	 */
 	stageDeleted(name: string): void {
 		if (this.folder !== name) return;
@@ -331,16 +329,17 @@ export class Seat {
 		this.loosePlaying = [];
 		this.of.save();
 		const pens = this.of.stage.pens;
-		if (pens) this.newStage("");
-		else this.publishContext();
+		if (!pens) return void this.publishContext();
+		const fresh = this.newStage("");
+		this.of.tell(`[The canvas "${name}" was deleted, with the cards on it. Your chat's camera is on a new, empty canvas now (--canvas ${fresh}).]`);
 	}
 
 	/** A new, empty stage, named from a title, and opened. Returns its folder name. */
-	newStage(title: string, options: { provisional?: boolean; by?: "itself" | "other" } = {}): string {
+	newStage(title: string, options: { provisional?: boolean } = {}): string {
 		const pens = this.of.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		const name = pens.claim(title.trim() || UNTITLED, { provisional: options.provisional === true || !title.trim() });
-		this.openStage(name, options.by ?? "other");
+		this.openStage(name);
 		return name;
 	}
 

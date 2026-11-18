@@ -85,3 +85,38 @@ test("a message is sent with the line as its last note, and a slash command with
 		rmSync(dataDir, { recursive: true, force: true });
 	}
 });
+
+test("a camera moved between canvases is not told to the agent; a canvas deleted from under it is", async () => {
+	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-moved-")));
+	const deck = join(dataDir, "decks");
+	mkdirSync(join(deck, "boards"), { recursive: true });
+	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
+	try {
+		const agent = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
+		const sent: string[] = [];
+		const conversation = agent.conversation as unknown as { start: () => Promise<void>; backend: unknown };
+		conversation.start = async () => {};
+		conversation.backend = new Proxy({ prompt: async (text: string) => void sent.push(text), isStreaming: false } as Record<string, unknown>, { get: (own, key: string) => (key in own ? own[key] : () => undefined) });
+		const first = agent.seat.stageName(true)!;
+		// The person looks at one tab and then another, five times over, between two messages.
+		const plan = agent.seat.newStage("Plan");
+		for (let i = 0; i < 5; i++) {
+			agent.seat.openStage(first);
+			agent.seat.openStage(plan);
+		}
+		await agent.prompt("hello", undefined, { kind: "canvas", target: plan });
+		assert.ok(!/moved|home canvas/.test(sent[0]!), sent[0]);
+		assert.ok(sent[0]!.endsWith('[The person wrote this while looking at the canvas "Plan" (--canvas plan).]\n\nhello'), sent[0]);
+		// The canvas its camera is on is deleted: said once, by the name a call would now be refused for.
+		agent.seat.stageDeleted(plan);
+		const fresh = agent.seat.stageName(true)!;
+		assert.notEqual(fresh, plan);
+		await agent.prompt("and now?");
+		assert.ok(sent[1]!.includes(`[The canvas "plan" was deleted, with the cards on it. Your chat's camera is on a new, empty canvas now (--canvas ${fresh}).]`), sent[1]);
+		await agent.prompt("again");
+		assert.ok(!/was deleted/.test(sent[2]!), sent[2]);
+	} finally {
+		app.dispose();
+		rmSync(dataDir, { recursive: true, force: true });
+	}
+});
