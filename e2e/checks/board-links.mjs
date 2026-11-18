@@ -36,9 +36,14 @@ await canvas.waitForFunction((path) => !(window.__decksProbes?.cards?.() ?? []).
 say("the linked board is off the canvas to begin with", !(await onCanvas()).includes(LINKED), (await onCanvas()).join(" "));
 
 const rectOf = (path) => canvas.evaluate((wanted) => (window.__decksProbes?.cards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, path);
-/** The card framed, then its `n`th link pressed where it is on screen. */
+/**
+ * The card framed, then its `n`th link pressed where it is on screen. Framed by selecting it and
+ * pressing Fit, unless it is the selected card already: this card is links from edge to edge, and a
+ * press on a selected card is the card's own, so the press that would select it follows a link.
+ */
 const press = async (n) => {
-	await flyToCard(page, CARD);
+	const selected = await canvas.evaluate((path) => [...document.querySelectorAll('.card-node[data-selected="true"]')].some((one) => one.dataset.path === path), CARD);
+	if (!selected) await flyToCard(page, CARD);
 	await settle(page, 400);
 	const r = await rectOf(CARD);
 	await page.mouse.click(r.x + r.width * 0.15 + 40, r.y + r.height * (n * 0.25 + 0.125));
