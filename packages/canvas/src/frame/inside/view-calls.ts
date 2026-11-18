@@ -18,7 +18,7 @@ export interface ViewCallsNeeds {
 	readonly start: Start;
 	readonly moveTo: (to: Camera, animate?: boolean) => void;
 	readonly ctx: FrameContext;
-	readonly selectCard: (path: string | undefined, asPress?: boolean) => void;
+	readonly selectCard: (path: string | undefined) => void;
 	readonly end: FrameEnd;
 	readonly handle: CanvasHandle;
 	readonly backend: Backend;

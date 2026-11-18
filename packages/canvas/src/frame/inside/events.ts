@@ -94,14 +94,20 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	}
 	follower.at(first.rev);
 
-	/** Select a card by its path; `asPress`, as a press on it would, the card itself selected too (what the page restores as a frame starts). */
-	const selectCard = (path: string | undefined, asPress = false) => {
+	/**
+	 * Select a card by its path, as a press on it does: the card itself, and nothing in the drawing's
+	 * own selection. An agent's `view focus`, a row of the side panel and a canvas opened again all come
+	 * here. They used to put the card in the drawing's selection instead, which is what the properties
+	 * panel shows for, so every card an agent placed and flew to came with its position, size and
+	 * corners in a panel over the canvas, where a press on a card never opens one.
+	 */
+	const selectCard = (path: string | undefined) => {
 		if (!path) return;
 		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path || path.endsWith(one.metadata?.path ?? "\u0000"));
-		if (child?.id) handle.select([child.id], asPress ? child.metadata!.path : undefined);
+		if (child?.metadata?.path) handle.select([], child.metadata.path);
 	};
 	// The card the page had selected on this canvas when the frame was made again (an agent switch and back).
-	selectCard(start.selected, true);
+	selectCard(start.selected);
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
 	const { viewCall } = createViewCalls({ pages, agent, start, moveTo, ctx, selectCard, end, handle, backend });
 	followLine({ studio, handle, changed, first, ctx, backend, viewCall, pages, setPages, follower });

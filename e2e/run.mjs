@@ -216,6 +216,8 @@ const CHECKS = [
 	{ file: "canvas-pictures.mjs", needsAgent: false },
 	/* The conversation taken out of the side panel as a float, by a drag of its head or its button, and put back. */
 	{ file: "chat-out.mjs", needsAgent: false },
+	/* A card an agent places and focuses is selected quietly: no properties panel until the person presses the canvas. */
+	{ file: "focus-quiet.mjs", needsAgent: false },
 	/* The SDK redesign's view calls in a real browser: reload counted per page, goto, focus on a named canvas. */
 	{ file: "view-calls.mjs", needsAgent: false },
 	/* Measures, not a check: the stage's costs on a 2,000-item canvas (`node scripts/render-perf.mjs`). Run only when named. */
