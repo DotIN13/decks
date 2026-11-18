@@ -1,4 +1,4 @@
-import { PenError, walk, type PenDocument, type PenNode } from "@decks/pen";
+import { PenError, walk, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
 import { posix } from "node:path";
 import { canvasFolder, referenceFor, resolveReference, urlFor } from "@decks/hub/layout";
 
@@ -93,6 +93,39 @@ export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocume
 	if (adopt?.frame) for (const ref of frameRefsOf(out)) adopt.frame(name, ref);
 	if (adopt?.file) adoptFills(name, out, adopt.file);
 	return out;
+}
+
+/**
+ * Edits worked out between two drawings as the harness holds them, said as they would be between the
+ * same drawings on disk: what goes to Studio (`HarnessSync.edited`), which keeps a canvas as its folder
+ * has it and sends it back to be written as a file. A card inserted, or its `metadata` set, is named
+ * from the canvas's own folder; a refused card goes back as it was written. Nothing else differs.
+ * Without this a card placed while the harness was linked came back from Studio named by its deck
+ * path, and the file named it so, which the canvas refuses (`toMemory`).
+ */
+export function editsToDisk(name: string, edits: readonly PenEdit[]): PenEdit[] {
+	return edits.map((edit) => {
+		if (edit.op === "insert" && edit.props.type === "browser") {
+			const disk = itemToDisk(name, { ...edit.props, id: edit.id } as PenNode);
+			if (!disk) return edit;
+			const { id: _id, children: _children, ...props } = disk;
+			return { ...edit, props };
+		}
+		if (edit.op === "set" && edit.key === "metadata" && edit.value && typeof edit.value === "object") {
+			const disk = itemToDisk(name, { id: edit.id, type: "browser", metadata: edit.value } as PenNode);
+			return disk ? { ...edit, value: disk.metadata } : edit;
+		}
+		return edit;
+	});
+}
+
+/** One item as `toDisk` writes it, or undefined when it cannot be named from this canvas (left as it is). */
+function itemToDisk(name: string, node: PenNode): PenNode | undefined {
+	try {
+		return toDisk(name, { version: "2.14", children: [node] } as PenDocument).children[0] as PenNode | undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 /**

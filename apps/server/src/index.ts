@@ -12,6 +12,7 @@ import { installDir } from "@decks/runtime";
 import { Line } from "./connections/line.ts";
 import { revokeStudioTokens, startStudio, studioToken as studioGives } from "./studio/index.ts";
 import { DryRun } from "./migrations/index.ts";
+import { editsToDisk } from "./canvas/canvas-refs.ts";
 
 const config = loadConfig();
 
@@ -79,7 +80,8 @@ line.onPresence = (message) => {
 	studio.presence(canvas, { by: { kind: by.kind, id: by.id, ...(by.name ? { name: by.name } : {}), color: by.color }, ...rest });
 };
 // Every write of a canvas, as logged: a canvas on Studio has its edits sent up at once (`HarnessSync.edited`).
-app.pens.log.wrote = (name, change) => studio.edited(name, change);
+// They go as the file has them, cards named from the canvas's folder, since what Studio sends back is written as the file (`editsToDisk`).
+app.pens.log.wrote = (name, change) => studio.edited(name, { ...change, edits: editsToDisk(name, change.edits) });
 app.addressesChanged = () => studio.report();
 
 /*

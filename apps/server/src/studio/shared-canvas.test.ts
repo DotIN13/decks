@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -10,6 +10,7 @@ import { Live, MemoryStore, syncHandler, type Who } from "@decks/hub";
 import { nodeHandler } from "@decks/hub/node";
 import { HarnessSync } from "@decks/sync-client";
 import { CanvasPens } from "../canvas/pens.ts";
+import { editsToDisk } from "../canvas/canvas-refs.ts";
 
 /**
  * Two harnesses on one Studio account, one canvas: an edit on either is applied there at once, sent to
@@ -63,7 +64,7 @@ function harness(url: string, key: string) {
 			},
 		},
 	});
-	pens.log.wrote = (name, change) => sync.edited(name, change);
+	pens.log.wrote = (name, change) => sync.edited(name, { ...change, edits: editsToDisk(name, change.edits) });
 	return { deck, pens, sync, heard, present, async stop() {
 		await sync.stop();
 		pens.close();
@@ -120,6 +121,37 @@ test("two harnesses on one canvas: an edit on either reaches the other through S
 		assert.equal(a.present.length, 0, "never back to the harness that said it");
 		a.sync.presence(name, { by: { kind: "person", id: "l1", color: "#2563eb" }, gone: true });
 		assert.ok(await until(() => b.present.some((one) => one.gone)), "and the leave");
+	} finally {
+		await a.stop();
+		await b.stop();
+		await s.close();
+	}
+});
+
+test("a card placed while linked comes back from Studio as the same card on both harnesses, never refused", async () => {
+	const s = await studio();
+	const a = harness(s.url, "key-a");
+	const b = harness(s.url, "key-b");
+	try {
+		const name = a.pens.claim("Cards");
+		a.pens.edit(name, [{ op: "insert", node: { type: "note", id: "n", content: "one" }, box: { x1: 0, y1: 0 } }]);
+		await a.sync.start();
+		await b.sync.start();
+		assert.ok(await until(() => content(b.pens, name, "n") === "one"));
+		// The card's folder is the canvas's own; placed as the canvas service places it, by its deck path.
+		const folder = join(a.deck, "canvases", name, "cards", "c1");
+		mkdirSync(folder, { recursive: true });
+		writeFileSync(join(folder, "index.html"), "<title>C1</title><div class=doc>hello</div>");
+		a.pens.edit(name, [{ op: "insert", node: { type: "browser", id: "c1", name: "C1", width: 400, height: 300, metadata: { type: "decks.card", path: `canvases/${name}/cards/c1/index.html` } }, box: { x1: 600, y1: 0 } }]);
+		const card = (pens: CanvasPens) => pens.get(name).doc.children.find((n) => n.id === "c1") as { metadata?: { type?: string; path?: string } } | undefined;
+		assert.ok(await until(() => card(b.pens) !== undefined), "B has the card");
+		// Studio's answer has been written on A by now: the card is still a card there, named by its deck path in memory.
+		await new Promise((done) => setTimeout(done, 400));
+		assert.deepEqual(card(a.pens)?.metadata, { type: "decks.card", path: `canvases/${name}/cards/c1/index.html` }, "A's card is not refused");
+		assert.equal(card(b.pens)?.metadata?.type, "decks.card", "B's card is not refused");
+		const id = Object.values(s.store.canvases("tiger"))[0]!.id;
+		const kept = s.store.canvas(id)!.pen.children.find((n: { id: string }) => n.id === "c1") as { metadata?: { path?: string } };
+		assert.equal(kept.metadata?.path, "cards/c1/index.html", "Studio keeps it as the folder has it");
 	} finally {
 		await a.stop();
 		await b.stop();
