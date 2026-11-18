@@ -104,7 +104,15 @@ export function SidePanel(props: { parts: Parts }) {
 				onApp={apps.onApp}
 				onAppLogs={apps.onAppLogs}
 				chat={
-					<Show when={!phone() && !chatOut()}>
+					<Show
+						when={!phone() && !chatOut()}
+						/* Held over the panel, the conversation's slot: a section of the panel's own layout, so it is exactly the room the conversation takes. */
+						fallback={
+							<Show when={!phone() && chatFloat.landing()}>
+								<section class="v3-chat v3-chat-slot" aria-hidden="true" />
+							</Show>
+						}
+					>
 						<ChatSection
 							chat={focusedChat()}
 							identity={state.identities[state.focused ?? ""]}
@@ -114,7 +122,7 @@ export function SidePanel(props: { parts: Parts }) {
 								setChatFolded(folded);
 								holdHistory();
 							}}
-							out={{ headDown: chatFloat.headDown, press: chatFloat.takeOut }}
+							out={{ gripDown: chatFloat.gripDown }}
 						>
 							<FocusedStream shown={chatShown()} items={transcript()} chat={focusedChat()} atTurn={atTurn()} />
 						</ChatSection>
@@ -131,7 +139,7 @@ export function SidePanel(props: { parts: Parts }) {
 						setChatFolded(folded);
 						holdHistory();
 					}}
-					float={{ placed: chatFloat.placed, cornerDown: chatFloat.cornerDown, back: chatFloat.putBack }}
+					float={{ placed: chatFloat.placed, cornerDown: chatFloat.cornerDown }}
 				>
 					<FocusedStream shown={chatShown()} items={transcript()} chat={focusedChat()} atTurn={atTurn()} />
 				</ChatSection>

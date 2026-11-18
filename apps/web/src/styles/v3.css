@@ -2631,27 +2631,50 @@ body {
 
 /* ---- the conversation taken out of the panel: a float over the canvas (`app/chat-float.ts`) ---- */
 @layer components {
-	/* Its head is what takes it: out of the panel by a drag, and about the canvas once it is out. */
 	.v3-chat-head {
+		position: relative;
 		user-select: none;
 		-webkit-user-select: none;
 	}
-	.v3-chat:not([data-sheet="true"]) .v3-chat-head {
+	/*
+	 * Its one handle, the composer's own grip: a short bar at the top of the head, in a band tall
+	 * and wide enough to take hold of. In the panel it takes the conversation out; out, it moves it.
+	 */
+	.v3-chat-grip {
+		position: absolute;
+		z-index: 2;
+		top: 5px;
+		left: 50%;
+		width: 36px;
+		height: 4px;
+		margin-left: -18px;
+		border-radius: 2px;
+		background: var(--v3-fg3);
+		cursor: grab;
+		opacity: 0.55;
 		touch-action: none;
+		transition: opacity 120ms ease;
 	}
-	.v3-chat-out {
-		color: var(--v3-fg2);
+	.v3-chat-grip::before {
+		position: absolute;
+		inset: -4px -22px -9px;
+		content: "";
 	}
-	.v3-chat-out:hover,
-	.v3-chat-out:focus-visible {
-		color: var(--v3-fg);
+	.v3-chat-grip:hover,
+	.v3-chat[data-dragging="true"] .v3-chat-grip {
+		opacity: 1;
+	}
+	.v3-chat[data-dragging="true"] .v3-chat-grip {
+		cursor: grabbing;
 	}
 	/*
-	 * At home it stands under the top-right bar, its right edge in line with the bar's. Away from
-	 * home the inline `left` and `top` the float writes place it. Never taller than the canvas has
-	 * room for under the bar.
+	 * A float, placed by the float system's inline `left` and `top` (`floats.ts`). The place here is
+	 * only where it stands for the moment before it has been given one. Never taller than the canvas
+	 * has room for under the top bar.
 	 */
 	.v3-chat[data-float="true"] {
+		--stowtab-w: 28px;
+		--stowtab-h: 56px;
 		position: absolute;
 		z-index: var(--z-float);
 		top: 64px;
@@ -2672,17 +2695,38 @@ body {
 	.v3-chat[data-float="true"][data-floating="true"] {
 		right: auto;
 	}
+	/*
+	 * Let go, it glides to where it rests, as the composer and the tools do: on with the throw, to an
+	 * edge, behind one. The float system sets this for the length of the glide (`[data-snapping]`,
+	 * `--snap-ms`) and takes it off after, so a drag never fights a transition.
+	 */
+	.v3-chat[data-float="true"][data-snapping="true"] {
+		transition:
+			left var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1);
+	}
+	.v3-chat[data-float="true"]:is([data-dragging="true"], [data-landing="true"]) {
+		transition: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-chat[data-float="true"][data-snapping="true"] {
+			transition-duration: 0s;
+		}
+	}
+	/* Put away behind an edge, it is only its tab: its own surface goes with what is in it. */
+	.v3-chat[data-float="true"][data-stowed] {
+		background: transparent;
+		box-shadow: none;
+		overflow: visible;
+	}
+	.v3-chat[data-float="true"] > :not(.stowtab) {
+		transition: opacity 160ms ease;
+	}
 	/* Folded, the head alone, as wide as it was. */
 	.v3-chat[data-float="true"][data-folded="true"] {
 		height: 44px;
 		min-height: 44px;
 		flex: none;
-	}
-	.v3-chat[data-float="true"] .v3-chat-head {
-		cursor: grab;
-	}
-	.v3-chat[data-float="true"][data-dragging="true"] .v3-chat-head {
-		cursor: grabbing;
 	}
 	/* The corner: a quarter-circle of two short strokes, 20px to take hold of. */
 	.v3-chat-corner {
@@ -2716,17 +2760,16 @@ body {
 		user-select: none;
 	}
 	/*
-	 * Held over the side panel, the panel shows where the conversation lands: its lower part, at the
-	 * height the conversation has there. No words in it: the float held over it would cover them.
+	 * Held over the side panel, the conversation's slot: an empty section in the conversation's own
+	 * place in the panel, laid out by the conversation's own rules, so it is exactly the room the
+	 * conversation takes when it lands. No words in it: the float held over it would cover them.
 	 */
-	.panel-shell[data-chat-drop="true"]::after {
+	.v3-chat-slot {
+		transition: none;
+	}
+	.v3-chat-slot::after {
 		position: absolute;
-		z-index: 30;
-		right: 6px;
-		bottom: 6px;
-		left: 6px;
-		height: calc(var(--v3-chat-h, 48%) - 12px);
-		min-height: 96px;
+		inset: 6px;
 		border: 2px dashed var(--v3-accent);
 		border-radius: 14px;
 		background: color-mix(in srgb, var(--v3-accent) 12%, var(--v3-panel));
