@@ -28,7 +28,6 @@ export const cardKind: TabKind = {
 	name: "card",
 	address: "card",
 	title: (tab) => cardAt(tab.target)?.title,
-	says: (tab) => (tab.target ? `the card "${cardAt(tab.target)?.title ?? tab.target}" (@${tab.target})` : undefined),
 	offers: {
 		label: "Cards",
 		list: async () => ((await act<Array<{ path: string; title: string }>>("card.list", [])) ?? []).map((card) => ({ target: card.path, title: card.title || card.path, note: canvasOfPath(card.path) })),

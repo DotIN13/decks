@@ -21,6 +21,8 @@ const screen = { touches: "screen", effect: "change", who: "person" } as const;
 const outside = { touches: "outside", effect: "change", who: "person" } as const;
 
 const Parts = arr(any("A part of the message: a card, a comment, a file, as the composer puts them in."));
+/** The tab in front when the person wrote a message: its kind, and what it is of (a canvas's name, a card's or a document's path, an app's name). */
+const LookingAt = obj({ kind: lit("canvas", "card", "document", "app"), target: str() });
 const Thinking = str("How hard the agent thinks, as its runtime names the levels.");
 const OnCanvas = obj({ canvas: opt(str()) });
 
@@ -62,14 +64,14 @@ export const PERSON_VERBS: readonly Verb[] = [
 	{ name: "agent.answer", group: "agent", ...agents, summary: "Answer a question an agent's runtime put up (agent.prompt).", params: [{ name: "answer", schema: any() }] },
 
 	// --- the conversation -------------------------------------------------------------------
-	{ name: "chat.send", group: "agent", ...agents, summary: "Send the agent a message from the person: words and the parts the composer holds.", params: [{ name: "id", schema: str() }, { name: "message", schema: obj({ text: str(), parts: opt(Parts) }) }] },
+	{ name: "chat.send", group: "agent", ...agents, summary: "Send the agent a message from the person: words, the parts the composer holds, and what the person was looking at when they wrote it (`at`, the tab in front), which the harness says to the agent in a line before the words, never before a slash command.", params: [{ name: "id", schema: str() }, { name: "message", schema: obj({ text: str(), parts: opt(Parts), at: opt(LookingAt) }) }] },
 	{ name: "chat.abort", group: "agent", ...agents, summary: "Stop the agent's turn.", params: [{ name: "id", schema: str() }] },
 	{
 		name: "chat.queue",
 		group: "agent",
 		...agents,
 		summary: "The person's own queue for an agent: add a message, remove one, send one now, or release the queue.",
-		params: [{ name: "id", schema: str() }, { name: "change", schema: obj({ action: lit("add", "remove", "send", "release"), text: opt(str()), parts: opt(Parts), item: opt(str()) }) }],
+		params: [{ name: "id", schema: str() }, { name: "change", schema: obj({ action: lit("add", "remove", "send", "release"), text: opt(str()), parts: opt(Parts), at: opt(LookingAt), item: opt(str()) }) }],
 	},
 	{ name: "chat.open", group: "agent", ...agentsRead, summary: "Read the agent's conversation: its recent history comes back as chat.history.", params: [{ name: "id", schema: str() }] },
 	{ name: "chat.earlier", group: "agent", ...agentsRead, summary: "Older messages, before one: back as chat.earlier.", params: [{ name: "id", schema: str() }, { name: "page", schema: obj({ before: str(), limit: opt(int()) }) }] },

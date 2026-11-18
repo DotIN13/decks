@@ -1,10 +1,10 @@
 import { createSignal } from "solid-js";
-import { commentPill, messageParts } from "../composer/pill-about.ts";
+import { messageParts } from "../composer/pill-about.ts";
 import type { Draft } from "@decks/agent-ui/composer";
 import { withComments } from "../markup/comments.ts";
 import { takeComments } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
-import { aboutLine } from "../tabs/about.ts";
+import { lookingAt } from "../tabs/about.ts";
 import { notice } from "../state/notices.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { destination, stripMention, withoutName } from "./send-from-bar.ts";
@@ -54,20 +54,18 @@ export function createBar(names: BarNames) {
 				 * again after a reload and on another device. The `@name` that picked the agent is not part of it.
 				 */
 				const stage = canvasOnScreen()?.name;
-				const partsOf = (wrote: Draft) => messageParts(wrote, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
-				const written = draft && partsOf(dest.named ? withoutName(draft, dest.name) : draft);
+				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
+				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : {};
 				/*
-				 * The agent's text says what the person was looking at (`tabs/about.ts`), and the message is
-				 * kept as it was written, without that line. One sent with no draft (a comment's Send now) is
-				 * its comments' pills and then its words, as the composer would have held it.
+				 * With the words goes the tab that was in front (`tabs/about.ts`): the harness tells the agent
+				 * what the person was looking at, in a line of its own before the words, and before a slash
+				 * command it adds nothing. The words are sent as they were written.
 				 */
-				const about = aboutLine();
-				const asWritten = () => written ?? partsOf([...notes.map((note) => commentPill(note, names.titleOf, names.itemName)), { type: "text" as const, text: typed }]);
-				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : about && (typed || notes.length > 0) ? { parts: asWritten() } : {};
-				const said = about ? `${about}\n\n${line}` : line;
+				const looking = lookingAt();
+				const at = looking ? { at: looking } : {};
 				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
-				if (queue) void call("chat.queue", [dest.id, { action: "add", text: said, ...parts }]).then(warnIfFailed);
-				else void call("chat.send", [dest.id, { text: said, ...parts }]).then(warnIfFailed);
+				if (queue) void call("chat.queue", [dest.id, { action: "add", text: line, ...parts, ...at }]).then(warnIfFailed);
+				else void call("chat.send", [dest.id, { text: line, ...parts, ...at }]).then(warnIfFailed);
 				return;
 			}
 			case "note":

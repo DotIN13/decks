@@ -12,6 +12,7 @@ import type { Act } from "./acts.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
 import { identityReminder } from "./identity-reminder.ts";
+import { lookingLineIn, type LookingAt } from "./looking-at.ts";
 import { canvasNameReminder } from "../canvas/canvas-name.ts";
 import { Conversation } from "./conversation.ts";
 import { Inbox } from "./inbox.ts";
@@ -223,7 +224,7 @@ export class DeckAgent {
 				emit: (message) => this.emit(message),
 				name: () => this.identity.name,
 				state: () => this.conversation.state,
-				prompt: (text, parts) => this.prompt(text, parts),
+				prompt: (text, parts, at) => this.prompt(text, parts, at),
 				run: (text) => this.run(text),
 				notice: (level, text) => this.conversation.translator.notice(level, text),
 				brief: (task, boards, person) => host.brief(task, boards, person),
@@ -566,36 +567,46 @@ export class DeckAgent {
 		return this.personal;
 	}
 
-	/** `parts`: the message as written (`MessagePart`), kept with it in the conversation; the agent gets `text`. */
-	async prompt(text: string, parts?: MessagePart[]): Promise<void> {
+	/**
+	 * `parts`: the message as written (`MessagePart`), kept with it in the conversation; the agent gets
+	 * `text`. `at`: what the person was looking at when they wrote it, as their page says
+	 * (`looking-at.ts`); the agent is told in a line put before the words, with the other notes.
+	 */
+	async prompt(text: string, parts?: MessagePart[], at?: LookingAt): Promise<void> {
 		// Before anything is appended: a restored chat's stored rows belong under the new message, not after it.
 		this.conversation.window();
-		// An outside agent has no runtime to prompt: the words wait in its inbox (`Inbox.leave`). A slash command means nothing to it.
+		// An outside agent has no runtime to prompt: the words wait in its inbox (`Inbox.leave`), with where they were written. A slash command means nothing to it.
 		if (this.inbox.outsideKey !== undefined) {
-			this.inbox.leave(text, parts);
+			this.inbox.leave(text, parts, at ? lookingLineIn(at, this.deck, this.stage.pens, this.seat.stageName()) : undefined);
 			return;
 		}
-		await this.conversation.say(text, parts, (slash) => this.notesFor(slash));
+		await this.conversation.say(text, parts, (slash) => this.notesFor(slash, at));
 	}
+
 
 	/**
 	 * What the agent should know before it reads what to do, put first in its next message.
 	 *
-	 * Anything the person did to a card since the last turn rides along with the message rather than
-	 * arriving as its own interruption. Then, never on a slash command, which every runtime reads as
-	 * an exact line: what others changed on its canvases since its last message (every way in comes
-	 * through here: a message typed, queued, sent into a running turn or handed over), who it has not
-	 * said it is, until it has (`agents/identity-reminder.ts`), and its canvas's name, while it has
-	 * none of its own or has outgrown it (`canvas/canvas-name.ts`).
+	 * Every line Decks adds to a message is added here, and nowhere else. A slash command gets none of
+	 * them: every runtime reads one as an exact line, so anything put before it turns the command into
+	 * a sentence for the model. What it would have carried waits for the next message.
+	 *
+	 * In order: anything the person did to a card since the last turn, which rides along with the
+	 * message rather than arriving as its own interruption; what others changed on its canvases since
+	 * its last message (every way in comes through here: a message typed, queued, sent into a running
+	 * turn or handed over); who it has not said it is, until it has (`agents/identity-reminder.ts`);
+	 * its canvas's name, while it has none of its own or has outgrown it (`canvas/canvas-name.ts`); and
+	 * last, nearest the words, what the person was looking at when they wrote them (`looking-at.ts`).
 	 */
-	private notesFor(slash: boolean): string[] {
+	private notesFor(slash: boolean, at?: LookingAt): string[] {
+		if (slash) return [];
 		const notes = this.pending.splice(0);
-		if (slash) return notes;
 		notes.push(...this.seat.canvasNotes());
 		const unsaid = identityReminder(this.identity);
 		if (unsaid) notes.push(unsaid);
 		const unnamed = canvasNameReminder(this.stage.pens, this.seat.stageName());
 		if (unnamed) notes.push(unnamed);
+		if (at) notes.push(lookingLineIn(at, this.deck, this.stage.pens, this.seat.stageName()));
 		return notes;
 	}
 

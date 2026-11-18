@@ -20,7 +20,6 @@ export const appKind: TabKind = {
 	name: "app",
 	address: "app",
 	title: (tab) => tab.target,
-	says: (tab) => (tab.target ? `the app ${tab.target}` : undefined),
 	offers: {
 		label: "Apps",
 		always: true,

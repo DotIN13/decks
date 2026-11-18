@@ -79,10 +79,11 @@ export class Inbox {
 	 * The person wrote to an outside agent. It has no runtime to prompt: the words are shown here,
 	 * wait in its inbox, and reach it with its next call.
 	 */
-	leave(text: string, parts?: MessagePart[]): void {
+	leave(text: string, parts?: MessagePart[], note?: string): void {
 		if (!this.outside) return;
 		this.of.said(text, parts);
-		this.of.turns.leave({ from: PERSON, fromName: "The person", task: text, boards: [], at: Date.now(), person: true });
+		// What it reads has the note first (what the person was looking at); the conversation shows the words.
+		this.of.turns.leave({ from: PERSON, fromName: "The person", task: note ? `${note}\n\n${text}` : text, boards: [], at: Date.now(), person: true });
 		this.of.notice("info", `${this.of.name()} works in ${this.outside.client}, outside Decks: it reads this with its next call.`);
 		this.changed();
 	}

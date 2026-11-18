@@ -1,4 +1,5 @@
 import type { AgentKind, AgentState, MessagePart, ServerMessage } from "@decks/protocol";
+import type { LookingAt } from "./looking-at.ts";
 import type { QueuedWork } from "./work.ts";
 
 /**
@@ -57,7 +58,7 @@ export interface TurnsHost {
 	name(): string;
 	state(): AgentState;
 	/** Say a message to the agent, as a turn (`DeckAgent.prompt`). */
-	prompt(text: string, parts?: MessagePart[]): Promise<void>;
+	prompt(text: string, parts?: MessagePart[], at?: LookingAt): Promise<void>;
 	/** Run one turn of handed-over work to its end, and answer its report (`DeckAgent.run`). */
 	run(text: string): Promise<{ report: string; boards: string[] }>;
 	/** A line in the conversation that is nobody's message. */
@@ -98,7 +99,7 @@ export class Turns {
 	 * each as the turn before it ends, and before any work another agent handed over. `mineHeld` is
 	 * Stop's: a stopped turn holds the queue until you send it.
 	 */
-	private mine: Array<{ id: string; text: string; parts?: MessagePart[] }> = [];
+	private mine: Array<{ id: string; text: string; parts?: MessagePart[]; /** What the person was looking at when they wrote it, kept until it is sent. */ at?: LookingAt }> = [];
 	private mineHeld = false;
 
 	constructor(
@@ -226,14 +227,14 @@ export class Turns {
 		return { items: this.mine.map((one) => ({ id: one.id, text: one.text })), held: this.mineHeld };
 	}
 
-	queueMine(text: string, parts?: MessagePart[]): void {
+	queueMine(text: string, parts?: MessagePart[], at?: LookingAt): void {
 		const said = text.trim();
 		if (!said) return;
 		if (this.of.state() === "idle" && this.mine.length === 0) {
-			void this.of.prompt(said, parts);
+			void this.of.prompt(said, parts, at);
 			return;
 		}
-		this.mine.push({ id: `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, text: said, ...(parts?.length ? { parts } : {}) });
+		this.mine.push({ id: `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, text: said, ...(parts?.length ? { parts } : {}), ...(at ? { at } : {}) });
 		this.sayMine();
 	}
 
@@ -249,7 +250,7 @@ export class Turns {
 		const found = this.mine.find((one) => one.id === item);
 		if (!found) return;
 		this.unqueueMine(item);
-		void this.of.prompt(found.text, found.parts);
+		void this.of.prompt(found.text, found.parts, found.at);
 	}
 
 	/** A queue Stop held, let go: the next message goes now if nothing is running. */
@@ -264,7 +265,7 @@ export class Turns {
 		if (this.mineHeld || this.mine.length === 0) return false;
 		const next = this.mine.shift()!;
 		this.sayMine();
-		void this.of.prompt(next.text, next.parts);
+		void this.of.prompt(next.text, next.parts, next.at);
 		return true;
 	}
 

@@ -20,7 +20,6 @@ export const documentKind: TabKind = {
 	name: "document",
 	address: "doc",
 	title: (tab) => nameOf(tab.target),
-	says: (tab) => (tab.target ? `the document @${tab.target}` : undefined),
 	offers: {
 		label: "Documents",
 		// The files a document can be, by their endings, wherever they are in the deck.

@@ -5,6 +5,7 @@ import { STT_MODELS, type ServerMessage } from "@decks/protocol";
 import { harnessVersion } from "../connections/routes/shared.ts";
 import { sttReady } from "../stt.ts";
 import type { App } from "../app.ts";
+import { cleanLooking } from "../agents/looking-at.ts";
 import { cleanParts } from "../agents/message-parts.ts";
 import type { DeckAgent } from "../agents/session.ts";
 import { joinSpot } from "../deck/place.ts";
@@ -184,9 +185,9 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		},
 
 		"chat.send": async ([id, message]) => {
-			const given = (message ?? {}) as { text?: string; parts?: unknown[] };
+			const given = (message ?? {}) as { text?: string; parts?: unknown[]; at?: unknown };
 			const agent = agents().get(String(id)) ?? agents().focused();
-			void agent.prompt(String(given.text ?? ""), cleanParts(given.parts as never));
+			void agent.prompt(String(given.text ?? ""), cleanParts(given.parts as never), cleanLooking(given.at));
 			agent.sayRow();
 		},
 		"chat.abort": async ([id]) => {
@@ -194,8 +195,8 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		},
 		"chat.queue": async ([id, change]) => {
 			const agent = need(id);
-			const asked = (change ?? {}) as { action?: string; text?: string; parts?: unknown[]; item?: string };
-			if (asked.action === "add" && typeof asked.text === "string") agent.turns.queueMine(asked.text, cleanParts(asked.parts as never));
+			const asked = (change ?? {}) as { action?: string; text?: string; parts?: unknown[]; item?: string; at?: unknown };
+			if (asked.action === "add" && typeof asked.text === "string") agent.turns.queueMine(asked.text, cleanParts(asked.parts as never), cleanLooking(asked.at));
 			else if (asked.action === "remove" && typeof asked.item === "string") agent.turns.unqueueMine(asked.item);
 			else if (asked.action === "send" && typeof asked.item === "string") agent.turns.sendMineNow(asked.item);
 			else if (asked.action === "release") agent.turns.releaseMine();

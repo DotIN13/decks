@@ -1,11 +1,12 @@
 /**
- * A message says where the chat's camera was (`apps/web/src/tabs/about.ts`).
+ * A message says where the chat's camera was (`apps/web/src/tabs/about.ts`,
+ * `apps/server/src/agents/looking-at.ts`).
  *
  * The composer talks to the agent of the conversation on screen whichever tab is in front, and an agent
- * has no home canvas to take "here" for. So the agent's text always carries one line in front of the
- * words saying what the person was looking at: a canvas by the name a call can use, and a card, a
- * document or an app with the canvas held behind it. The composer shows nothing of it and has no way
- * to leave it out, and the message kept in the conversation is the words alone.
+ * has no home canvas to take "here" for. So the page sends, with the words, the tab that was in
+ * front, and the harness tells the agent in a line before the words (its own test reads that line).
+ * The page adds nothing to the words themselves: put there, the line stood in front of a slash
+ * command, and `/compact` reached the model as a sentence. The composer shows nothing of it.
  *
  * No agent runs here: the page's line is routed, and what it would send an agent is held back and read.
  */
@@ -61,29 +62,33 @@ const write = async (words) => {
 	return sent.at(-1);
 };
 
-// --- on the chat's canvas: the agent is told where the person is, and the composer says nothing of it --------
-if (process.env.LOOK_SHOTS) await page.locator(".dock").first().screenshot({ path: `${process.env.LOOK_SHOTS}/composer.png` });
+// --- on the chat's canvas: the words go as written, with the tab that was in front ----------------------------
 say("the composer has no chip for it: nothing to press, nothing to leave out", (await page.locator(".dock-about").count()) === 0 && !/\bOn\b/.test(await page.locator(".dock .dock-row").first().innerText()), await page.locator(".dock .dock-row").first().innerText().catch(() => ""));
 const first = await write("hello from the first canvas");
-say("the agent's text says which canvas the person was looking at, by the name a call can use", first?.text === `[The person wrote this while looking at the canvas "Auth refresh" (--canvas ${CANVAS}).]\n\nhello from the first canvas`, JSON.stringify(first?.text));
-say("…and the message kept is the words alone", JSON.stringify(first?.parts) === JSON.stringify([{ type: "text", text: "hello from the first canvas" }]), JSON.stringify(first?.parts));
+say("the words are sent as they were written, with nothing put before them", first?.text === "hello from the first canvas" && first?.parts === undefined, JSON.stringify(first));
+say("…and with them the tab the person was looking at: the canvas, by its name", JSON.stringify(first?.at) === JSON.stringify({ kind: "canvas", target: CANVAS }), JSON.stringify(first?.at));
 
-// --- the camera on another canvas: the line follows ------------------------------------------------------------
+// --- the camera on another canvas: what is sent follows --------------------------------------------------------
 await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
 await page.locator('.switcher-canvas:has-text("Tab two")').click();
 await until(async () => ((await page.locator('.v3-topbar .tab-chip[data-camera="true"]').innerText()).includes("Tab two") ? true : undefined));
 const there = await write("hello from the tab");
-say("with the camera on another canvas the agent's text names that one", there?.text === `[The person wrote this while looking at the canvas "Tab two" (--canvas ${second}).]\n\nhello from the tab`, JSON.stringify(there?.text));
-const again = await write("and again");
-say("…in every message, not only the first", again?.text === `[The person wrote this while looking at the canvas "Tab two" (--canvas ${second}).]\n\nand again`, JSON.stringify(again?.text));
+say("with the camera on another canvas, that canvas is what is sent", there?.text === "hello from the tab" && JSON.stringify(there?.at) === JSON.stringify({ kind: "canvas", target: second }), JSON.stringify(there));
 
-// --- a card in front: the line names the card, and the canvas behind it ------------------------------------------
+// --- a slash command is sent as the exact line it is --------------------------------------------------------------
+await page.locator(".dockfield").fill("/compact");
+const before = sent.length;
+// With the command menu up the first Enter completes the row it is on, and the next one sends.
+await page.locator(".dockfield").press("Enter");
+if (!(await until(() => sent.length > before, 1200))) await page.locator(".dockfield").press("Enter");
+await until(() => sent.length > before);
+say("a slash command goes as the exact line it is, nothing put before it", sent.length === before + 1 && /^\/compact ?$/.test(sent.at(-1)?.text ?? ""), JSON.stringify(sent.at(-1)));
+
+// --- a card in front: the card is what is sent ------------------------------------------------------------------
 await call("view.open", [card("plan")]);
 await until(() => page.locator('.tab-chip[data-kind="card"][data-front="true"]').count());
 const onCard = await write("about this card");
-say("with a card in front the agent's text names it by its path", (onCard?.text ?? "").startsWith(`[The person wrote this while looking at the card "`) && (onCard?.text ?? "").includes(`(@${card("plan")})`), JSON.stringify(onCard?.text));
-say("…and the canvas held behind it, by the name a call can use", (onCard?.text ?? "").includes(`, with the canvas "Tab two" (--canvas ${second}) behind it.]\n\nabout this card`), JSON.stringify(onCard?.text));
-say("…and the message kept is still the words alone", JSON.stringify(onCard?.parts) === JSON.stringify([{ type: "text", text: "about this card" }]), JSON.stringify(onCard?.parts));
+say("with a card in front, the card is what is sent, by its path, and the words alone", onCard?.text === "about this card" && JSON.stringify(onCard?.at) === JSON.stringify({ kind: "card", target: card("plan") }), JSON.stringify(onCard));
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();

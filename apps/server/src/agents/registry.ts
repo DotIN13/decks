@@ -1,3 +1,4 @@
+import { parseSlash } from "./slash.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ModelOption, ServerMessage } from "@decks/protocol";
@@ -720,7 +721,9 @@ export class Registry {
  * drift within a turn. The board source is the plan of record — the child reads the
  * same bytes the user is looking at, and reports by changing them.
  */
-function brief(task: string, boards: string[], deck: Deck, person?: boolean): string {
+export function brief(task: string, boards: string[], deck: Deck, person?: boolean): string {
+	// A slash command the person handed over (a card's button they pressed): the exact line it is, with nothing after it for the runtime to take as its argument.
+	if (person && parseSlash(task)) return task.trim();
 	// When the work runs, not when it was queued: "since yesterday" is read against this.
 	const parts = [task.trim(), "", `It is now ${nowWords(Date.now(), processZone())}.`];
 

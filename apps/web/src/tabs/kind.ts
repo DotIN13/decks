@@ -35,11 +35,6 @@ export interface TabKind {
 	/** What a tab of this kind is called in the row. */
 	title(tab: Tab): string | undefined;
 	/**
-	 * What a message written while a tab of this kind is in front says the person was looking at, as
-	 * the agent reads it: what it is, by the name an agent can act on (`about.ts`).
-	 */
-	says(tab: Tab): string | undefined;
-	/**
 	 * What can be opened as a tab of this kind, for the + (`OpenMore.tsx`): asked for when the + is
 	 * opened. `label` heads them; `always` lists the first few before anything is typed (a deck's apps
 	 * are few), where the others are found by typing. The canvas has none: the + lists canvases itself.

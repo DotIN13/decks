@@ -1,3 +1,4 @@
+import { parseSlash } from "./slash.ts";
 import { readFileSync } from "node:fs";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, ChatItem, MessagePart, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
@@ -566,7 +567,8 @@ export class Conversation {
 		 * message rather than arriving as its own interruption. Prefixed, not appended:
 		 * the agent should know the board moved *before* it reads what to do about it.
 		 */
-		const slash = text.trimStart().startsWith("/");
+		// A slash command by the one rule every runtime reads it by (`parseSlash`): a message that only begins with a path is a message, and gets its notes.
+		const slash = parseSlash(text) !== undefined;
 		const nudges = notes(slash);
 		const sent = nudges.length > 0 ? `${nudges.join("\n")}\n\n${text}` : text;
 		try {
