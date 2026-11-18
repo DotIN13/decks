@@ -2779,6 +2779,11 @@ body {
 		content: "";
 		pointer-events: none;
 	}
+	/* Folded, the slot is the head's strip at the panel's foot. */
+	.v3-chat-slot[data-folded="true"]::after {
+		inset: 4px 6px;
+		border-radius: 10px;
+	}
 	.app[data-presenting="true"] .v3-chat[data-float="true"] {
 		display: none !important;
 	}

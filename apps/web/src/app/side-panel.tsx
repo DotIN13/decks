@@ -106,10 +106,10 @@ export function SidePanel(props: { parts: Parts }) {
 				chat={
 					<Show
 						when={!phone() && !chatOut()}
-						/* Held over the panel, the conversation's slot: a section of the panel's own layout, so it is exactly the room the conversation takes. */
+						/* Held over the panel, the conversation's slot: a section of the panel's own layout, folded if the conversation is, so it is exactly the room the conversation takes. */
 						fallback={
 							<Show when={!phone() && chatFloat.landing()}>
-								<section class="v3-chat v3-chat-slot" aria-hidden="true" />
+								<section class="v3-chat v3-chat-slot" data-folded={chatFolded() ? "true" : undefined} aria-hidden="true" />
 							</Show>
 						}
 					>

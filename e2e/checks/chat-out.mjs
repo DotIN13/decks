@@ -11,8 +11,9 @@
  * a reload; its corner sizes it from its top left; its title still folds it and a drag does not;
  * thrown at the top it rests under the top bars, never over them; held over the panel the slot
  * shows again, the same box, and let go there it is in the panel again; thrown at the panel from
- * the canvas and let go short of it, it glides on into the slot; and a double-click on the grip
- * sends it home too. `LOOK_SHOTS=<dir>` keeps pictures.
+ * the canvas and let go short of it, or from the far side, it glides on into the slot; a
+ * double-click on the grip sends it home too; and folded, it is taken out folded and put back
+ * folded. `LOOK_SHOTS=<dir>` keeps pictures.
  */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -260,6 +261,34 @@ await page.mouse.dblclick(g.x, g.y);
 await settle(page, 1000);
 const end = await look();
 say("a double-click on its grip sends it home, to the panel", same(end.docked, home) && !end.float && end.out === "0", JSON.stringify({ docked: end.docked, float: end.float }));
+
+// --- taken out folded, it stays folded, and comes back folded -----------------------------------------
+await page.mouse.click(end.title.cx, end.title.cy);
+await settle(page, 500);
+const foldedHome = (await look()).docked;
+say("folded in the panel, it is its head at the panel's foot", (await look()).folded === true && foldedHome.h === 44, JSON.stringify(foldedHome));
+{
+	const grip = await gripOf();
+	let up;
+	await drag(grip, { x: 820, y: 420 }, {
+		steps: 20,
+		hold: {
+			at: 1,
+			then: async () => {
+				up = await look();
+				if (OUT) await page.screenshot({ path: join(OUT, "8-lifted-folded.png") });
+			},
+		},
+	});
+	say("dragged out folded, it is a folded float, and its slot is the folded head's box", !!up?.float && up.folded === true && up.float.h === 44 && same(up.slot, foldedHome), JSON.stringify({ float: up?.float, slot: up?.slot, had: foldedHome }));
+	const rest = await look();
+	say("let go on the canvas it stays folded", !!rest.float && rest.folded === true && rest.float.h === 44, JSON.stringify(rest.float));
+	if (OUT) await page.screenshot({ path: join(OUT, "9-out-folded.png") });
+	await drag(await gripOf(), { x: 180, y: 700 });
+	await settle(page, 600);
+	const back = await look();
+	say("put back folded, it is folded in the panel, in the box it had", same(back.docked, foldedHome) && back.folded === true && !back.float, JSON.stringify({ docked: back.docked, had: foldedHome, folded: back.folded }));
+}
 
 say("no errors on the page", errors.length === 0, errors.join(" | ").slice(0, 300));
 await browser.close();

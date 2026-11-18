@@ -26,7 +26,6 @@ import type { Floats } from "./floats.ts";
 
 interface ChatFloatLayout {
 	setChatOut: (out: boolean) => void;
-	setChatFolded: (folded: boolean) => void;
 	holdHistory: () => void;
 }
 
@@ -64,14 +63,11 @@ export function createChatFloat(layout: ChatFloatLayout, { workBox, mountFloat }
 
 	// --- taking it out, and putting it back ---------------------------------------------------
 
-	const takeOut = () => {
-		layout.setChatFolded(false);
-		layout.setChatOut(true);
-	};
+	/* Folded or open, it is taken out and put back as it is: a conversation folded to its head in the panel is that head as a float, and back. */
+	const takeOut = () => layout.setChatOut(true);
 	const putBack = () => {
 		setLanding(false);
 		layout.setChatOut(false);
-		layout.setChatFolded(false);
 		setPanelOpen(true);
 		layout.holdHistory();
 	};
