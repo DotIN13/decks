@@ -62,8 +62,9 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 		},
 
 		/*
-		 * Decks Studio (`studio/`). The harness signs in itself: from a terminal that is a short code,
-		 * typed on Studio from any device, since a machine with no screen has no browser to send back.
+		 * Decks Studio (`studio/`). The harness signs in itself, as Claude Code does: `login` answers an
+		 * address on Studio, which shows a code to any browser signed in there, and `code` takes the code,
+		 * pasted, since a machine with no screen has no browser to send back.
 		 * Only the person: an agent or a card that could sign the harness in could send the whole deck to
 		 * an account of its choosing.
 		 */
@@ -71,13 +72,20 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 			login: async (url?: string) => {
 				if (!agent.person) throw new Error("Only the person can sign this harness in to Decks Studio.");
 				if (!service.studioLogin) throw new Error("This server signs in to no Studio.");
-				const shown = await service.studioLogin(typeof url === "string" ? url : undefined);
-				ctx.notes.push(`Open ${shown.verify} on any device signed in to Studio and type ${shown.code}, within ${Math.max(1, Math.round((shown.expires - Date.now()) / 60_000))} minutes. decks studio status says when it is done.`);
-				return shown;
+				const open = await service.studioLogin(typeof url === "string" ? url : undefined);
+				ctx.notes.push(`Open that address in a browser, on any device. Studio shows a code there: paste it here, or run decks studio code <code>, within ${Math.max(1, Math.round((open.expires - Date.now()) / 60_000))} minutes.`);
+				return { url: open.url, expires: open.expires };
+			},
+			code: async (code: string) => {
+				if (!agent.person) throw new Error("Only the person can sign this harness in to Decks Studio.");
+				if (!service.studioCode) throw new Error("This server signs in to no Studio.");
+				const got = await service.studioCode(String(code ?? ""));
+				ctx.notes.push(`Signed in to ${got.url}${got.account ? ` as ${got.account}` : ""}. The deck syncs there in the background.`);
+				return { connected: true, ...got };
 			},
 			status: async () => {
-				const waiting = service.studioShowing?.().code;
-				const signingIn = waiting ? { code: waiting.code, verify: waiting.verify } : {};
+				const open = service.studioShowing?.().open;
+				const signingIn = open ? { signingIn: open.url } : {};
 				const file = join(service.deckPath(), ".decks", "studio.json");
 				if (process.env.DECKS_STUDIO_KEY) return { connected: true, url: process.env.DECKS_STUDIO_URL };
 				if (!existsSync(file)) return { connected: false, ...signingIn };

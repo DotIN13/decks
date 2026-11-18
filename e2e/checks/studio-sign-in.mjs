@@ -1,14 +1,16 @@
 /**
  * The harness signs in to Decks Studio from its own Settings (`settings/StudioSignIn.tsx`,
- * `server/src/studio/login.ts`), in a real browser, against a stand-in for Studio.
+ * `server/src/studio/login.ts`), the way Claude Code signs in, in a real browser, against a stand-in
+ * for Studio.
  *
- * What is checked: Settings, Connections has a Decks Studio group that says Sign in, with Studio's
- * address in a field; pressed from this tab, which is on the harness's own machine, it opens a tab on
- * Studio that comes straight back, and Settings then says signed in and as whom, with no code and no
- * address typed anywhere; the key is on disk; the page that loaded told the harness nothing to report
- * but its own address; Sign out takes it back to Sign in; a sign-in started from another device
- * shows a short code and where to type it, and once it is typed there Settings says signed in.
- * `LOOK_SHOTS=<dir>` keeps pictures of the three states.
+ * What is checked: Settings, Accounts has a Decks Studio login group that says Sign in, with
+ * Studio's address in a field; pressed, it opens a tab on Studio, which shows a code and, since this
+ * tab is on the harness's own machine, a button; Settings meanwhile says Studio is showing a code and
+ * has a field to paste it into; the button brings the tab back and Settings says signed in and as
+ * whom; the key is on disk; the harness reports its address; Sign out takes it back to Sign in; a
+ * sign-in started from another device opens a page with no button, a wrong code pasted is refused
+ * and the right one signs in; Cancel gives a sign-in up.
+ * `LOOK_SHOTS=<dir>` keeps pictures of the states.
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -27,10 +29,9 @@ const until = async (test, ms = 8000) => {
 	}
 };
 
-// --- a stand-in for Studio: its connect address sends a signed-in person's tab straight back -------
+// --- a stand-in for Studio: its connect page shows a signed-in person the code, and a button when it can send the tab back ---
 const KEY = "dsk_abcdefghijklmnopqrstuvwxyz012345";
 const grants = new Map();
-const devices = new Map();
 const reported = [];
 const studio = createServer((req, res) => {
 	const url = new URL(req.url, "http://studio");
@@ -39,35 +40,28 @@ const studio = createServer((req, res) => {
 		res.end(JSON.stringify(value));
 	};
 	if (req.method === "GET" && url.pathname === "/connect") {
-		const redirect = url.searchParams.get("redirect");
-		if (!redirect) return void res.writeHead(200, { "Content-Type": "text/html" }).end("<h1>Type the code your Decks shows</h1>");
-		const code = `code-${grants.size + 1}`;
+		const code = `ACDE-FGH${grants.size + 3}`;
 		grants.set(code, url.searchParams.get("challenge"));
-		const back = new URL(redirect);
-		back.searchParams.set("code", code);
-		back.searchParams.set("state", url.searchParams.get("state") ?? "");
-		return void res.writeHead(302, { Location: back.href }).end();
+		const redirect = url.searchParams.get("redirect");
+		let button = "";
+		if (redirect) {
+			const back = new URL(redirect);
+			back.searchParams.set("code", code);
+			back.searchParams.set("state", url.searchParams.get("state") ?? "");
+			button = `<a id="go" href="${back.href.replace(/&/g, "&amp;")}">Sign it in</a>`;
+		}
+		return void res.writeHead(200, { "Content-Type": "text/html" }).end(`<h1>Sign this Decks in to Studio</h1>${button}<output id="code">${code}</output>`);
 	}
 	let text = "";
 	req.on("data", (chunk) => (text += chunk));
 	req.on("end", () => {
 		const body = text ? JSON.parse(text) : {};
-		const proves = (challenge) => !!challenge && createHash("sha256").update(body.verifier ?? "").digest("base64url") === challenge;
-		const signedIn = { key: KEY, harness: { id: "h1", name: "This Mac" }, account: { name: "Ada", email: "ada@example.com" } };
-		if (url.pathname === "/api/connect/device") {
-			const device = `dev-${devices.size + 1}`;
-			devices.set(device, { challenge: body.challenge, typed: false });
-			return json(200, { device, code: "ACDE-FGHJ", verify: `${at}/connect`, expires: 600, interval: 0.25 });
-		}
 		if (url.pathname === "/api/connect/exchange") {
-			if (body.code) {
-				const challenge = grants.get(body.code);
-				grants.delete(body.code);
-				return proves(challenge) ? json(201, signedIn) : json(400, { error: "This sign-in has run out or was used already." });
-			}
-			const one = devices.get(body.device);
-			if (!one || !proves(one.challenge)) return json(400, { error: "This sign-in has run out or was used already." });
-			return one.typed ? (devices.delete(body.device), json(201, signedIn)) : json(202, { waiting: true });
+			const code = String(body.code ?? "").toUpperCase();
+			const challenge = grants.get(code);
+			if (!challenge || createHash("sha256").update(body.verifier ?? "").digest("base64url") !== challenge) return json(400, { error: "That code is wrong, has run out or was used already." });
+			grants.delete(code);
+			return json(201, { key: KEY, harness: { id: "h1", name: "This Mac" }, account: { name: "Ada", email: "ada@example.com" } });
 		}
 		if (url.pathname === "/sync/v1/addresses") {
 			reported.push(body.urls);
@@ -85,46 +79,74 @@ const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { metho
 const file = join((await deckState()).path, ".decks", "studio.json");
 const { browser, context, page, errors } = await open({ width: 1400, height: 900 });
 await page.locator('[aria-label="Settings"]').first().click();
-await page.locator(".settings .sw-nav button", { hasText: "Connections" }).click();
+await page.locator(".settings .sw-nav button", { hasText: "Accounts" }).click();
 await settle(page, 300);
 const group = page.locator('.sw-group[data-group="studio"]');
 const words = async () => (await group.innerText()).replace(/\s+/g, " ").trim();
 const shot = async (name) => OUT && (await page.locator(".settings").screenshot({ path: join(OUT, `${name}.png`) }));
 
-say("Connections has a Decks Studio group that offers to sign in, with Studio's address in a field", /Sign in to Decks Studio/.test(await words()) && (await group.locator(".sw-studio-at").inputValue()).startsWith("https://"), await words());
+say("Accounts has a Decks Studio login group that offers to sign in, with Studio's address in a field", /Decks Studio login/.test(await words()) && /Sign in to Decks Studio/.test(await words()) && (await group.locator(".sw-studio-at").inputValue()).startsWith("https://"), await words());
 
 await shot("1-sign-in");
-// --- from this tab, on the harness's own machine: one press, a tab that comes straight back ---------
+// --- from this tab, on the harness's own machine: Studio shows the code, and its button brings it back ---
 await group.locator(".sw-studio-at").fill(at);
 const tabOpened = context.waitForEvent("page", { timeout: 8000 });
 await group.locator('[data-studio="sign-in"]').click();
 const tab = await tabOpened.catch(() => undefined);
+const there = tab ? await until(async () => (/\/connect\?/.test(tab.url()) ? await tab.locator("#code").innerText() : undefined)) : undefined;
+say("Sign in opens a tab on Studio, which shows a code", /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(there ?? ""), `${tab?.url()} ${there}`);
+const waiting = await until(async () => (/Studio is showing a code/.test(await words()) ? await words() : undefined));
+say("Settings says Studio is showing a code, and has a field to paste it into", !!waiting && waiting.includes(new URL(at).host) && (await group.locator(".sw-studio-code").count()) === 1 && (await group.locator('[data-studio="paste"]').isDisabled()), await words());
+await shot("2-waiting");
+await tab?.locator("#go").click();
 const landed = tab ? await until(async () => (/\/api\/studio\/callback/.test(tab.url()) ? await tab.locator("h1").innerText() : undefined)) : undefined;
-say("Sign in opens a tab on Studio, which comes straight back to the harness", landed === "Signed in to Decks Studio", `${tab?.url()} ${landed}`);
+say("Studio's button brings the tab back to the harness", landed === "Signed in to Decks Studio", `${tab?.url()} ${landed}`);
 const signedIn = await until(async () => (/Signed in to Decks Studio as ada@example\.com/.test(await words()) ? await words() : undefined));
 say("Settings says signed in, and as whom, with nothing typed anywhere", !!signedIn && (await group.locator(".sw-studio-code").count()) === 0, await words());
 say("…the key is kept on the harness", existsSync(file) && JSON.parse(readFileSync(file, "utf8")).key === KEY && JSON.parse(readFileSync(file, "utf8")).url === at, existsSync(file) ? readFileSync(file, "utf8").replace(KEY, "dsk_…") : "no file");
 const said = await until(async () => (reported.length ? reported.at(-1) : undefined));
 say("…and the harness tells Studio where it can be reached, its own loopback address among them", Array.isArray(said) && said.some((one) => /^http:\/\/127\.0\.0\.1:\d+$/.test(one)), JSON.stringify(said));
 await tab?.close().catch(() => {});
-await shot("2-signed-in");
+await shot("3-signed-in");
 
 // --- signed out again -------------------------------------------------------------------------------
 await group.locator('[data-studio="sign-out"]').click();
 const out = await until(async () => (/Sign in to Decks Studio/.test(await words()) ? true : undefined));
 say("Sign out takes it back to Sign in, and the key is gone", !!out && !existsSync(file), await words());
 
-// --- from another device: a short code, typed on Studio ---------------------------------------------
+// --- from another device: no tab can come back, so the code is copied from Studio and pasted here ----
 const away = await call("harness.studioSignIn", [{ studio: at, back: "https://mac.tail1.ts.net:8443" }]);
-const shown = await until(async () => ((await group.locator(".sw-studio-code").count()) ? await words() : undefined));
-say("a sign-in from another device shows a short code, and where to type it", away.ok === true && /ACDE-FGHJ/.test(shown ?? "") && shown.includes(`${new URL(at).host}/connect`), `${JSON.stringify(away).slice(0, 120)} | ${shown}`);
-await shot("3-code");
-const box = await group.locator(".sw-studio-code").boundingBox();
-say("…the code large enough to read across a desk", !!box && box.height >= 20, JSON.stringify(box));
-for (const one of devices.values()) one.typed = true;
+const far = new URL(away.value?.url ?? at);
+const shown = await (await fetch(far)).text();
+const code = /<output id="code">([^<]+)</.exec(shown)?.[1] ?? "";
+say("a sign-in from another device opens Studio's page with a code and no button", away.ok === true && !far.searchParams.has("redirect") && !/id="go"/.test(shown) && code.length === 9, `${JSON.stringify(away).slice(0, 160)} | ${shown}`);
+const field = group.locator(".sw-studio-code");
+await until(async () => ((await field.count()) ? true : undefined));
+await field.fill("AAAA-AAAA");
+await group.locator('[data-studio="paste"]').click();
+const refused = await until(async () => ((await page.locator("text=That code is wrong").count()) ? true : undefined), 5000);
+say("a wrong code pasted is refused in Studio's words, and the field stays", !!refused && (await field.count()) === 1 && !existsSync(file), await words());
+await field.fill(code.toLowerCase());
+await shot("4-pasted");
+await field.press("Enter");
 const again = await until(async () => (/Signed in to Decks Studio as ada@example\.com/.test(await words()) ? true : undefined));
-say("once it is typed on Studio, Settings says signed in", !!again && existsSync(file), await words());
+say("the code Studio showed, pasted, signs it in", !!again && existsSync(file), await words());
 await call("harness.unpair", []);
+
+// --- given up ---------------------------------------------------------------------------------------
+await call("harness.studioSignIn", [{ studio: at, back: "https://mac.tail1.ts.net:8443" }]);
+await until(async () => ((await field.count()) ? true : undefined));
+await group.locator('[data-studio="cancel"]').click();
+const back = await until(async () => (/Sign in to Decks Studio/.test(await words()) && (await field.count()) === 0 ? true : undefined));
+say("Cancel gives the sign-in up", !!back && !existsSync(file), await words());
+
+// --- Connections keeps what connects another Decks to this one, and nothing of Studio's login -------
+await page.locator(".settings .sw-nav button", { hasText: "Connections" }).click();
+await settle(page, 300);
+const labels = await page.locator(".settings .sw-body .sw-label").allInnerTexts();
+const pane = (await page.locator(".settings .sw-body").innerText()).replace(/\s+/g, " ");
+say("Connections has the Decks connection, its address and pairing code, and no Studio login", JSON.stringify(labels) === JSON.stringify(["Decks connection", "Connected to this Decks"]) && /Pairing code/.test(pane) && /its login is under Accounts/.test(pane) && (await page.locator('.sw-group[data-group="studio"]').count()) === 0, `${JSON.stringify(labels)} | ${pane.slice(0, 200)}`);
+await shot("5-connections");
 
 say("no errors on the page", errors.length === 0, errors.join(" | ").slice(0, 300));
 await browser.close();

@@ -587,15 +587,22 @@
 		opacity: 0.45;
 		cursor: default;
 	}
-	/* Decks Studio's row (`settings/StudioSignIn.tsx`): Studio's address, the short code on show, and why a sign-in ended. */
-	.sw-studio-at {
+	/* Decks Studio's rows (`settings/StudioSignIn.tsx`): Studio's address, the field its code is pasted into, and why a sign-in ended. */
+	.sw-field.sw-studio-at {
 		width: 190px;
 	}
-	.sw-studio-code {
-		font: 600 20px/1.2 var(--font-mono);
-		letter-spacing: 0.14em;
-		font-variant-numeric: tabular-nums;
-		user-select: all;
+	.sw-mark[data-empty] {
+		visibility: hidden;
+	}
+	.sw-field.sw-studio-code {
+		width: 150px;
+		font-family: var(--font-mono);
+		letter-spacing: 0.12em;
+		text-align: center;
+		text-transform: uppercase;
+	}
+	.sw-studio-code::placeholder {
+		letter-spacing: 0.12em;
 	}
 	.sw-studio-failed {
 		color: var(--v3-danger);

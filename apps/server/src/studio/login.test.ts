@@ -14,9 +14,10 @@ import { Addresses } from "./addresses.ts";
 import { isLoopbackOrigin, studioAddress, StudioLogin, type SignedIn } from "./login.ts";
 
 /*
- * The harness signs in to Studio itself: it keeps a secret and sends its hash, the person says the
- * harness is theirs on Studio (a redirect on this machine, or its short code typed), and the harness
- * trades what it holds, with the secret, for its key. No page hands it one.
+ * The harness signs in to Studio itself, the way Claude Code signs in: it keeps a secret and opens
+ * Studio with its hash, Studio shows the person a code, the code reaches the harness (Studio's button
+ * on this machine, or pasted), and the harness trades it, with the secret, for its key. No page
+ * hands it one.
  */
 
 const KEY = "dsk_abcdefghijklmnopqrstuvwxyz012345";
@@ -24,10 +25,9 @@ const ACCOUNT = { name: "Ada", email: "ada@example.com" };
 
 /**
  * A stand-in for Studio's side of it (the decks-studio repository's connect routes): it hands a key only
- * for a code or a device it gave, and only to the secret whose hash came first.
+ * for a code it showed, and only to the secret whose hash the code was made for.
  */
 async function fakeStudio() {
-	const devices = new Map<string, { challenge: string; typed: boolean }>();
 	const grants = new Map<string, string>();
 	const asked: { path: string; body: Record<string, unknown> }[] = [];
 	const signedOut: string[] = [];
@@ -41,26 +41,14 @@ async function fakeStudio() {
 				res.writeHead(status, { "Content-Type": "application/json" });
 				res.end(JSON.stringify(value));
 			};
-			const proves = (challenge: string | undefined) => !!challenge && createHash("sha256").update(body.verifier ?? "").digest("base64url") === challenge;
 			if (req.url === "/sync/v1/harness" && req.method === "DELETE") {
 				signedOut.push(String(req.headers.authorization));
 				return say(200, {});
 			}
-			if (req.url === "/api/connect/device") {
-				const device = `dev-${devices.size + 1}`;
-				devices.set(device, { challenge: body.challenge!, typed: false });
-				return say(200, { device, code: "ACDE-FGHJ", verify: `${base}/connect`, expires: 600, interval: 0.25 });
-			}
 			if (req.url === "/api/connect/exchange") {
-				if (body.code) {
-					const challenge = grants.get(body.code);
-					grants.delete(body.code);
-					return proves(challenge) ? say(201, { key: KEY, harness: { id: "h1", name: "Mini" }, account: ACCOUNT }) : say(400, { error: "This sign-in has run out or was used already." });
-				}
-				const one = devices.get(body.device ?? "");
-				if (!one || !proves(one.challenge)) return say(400, { error: "This sign-in has run out or was used already." });
-				if (!one.typed) return say(202, { waiting: true });
-				devices.delete(body.device!);
+				const challenge = grants.get(body.code ?? "");
+				if (!challenge || createHash("sha256").update(body.verifier ?? "").digest("base64url") !== challenge) return say(400, { error: "That code is wrong, has run out or was used already." });
+				grants.delete(body.code!);
 				return say(201, { key: KEY, harness: { id: "h1", name: "Mini" }, account: ACCOUNT });
 			}
 			say(404, { error: "no such route" });
@@ -72,15 +60,12 @@ async function fakeStudio() {
 		base,
 		asked,
 		signedOut,
-		/** The person, signed in to Studio, whose page asks for a redirect's code for a challenge. */
+		/** The person, signed in to Studio, whose page shows the code for a challenge. */
 		grant: (challenge: string) => {
-			const code = `code-${grants.size + 1}`;
+			const code = `ACDE-FGH${grants.size + 3}`;
 			grants.set(code, challenge);
 			return code;
 		},
-		/** The person types the short code. */
-		type: () => devices.forEach((one) => (one.typed = true)),
-		forget: () => devices.clear(),
 		close: () => server.close(),
 	};
 }
@@ -101,14 +86,15 @@ test("Studio's address is an http or https origin, the usual one unless said, an
 	for (const away of ["https://mac.tail1.ts.net:8443", "http://192.168.1.4:4329", "https://127.0.0.1:4329", "http://127.0.0.1", "", undefined, "nope"]) assert.ok(!isLoopbackOrigin(away), String(away));
 });
 
-test("by a redirect: the address to open carries only the secret's hash, and the tab coming back is traded once, for the sign-in this harness started", async () => {
+test("on this machine: the address to open carries only the secret's hash and where to come back, and the tab coming back is traded once, for the sign-in this harness started", async () => {
 	const studio = await fakeStudio();
 	const got: SignedIn[] = [];
 	const login = new StudioLogin({ name: () => "Mac mini", signedIn: (one) => got.push(one), changed: () => {} });
 	try {
-		assert.throws(() => login.start(studio.base, "https://mac.tail1.ts.net:8443"), /only to this machine/);
-		const { url } = login.start(studio.base, "http://127.0.0.1:4329");
-		const open = new URL(url);
+		const started = login.start(studio.base, "http://127.0.0.1:4329");
+		assert.ok(started.expires > Date.now() + 500_000);
+		assert.equal(started.studio, studio.base);
+		const open = new URL(started.url);
 		assert.equal(open.origin + open.pathname, `${studio.base}/connect`);
 		assert.equal(open.searchParams.get("redirect"), "http://127.0.0.1:4329/api/studio/callback");
 		assert.equal(open.searchParams.get("name"), "Mac mini");
@@ -116,63 +102,61 @@ test("by a redirect: the address to open carries only the secret's hash, and the
 		const state = open.searchParams.get("state")!;
 		assert.match(challenge, /^[A-Za-z0-9_-]{43}$/);
 		assert.ok(state.length >= 16);
+		assert.deepEqual(login.showing(), { open: started });
 		// A tab that comes back with a state this harness did not make is turned away, and spends nothing.
-		await assert.rejects(login.finish("not-mine", studio.grant(challenge)), /did not start that sign-in/);
+		await assert.rejects(login.finish(studio.grant(challenge), "not-mine"), /did not start that sign-in/);
+		await assert.rejects(login.finish(studio.grant(challenge), ""), /did not start that sign-in/);
 		const code = studio.grant(challenge);
-		const done = await login.finish(state, code);
+		const done = await login.finish(code, state);
 		assert.deepEqual(done, { url: studio.base, key: KEY, account: ACCOUNT });
 		assert.deepEqual(got, [done]);
+		assert.deepEqual(login.showing(), {}, "nothing left under way");
 		// What went to Studio: the code and the secret whose hash it was sent first, and nothing else.
 		const trade = studio.asked.at(-1)!;
 		assert.equal(trade.path, "/api/connect/exchange");
 		assert.deepEqual(Object.keys(trade.body).sort(), ["code", "verifier"]);
 		assert.equal(createHash("sha256").update(String(trade.body.verifier)).digest("base64url"), challenge);
-		// Once: the same tab again is turned away.
-		await assert.rejects(login.finish(state, code), /did not start that sign-in/);
-		// Studio saying no is said as Studio said it.
-		const again = new URL(login.start(studio.base, "http://localhost:4329").url);
-		await assert.rejects(login.finish(again.searchParams.get("state")!, "a-code-studio-never-gave"), /run out or was used/);
+		// Once: the same tab again finds no sign-in under way.
+		await assert.rejects(login.finish(code, state), /No sign-in to Studio is under way/);
 	} finally {
 		login.stop();
 		studio.close();
 	}
 });
 
-test("by a short code: the harness shows it, asks until it is typed on Studio, and then has its key; a code Studio forgets ends the sign-in and says so", async () => {
+test("from anywhere else: the address says nowhere to come back, the code is pasted, a wrong one can be tried again, and giving up forgets it", async () => {
 	const studio = await fakeStudio();
 	const got: SignedIn[] = [];
 	let changes = 0;
 	const login = new StudioLogin({ name: () => "Mac mini", signedIn: (one) => got.push(one), changed: () => changes++ });
 	try {
-		const shown = await login.code(studio.base);
-		assert.equal(shown.code, "ACDE-FGHJ");
-		assert.equal(shown.verify, `${studio.base}/connect`);
-		assert.ok(shown.expires > Date.now() + 500_000);
-		assert.deepEqual(login.showing(), { code: shown });
-		assert.equal(studio.asked[0]!.body.name, "Mac mini");
-		// Asked a few times with nobody typing: still waiting, no key.
-		await until(() => studio.asked.filter((one) => one.path === "/api/connect/exchange").length >= 2);
-		assert.equal(got.length, 0);
-		studio.type();
-		await until(() => got.length === 1);
-		assert.deepEqual(got[0], { url: studio.base, key: KEY, account: ACCOUNT });
-		assert.deepEqual(login.showing(), {}, "nothing left on show");
-
-		// Another, which Studio forgets (it ran out there): the harness stops asking and says why.
-		await login.code(studio.base);
-		const before = changes;
-		studio.forget();
-		await until(() => login.showing().failed !== undefined);
-		assert.match(login.showing().failed!, /run out or was used/);
-		assert.equal(login.showing().code, undefined);
-		assert.ok(changes > before, "Settings is told");
-		// Starting again clears the old failure; giving up clears the code.
-		await login.code(studio.base);
-		assert.equal(login.showing().failed, undefined);
+		// A tab on another device, or a terminal: no tab can be sent back to this harness.
+		for (const back of ["https://mac.tail1.ts.net:8443", undefined]) {
+			const open = new URL(login.start(studio.base, back).url);
+			assert.equal(open.searchParams.get("redirect"), null);
+			assert.equal(open.searchParams.get("state"), null);
+			assert.match(open.searchParams.get("challenge")!, /^[A-Za-z0-9_-]{43}$/);
+		}
+		assert.ok(changes >= 2, "Settings is told a sign-in is under way");
+		const challenge = new URL(login.showing().open!.url).searchParams.get("challenge")!;
+		await assert.rejects(login.finish("  "), /Paste the code/);
+		// Mistyped: Studio's own words, and the sign-in stays open for the right one.
+		await assert.rejects(login.finish("AAAA-AAAA"), /wrong, has run out or was used/);
+		assert.ok(login.showing().open);
+		const done = await login.finish(` ${studio.grant(challenge)} `);
+		assert.deepEqual(done, { url: studio.base, key: KEY, account: ACCOUNT });
+		assert.deepEqual(got, [done]);
+		assert.deepEqual(login.showing(), {});
+		// With none under way a pasted code is turned away without asking Studio.
+		const asks = studio.asked.length;
+		await assert.rejects(login.finish("ACDE-FGH9"), /No sign-in to Studio is under way/);
+		assert.equal(studio.asked.length, asks);
+		// Giving up forgets it; a Studio that is not there is said plainly.
+		login.start(studio.base);
 		login.cancel();
 		assert.deepEqual(login.showing(), {});
-		// A Studio that is not there is said plainly.
-		await assert.rejects(login.code("http://127.0.0.1:9"), /was not reached/);
+		login.start("http://127.0.0.1:9");
+		await assert.rejects(login.finish("ACDE-FGH9"), /was not reached/);
 	} finally {
 		login.stop();
 		studio.close();
@@ -203,7 +187,7 @@ test("where the harness can be reached: the origins its tabs loaded from, newest
 	}
 });
 
-test("in the harness: Sign in to Studio from a tab on this machine answers an address to open, the tab coming back signs it in, and from another device it is a short code", async () => {
+test("in the harness: Sign in to Studio answers an address to open; Studio's button brings the tab back on this machine, and from another device or a terminal the code is pasted", async () => {
 	const studio = await fakeStudio();
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-studio-login-")));
 	const deck = join(dataDir, "decks");
@@ -221,6 +205,7 @@ test("in the harness: Sign in to Studio from a tab on this machine answers an ad
 		assert.ok(started.answer.ok, JSON.stringify(started.answer));
 		const open = new URL((started.answer as { value: { url: string } }).value.url);
 		assert.equal(open.searchParams.get("redirect"), `${base}/api/studio/callback`);
+		assert.equal((app.pairingMessage() as { studioSignIn?: { open?: { url: string } } }).studioSignIn?.open?.url, open.href, "Settings shows a sign-in under way");
 		// The tab comes back with no token of this harness's: let in by the state alone.
 		const wrong = await fetch(`${base}/api/studio/callback?state=nope&code=x`);
 		assert.equal(wrong.status, 400);
@@ -236,29 +221,35 @@ test("in the harness: Sign in to Studio from a tab on this machine answers an ad
 		assert.equal(shown.studioSignIn, undefined);
 		assert.ok(shown.studioAt, "Settings is told which Studio a sign-in would go to");
 
-		// Signed out, then in again from a tab on another device: no redirect can come back here, so a short code.
+		// Signed out, then in again from a tab on another device: nothing can come back here, so the code is pasted into Settings.
 		assert.ok((await person("harness.unpair", [])).answer.ok);
 		assert.ok(!existsSync(file));
 		await until(() => studio.signedOut.length === 1);
 		assert.deepEqual(studio.signedOut, [`Bearer ${KEY}`], "Studio is told, with the key, so it forgets this harness");
 		const away = await person("harness.studioSignIn", [{ studio: studio.base, back: "https://mac.tail1.ts.net:8443" }]);
-		const code2 = (away.answer as { value: { shown: { code: string; verify: string } } }).value.shown;
-		assert.equal(code2.code, "ACDE-FGHJ");
-		assert.deepEqual((app.pairingMessage() as { studioSignIn?: { code?: { code: string } } }).studioSignIn?.code?.code, "ACDE-FGHJ", "Settings shows the code");
-		studio.type();
-		await until(() => existsSync(file));
+		const far = new URL((away.answer as { value: { url: string } }).value.url);
+		assert.equal(far.searchParams.get("redirect"), null);
+		assert.equal((await person("harness.studioCode", ["AAAA-AAAA"])).answer.ok, false, "a wrong code is refused, in Studio's words");
+		assert.equal((await runVerb(app, { kind: "agent", id: app.agents.focused().id }, {}, "harness.studioCode", [studio.grant(far.searchParams.get("challenge")!)])).status, 403, "not an agent's to paste");
+		assert.ok((await person("harness.studioCode", [studio.grant(far.searchParams.get("challenge")!)])).answer.ok);
 		assert.equal(JSON.parse(readFileSync(file, "utf8")).key, KEY);
 		assert.equal((app.pairingMessage() as { studioSignIn?: unknown }).studioSignIn, undefined);
 
-		// From a terminal: the same short code, by the verb the decks command runs.
+		// From a terminal: the verbs the decks command runs. An address, then the code it showed.
 		await person("harness.unpair", []);
 		const term = await runVerb(app, { kind: "person" }, {}, "studio.login", [studio.base]);
 		assert.ok(term.answer.ok, JSON.stringify(term.answer));
-		assert.equal((term.answer as { value: { code: string } }).value.code, "ACDE-FGHJ");
-		assert.match(term.answer.notes.join(" "), /type ACDE-FGHJ/);
+		const there = new URL((term.answer as { value: { url: string } }).value.url);
+		assert.equal(there.origin + there.pathname, `${studio.base}/connect`);
+		assert.equal(there.searchParams.get("redirect"), null);
+		assert.match(term.answer.notes.join(" "), /Studio shows a code there/);
 		const status = await runVerb(app, { kind: "person" }, {}, "studio.status", []);
-		assert.deepEqual((status.answer as { value: unknown }).value, { connected: false, code: "ACDE-FGHJ", verify: `${studio.base}/connect` });
+		assert.deepEqual((status.answer as { value: unknown }).value, { connected: false, signingIn: there.href });
 		assert.equal((await runVerb(app, { kind: "agent", id: app.agents.focused().id }, {}, "studio.login", [studio.base])).answer.ok, false, "not an agent's to call");
+		assert.equal((await runVerb(app, { kind: "agent", id: app.agents.focused().id }, {}, "studio.code", ["ACDE-FGH3"])).answer.ok, false, "nor to finish");
+		const done = await runVerb(app, { kind: "person" }, {}, "studio.code", [studio.grant(there.searchParams.get("challenge")!)]);
+		assert.deepEqual((done.answer as { value: unknown }).value, { connected: true, url: studio.base, account: ACCOUNT.email });
+		assert.deepEqual(((await runVerb(app, { kind: "person" }, {}, "studio.status", [])).answer as { value: unknown }).value, { connected: true, url: studio.base, account: ACCOUNT.email });
 	} finally {
 		server.close();
 		app.dispose();

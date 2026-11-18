@@ -220,7 +220,7 @@ const CHECKS = [
 	{ file: "focus-quiet.mjs", needsAgent: false },
 	/* A card dragged onto the composer while the caret is in the composer is mentioned there. */
 	{ file: "card-to-composer.mjs", needsAgent: false },
-	/* The harness signs in to Decks Studio from its own Settings: a tab that comes straight back, or a short code. */
+	/* The harness signs in to Decks Studio from its own Settings: Studio shows the code, and its button or a paste brings it back. */
 	{ file: "studio-sign-in.mjs", needsAgent: false },
 	/* The SDK redesign's view calls in a real browser: reload counted per page, goto, focus on a named canvas. */
 	{ file: "view-calls.mjs", needsAgent: false },

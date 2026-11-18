@@ -399,8 +399,30 @@ async function main(argv) {
 	const args = argsOf(found.verb, found.rest);
 	const decks = connect(caller());
 	const { value, notes } = await decks.call(found.verb.name, args);
+	// Signing in to Studio is finished here, as Claude Code's is: the address, then the code its page shows, pasted.
+	if (found.verb.name === "studio.login" && value?.url && process.stdin.isTTY) return studioCode(decks, value.url);
 	if (value !== undefined && value !== null) out(typeof value === "string" ? value : JSON.stringify(value, null, 2));
 	for (const note of notes) err(note);
+	return 0;
+}
+
+/**
+ * `decks studio login`, with someone at the terminal: the address to open in a browser, on this
+ * machine or any other, then a wait for the code Studio's page shows there. Enter with nothing leaves
+ * the sign-in open for `decks studio code <code>`.
+ */
+async function studioCode(decks, url) {
+	err("Open this address in a browser, on any device, and sign in to Decks Studio:\n");
+	out(url);
+	const ask = createInterface({ input: process.stdin, output: process.stderr });
+	const code = (await ask.question("\nPaste the code it shows: ")).trim();
+	ask.close();
+	if (!code) {
+		err("Nothing pasted. The sign-in waits ten minutes: decks studio code <code> finishes it.");
+		return 1;
+	}
+	const done = await decks.call("studio.code", [code]);
+	for (const note of done.notes) err(note);
 	return 0;
 }
 

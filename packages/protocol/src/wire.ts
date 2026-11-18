@@ -34,11 +34,12 @@ export interface StudioLinkRow {
 }
 
 /**
- * This harness signing in to Decks Studio by a short code (`server/src/studio/login.ts`): the code to
- * type on Studio, where, and until when; or why the last such sign-in ended without a key.
+ * This harness signing in to Decks Studio (`server/src/studio/login.ts`): the sign-in under way (the
+ * address on Studio that shows its code, Studio's own address, and until when the code can be
+ * brought here); or why the last one ended without a key.
  */
 export interface StudioSignIn {
-	code?: { code: string; verify: string; expires: number };
+	open?: { url: string; studio: string; expires: number };
 	failed?: string;
 }
 

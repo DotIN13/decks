@@ -624,9 +624,17 @@ export const VERBS: readonly Verb[] = [
 		name: "studio.login",
 		group: "misc",
 		...outsideChange,
-		summary: "Sign this harness in to Decks Studio from a terminal: answers a short code and the address to type it at, on any device signed in to Studio. Once it is typed the deck syncs there in the background; studio.status says when. `url` is Studio's address, when it is not the usual one. Only the person can call it.",
+		summary: "Start signing this harness in to Decks Studio from a terminal: answers an address to open in a browser on any device, where Studio shows a code. Paste the code where the command asks, or give it to studio.code. `url` is Studio's address, when it is not the usual one. Only the person can call it.",
 		params: [o("url", str())],
-		result: obj({ code: str(), verify: str(), expires: num() }),
+		result: obj({ url: str(), expires: num() }),
+	},
+	{
+		name: "studio.code",
+		group: "misc",
+		...outsideChange,
+		summary: "Finish signing in to Decks Studio with the code its page showed after studio.login: the harness trades it for its key, and the deck syncs there in the background. Only the person can call it.",
+		params: [p("code", str())],
+		result: obj({ connected: bool(), url: str(), account: opt(str()) }),
 	},
 	{
 		name: "pair.code",
@@ -636,7 +644,7 @@ export const VERBS: readonly Verb[] = [
 		params: [],
 		result: obj({ code: str(), expires: num() }),
 	},
-	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, with which, and as whom; or the short code a sign-in is waiting on.", params: [], result: obj({ connected: bool(), url: opt(str()), account: opt(str()), code: opt(str()), verify: opt(str()) }) },
+	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, with which, and as whom; or the address of the sign-in under way.", params: [], result: obj({ connected: bool(), url: opt(str()), account: opt(str()), signingIn: opt(str()) }) },
 	{ name: "studio.disconnect", group: "misc", ...outsideChange, summary: "Sign out of Decks Studio: stop syncing and forget the key. Only the person can call it.", params: [], result: obj({ connected: bool() }) },
 	{ name: "now", card: "frame", group: "misc", ...outsideRead, summary: "The time where the person is.", params: [], result: obj({ iso: str(), timezone: str(), words: str(), epoch: num() }, true) },
 ];

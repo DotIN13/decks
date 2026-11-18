@@ -166,7 +166,7 @@ await page.waitForSelector(".settings", { timeout: 6000 });
 await settle(page, 500);
 
 /*
- * The Settings redesign (`settings/Settings.tsx`): a window of six sections on a grey left, the
+ * The Settings redesign (`settings/Settings.tsx`): a window of seven sections on a grey left, the
  * open one on the right under its name, opening on Notifications. Notifications is one table
  * (`settings/AlertSettings.tsx`): each moment once, its sound and its banner side by side under
  * When / Sound / Banner, then Volume as four stops, then the permission line when the browser
@@ -186,7 +186,7 @@ const panel = await page.evaluate(() => ({
 	volume: [...document.querySelectorAll('.sw-group[data-group="volume"] .sw-seg > button')].map((b) => b.textContent),
 	strip: document.querySelector(".sw-strip")?.innerText.replace(/\s+/g, " ").trim() ?? null,
 }));
-say("Settings is a window of six sections", JSON.stringify(panel.nav) === JSON.stringify(["General", "Notifications", "Accounts", "Voice", "Connections", "Chrome"]), JSON.stringify(panel.nav));
+say("Settings is a window of seven sections", JSON.stringify(panel.nav) === JSON.stringify(["General", "Notifications", "Accounts", "Claude", "Voice", "Connections", "Chrome"]), JSON.stringify(panel.nav));
 say("…opening on Notifications, under its name", panel.open === "Notifications" && panel.title === "Notifications", `${panel.open} / ${panel.title}`);
 say("one table under When, Sound and Banner", JSON.stringify(panel.heads) === JSON.stringify(["When", "Sound", "Banner"]), JSON.stringify(panel.heads));
 say("…with each of the three moments once", panel.moments.length === 3 && new Set(panel.moments.map((m) => m.name)).size === 3, JSON.stringify(panel.moments.map((m) => m.name)));
@@ -194,11 +194,11 @@ say("…each with the sentence that explains it", panel.moments.every((m) => m.n
 say("…and a sound and a banner switch side by side", panel.moments.every((m) => m.sound && m.banner === "switch"), JSON.stringify(panel.moments));
 say("volume is four stops, Off first", JSON.stringify(panel.volume) === JSON.stringify(["Off", "Quiet", "Medium", "Loud"]), JSON.stringify(panel.volume));
 say("the permission line is in Notifications, about banners", /banner|permission|notification/i.test(panel.strip ?? ""), panel.strip?.slice(0, 70));
-// Accounts is its own section now, adding one its last row.
-await page.locator(".settings .sw-nav button[data-section='accounts']").click();
+// Claude's subscriptions are a section of their own, adding one its last row.
+await page.locator(".settings .sw-nav button[data-section='claude']").click();
 await settle(page, 300);
 const add = await page.evaluate(() => ({ add: document.querySelector(".settings .sw-add")?.innerText.trim(), footer: document.querySelectorAll(".settings > footer").length }));
-say("adding an account is a row of Accounts, not a window footer", /Add an account/.test(add.add ?? "") && add.footer === 0, `${add.add} · ${add.footer} footers`);
+say("adding an account is a row of Claude, not a window footer", /Add an account/.test(add.add ?? "") && add.footer === 0, `${add.add} · ${add.footer} footers`);
 await page.locator(".settings .sw-nav button[data-section='notifications']").click();
 await settle(page, 300);
 

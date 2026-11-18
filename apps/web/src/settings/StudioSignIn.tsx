@@ -7,17 +7,18 @@ import { call, warnIfFailed } from "../state/socket.ts";
 import { SetGroup, SetRow } from "./rows.tsx";
 
 /**
- * Decks Studio in Settings: this harness signs in to Studio itself (`server/src/studio/login.ts`),
- * and this is where: not signed in, a short code on show, or signed in and as whom.
+ * Decks Studio in Settings: this harness signs in to Studio itself (`server/src/studio/login.ts`), the
+ * way Claude Code signs in, and this is where: not signed in, a sign-in under way, or signed in and
+ * as whom.
  *
- * From a tab on the harness's own machine, Sign in opens a tab on Studio that comes straight back:
- * signed in there already, there is nothing more to do. From any other device no tab can be sent
- * back to the harness, so it shows a short code to type on Studio instead. Studio's address is the
- * usual one unless another is typed. Sign out deletes the key: the deck stops syncing, and every
- * browser at Studio loses its way here.
+ * Sign in opens a tab on Studio, which shows a code. When this tab is on the harness's own machine,
+ * Studio's page has a button that brings the code back by itself; from any other device the person
+ * copies it there and pastes it here. Studio's address is the usual one unless another is typed.
+ * Sign out deletes the key: the deck stops syncing, and every browser at Studio loses its way here.
  */
 export function StudioGroup() {
 	const [address, setAddress] = createSignal<string>();
+	const [code, setCode] = createSignal("");
 	const [busy, setBusy] = createSignal(false);
 	const studioAt = () => address() ?? pairing().studioAt ?? "";
 	const hostOf = (url: string) => {
@@ -27,30 +28,44 @@ export function StudioGroup() {
 			return url;
 		}
 	};
-	/** Whether this tab is on the harness's own machine: where Studio can send a tab back to. */
-	const here = () => ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname) && location.protocol === "http:";
+	/** Whether Studio's page can send its tab back here by itself: the sign-in was started from a tab on the harness's own machine. */
+	const sendsBack = (url: string) => {
+		try {
+			return new URL(url).searchParams.has("redirect");
+		} catch {
+			return false;
+		}
+	};
 	const signIn = async () => {
 		if (busy()) return;
 		setBusy(true);
+		setCode("");
 		// Opened now, while the press still counts, and sent on once the harness says where.
-		const tab = here() ? window.open("about:blank", "_blank") : null;
+		const tab = window.open("about:blank", "_blank");
 		try {
-			const answer = await call<{ url?: string; shown?: unknown }>("harness.studioSignIn", [{ ...(studioAt() ? { studio: studioAt() } : {}), back: location.origin }]);
-			if (!answer.ok) {
+			const answer = await call<{ url?: string }>("harness.studioSignIn", [{ ...(studioAt() ? { studio: studioAt() } : {}), back: location.origin }]);
+			if (!answer.ok || !answer.value?.url) {
 				tab?.close();
-				return void notice("error", answer.error);
+				if (!answer.ok) notice("error", answer.error);
+				return;
 			}
-			if (answer.value?.url && tab) tab.location.href = answer.value.url;
-			else {
-				tab?.close();
-				// No tab could be opened: the address is said, to open by hand.
-				if (answer.value?.url) notice("info", `Open ${answer.value.url} to finish signing in.`);
-			}
+			// No tab could be opened: the row that follows has Open Studio, to press.
+			if (tab) tab.location.href = answer.value.url;
 		} finally {
 			setBusy(false);
 		}
 	};
-	const minutes = (until: number) => Math.max(1, Math.round((until - Date.now()) / 60_000));
+	const paste = async () => {
+		if (busy() || !code().trim()) return;
+		setBusy(true);
+		try {
+			const answer = await call("harness.studioCode", [code().trim()]);
+			if (!answer.ok) notice("error", answer.error);
+			else setCode("");
+		} finally {
+			setBusy(false);
+		}
+	};
 	const mark = (
 		<span class="sw-mark">
 			<Icon of={Cloud} size={14} />
@@ -62,7 +77,7 @@ export function StudioGroup() {
 				when={pairing().studio}
 				fallback={
 					<Show
-						when={pairing().studioSignIn?.code}
+						when={pairing().studioSignIn?.open}
 						fallback={
 							<SetRow
 								lead={mark}
@@ -81,23 +96,38 @@ export function StudioGroup() {
 							</SetRow>
 						}
 					>
-						{(shown) => (
-							<SetRow
-								lead={mark}
-								title={<span class="sw-studio-code">{shown().code}</span>}
-								sub={
-									<>
-										Type this code at <span class="sw-mono">{hostOf(shown().verify)}/connect</span>, on any device signed in to Studio. It lasts {minutes(shown().expires)} more minutes.
-									</>
-								}
-							>
-								<button class="sw-btn" type="button" data-studio="open" onClick={() => window.open(shown().verify, "_blank", "noopener")}>
-									Open Studio
-								</button>
-								<button class="sw-btn" type="button" data-studio="cancel" onClick={() => void call("harness.studioCancel").then(warnIfFailed)}>
-									Cancel
-								</button>
-							</SetRow>
+						{(open) => (
+							<>
+								<SetRow
+									lead={mark}
+									title="Studio is showing a code"
+									sub={sendsBack(open().url) ? `At ${hostOf(open().studio)}, in the tab that opened. Press Sign it in there, or copy the code and paste it below.` : `Open Studio at ${hostOf(open().studio)}, copy the code it shows, and paste it below.`}
+								>
+									<button class="sw-btn" type="button" data-studio="open" onClick={() => window.open(open().url, "_blank")}>
+										Open Studio
+									</button>
+									<button class="sw-btn" type="button" data-studio="cancel" onClick={() => void call("harness.studioCancel").then(warnIfFailed)}>
+										Cancel
+									</button>
+								</SetRow>
+								<SetRow lead={<span class="sw-mark" data-empty />} title="Code from Studio">
+									<input
+										class="sw-field sw-studio-code"
+										aria-label="The code Studio shows"
+										placeholder="ABCD-EFGH"
+										maxLength={12}
+										autocomplete="off"
+										autocapitalize="characters"
+										spellcheck={false}
+										value={code()}
+										onInput={(event) => setCode(event.currentTarget.value)}
+										onKeyDown={(event) => event.key === "Enter" && void paste()}
+									/>
+									<button class="sw-btn" type="button" data-studio="paste" disabled={busy() || !code().trim()} onClick={() => void paste()}>
+										Sign in
+									</button>
+								</SetRow>
+							</>
 						)}
 					</Show>
 				}

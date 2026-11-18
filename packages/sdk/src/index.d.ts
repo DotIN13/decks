@@ -487,17 +487,22 @@ export interface Verbs {
 	};
 	studio: {
 		/**
-		 * Sign this harness in to Decks Studio from a terminal: answers a short code and the address to
-		 * type it at, on any device signed in to Studio. Once it is typed the deck syncs there in the
-		 * background; studio.status says when. `url` is Studio's address, when it is not the usual one.
-		 * Only the person can call it.
+		 * Start signing this harness in to Decks Studio from a terminal: answers an address to open in a
+		 * browser on any device, where Studio shows a code. Paste the code where the command asks, or give
+		 * it to studio.code. `url` is Studio's address, when it is not the usual one. Only the person can
+		 * call it.
 		 */
-		login(url?: string): Promise<{ code: string; verify: string; expires: number }>;
+		login(url?: string): Promise<{ url: string; expires: number }>;
 		/**
-		 * Whether this harness syncs with Decks Studio, with which, and as whom; or the short code a
-		 * sign-in is waiting on.
+		 * Finish signing in to Decks Studio with the code its page showed after studio.login: the harness
+		 * trades it for its key, and the deck syncs there in the background. Only the person can call it.
 		 */
-		status(): Promise<{ connected: boolean; url?: string; account?: string; code?: string; verify?: string }>;
+		code(code: string): Promise<{ connected: boolean; url: string; account?: string }>;
+		/**
+		 * Whether this harness syncs with Decks Studio, with which, and as whom; or the address of the
+		 * sign-in under way.
+		 */
+		status(): Promise<{ connected: boolean; url?: string; account?: string; signingIn?: string }>;
 		/** Sign out of Decks Studio: stop syncing and forget the key. Only the person can call it. */
 		disconnect(): Promise<{ connected: boolean }>;
 	};

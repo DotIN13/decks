@@ -22,7 +22,7 @@ interface PairingState {
 	paired: PairedRow[];
 	/** The link to Decks Studio, its key, when this harness has one. */
 	studio?: StudioLinkRow;
-	/** A sign-in to Studio by short code under way, or why the last one ended. */
+	/** A sign-in to Studio under way (Studio is showing its code), or why the last one ended. */
 	studioSignIn?: StudioSignIn;
 	/** Studio's address, as this harness would sign in to it. */
 	studioAt?: string;

@@ -125,6 +125,7 @@ export const VERBS = [
 	["web.stop",[]],
 	["ports",["change?"]],
 	["studio.login",["url?"]],
+	["studio.code",["code"]],
 	["pair.code",[]],
 	["studio.status",[]],
 	["studio.disconnect",[]],

@@ -408,7 +408,12 @@ export class App {
 		};
 		this.stage.studioLogin = async (url) => {
 			if (studioLink(this.deck.path)?.env) throw new Error("This harness's Studio key is set by DECKS_STUDIO_KEY: remove it there to sign in another way.");
-			return this.studioLogin.code(studioAddress(url));
+			// From a terminal there is no tab to send back: the address shows a code, and the code is pasted (`studioCode`).
+			return this.studioLogin.start(studioAddress(url));
+		};
+		this.stage.studioCode = async (code) => {
+			const got = await this.studioLogin.finish(code);
+			return { url: got.url, ...(got.account.email ? { account: got.account.email } : {}) };
 		};
 		this.stage.studioShowing = () => this.studioLogin.showing();
 		this.stage.studioSignOut = () => {
@@ -549,7 +554,7 @@ export class App {
 		} catch {
 			// An address in the environment that is none: Settings shows no default, and a sign-in says what is wrong.
 		}
-		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio } : {}), ...(signIn.code || signIn.failed ? { studioSignIn: signIn } : {}), ...(studioAt ? { studioAt } : {}) };
+		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio } : {}), ...(signIn.open || signIn.failed ? { studioSignIn: signIn } : {}), ...(studioAt ? { studioAt } : {}) };
 	}
 
 	/**

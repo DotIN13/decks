@@ -121,9 +121,10 @@ export const PERSON_VERBS: readonly Verb[] = [
 		name: "harness.studioSignIn",
 		group: "misc",
 		...outside,
-		summary: "Sign this harness in to Decks Studio. From a tab on the harness's own machine (`back`, its loopback origin): an address on Studio to open, which sends the tab back. From anywhere else: a short code to type on Studio (`shown`).",
+		summary: "Start signing this harness in to Decks Studio: an address on Studio to open, which shows a code. From a tab on the harness's own machine (`back`, its loopback origin) Studio's page can send the tab back by itself; else the code is pasted (harness.studioCode).",
 		params: [{ name: "how", schema: obj({ studio: opt(str()), back: opt(str()) }), optional: true }],
 	},
+	{ name: "harness.studioCode", group: "misc", ...outside, summary: "The code Studio showed, pasted: the sign-in under way trades it for this harness's key.", params: [{ name: "code", schema: str() }] },
 	{ name: "harness.studioCancel", group: "misc", ...outside, summary: "Give up the sign-in to Studio that is under way.", params: [] },
 	{ name: "web.answer", group: "web", ...outside, summary: "Answer the shared browser's question: yes or no.", params: [{ name: "id", schema: str() }, { name: "ok", schema: bool() }] },
 	// --- added with the side routes (step 4): what Studio and a terminal asked of /api/agents, /api/harness, /api/deck, /api/google ---

@@ -463,16 +463,19 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			unpairStudioHere(app);
 		},
 		/*
-		 * Sign this harness in to Studio (`studio/login.ts`). From a tab on this machine (`back`, its
-		 * loopback origin) the answer is an address on Studio to open, which sends the tab back with a code;
-		 * from anywhere else it is a short code to type on Studio, which Settings then shows.
+		 * Sign this harness in to Studio (`studio/login.ts`): the answer is an address on Studio to open,
+		 * which shows a code. From a tab on this machine (`back`, its loopback origin) Studio's page can
+		 * send the tab back with it; from anywhere else the person pastes it (`harness.studioCode`).
 		 */
 		"harness.studioSignIn": async ([given]) => {
 			const asked = (given ?? {}) as { studio?: unknown; back?: unknown };
 			const studio = studioAddress(typeof asked.studio === "string" ? asked.studio : undefined);
 			if (studioLink(app.deck.path)?.env) throw new Error("This harness's Studio key is set by DECKS_STUDIO_KEY: remove it there to sign in another way.");
-			if (isLoopbackOrigin(typeof asked.back === "string" ? asked.back : undefined)) return app.studioLogin.start(studio, asked.back as string);
-			return { shown: await app.studioLogin.code(studio) };
+			const open = app.studioLogin.start(studio, typeof asked.back === "string" ? asked.back : undefined);
+			return { url: open.url, expires: open.expires };
+		},
+		"harness.studioCode": async ([code]) => {
+			await app.studioLogin.finish(String(code ?? ""));
 		},
 		"harness.studioCancel": async () => {
 			app.studioLogin.cancel();

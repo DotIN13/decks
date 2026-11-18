@@ -9,6 +9,7 @@ import Plug from "lucide-solid/icons/plug";
 import Plus from "lucide-solid/icons/plus";
 import Puzzle from "lucide-solid/icons/puzzle";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
+import Sparkles from "lucide-solid/icons/sparkles";
 import User from "lucide-solid/icons/user";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js";
@@ -22,11 +23,16 @@ import { can, pairing } from "../connections/backend.ts";
 import { AlertSettings } from "./AlertSettings.tsx";
 import type { AlertPrefs } from "@decks/agent-ui/alerts";
 
-/** The six sections, in the order the left of the window lists them. */
+/**
+ * The seven sections, in the order the left of the window lists them. Accounts is the person's own
+ * account, Decks Studio's; Claude is the model's subscriptions; Connections is other Decks reaching
+ * this one.
+ */
 const SECTIONS = [
 	{ id: "general", label: "General", icon: SlidersHorizontal },
 	{ id: "notifications", label: "Notifications", icon: Bell },
 	{ id: "accounts", label: "Accounts", icon: User },
+	{ id: "claude", label: "Claude", icon: Sparkles },
 	{ id: "voice", label: "Voice", icon: Mic },
 	{ id: "connections", label: "Connections", icon: Plug },
 	{ id: "chrome", label: "Chrome", icon: Puzzle },
@@ -47,7 +53,7 @@ const saved = (): Section => {
 /**
  * Settings, one section at a time, as the "Settings redesign" drawing has it.
  *
- * On a computer and an iPad it is a window: the six sections on a grey left, the open one on the
+ * On a computer and an iPad it is a window: the seven sections on a grey left, the open one on the
  * right under its name and a ×. On a phone it is the app's bottom sheet, as the properties sheet
  * is: Settings and a blue Done, then the sections as the sidebar's tabs, scrolling sideways, over
  * the same rows. The rows are one vocabulary (`.sw-row`: words on the left, one control on the
@@ -74,7 +80,10 @@ export function Settings(props: {
 	phone?: boolean;
 	onClose: () => void;
 }) {
-	const [section, setSection] = createSignal<Section>(saved());
+	// Accounts is Decks Studio's login, which a backend that cannot share has none of.
+	const sections = () => SECTIONS.filter((one) => one.id !== "accounts" || can("share"));
+	const [chosen, setSection] = createSignal<Section>(saved());
+	const section = (): Section => (sections().some((one) => one.id === chosen()) ? chosen() : "notifications");
 	const open = (id: Section) => {
 		setSection(id);
 		try {
@@ -106,7 +115,10 @@ export function Settings(props: {
 					<AlertSettings prefs={props.prefs} onChange={props.onPrefs} />
 				</Match>
 				<Match when={section() === "accounts"}>
-					<Accounts accounts={props.accounts} active={props.active} onAdd={props.onAdd} onForget={props.onForget} />
+					<StudioGroup />
+				</Match>
+				<Match when={section() === "claude"}>
+					<ClaudeAccounts accounts={props.accounts} active={props.active} onAdd={props.onAdd} onForget={props.onForget} />
 				</Match>
 				<Match when={section() === "voice"}>
 					<VoiceSettings />
@@ -150,7 +162,7 @@ export function Settings(props: {
 					<div class="settings sw-win" role="dialog" aria-label="Settings">
 						<nav class="sw-nav" aria-label="Sections">
 							<span class="sw-nav-title">Settings</span>
-							<For each={SECTIONS}>
+							<For each={sections()}>
 								{(one) => (
 									<button type="button" data-section={one.id} data-on={section() === one.id} aria-current={section() === one.id ? "page" : undefined} onClick={() => open(one.id)}>
 										<Icon of={one.icon} size={15} />
@@ -182,7 +194,7 @@ export function Settings(props: {
 					</header>
 					<div class="sw-tabs" role="tablist" ref={tabs}>
 						<Show when={mark()}>{(at) => <span class="sw-tab-mark" style={{ left: `${at().left}px`, width: `${at().width}px` }} />}</Show>
-						<For each={SECTIONS}>
+						<For each={sections()}>
 							{(one) => (
 								<button type="button" role="tab" data-section={one.id} data-on={section() === one.id} aria-selected={section() === one.id} onClick={() => open(one.id)}>
 									<Icon of={one.icon} size={15} />
@@ -303,16 +315,16 @@ function CanvasSettings() {
 }
 
 /* ---------------------------------------------------------------------------------------- */
-/* Accounts                                                                                   */
+/* Claude                                                                                     */
 
 /**
  * The Claude subscriptions: each with its plan, whose it is, and how much of its 5-hour window is
  * used, as a bar. Which one answers is chosen per conversation in its model picker; this list adds
  * and removes them. The CLI's own login has no Remove: those credentials are `claude auth logout`'s.
  */
-function Accounts(props: { accounts: ClaudeAccount[]; active: string; onAdd: () => void; onForget: (id: string) => void }) {
+function ClaudeAccounts(props: { accounts: ClaudeAccount[]; active: string; onAdd: () => void; onForget: (id: string) => void }) {
 	return (
-		<SetGroup label="Claude" group="accounts" foot="Each conversation picks its account in the model menu.">
+		<SetGroup label="Subscriptions" group="claude" foot="Each conversation picks its account in the model menu.">
 			<For each={props.accounts}>{(account) => <AccountRow account={account} next={props.active === account.id && account.signedIn} onForget={() => props.onForget(account.id)} />}</For>
 			<button class="sw-add" type="button" onClick={props.onAdd}>
 				<Icon of={Plus} size={15} />
@@ -426,20 +438,17 @@ function foldPaired(rows: PairedRow[]): { label: string; origin: string; ids: st
 }
 
 /**
- * Two things, told apart by their words. On top, **Decks Studio login**: this harness signs in to
- * Studio (`StudioSignIn.tsx`), and Sign out deletes its key and takes back every token given through
- * it. Under it, **Decks connection**: what another Decks, the iPad app or a terminal connects to this
- * one with, its address and a pairing code, which Studio has no use for. A code is never made here
- * (`decks pair code`, on this machine). Last, who is connected: Revoke takes every token of a row back.
+ * Decks connection: what another Decks, the iPad app or a terminal connects to this one with, its
+ * address and a pairing code, and who is connected; Revoke takes every token of a row back. A code
+ * is never made here (`decks pair code`, on this machine). Decks Studio is not here: this harness
+ * signs in to it, which is the person's account and so is under Accounts (`StudioSignIn.tsx`), and
+ * the words keep the two apart, connect for a Decks and sign in for Studio.
  */
 function Connections() {
 	const { copied, copy } = useCopy();
 	return (
 		<>
-			<Show when={can("share")}>
-				<StudioGroup />
-			</Show>
-			<SetGroup label="Decks connection" group="this-deck" foot="For another Decks, the iPad app or a terminal connecting to this one. Decks Studio needs neither: it has its own login, above.">
+			<SetGroup label="Decks connection" group="this-deck" foot="For another Decks, the iPad app or a terminal connecting to this one. Decks Studio needs neither: its login is under Accounts.">
 				<SetRow title="Address" sub={<span class="sw-mono">{location.origin}</span>}>
 					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? "Copied" : "Copy"}</Btn>
 				</SetRow>

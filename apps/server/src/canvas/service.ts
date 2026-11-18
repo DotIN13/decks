@@ -143,9 +143,10 @@ export class CanvasService {
 	apps: Apps | undefined;
 	/** A fresh pairing code for another Decks front end (`auth/issue.ts`), for `decks pair code`. */
 	pairCode: (() => { code: string; expires: number }) | undefined;
-	/** Sign the harness in to Decks Studio by a short code (`studio/login.ts`), and the code a sign-in is waiting on; set by the app. */
-	studioLogin: ((url?: string) => Promise<{ code: string; verify: string; expires: number }>) | undefined;
-	studioShowing: (() => { code?: { code: string; verify: string; expires: number }; failed?: string }) | undefined;
+	/** Start signing the harness in to Decks Studio (`studio/login.ts`): the address that shows its code; then the code, pasted; and the sign-in under way. Set by the app. */
+	studioLogin: ((url?: string) => Promise<{ url: string; studio: string; expires: number }>) | undefined;
+	studioCode: ((code: string) => Promise<{ url: string; account?: string }>) | undefined;
+	studioShowing: (() => { open?: { url: string; studio: string; expires: number }; failed?: string }) | undefined;
 	/** Sign the harness out of Studio as Settings does (`studio/index.ts`, `unpairStudio`); set by the app. */
 	studioSignOut: (() => void) | undefined;
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */
