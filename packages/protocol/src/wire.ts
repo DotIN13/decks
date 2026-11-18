@@ -68,6 +68,8 @@ export interface StageRow {
 	changedAt?: number;
 	boards: number;
 	rev: number;
+	/** The drawing as a short hash, which a picture of the canvas is asked for by: unlike `rev`, the same after the harness restarts. */
+	shot?: string;
 	agents: Array<{ id: string; name: string; color: string }>;
 	/** The words its boards and notes carry, for the manager's search field. */
 	words: string;

@@ -430,3 +430,36 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("a canvas's shot is its drawing as a hash: the same after a restart, where rev starts again, and new when the drawing changes", () => {
+	const dir = deck();
+	const first = new CanvasPens(dir, () => {});
+	let name = "";
+	let before = { rev: 0, shot: "" };
+	try {
+		name = first.claim("Plan");
+		first.edit(name, [{ op: "insert", node: { type: "note", id: "a", content: "one" }, box: { x1: 0, y1: 0 } }]);
+		first.edit(name, [{ op: "insert", node: { type: "note", id: "b", content: "two" }, box: { x1: 0, y1: 200 } }]);
+		before = first.summary(name);
+		assert.match(before.shot, /^[0-9a-f]{12}$/);
+		assert.equal(first.summary(name).shot, before.shot);
+	} finally {
+		first.close();
+	}
+	// The harness restarted: the same folder, read by a new run.
+	const second = new CanvasPens(dir, () => {});
+	try {
+		const after = second.summary(name);
+		assert.equal(after.rev, 1);
+		assert.notEqual(after.rev, before.rev);
+		assert.equal(after.shot, before.shot);
+		second.edit(name, [{ op: "update", id: "a", set: { content: "one, changed" } }]);
+		const edited = second.summary(name);
+		assert.notEqual(edited.shot, before.shot);
+		// A canvas with no drawing yet still answers.
+		assert.equal(second.summary("nobody-drew-here").shot, "0");
+	} finally {
+		second.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

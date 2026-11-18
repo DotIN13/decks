@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Author } from "./log.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
@@ -69,6 +70,8 @@ export interface PenEntry {
 	placed?: Map<string, Placed>;
 	/** The file's text as last read or written. */
 	text?: string;
+	/** `text` as a short hash, worked out the first time it is asked for (`summary`). */
+	shot?: string;
 }
 
 /**
@@ -384,8 +387,14 @@ export class CanvasPens {
 	 * The words are what the manager's search matches beyond the name — every board's title and
 	 * every note's text — gathered here because this is the only place that reads the file. A
 	 * stage with a file that does not parse still answers, from the last good document.
+	 *
+	 * `shot` is what a picture of the canvas is kept and asked for by (`shots.ts`, `thumb`): the
+	 * drawing's text as a short hash. `rev` cannot do it, since it counts from 1 again each time the
+	 * harness starts, so a picture kept as revision 1 weeks ago was shown as today's after a restart.
+	 * The hash is the same until the drawing changes, whichever run of the harness reads it. A saved
+	 * frame or a card's content changing does not change it: the picture follows at the next edit.
 	 */
-	summary(name: string): { boards: number; rev: number; words: string } {
+	summary(name: string): { boards: number; rev: number; shot: string; words: string } {
 		const entry = this.get(name);
 		const words: string[] = [];
 		let boards = 0;
@@ -395,7 +404,8 @@ export class CanvasPens {
 			const content = (node as { content?: unknown }).content;
 			if (typeof content === "string" && content) words.push(content);
 		}
-		return { boards, rev: entry.rev, words: words.join(" ").replace(/\s+/g, " ").slice(0, 600) };
+		entry.shot ??= entry.text === undefined ? "0" : createHash("sha1").update(entry.text).digest("hex").slice(0, 12);
+		return { boards, rev: entry.rev, shot: entry.shot, words: words.join(" ").replace(/\s+/g, " ").slice(0, 600) };
 	}
 
 	/** The `stage.pen` frame for one agent looking at this stage. */

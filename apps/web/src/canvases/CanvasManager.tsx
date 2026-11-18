@@ -403,7 +403,7 @@ function StageCard(props: {
 			onPointerLeave={(event) => event.pointerType === "mouse" && setConfirming(false)}
 		>
 			{/*
-				The picture is the canvas as the server drew it, cached by the drawing's revision — so an
+				The picture is the canvas as the server drew it, cached by the drawing's hash — so an
 				unchanged canvas is never redrawn, and a changed one cannot show yesterday. An empty canvas,
 				or one with no picture to be had, says what it is rather than showing a blank tile.
 			*/}
@@ -419,7 +419,7 @@ function StageCard(props: {
 				>
 					<AuthedImg
 						class="stage-shot"
-						src={api(`/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().rev}&scheme=${props.scheme}`)}
+						src={api(`/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().shot ?? stage().rev}&scheme=${props.scheme}`)}
 						alt=""
 						loading="lazy"
 						onError={() => setBroken(true)}

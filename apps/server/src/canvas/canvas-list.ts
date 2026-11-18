@@ -12,7 +12,7 @@ import type { CanvasPens } from "./pens.ts";
  */
 export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id: string; name: string; color: string; seat: { stageName(): string | undefined } }>): ServerMessage {
 	const stages = pens.names().map((name) => {
-		const { boards, rev, words } = pens.summary(name);
+		const { boards, rev, shot, words } = pens.summary(name);
 		let changedAt: number | undefined;
 		try {
 			changedAt = Math.round(statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : pens.folderOf(name)).mtimeMs);
@@ -27,6 +27,7 @@ export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id
 			...(changedAt ? { changedAt } : {}),
 			boards,
 			rev,
+			shot,
 			words,
 			...(pens.formerly(name).length ? { formerly: pens.formerly(name) } : {}),
 			agents: everyone

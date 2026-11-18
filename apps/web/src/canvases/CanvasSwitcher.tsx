@@ -68,7 +68,7 @@ export function CanvasSwitcher(props: {
 						<button type="button" role="menuitem" data-row data-flat="true" class="switcher-canvas" data-current={stage.name === props.here ? "true" : undefined} onClick={() => pick(() => props.onPick(stage.name))}>
 							<span class="switcher-thumb" aria-hidden="true">
 								<Show when={stage.boards > 0}>
-									<AuthedImg alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(stage.name)}?v=${stage.rev}&scheme=${props.scheme}`)} />
+									<AuthedImg alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(stage.name)}?v=${stage.shot ?? stage.rev}&scheme=${props.scheme}`)} />
 								</Show>
 							</span>
 							<span class="row-label min-w-0 flex-1 truncate">{stage.title}</span>

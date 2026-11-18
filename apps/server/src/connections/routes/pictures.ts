@@ -149,8 +149,9 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * A picture of a whole stage, for the manager's cards (`canvas/shots.ts`).
 	 *
 	 * The board thumbnails' bargain, one level up: the request waits for the picture because an
-	 * `<img>` cannot be told "later", `v` is the drawing's revision and is what makes the URL new
-	 * when the stage changes, and a year of caching is safe because of it. 503 when this machine
+	 * `<img>` cannot be told "later", `v` is the drawing as a short hash (`pens.summary`, `shot`) and
+	 * is what makes the URL new when the stage changes, and a year of caching is safe because of it:
+	 * the hash is the same drawing whichever run of the harness answers. 503 when this machine
 	 * has no Chromium, 404 for no such stage; the card draws its plain tile for either.
 	 */
 	api.get(
@@ -164,10 +165,10 @@ export function register(api: Router, { app }: RouteDeps): void {
 				return;
 			}
 			const scheme = req.query.scheme === "dark" ? "dark" : "light";
-			const { rev } = pens.summary(name);
+			const { shot } = pens.summary(name);
 			try {
-				const file = await shots.thumb(name, rev, scheme);
-				res.setHeader("Cache-Control", req.query.v === String(rev) ? "private, max-age=31536000, immutable" : "no-cache");
+				const file = await shots.thumb(name, shot, scheme);
+				res.setHeader("Cache-Control", req.query.v === shot ? "private, max-age=31536000, immutable" : "no-cache");
 				res.type("jpeg");
 				await sendFile(res, file);
 			} catch (error) {

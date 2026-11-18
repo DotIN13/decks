@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { CanvasPens } from "./pens.ts";
-import { shotBox, shotTarget } from "./shots.ts";
+import { CanvasShots, isThumbOf, shotBox, shotTarget } from "./shots.ts";
 
 test("a picture frames what it names with a margin: an item, a board, several, everything, or a box", () => {
 	const dir = mkdtempSync(join(tmpdir(), "shots-"));
@@ -70,4 +70,44 @@ test("a picture's to is a path in the deck; a full path inside it is taken, one 
 	} finally {
 		rmSync(deck, { recursive: true, force: true });
 	}
+});
+
+test("a canvas's picture is kept by its drawing's hash: taken once, taken again for a new drawing, and only its own older ones removed", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
+	try {
+		const shots = new CanvasShots({ deck: dir } as unknown as ConstructorParameters<typeof CanvasShots>[0]);
+		let taken = 0;
+		// The picture itself needs a browser or the engine: here it is a file with a number in it.
+		(shots as unknown as { take: (request: { to: string }) => Promise<unknown> }).take = async (request) => {
+			taken += 1;
+			mkdirSync(dirname(join(dir, request.to)), { recursive: true });
+			writeFileSync(join(dir, request.to), String(taken));
+			return {};
+		};
+		const folder = join(dir, ".decks", "thumbs", "stages");
+		mkdirSync(folder, { recursive: true });
+		// Left by earlier runs: this canvas's picture by an old revision number, and those of a canvas whose name begins with this one's.
+		for (const old of ["plan-1-dark.jpg", "plan-1-light.jpg", "plan-b-1-dark.jpg", "plan-b-0123456789ab-dark.jpg"]) writeFileSync(join(folder, old), "old");
+		const one = await shots.thumb("plan", "aaaaaaaaaaaa", "dark");
+		assert.equal(taken, 1);
+		assert.equal(await shots.thumb("plan", "aaaaaaaaaaaa", "dark"), one);
+		assert.equal(taken, 1, "the same drawing is not pictured twice");
+		assert.deepEqual(readdirSync(folder).sort(), ["plan-1-light.jpg", "plan-aaaaaaaaaaaa-dark.jpg", "plan-b-0123456789ab-dark.jpg", "plan-b-1-dark.jpg"]);
+		const two = await shots.thumb("plan", "bbbbbbbbbbbb", "dark");
+		assert.equal(taken, 2);
+		assert.notEqual(two, one);
+		assert.ok(!existsSync(one), "the older drawing's picture is removed");
+		assert.ok(existsSync(join(folder, "plan-b-1-dark.jpg")) && existsSync(join(folder, "plan-b-0123456789ab-dark.jpg")), "another canvas's pictures stay");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a file is a canvas's picture only by its whole name", () => {
+	assert.ok(isThumbOf("plan-1-dark.jpg", "plan", "dark"));
+	assert.ok(isThumbOf("plan-0123456789ab-dark.jpg", "plan", "dark"));
+	assert.ok(!isThumbOf("plan-b-1-dark.jpg", "plan", "dark"));
+	assert.ok(!isThumbOf("plan-1-light.jpg", "plan", "dark"));
+	assert.ok(!isThumbOf("plan--dark.jpg", "plan", "dark"));
+	assert.ok(isThumbOf("第三集-脚本-2-light.jpg", "第三集-脚本", "light"));
 });
