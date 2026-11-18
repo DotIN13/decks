@@ -1,4 +1,3 @@
-import type { Setter } from "solid-js";
 import type { Camera } from "@decks/protocol";
 import { untrack } from "solid-js";
 import type { EditorState } from "../../view/types.ts";
@@ -18,18 +17,18 @@ export interface StartNeeds {
 	readonly modeNow: "edit" | "browse";
 	readonly localCamera: Camera;
 	readonly appStoredNow: () => Record<string, Record<string, string>>;
-	fromFrame: { camera?: Camera; selected?: string; mode?: "edit" | "browse"; };
 	readonly wire: (page: PageEnd, canvas: string) => void;
-	readonly setEnd: Setter<PageEnd | undefined>;
 }
 
 export function createStart(d: StartNeeds) {
 	/**
 	 * Start the frame on a canvas: its hello is listened for at once (a frame moved in place says it
 	 * again soon after its `reset`), and the pass is asked for beside it; once both are here, the frame
-	 * gets everything it begins with. Answers how to stop waiting, for a canvas left before it started.
+	 * gets everything it begins with, and `started` is handed the page's end of its line: the frame may
+	 * be the one in front by then or one kept behind it (`surface.tsx`). Answers how to stop waiting, for
+	 * a canvas left before it started.
 	 */
-	const startFrame = (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean): (() => void) => {
+	const startFrame = (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean, started: (page: PageEnd, selected: string | undefined) => void): (() => void) => {
 		const begin = (pass: CanvasPass) => {
 			const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
 			const pen = untrack(() => d.state?.pen?.());
@@ -63,9 +62,8 @@ export function createStart(d: StartNeeds) {
 			const page = peer(channel.port1) as PageEnd;
 			// A new frame has said nothing yet, and starts with the page's selection (`start.selected`), so it is not sent again.
 			const selected = untrack(() => d.state?.selected?.[0]());
-			d.fromFrame = selected ? { selected } : {};
 			d.wire(page, canvas);
-			d.setEnd(page);
+			started(page, selected);
 			// The canvas pass, kept current for as long as the frame is there (`renewPass`): the frame takes the new one for its calls, and the new addresses for its files and pictures.
 			renewPass({ pass: () => d.options.frame.pass(canvas), expires: pass.expires, cancelled, renewed: (next) => page.emit("token", { token: next.token, files: { base: next.files, expires: next.expires }, pictures: next.pictures }) });
 			// The camera as it is now: the page may have landed while the frame was loading.

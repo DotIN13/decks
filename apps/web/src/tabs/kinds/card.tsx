@@ -1,12 +1,14 @@
 import FileText from "lucide-solid/icons/file-text";
 import { CardFrame } from "@decks/canvas";
 import { Icon } from "@decks/ui";
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { state } from "../../state/deck.ts";
 import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
+import { ITEM_KINDS, ITEMS_BEHIND } from "../budget.ts";
+import { aliveAmong } from "../tabs.ts";
 
 /** The canvas a card is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
 function canvasOfPath(path: string): string | undefined {
@@ -22,7 +24,9 @@ const cardAt = (path: string | undefined) => state.pages.find((one) => one.path 
 /**
  * A card, as a kind of tab: the card whole, in a frame of its own (`@decks/canvas`, `CardFrame`: the
  * frame every kind runs in, with the card kind inside), on its canvas's pass. Its buttons work as on
- * its canvas: its calls take the same roads. Put away while it is not in front.
+ * its canvas: its calls take the same roads. Kept alive behind the tab in front, within the device's
+ * budget (`budget.ts`), so coming back to it is showing it; one past the budget is put away, and
+ * loads again from its files.
  */
 export const cardKind: TabKind = {
 	name: "card",
@@ -33,18 +37,15 @@ export const cardKind: TabKind = {
 		list: async () => ((await act<Array<{ path: string; title: string }>>("card.list", [])) ?? []).map((card) => ({ target: card.path, title: card.title || card.path, note: canvasOfPath(card.path) })),
 	},
 	icon: (props) => <Icon of={FileText} size={props.size ?? 16} />,
-	view: (tab, parts) => (
-		<Show when={tab()} keyed>
-			{(shown) => <CardTab tab={shown} foot={parts.dock.dockCover()} />}
-		</Show>
-	),
+	view: (tab, parts) => <For each={aliveAmong(ITEM_KINDS, ITEMS_BEHIND).filter((one) => one.kind === "card")}>{(one) => <CardTab tab={one} shown={tab()?.id === one.id} foot={parts.dock.dockCover()} />}</For>,
 };
 
-function CardTab(props: { tab: Tab; foot: number }) {
+function CardTab(props: { tab: Tab; shown: boolean; foot: number }) {
 	const path = props.tab.target ?? "";
 	const canvas = canvasOfPath(path);
 	return (
-		<div class="surface" data-surface="card">
+		// Hidden, not taken out of the layout: the frame keeps its size, so the card is as it was when it shows again.
+		<div class="surface" data-surface="card" data-kept={props.shown ? undefined : "true"} style={{ visibility: props.shown ? undefined : "hidden", "pointer-events": props.shown ? undefined : "none" }}>
 			<Show when={canvas && cardAt(path)} fallback={<p class="tab-missing">This card is not in the deck any more.</p>}>
 				<CardFrame
 					card={{ path, title: cardAt(path)?.title ?? path, rev: cardAt(path)?.rev ?? 0, w: cardAt(path)?.w ?? 600, trusted: !path.startsWith("shared/") }}

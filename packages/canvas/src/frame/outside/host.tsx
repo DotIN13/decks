@@ -10,6 +10,7 @@ import { createWire } from "./wire.ts";
 import { createStart } from "./start.ts";
 import { createFrameFocus } from "./focus.ts";
 import { createFrameStores } from "./stores.ts";
+import { forgetFrameZoom, mirrorTools } from "../tools-mirror.ts";
 
 
 /** What the page answers for its frame beyond the editor's own options. */
@@ -27,6 +28,13 @@ export interface FrameHostOptions {
 	 * a card's script can leave code running in the frame after its card is gone. Left out: never.
 	 */
 	inPlace?(from: string, to: string): boolean;
+	/**
+	 * The canvases to keep a frame for behind the one on screen, by name: each stays as it was, following
+	 * its canvas out of sight, and comes forward at once when the page moves to it (`surface.tsx`). As
+	 * many as the device can bear is the page's to say. Left out: none, and a move makes the frame again
+	 * or moves it in place.
+	 */
+	kept?(): readonly string[];
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
 	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
@@ -53,8 +61,8 @@ export interface FrameHostOptions {
 	agents?(): Record<string, { name: string; color: string }>;
 	/** The conversation on screen, whose `decks view …` the frame carries out on its canvas. */
 	focused?(): string | undefined;
-	/** A view for another conversation, from an agent's `decks view …` on this canvas: the page keeps it for when that chat opens, and the harness hears it, to answer that agent's `view.camera`. */
-	viewFor?(agent: string, camera: Camera, selected?: string): void;
+	/** A view for another conversation, from an agent's `decks view …` on this canvas: the page keeps it for when that chat opens, and the harness hears it, to answer that agent's `view.camera`. `canvas` names the canvas the view is of, which is the frame's that said it: the one on screen, or one kept behind it (`kept`), where the chat on screen's own agent's view is kept this way too. */
+	viewFor?(agent: string, camera: Camera, selected?: string, canvas?: string): void;
 	/** Move a conversation to a canvas, as the page's canvas switcher does: an agent's `view.goto` the person said Go to. */
 	moveTo?(agent: string, canvas: string): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
@@ -177,8 +185,9 @@ type Options = FramedEditorOptions;
  * keeps it in step with the host's state, turns its messages into the host's callbacks, and answers
  * what it asks.
  *
- * One frame for one canvas: when the host moves to another canvas the frame is made again, on a ticket
- * for that canvas.
+ * One frame for one canvas: when the host moves to another canvas the frame is made again or moved in
+ * place, on a pass for that canvas, or, for a canvas the host keeps a frame for (`kept`), the frame
+ * held for it comes forward (`surface.tsx`). The page talks on one line at a time, the frame in front's.
  */
 export function createFramedEditor(options: Options): FramedEditor {
 	const state = options.state;
@@ -206,17 +215,47 @@ export function createFramedEditor(options: Options): FramedEditor {
 	});
 
 	const { startFrame } = createStart({
-		options, state, storage, storeKey, appStoredNow, setEnd,
+		options, state, storage, storeKey, appStoredNow,
 		get darkNow() { return darkNow; },
 		get modeNow() { return modeNow; },
 		get localCamera() { return localCamera; },
-		get fromFrame() { return fromFrame; },
-		set fromFrame(next) { fromFrame = next; },
 		get wire() { return wire; },
 	});
 
+	/** Stops the tools' mirror on the line the page talks on now. */
+	let stopMirror: (() => void) | undefined;
+	/**
+	 * Make a frame's line the one the page talks on, or none (`surface.tsx`). What the page keeps in step
+	 * with a frame follows whichever line this is (`sync.ts`), so most of it is said to the new one by
+	 * itself: the camera, the selection, the chat on screen, what the page's chrome covers. The rest is
+	 * said here: the tools' state has one mirror, on this line alone, and a frame that was in front
+	 * before is told the scheme and the mode as they are now, and asked for what only it knows (its
+	 * selection, its zoom), which the page last heard from another frame.
+	 */
+	const attach = (page: PageEnd | undefined, how: { again: boolean; selected?: string | undefined }) => {
+		stopMirror?.();
+		stopMirror = undefined;
+		forgetFrameZoom();
+		/*
+		 * A frame that has just started was given the page's selection (`start.selected`), so it is not
+		 * sent again. One coming forward again keeps the view it has: the page's camera is still the
+		 * canvas's it is leaving, and is not said to this one; where the page lands on this canvas
+		 * (`camera/landing.ts`) is said when it lands.
+		 */
+		fromFrame = how.again ? { camera: untrack(() => state?.camera?.[0]()) } : how.selected ? { selected: how.selected } : {};
+		if (page) {
+			if (options.pageTools) stopMirror = mirrorTools("page", page, { frameAt: () => frameAt()?.getBoundingClientRect() });
+			if (how.again) {
+				page.emit("look", { dark: darkNow, mode: modeNow });
+				if (options.pageTools) page.emit("tools", { again: true });
+			}
+		}
+		setEnd(() => page);
+	};
+
 	const { wire } = createWire({
 		state, options, frameInUse, onPage, storage, storeKey, frameAt,
+		inFront: (page) => untrack(end) === page,
 		get fromFrame() { return fromFrame; },
 		get localCamera() { return localCamera; },
 		set localCamera(next) { localCamera = next; },
@@ -231,7 +270,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 		set modeNow(next) { modeNow = next; },
 	});
 
-	const { surface } = createSurface({ keepInStep, startFrame, end, setEnd, options, frameAt, setFrameAt });
+	const { surface } = createSurface({ keepInStep, startFrame, end, attach, options, frameAt, setFrameAt });
 
 	// The frame follows the drawing itself, from the harness or Studio: nothing of it is passed on from here.
 	const handle: FramedHandle = {
@@ -260,6 +299,8 @@ export function createFramedEditor(options: Options): FramedEditor {
 		paste: (data) => end()?.emit("paste", data),
 		restored: false,
 		dispose: () => {
+			stopMirror?.();
+			stopMirror = undefined;
 			end()?.close();
 			setEnd(undefined);
 		},

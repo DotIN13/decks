@@ -301,8 +301,13 @@ export async function open({ width = 1500, height = 950, scheme = "dark", cards 
 export async function canvasFrame(page, { timeout = 30000 } = {}) {
 	const deadline = Date.now() + timeout;
 	for (;;) {
-		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame.html"));
-		if (frame && (await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false))) return frame;
+		// The frame in front, `iframe.canvas-frame`: a canvas kept behind it (`canvas-frame-kept`) and a card's, a document's or an app's frame load the same page.
+		for (const frame of page.frames()) {
+			if (frame.isDetached() || !frame.url().includes("canvas-frame.html")) continue;
+			const owner = await frame.frameElement().catch(() => undefined);
+			if (!owner || !(await owner.evaluate((element) => element.classList.contains("canvas-frame")).catch(() => false))) continue;
+			if (await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false)) return frame;
+		}
 		if (Date.now() > deadline) throw new Error("the canvas frame never showed its stage");
 		await page.waitForTimeout(100);
 	}

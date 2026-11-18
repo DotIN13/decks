@@ -17,8 +17,9 @@ import { aim, aimCanvas, canvasOnScreen, keepCanvas, onCanvas, openTab, showCanv
  * browser that was told, in the same store the landing parks views in and takes them from when that
  * chat opens (`camera/landing.ts`).
  */
-export function rememberView(agentId: string, camera: Camera, selected?: string): void {
-	agentViews(state.deck?.path ?? "").keep(agentId, stageOf(agentId)?.name, viewToPark(camera, selected));
+export function rememberView(agentId: string, camera: Camera, selected?: string, canvas?: string): void {
+	// The canvas is named by the frame that said it: the page may not have heard yet that the agent's camera went there.
+	agentViews(state.deck?.path ?? "").keep(agentId, canvas ?? stageOf(agentId)?.name, viewToPark(camera, selected));
 	// Its camera is on its canvas now, with no card, document or app over it: opening its chat shows this view.
 	aimCanvas(agentId);
 	// So `decks.view.camera()` answers for that agent's stage rather than falling back to wherever the last person to look at anything was.

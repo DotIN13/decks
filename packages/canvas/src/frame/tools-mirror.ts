@@ -69,6 +69,8 @@ type Box = { x: number; y: number; w: number; h: number };
 /** The zoom as the frame's camera has it at each step, for the page's zoom reading: the page's own camera hears only where a move comes to rest. */
 const [frameZoom, setFrameZoom] = createSignal<number | undefined>();
 export { frameZoom };
+/** The page talks to another frame, or to none while one starts: the zoom the last one said is not this one's, and the page reads its own camera's until it hears (`outside/host.tsx`, `attach`). */
+export const forgetFrameZoom = (): void => void setFrameZoom(undefined);
 
 const MIRRORED: Record<string, Mirrored> = {
 	tool: { read: penTool, write: setPenTool, owner: "page" },
@@ -151,6 +153,16 @@ export function mirrorTools(side: "page" | "frame", end: MirrorEnd, own: { frame
 			});
 		}
 		end.on("tools", (data) => batch(() => {
+			/*
+			 * The page talks to this frame again after talking to another (`outside/host.tsx`, `attach`): what
+			 * only the frame knows is said whole, since the page's copy is the other frame's.
+			 */
+			if (data.again && side === "frame") for (const [key, one] of Object.entries(MIRRORED)) {
+				if (one.owner !== "frame") continue;
+				const value = wire(one, untrack(one.read));
+				last.set(key, JSON.stringify(value ?? null));
+				say(key, value ?? null);
+			}
 			for (const [key, sent] of Object.entries(data)) {
 				const one = MIRRORED[key];
 				if (!one) continue;

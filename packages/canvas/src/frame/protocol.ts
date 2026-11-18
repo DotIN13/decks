@@ -121,7 +121,13 @@ interface FrameToPage {
 	/** A sheet is open over the canvas's foot (the properties drawer on a phone): the page's composer makes way for it, as under an iOS sheet, until it closes. */
 	sheet: { open: boolean };
 	/** Once the camera rests; or a view kept for another conversation (`agent`), for the page to keep as that agent's view and the harness to answer its `view.camera` by. */
-	camera: { camera: Camera; agent?: string; selected?: string };
+	/**
+	 * The frame's camera at rest. With `agent`, a view of this canvas that is that agent's chat's, from
+	 * its `decks view …`: one for a chat that is not on screen, kept by the page for when it opens; or,
+	 * `moved`, one the frame has carried out for the chat on screen, said so a page that keeps this
+	 * frame behind another (`outside/surface.tsx`) keeps the view for when its canvas comes forward.
+	 */
+	camera: { camera: Camera; agent?: string; selected?: string; moved?: true };
 	viewport: { width: number; height: number };
 	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect; /** The box at once (a pill's Comment), not the small button words selected show first. */ open?: boolean };
 	export: { ids: string[]; format?: "png" | "pdf" };

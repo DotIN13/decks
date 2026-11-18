@@ -190,6 +190,8 @@ const CHECKS = [
 	{ file: "tabs-phone.mjs", needsAgent: false },
 	{ file: "canvas-drawer.mjs", needsAgent: false },
 	{ file: "tabs-cameras.mjs", needsAgent: false },
+	/* Open tabs stay alive: a canvas kept behind the one in front in a frame of its own, a card's tab too, within the device's budget. */
+	{ file: "tabs-alive.mjs", needsAgent: false },
 	/* Between two of your canvases the frame moves in place; to and from a friend's it is made anew. */
 	{ file: "canvas-switch.mjs", needsAgent: false },
 	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */

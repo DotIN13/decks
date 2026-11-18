@@ -32,13 +32,18 @@ export function createViewCalls(d: ViewCallsNeeds) {
 	const viewCall = (call: StageCall) => {
 		if (call.op === "shot") return void shootCard(call);
 		let value: unknown;
+		/** Where this call moved the view, and the card it picked: said to the page once it is done. */
+		let moved: { camera: Camera; selected?: string } | undefined;
 		try {
 			value = runViewCall(call, {
 				boards: () => untrack(d.pages) as Page[],
 				viewport: () => ({ width: innerWidth, height: innerHeight }),
 				focused: () => untrack(d.agent),
 				canvasOnScreen: () => d.start.canvas.name,
-				setCamera: (to, options) => d.moveTo(to, options?.animate),
+				setCamera: (to, options) => {
+					d.moveTo(to, options?.animate);
+					moved = { camera: to };
+				},
 				handsOn,
 				offerView: (from, to, selected, what) => d.ctx.setOffer({ agent: from, what, go: () => {
 					d.moveTo(to, true);
@@ -52,7 +57,10 @@ export function createViewCalls(d: ViewCallsNeeds) {
 				} }),
 				// Kept by the page with the views it parks (`camera/landing.ts`): it arrives when that chat opens.
 				rememberView: (id, to, selected) => d.end.emit("camera", { camera: to, agent: id, ...(selected ? { selected } : {}) }),
-				select: d.selectCard,
+				select: (path) => {
+					d.selectCard(path);
+					if (moved && path) moved.selected = path;
+				},
 				reload: (path) => d.handle.reloadCard(path),
 				cursor: (at) => {
 					if (!at) {
@@ -69,6 +77,8 @@ export function createViewCalls(d: ViewCallsNeeds) {
 		} catch (error) {
 			value = { error: error instanceof Error ? error.message : String(error) };
 		}
+		// The view moved here for the chat on screen: the page is told whose and where, for a canvas it keeps behind another (`protocol.ts`, `camera`).
+		if (moved && call.agentId) d.end.emit("camera", { camera: moved.camera, agent: call.agentId, ...(moved.selected ? { selected: moved.selected } : {}), moved: true });
 		d.backend.answer(call.id, value);
 	};
 

@@ -17,7 +17,8 @@ import type { CanvasComment } from "@decks/canvas";
 import type { createFileDrops } from "../../app/files/drops.ts";
 import { rememberView } from "../../app/heard/view.ts";
 import { openLinkedPage } from "../../app/links.ts";
-import { canvasOnScreen } from "../tabs.ts";
+import { canvasesBehind, canvasOnScreen } from "../tabs.ts";
+import { CANVASES_BEHIND } from "../budget.ts";
 import { openItem } from "../open.ts";
 
 /** What the canvas host needs of the page around it. */
@@ -106,6 +107,8 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 				const row = stages().find((one) => one.name === name);
 				return !!row && !row.shared && !row.othersEdit;
 			}),
+			// The canvas tabs last in front keep their frames behind this one, within the device's budget (`tabs/budget.ts`): coming back to one is showing it.
+			kept: () => canvasesBehind(CANVASES_BEHIND),
 			comment: frameComment,
 			ink: frameInk,
 			panel: (name) => (name === "files" ? openFileAtMiddle() : openAppsPanel()),

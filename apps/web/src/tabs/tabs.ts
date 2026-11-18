@@ -82,19 +82,39 @@ export const sawFront = (id: string): void => {
 };
 
 /**
- * The tabs of a kind that are alive now: the one in front, and the `behind` that were in front most
- * lately. A kind whose tabs go on running behind the front one (an app) keeps these and puts the
- * rest away, so a device holds only as many as it has memory for (`budget.ts`). A tab put back by
- * `restoreTabs` and not shown since is not among them: a row of apps does not all start at once.
+ * The tabs of these kinds that are alive now: the one in front, and the `behind` that were in front
+ * most lately, counted across the kinds together. A kind whose tabs go on running behind the front
+ * one keeps these and puts the rest away, so a device holds only as many as it has memory for
+ * (`budget.ts`). A tab put back by `restoreTabs` and not shown since is not among them: a row of
+ * tabs does not all start at once.
  */
-export function alive(kind: string, behind: number): Tab[] {
+export function aliveAmong(kinds: readonly string[], behind: number): Tab[] {
 	const order = shown();
-	const of = tabs().filter((tab) => tab.kind === kind && (order.includes(tab.id) || tab.id === front().id));
+	const of = tabs().filter((tab) => kinds.includes(tab.kind) && (order.includes(tab.id) || tab.id === front().id));
 	const rank = (tab: Tab) => (tab.id === front().id ? -1 : order.indexOf(tab.id));
-	const live = [...of].sort((a, b) => rank(a) - rank(b)).slice(0, (front().kind === kind ? 1 : 0) + behind);
+	const live = [...of].sort((a, b) => rank(a) - rank(b)).slice(0, (kinds.includes(front().kind) ? 1 : 0) + behind);
 	// In the row's order, so a tab's place among them does not change as others come and go.
 	return of.filter((tab) => live.includes(tab));
 }
+
+/**
+ * The canvases to keep a frame for behind the one the camera is on: the canvas tabs of the row that
+ * were in front most lately, up to `behind` of them (`budget.ts`). The camera's own canvas is not
+ * among them: it always has its frame, in front or held behind a card, a document or an app. A
+ * canvas the camera left that is not a tab of the row is not kept: closing a tab lets its frame go.
+ */
+export function canvasesBehind(behind: number): string[] {
+	const order = shown();
+	const here = canvasOnScreen()?.name;
+	return tabs()
+		.filter((tab) => tab.kind === "canvas" && tab.target !== undefined && tab.target !== here && order.includes(tab.id))
+		.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+		.slice(0, behind)
+		.map((tab) => tab.target!);
+}
+
+/** The tabs of one kind that are alive now (`aliveAmong`). */
+export const alive = (kind: string, behind: number): Tab[] => aliveAmong([kind], behind);
 
 /**
  * Put a tab in the row if it is not there: after the others. The canvas the camera of the chat on
