@@ -15,10 +15,10 @@ import type { Floats } from "./floats.ts";
  * go it glides on with the throw, it parks against an edge, it keeps clear of the other floats, a
  * hard throw at the left or right edge puts it away behind its tab, it follows the side panel as
  * that is folded or sized, and its place is remembered on this device. What is its own: its corner
- * sizes it, and its home is the side panel. Let go over the open panel it goes back in, and while it
- * is held there the panel shows the slot it will land in (`landing`, a section of the panel's own
- * layout, so it is exactly the room the conversation takes). A double-click on the grip sends it
- * home, as it does any float.
+ * sizes it, it keeps under the top bars, and its home is the side panel. Let go over the open panel,
+ * or thrown at it, it glides into its slot and is the panel's again; while it is held over the panel
+ * the panel shows that slot (`landing`, a section of the panel's own layout, so it is exactly the
+ * room the conversation takes). A double-click on the grip sends it home, as it does any float.
  *
  * Out, it shows whether the side panel is open or folded (`chat-layout.ts`, `chatShown`), which is
  * what taking it out is for: the canvas at its full width, with the conversation beside the work.
@@ -41,7 +41,7 @@ const SIZE = { w: 380, h: 520 };
 const LEAST = { w: 300, h: 220 };
 const MOST_W = 760;
 /** Where it stands when nothing says where it was put: under the top bar, a margin in from the canvas's right edge. */
-const HOME = { top: 64, right: 12 };
+const HOME = { top: 68, right: 12 };
 /** How much of it shows when it is put away behind an edge: its tab. */
 const STOW_TAB = 28;
 const SIZE_KEY = "decks.chatFloatSize";
@@ -85,7 +85,6 @@ export function createChatFloat(layout: ChatFloatLayout, { workBox, mountFloat }
 			setLanding(true);
 			takeOut();
 		},
-		home: putBack,
 		end: () => (carried = undefined),
 	};
 	const follow = (down: PointerEvent, docked?: HTMLElement) => followPress(down, docked, press);
@@ -116,21 +115,43 @@ export function createChatFloat(layout: ChatFloatLayout, { workBox, mountFloat }
 			const slot = shell()?.querySelector(".v3-chat")?.getBoundingClientRect();
 			return { x: (panel?.left ?? 0) - (work()?.left ?? 0), y: (slot?.top ?? (panel ? panel.top + panel.height / 2 : 0)) - (work()?.top ?? 0) };
 		};
-		// Held, it may be carried over the side panel, which is where it is put back; at rest it keeps to the canvas.
+		/*
+		 * Under the top bars, never over them: thrown upwards it comes to rest a margin below them, in
+		 * line with the tools. Held, it may be carried over the side panel, which is its home; at rest it
+		 * keeps to the canvas.
+		 */
 		const box = () => {
 			const canvas = workBox();
-			return el.dataset.dragging === "true" ? { x: 0, y: canvas.y, w: canvas.x + canvas.w, h: canvas.h } : canvas;
+			const top = underBars();
+			const x = el.dataset.dragging === "true" ? 0 : canvas.x;
+			return { x, y: top, w: canvas.x + canvas.w - x, h: canvas.h - top };
 		};
-		const mine = mountFloat(el, "conversation", grip, "button", home, "top", { tab: STOW_TAB }, undefined, box);
+		/*
+		 * A release goes home when the float, carried on by its throw, would rest with its grip over the
+		 * open side panel: let go there, or thrown at it from the canvas. The panel shows the slot, and
+		 * the float takes the slot's size as it glides in, so what arrives is what the panel then holds.
+		 */
+		const homeward = (thrown: Point) => {
+			const panel = panelOpen() ? shell()?.getBoundingClientRect() : undefined;
+			const go = !!panel && thrown.x + (work()?.left ?? 0) + el.offsetWidth / 2 < panel.right;
+			setLanding(go);
+			if (go) wearSlot(el);
+			return go;
+		};
+		const mine = mountFloat(el, "conversation", grip, "button", home, "top", { tab: STOW_TAB }, undefined, { box, homeward, onHome: putBack });
 		float = mine;
 		const down = (event: PointerEvent) => {
 			if (event.button === 0 && !mine.stowed()) follow(event);
 		};
-		// Home is the panel, so the float's own glide to the place it calls home is not what a double-click does.
+		// A double-click sends it home as it does any float: into the slot, where its home is, or straight back when the panel is folded.
 		const goHome = (event: MouseEvent) => {
 			event.stopImmediatePropagation();
 			event.preventDefault();
-			if (!mine.stowed()) putBack();
+			if (mine.stowed()) return;
+			if (!panelOpen()) return putBack();
+			setLanding(true);
+			wearSlot(el);
+			mine.goHome();
 		};
 		// Before the float's own listeners, so this one's release is heard first (`follow`).
 		grip.addEventListener("pointerdown", down, true);
@@ -175,16 +196,13 @@ export function createChatFloat(layout: ChatFloatLayout, { workBox, mountFloat }
 /**
  * One press of the grip, followed to its end. From the panel (`docked` is the section there) the
  * conversation is lifted out once the press has moved by `LIFT`; from the float it is already out
- * and the float moves itself. Either way the panel shows the slot while the pointer is over it, and
- * a release there sends the conversation home.
- *
- * Heard on the window before the float hears the same release, so a conversation put back is gone
- * before its float would glide to, and remember, a place beside the panel.
+ * and the float moves itself. Either way the panel shows the slot while the pointer is over it.
+ * Where a release sends the float is the float's to say (`homeward`), which hears it after this.
  */
 function followPress(
 	down: PointerEvent,
 	docked: HTMLElement | undefined,
-	on: { overPanel: (event: PointerEvent) => boolean; landing: (over: boolean) => void; lift: (event: PointerEvent, grab: Point) => void; home: () => void; end: () => void },
+	on: { overPanel: (event: PointerEvent) => boolean; landing: (over: boolean) => void; lift: (event: PointerEvent, grab: Point) => void; end: () => void },
 ): void {
 	const from = docked?.getBoundingClientRect();
 	let moved = false;
@@ -207,9 +225,7 @@ function followPress(
 		window.removeEventListener("pointerup", end, true);
 		window.removeEventListener("pointercancel", end, true);
 		on.end();
-		const home = moved && out && event.type !== "pointercancel" && on.overPanel(event);
 		on.landing(false);
-		if (home) on.home();
 	};
 	window.addEventListener("pointermove", move, true);
 	window.addEventListener("pointerup", end, true);
@@ -233,6 +249,18 @@ const fit = (size: Size, box: Box): Size => ({
 	w: Math.round(Math.max(LEAST.w, Math.min(size.w, MOST_W, box.w - 24))),
 	h: Math.round(Math.max(LEAST.h, Math.min(size.h, box.h - HOME.top - 12))),
 });
+/** The slot's size, taken by the float as it glides into it. */
+const wearSlot = (el: HTMLElement) => {
+	const slot = document.querySelector(".panel-shell .v3-chat-slot")?.getBoundingClientRect();
+	if (slot) wear(el, { w: Math.round(slot.width), h: Math.round(slot.height) });
+};
+/** How far down the top bars reach, in the canvas column's frame: the float keeps under them. */
+const underBars = (): number => {
+	const top = document.querySelector(".work")?.getBoundingClientRect().top ?? 0;
+	let bottom = 0;
+	for (const bar of document.querySelectorAll(".v3-topbar, .v3-topright")) if (bar.getClientRects().length > 0) bottom = Math.max(bottom, bar.getBoundingClientRect().bottom - top);
+	return bottom;
+};
 const wear = (el: HTMLElement, size: Size) => {
 	el.style.setProperty("--chat-float-w", `${size.w}px`);
 	el.style.setProperty("--chat-float-h", `${size.h}px`);

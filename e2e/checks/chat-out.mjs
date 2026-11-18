@@ -9,8 +9,10 @@
  * it glides on past where it was let go, a hard throw at the right edge puts it away behind its tab
  * and the tab brings it back, and it follows the side panel as that folds; it is where it was after
  * a reload; its corner sizes it from its top left; its title still folds it and a drag does not;
- * held over the panel the slot shows again, the same box, and let go there it is in the panel
- * again; and a double-click on the grip sends it home too. `LOOK_SHOTS=<dir>` keeps pictures.
+ * thrown at the top it rests under the top bars, never over them; held over the panel the slot
+ * shows again, the same box, and let go there it is in the panel again; thrown at the panel from
+ * the canvas and let go short of it, it glides on into the slot; and a double-click on the grip
+ * sends it home too. `LOOK_SHOTS=<dir>` keeps pictures.
  */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -50,6 +52,7 @@ const look = () =>
 			panel: box(shell),
 			panelOpen: shell?.getAttribute("data-open") !== "false",
 			work: box(document.querySelector(".work")),
+			bars: Math.max(...[...document.querySelectorAll(".v3-topbar, .v3-topright")].filter((bar) => bar.getClientRects().length > 0).map((bar) => Math.round(bar.getBoundingClientRect().bottom))),
 			list: box(document.querySelector(".panel-shell .panel-list")),
 			stream: !!at?.querySelector(".stream"),
 			out: localStorage.getItem("decks.chatOut"),
@@ -127,6 +130,8 @@ if (OUT) await page.screenshot({ path: join(OUT, "2-out-over-the-canvas.png") })
 	await settle(page, 900);
 	const rest = await look();
 	say("thrown, it glides on past where it was let go, by the float system's own transition", letGo.snapping && /top/.test(letGo.glides) && rest.float.y < out.float.y - 60 - 20 && rest.stowed === null && !rest.snapping, JSON.stringify({ letGoAt: out.float.y - 60, snapping: letGo.snapping, glides: letGo.glides, rest: rest.float.y }));
+	say("…and thrown at the top it comes to rest under the top bars, a margin below them, never over them", rest.bars === 56 && rest.float.y === rest.bars + 12, JSON.stringify({ bars: rest.bars, float: rest.float }));
+	if (OUT) await page.screenshot({ path: join(OUT, "2b-under-the-top-bars.png") });
 }
 
 // --- thrown hard at the right edge it is put away behind its tab -------------------------------
@@ -207,16 +212,35 @@ await drag(await gripOf(), { x: 180, y: 520 }, {
 	},
 });
 say("held over the side panel, the float is over it and the panel shows the slot, the box the conversation had", !!held?.slot && same(held.slot, home) && held.float.x < held.panel.r, JSON.stringify({ slot: held?.slot, had: home, float: held?.float }));
+await settle(page, 500);
 const docked = await look();
 say("let go there it is in the panel again, in that box, open", same(docked.docked, home) && !docked.float && !docked.slot && docked.folded === false && docked.out === "0", JSON.stringify({ docked: docked.docked, had: home }));
 say("…and the list is as it was", same(docked.list, listBefore), JSON.stringify({ list: docked.list, was: listBefore }));
+
+// --- thrown at the panel from the canvas, it lands in its slot -------------------------------------
+await drag(await gripOf(), { x: 700, y: 300 });
+{
+	const there = await look();
+	const grip = await gripOf();
+	await page.mouse.move(grip.x, grip.y);
+	await page.mouse.down();
+	// Towards the panel, quickly, and let go well short of it.
+	for (let i = 1; i <= 4; i++) await page.mouse.move(grip.x - i * 40, grip.y + i * 3);
+	await page.mouse.up();
+	const flying = await look();
+	if (OUT) await page.screenshot({ path: join(OUT, "7-thrown-at-the-slot.png") });
+	say("thrown at the side panel and let go short of it, it glides on to its slot, which the panel shows", there.float.x > there.panel.r && grip.x - 160 > there.panel.r && !!flying.float && flying.snapping && same(flying.slot, home), JSON.stringify({ letGoAt: grip.x - 160, panel: there.panel.r, snapping: flying.snapping, slot: flying.slot }));
+	await settle(page, 1000);
+	const landed = await look();
+	say("…and lands in it: the conversation is in the panel again, in the box it had", same(landed.docked, home) && !landed.float && !landed.slot && landed.out === "0", JSON.stringify({ docked: landed.docked, float: landed.float }));
+}
 
 // --- a double-click on the grip sends it home ------------------------------------------------------
 await drag(await gripOf(), { x: 900, y: 300 });
 say("taken out again", !!(await look()).float);
 const g = await gripOf();
 await page.mouse.dblclick(g.x, g.y);
-await settle(page, 600);
+await settle(page, 1000);
 const end = await look();
 say("a double-click on its grip sends it home, to the panel", same(end.docked, home) && !end.float && end.out === "0", JSON.stringify({ docked: end.docked, float: end.float }));
 

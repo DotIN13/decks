@@ -107,6 +107,15 @@ interface FloatOptions {
 	observe?: Element;
 	/** Which edge the vertical share is measured from; see `Pin`. `"top"` unless said. */
 	pin?: Pin;
+	/**
+	 * For a float whose home is somewhere its bounds do not reach (the conversation's, in the side
+	 * panel): whether a release goes home, asked with where the throw would carry it. When it does,
+	 * the float glides to `home()` and stays as it is, and `onHome` is told when it has arrived: what
+	 * home means there is the caller's. Asked before the edges are, so a throw at home is not a throw
+	 * at the edge behind it.
+	 */
+	homeward?: (thrown: Point, velocity: { vx: number; vy: number }) => boolean;
+	onHome?: () => void;
 }
 
 /** How far a tucked float's tab keeps from every other float: the throw bends up until it is this clear. */
@@ -124,7 +133,7 @@ const SAMPLES = 8;
 export function makeFloat(
 	el: HTMLElement,
 	options: FloatOptions,
-): { restore: () => void; follow: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; grab: (event: PointerEvent, at: Point) => void; dispose: () => void } {
+): { restore: () => void; follow: () => void; sendHome: () => void; goHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; grab: (event: PointerEvent, at: Point) => void; dispose: () => void } {
 	const { key, handle, ignore, home, bounds, size, apply, onChange, storage } = options;
 	const pin: Pin = options.pin ?? "top";
 	const disabled = (): boolean => options.disabled?.() === true;
@@ -174,7 +183,7 @@ export function makeFloat(
 		settling = undefined;
 		delete el.dataset.snapping;
 	};
-	const settle = (p: Point, thenHome: boolean, byHand = false): void => {
+	const settle = (p: Point, thenHome: boolean, byHand = false, then?: () => void): void => {
 		cancelSettle();
 		const ms = glideMs(current ?? home(), p);
 		el.style.setProperty("--snap-ms", `${ms}ms`);
@@ -185,6 +194,7 @@ export function makeFloat(
 			if (event && event.target !== el) return;
 			cancelSettle();
 			if (byHand) options.onSettled?.();
+			then?.();
 			if (!thenHome) return;
 			// The stylesheet's own `left` transition (the dock slides when the sidebar folds)
 			// would animate the handoff too, and half the width of a transform is a visible
@@ -290,6 +300,12 @@ export function makeFloat(
 		else settle(clear(back), false, true);
 	};
 
+	/** Glide to `home()`, wherever that is, and say so on arrival (`onHome`): nothing is remembered, and the float is left standing there. */
+	const goHome = (): void => {
+		if (stowed || drag) return;
+		settle(home(), false, false, options.onHome);
+	};
+
 	const sendHome = (): void => {
 		if (stowed) return;
 		remember("home");
@@ -345,6 +361,8 @@ export function makeFloat(
 		// inside the bounds whatever else. A placement (the pointer paused before letting
 		// go) has no velocity and rests where it was put, edges and home still applying.
 		const velocity = velocityFrom(samples, event.timeStamp);
+		// Thrown at a home outside its bounds, or let go on it: it glides there, and the caller takes it from there.
+		if (options.homeward?.(fling(current, velocity), velocity)) return goHome();
 		// Thrown hard at its edge, it is put away. The position it had before this drag
 		// stays saved, because that is where the tab brings it back to.
 		const side = options.stow ? stowSide(current, velocity, size(), bounds()) : undefined;
@@ -581,6 +599,7 @@ export function makeFloat(
 		restore,
 		follow,
 		sendHome,
+		goHome,
 		unstow,
 		stowed: () => stowed !== undefined,
 		placeAt,

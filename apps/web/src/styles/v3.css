@@ -2677,12 +2677,12 @@ body {
 		--stowtab-h: 56px;
 		position: absolute;
 		z-index: var(--z-float);
-		top: 64px;
+		top: 68px;
 		right: calc(var(--inset-right, 0px) + 12px);
 		width: var(--chat-float-w, 380px);
 		height: var(--chat-float-h, 520px);
 		max-width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 24px);
-		max-height: calc(100% - 76px);
+		max-height: calc(100% - 80px);
 		flex: none;
 		margin: 0;
 		border: 0;
@@ -2698,12 +2698,15 @@ body {
 	/*
 	 * Let go, it glides to where it rests, as the composer and the tools do: on with the throw, to an
 	 * edge, behind one. The float system sets this for the length of the glide (`[data-snapping]`,
-	 * `--snap-ms`) and takes it off after, so a drag never fights a transition.
+	 * `--snap-ms`) and takes it off after, so a drag never fights a transition. Its size glides with
+	 * it, which is what a glide home into the panel's slot is: it arrives the slot's size.
 	 */
 	.v3-chat[data-float="true"][data-snapping="true"] {
 		transition:
 			left var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
-			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1);
+			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			width var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			height var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1);
 	}
 	.v3-chat[data-float="true"]:is([data-dragging="true"], [data-landing="true"]) {
 		transition: none;
