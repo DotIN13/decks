@@ -426,16 +426,20 @@ function foldPaired(rows: PairedRow[]): { label: string; origin: string; ids: st
 }
 
 /**
- * Who reaches this deck: its own address, Decks Studio (`StudioSignIn.tsx`: this harness signs in to
- * it, and Sign out deletes its key and takes back every token given through it), and every other
- * Decks signed in with a token. A code is
- * never made here (`decks pair code`, on this machine). Revoke takes every token of the row back.
+ * Two things, told apart by their words. On top, **Decks Studio login**: this harness signs in to
+ * Studio (`StudioSignIn.tsx`), and Sign out deletes its key and takes back every token given through
+ * it. Under it, **Decks connection**: what another Decks, the iPad app or a terminal connects to this
+ * one with, its address and a pairing code, which Studio has no use for. A code is never made here
+ * (`decks pair code`, on this machine). Last, who is connected: Revoke takes every token of a row back.
  */
 function Connections() {
 	const { copied, copy } = useCopy();
 	return (
 		<>
-			<SetGroup label="This deck" group="this-deck">
+			<Show when={can("share")}>
+				<StudioGroup />
+			</Show>
+			<SetGroup label="Decks connection" group="this-deck" foot="For another Decks, the iPad app or a terminal connecting to this one. Decks Studio needs neither: it has its own login, above.">
 				<SetRow title="Address" sub={<span class="sw-mono">{location.origin}</span>}>
 					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? "Copied" : "Copy"}</Btn>
 				</SetRow>
@@ -443,17 +447,14 @@ function Connections() {
 					title="Pairing code"
 					sub={
 						<>
-							Made only on this machine: run <span class="sw-mono">decks pair code</span> there.
+							Asked for when connecting over the internet. Make one on this machine: <span class="sw-mono">decks pair code</span>
 						</>
 					}
 				/>
 			</SetGroup>
 			<Show when={can("share")}>
-				<StudioGroup />
-			</Show>
-			<Show when={can("share")}>
-				<SetGroup label="Signed in here" group="other-decks">
-					<For each={foldPaired(pairing().paired)} fallback={<SetRow title="Nothing else is signed in" />}>
+				<SetGroup label="Connected to this Decks" group="other-decks">
+					<For each={foldPaired(pairing().paired)} fallback={<SetRow title="Nothing else is connected" />}>
 						{(row) => (
 							<SetRow
 								lead={<span class="sw-mark">{/studio/i.test(row.label) ? <Icon of={Cloud} size={14} /> : <Icon of={Globe} size={14} />}</span>}
@@ -465,7 +466,7 @@ function Connections() {
 								}
 								sub={<span class="truncate">{`${row.origin || "unknown site"} · used ${ago(row.last)}`}</span>}
 							>
-								<Btn tone="danger" title="It will have to pair again with a new code" onClick={() => row.ids.forEach((id) => void call("harness.revoke", [id]))}>
+								<Btn tone="danger" title="It will have to connect again" onClick={() => row.ids.forEach((id) => void call("harness.revoke", [id]))}>
 									{row.ids.length > 1 ? "Revoke all" : "Revoke"}
 								</Btn>
 							</SetRow>

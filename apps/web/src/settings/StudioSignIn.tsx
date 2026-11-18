@@ -57,7 +57,7 @@ export function StudioGroup() {
 		</span>
 	);
 	return (
-		<SetGroup label="Decks Studio" group="studio">
+		<SetGroup label="Decks Studio login" group="studio">
 			<Show
 				when={pairing().studio}
 				fallback={
