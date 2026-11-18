@@ -9,8 +9,8 @@ const RETRY_MS = 30_000;
  * once both are here, `begin` is called with the pass, to hand the frame everything it starts with
  * (`sendStart`). Answers how to stop waiting, for a frame left before it started.
  */
-export function awaitHello<Pass>(frame: HTMLIFrameElement, d: { pass(): Promise<Pass>; cancelled(): boolean; begin(pass: Pass): void }): () => void {
-	let said = false;
+export function awaitHello<Pass>(frame: HTMLIFrameElement, d: { pass(): Promise<Pass>; cancelled(): boolean; begin(pass: Pass): void; /** The frame has said hello already: one the page kept spare (`spareFrame`), which said it with nobody starting it. */ said?: boolean }): () => void {
+	let said = d.said === true;
 	let pass: Pass | undefined;
 	const begin = (got: Pass) => {
 		if (!d.cancelled()) d.begin(got);
@@ -83,4 +83,22 @@ export function renewPass<Pass extends { expires: number }>(d: { pass(): Promise
 		if (typeof document !== "undefined" && document.visibilityState === "visible" && Date.now() >= due()) ask();
 	}
 	if (typeof document !== "undefined") document.addEventListener("visibilitychange", shown);
+}
+
+/**
+ * A frame kept spare: on the page with nothing to show, so the next thing that needs a frame finds one
+ * that has loaded its code. Its hello is heard here, since nobody is starting it yet, and answered
+ * with `warm`, at which its kind gets ready what it can (`Guest.warm`). Answers whether it has said
+ * hello, for whoever takes it (`awaitHello`, `said`), and how to stop listening.
+ */
+export function spareFrame(frame: HTMLIFrameElement): { said(): boolean; stop(): void } {
+	let said = false;
+	const onHello = (event: MessageEvent) => {
+		if (event.source !== frame.contentWindow || event.data?.t !== "hello") return;
+		removeEventListener("message", onHello);
+		said = true;
+		frame.contentWindow?.postMessage({ t: "warm" }, "*");
+	};
+	addEventListener("message", onHello);
+	return { said: () => said, stop: () => removeEventListener("message", onHello) };
 }

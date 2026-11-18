@@ -35,6 +35,12 @@ export interface FrameHostOptions {
 	 * or moves it in place.
 	 */
 	kept?(): readonly string[];
+	/**
+	 * Keep one more frame spare, on no canvas, its code loaded and its drawing engine started while
+	 * nothing waits for it: the next canvas that needs a new frame takes it, and another is made a
+	 * moment later (`surface.tsx`). For a device with memory to spare. Left out: none.
+	 */
+	spare?(): boolean;
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
 	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */

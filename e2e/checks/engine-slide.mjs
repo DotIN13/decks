@@ -48,6 +48,9 @@ await canvas.evaluate(() => {
  * Quiet first: the fixture's cards are awake at this zoom, and a card mounting, measuring or having its
  * picture come draws the sheet again. Waited until no draw has come for 700 ms.
  */
+// And the frame the page keeps spare made and its engine started (`frame/outside/surface.tsx`): it comes a moment after the page goes quiet, and a second engine starting is felt by the first.
+await page.waitForSelector("iframe.canvas-frame-spare", { state: "attached", timeout: 12000 }).catch(() => {});
+await settle(page, 1500);
 for (let i = 0, last = -1; i < 20; i++) {
 	const now = await draws();
 	if (now === last) break;

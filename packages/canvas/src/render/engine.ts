@@ -21,6 +21,7 @@ import { setCanvasWords } from "./measure.ts";
 import type { DocEdits } from "../model/drawing.ts";
 import type { FromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
+import { takeWarm, warmEngine } from "./warm.ts";
 import { PICTURES, readGpuClass } from "./device.ts";
 import { noticeFor } from "./backends/notice.ts";
 import { EngineFaces } from "./engine-faces.ts";
@@ -233,15 +234,18 @@ export class CanvasEngine {
 	 */
 	private async open(over: HTMLCanvasElement): Promise<void> {
 		this.faces.prefetchFonts();
-		this.worker = startWorker(renderWorkerUrl);
+		// An engine started ahead of any canvas, in a frame its page kept spare (`warm.ts`): its worker has loaded and booted already.
+		const warmed = await takeWarm();
+		if (this.disposed) return void warmed?.worker.terminate();
+		this.worker = warmed?.worker ?? startWorker(renderWorkerUrl);
 		this.tiles.posted = 0;
 		this.tiles.postedContent = 0;
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
-		const found = (this.detected ??= await detect());
-		const stage = await found.backend.load();
+		const found = (this.detected ??= warmed?.detected ?? (await detect()));
+		const stage = warmed?.stage ?? (await found.backend.load());
 		if (this.disposed) return;
 		this.stageModule = stage;
-		this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(stage) });
+		if (!warmed) this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(stage) });
 		this.fitCanvases();
 		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
 		this.lowMemory = !!found.lowMemory;
@@ -774,6 +778,9 @@ export class CanvasEngine {
  * a worker only from its own origin; a worker made from a `blob:` the page wrote is its own, and its
  * `import` of the real script crosses with CORS like any other module (`frame/`).
  */
+/** Start the engine ahead of any canvas (`warm.ts`): what a frame kept spare does while nothing waits for it. */
+export const warmCanvasEngine = (): void => warmEngine(() => startWorker(renderWorkerUrl), moduleOf);
+
 function startWorker(url: string): Worker {
 	/*
 	 * A page of opaque origin (the canvas frame's sandbox) may not start a worker from its server's

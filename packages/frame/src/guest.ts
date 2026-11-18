@@ -8,6 +8,11 @@ export interface Guest<Start> {
 	run(start: Start, port: MessagePort): Promise<(() => void) | undefined>;
 	/** What was running has been stopped and its life ended (`life.ts`): clear what it left, before hello is said again. */
 	cleared?(): void;
+	/**
+	 * The page keeps this frame spare, with nothing to show yet, and says so (`warm`): get ready what
+	 * takes time and is the same whatever comes (a canvas's drawing engine), while nothing waits for it.
+	 */
+	warm?(): void;
 }
 
 /**
@@ -44,6 +49,9 @@ export function bootGuest<Start>(guest: Guest<Start>): void {
 			parent.postMessage({ t: "hello", protocol: PROTOCOL } satisfies Hello, "*");
 			return undefined;
 		});
+	});
+	addEventListener("message", (event) => {
+		if (event.source === parent && (event.data as { t?: string } | null)?.t === "warm") guest.warm?.();
 	});
 	addEventListener("message", onStart);
 	// The line to what the page keeps (`kept.ts`), offered before hello: what is fetched as this frame starts can come down it.

@@ -1,4 +1,5 @@
 import { probes } from "../../base/debug.ts";
+import { warmCanvasEngine } from "../../render/engine.ts";
 import { createRoot } from "solid-js";
 import { render } from "solid-js/web";
 import { createEditor } from "../../view/editor.tsx";
@@ -51,6 +52,8 @@ export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView
 			forgetMissing();
 			root.replaceChildren();
 		},
+		// Kept spare by the page for the next canvas: the drawing engine starts now, with nothing to draw (`render/warm.ts`).
+		warm: warmCanvasEngine,
 	});
 }
 

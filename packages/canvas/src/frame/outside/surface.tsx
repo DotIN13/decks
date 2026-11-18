@@ -1,9 +1,10 @@
-import { ALLOW, SANDBOX } from "@decks/frame";
+import { ALLOW, SANDBOX, spareFrame } from "@decks/frame";
 import type { Accessor, Setter } from "solid-js";
 import { createEffect, createSignal, For, on, onCleanup, untrack, type JSX } from "solid-js";
 import { type PageEnd } from "../protocol.ts";
 import { type FramedEditorOptions, } from "./host.tsx";
 import { keepForFrames } from "./kept.ts";
+import { chooseFrame, type Held } from "./held.ts";
 
 const frameAddress = (): string => {
 	const page = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
@@ -23,7 +24,7 @@ const PASSED_ON = ["probe", "handlers", "autopilot", "pictures-per-frame", "pict
 /** What `createSurface` reads of `createFramedEditor` (`host.tsx`), each read when it is used. */
 export interface SurfaceNeeds {
 	readonly keepInStep: () => void;
-	readonly startFrame: (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean, started: (page: PageEnd, selected: string | undefined) => void) => (() => void);
+	readonly startFrame: (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean, started: (page: PageEnd, selected: string | undefined) => void, said?: boolean) => (() => void);
 	readonly end: Accessor<PageEnd | undefined>;
 	/** Make a frame's line the one the page talks on, or none: `again` when that frame was in front before (`host.tsx`, `attach`). */
 	readonly attach: (page: PageEnd | undefined, how: { again: boolean; selected?: string | undefined }) => void;
@@ -32,19 +33,8 @@ export interface SurfaceNeeds {
 	readonly setFrameAt: Setter<HTMLIFrameElement | undefined>;
 }
 
-/** One frame the page holds, and the canvas it shows or is being started on. */
-interface Held {
-	/** Which frame this is, for as long as it is on the page. */
-	n: number;
-	canvas: string;
-	frame?: HTMLIFrameElement;
-	/** The page's end of its line, once it has started on this canvas. */
-	end?: PageEnd;
-	/** Its line has been the page's before: coming forward again, it is told what changed while it was behind. */
-	seen?: true;
-	/** Stops the canvas it shows now: its start, its port, its renewals. */
-	leave?: () => void;
-}
+/** How long after the page has gone quiet a spare frame is made: not while the canvas on screen is still loading what it needs. */
+const SPARE_AFTER_MS = 1500;
 
 export function createSurface(d: SurfaceNeeds) {
 	/**
@@ -61,6 +51,8 @@ export function createSurface(d: SurfaceNeeds) {
 	 * - else a frame nothing wants any more, neither on screen nor kept, moves to it in place (`reset`,
 	 *   both canvases yours alone, `inPlace`): it ends the canvas it showed and keeps the code and the
 	 *   engine's module it loaded. With nothing kept this is every move, as it was before frames were kept;
+	 * - else the spare frame takes it, when the page keeps one (`FrameHostOptions.spare`): a frame made
+	 *   a moment after the page went quiet, its code loaded and its drawing engine started, on no canvas;
 	 * - else a new frame is made.
 	 *
 	 * Every other frame nothing wants is taken off the page. The frame in front is `iframe.canvas-frame`;
@@ -73,6 +65,8 @@ export function createSurface(d: SurfaceNeeds) {
 		keepForFrames();
 		const [held, setHeld] = createSignal<Held[]>([]);
 		const [front, setFront] = createSignal<Held>();
+		/** The frame kept spare, on no canvas: on the page beside the others, out of sight. */
+		const [spare, setSpare] = createSignal<Held>();
 		let made = 0;
 
 		/** The page talks on this frame's line now, or on none while it has not started. */
@@ -83,14 +77,18 @@ export function createSurface(d: SurfaceNeeds) {
 		};
 		/** Start a frame on its canvas, ending what it showed before. */
 		const start = (one: Held) => {
-			if (!one.frame) return;
+			if (!one.frame || one.canvas === undefined) return;
 			one.leave?.();
 			let cancelled = false;
 			delete one.seen;
+			// A frame that was the spare has said hello with nobody starting it, or will: heard either way.
+			const said = one.waiting?.said() === true;
+			one.waiting?.stop();
+			delete one.waiting;
 			const stopWaiting = d.startFrame(one.frame, one.canvas, () => cancelled, (page, selected) => {
 				one.end = page;
 				if (untrack(front) === one) bring(one, selected);
-			});
+			}, said);
 			one.leave = () => {
 				cancelled = true;
 				stopWaiting();
@@ -119,21 +117,15 @@ export function createSurface(d: SurfaceNeeds) {
 				([canvas, kept]) => {
 					const was = untrack(front);
 					const all = untrack(held);
-					const wanted = new Set<string>(canvas ? [canvas, ...kept] : kept);
-					const spare = all.filter((one) => !wanted.has(one.canvas));
-					let next = canvas ? all.find((one) => one.canvas === canvas) : undefined;
-					let moved: Held | undefined;
-					if (canvas && !next) {
-						// The one that was in front first: its place on the page is where the eye is.
-						moved = [...spare].sort((a, b) => Number(b === was) - Number(a === was)).find((one) => one.frame && one.end && d.options.frame.inPlace?.(one.canvas, canvas));
-						if (moved) {
-							moved.canvas = canvas;
-							start(moved);
-							moved.frame!.contentWindow?.postMessage({ t: "reset" }, "*");
-							next = moved;
-						} else next = { n: ++made, canvas };
+					const { next, how, gone } = chooseFrame({ held: all, front: was, spare: untrack(spare), canvas, kept, inPlace: (from, to) => d.options.frame.inPlace?.(from, to) === true, make: (on) => ({ n: ++made, canvas: on }) });
+					const moved = how === "moved" ? next : undefined;
+					if (next && canvas && (how === "moved" || how === "spare")) {
+						// The spare has its code loaded and its engine started, so it begins at once; a frame moved in place ends the canvas it showed first.
+						if (how === "spare") setSpare(undefined);
+						next.canvas = canvas;
+						start(next);
+						if (how === "moved") next.frame!.contentWindow?.postMessage({ t: "reset" }, "*");
 					}
-					const gone = spare.filter((one) => one !== moved);
 					for (const one of gone) one.leave?.();
 					const now = [...all.filter((one) => !gone.includes(one)), ...(next && !all.includes(next) ? [next] : [])];
 					if (now.length !== all.length || now.some((one, at) => one !== all[at])) setHeld(now);
@@ -147,19 +139,35 @@ export function createSurface(d: SurfaceNeeds) {
 				},
 			),
 		);
+		/*
+		 * The spare: made once the frame in front has started and the page has been quiet a moment, and
+		 * again a moment after one was taken, so starting it never competes with the canvas being opened.
+		 */
+		createEffect(() => {
+			if (!d.options.frame.spare?.() || spare() || !d.end()) return;
+			const timer = setTimeout(() => {
+				const idle = (globalThis as { requestIdleCallback?: (run: () => void, options?: { timeout: number }) => number }).requestIdleCallback;
+				const make = () => untrack(spare) === undefined && setSpare({ n: ++made, canvas: undefined });
+				if (idle) idle(make, { timeout: 2000 });
+				else make();
+			}, SPARE_AFTER_MS);
+			onCleanup(() => clearTimeout(timer));
+		});
 		onCleanup(() => {
 			for (const one of untrack(held)) one.leave?.();
+			untrack(spare)?.waiting?.stop();
 		});
 		return (
-			<For each={held()}>
+			<For each={[...held(), ...(spare() ? [spare()!] : [])]}>
 				{(one) => (
 					<iframe
 						ref={(frame) => {
 							one.frame = frame;
 							if (untrack(front) === one) d.setFrameAt(frame);
-							start(one);
+							if (one.canvas === undefined) one.waiting = spareFrame(frame);
+							else start(one);
 						}}
-						class={front() === one ? "canvas-frame" : "canvas-frame-kept"}
+						class={front() === one ? "canvas-frame" : one.canvas === undefined && spare() === one ? "canvas-frame-spare" : "canvas-frame-kept"}
 						title="Canvas"
 						/* What every frame may do, and why no more (`@decks/frame`, `sandbox.ts`): the apps inside this one can have no more than it has. */
 						sandbox={SANDBOX}

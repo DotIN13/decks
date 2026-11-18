@@ -8,7 +8,7 @@
  * within the device's budget (`tabs/budget.ts`).
  *
  * What is checked: a canvas opened as a tab leaves the one before it on the page, hidden, in a frame
- * of its own; going back shows that same frame, with what an agent drew there meanwhile already in
+ * of its own, the one the page kept spare with its drawing engine started; going back shows that same frame, with what an agent drew there meanwhile already in
  * it; the page talks to the frame in front only (its zoom reading, its selection); a third and fourth
  * canvas keep no more frames than the budget, the one in front longest ago let go; closing a tab
  * lets its frame go; and a card's tab is the same frame after another tab was in front, hidden
@@ -60,11 +60,24 @@ const firstTitle = (await page.locator('.v3-topbar .tab-chip[data-camera="true"]
 const firstIds = await drawn();
 await mark("first");
 
+// --- a spare frame waits, on no canvas, and the next canvas opened starts in it ----------------------------
+const spare = () => page.locator("iframe.canvas-frame-spare");
+const hasSpare = await until(async () => ((await spare().count()) === 1 ? true : undefined), 9000);
+const spareHidden = hasSpare ? await spare().evaluate((frame) => getComputedStyle(frame).visibility === "hidden" && frame.getBoundingClientRect().width > 200) : false;
+say("a moment after the page goes quiet a spare frame is on the page, out of sight", !!hasSpare && spareHidden);
+// Warmed: its drawing engine's worker is made before any canvas is given to it.
+const warmed = hasSpare ? await until(async () => (page.frames().some((frame) => frame.url().includes("canvas-frame.html")) && page.workers().length >= 2 ? page.workers().length : undefined), 6000) : undefined;
+say("…with its drawing engine started: a second worker runs before a second canvas is open", !!warmed, String(page.workers().length));
+if (hasSpare) await spare().evaluate((frame) => void (frame.dataset.mark = "was-spare"));
+
 // --- a canvas opened as a tab: the one before it stays on the page, behind ---------------------------------
 await openCanvas("Alive two");
 const second = await until(async () => ((await drawn()).includes("note-1") ? true : undefined));
+const tookSpare = await page.evaluate(() => document.querySelector("iframe.canvas-frame")?.dataset.mark === "was-spare");
+say("the canvas opened started in the frame that was spare", tookSpare === true);
 await mark("two");
 const two = await frames();
+say("…and another spare is made a moment later", (await until(async () => ((await spare().count()) === 1 ? true : undefined), 9000)) === true);
 say("the canvas opened shows in a frame of its own", !!second && two.filter((one) => one.front).length === 1 && two.find((one) => one.front)?.mark === "two", JSON.stringify(two));
 say("…and the one before it is kept: on the page, out of sight, at its full size", two.some((one) => !one.front && one.mark === "first" && one.hidden && one.sized), JSON.stringify(two));
 

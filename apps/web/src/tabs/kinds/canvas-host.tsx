@@ -109,6 +109,8 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			}),
 			// The canvas tabs last in front keep their frames behind this one, within the device's budget (`tabs/budget.ts`): coming back to one is showing it.
 			kept: () => canvasesBehind(CANVASES_BEHIND),
+			// And one frame spare where frames are kept at all: the next canvas opened starts in a frame that has loaded already.
+			spare: () => CANVASES_BEHIND > 0,
 			comment: frameComment,
 			ink: frameInk,
 			panel: (name) => (name === "files" ? openFileAtMiddle() : openAppsPanel()),

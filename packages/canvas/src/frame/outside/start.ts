@@ -25,10 +25,10 @@ export function createStart(d: StartNeeds) {
 	 * Start the frame on a canvas: its hello is listened for at once (a frame moved in place says it
 	 * again soon after its `reset`), and the pass is asked for beside it; once both are here, the frame
 	 * gets everything it begins with, and `started` is handed the page's end of its line: the frame may
-	 * be the one in front by then or one kept behind it (`surface.tsx`). Answers how to stop waiting, for
-	 * a canvas left before it started.
+	 * be the one in front by then or one kept behind it (`surface.tsx`). `said` when the frame has said
+	 * hello already, as one kept spare has. Answers how to stop waiting, for a canvas left before it started.
 	 */
-	const startFrame = (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean, started: (page: PageEnd, selected: string | undefined) => void): (() => void) => {
+	const startFrame = (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean, started: (page: PageEnd, selected: string | undefined) => void, said = false): (() => void) => {
 		const begin = (pass: CanvasPass) => {
 			const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
 			const pen = untrack(() => d.state?.pen?.());
@@ -70,7 +70,7 @@ export function createStart(d: StartNeeds) {
 			sendStart<Start>(frame, { ...start, camera: d.localCamera, ...(selected ? { selected } : {}) } as Start, channel.port2);
 		};
 		// The frame's hello and its pass, as for every frame (`@decks/frame`); then what a canvas starts from.
-		return awaitHello(frame, { pass: () => d.options.frame.pass(canvas), cancelled, begin });
+		return awaitHello(frame, { pass: () => d.options.frame.pass(canvas), cancelled, begin, said });
 	};
 
 	return {
