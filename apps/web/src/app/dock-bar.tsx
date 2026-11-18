@@ -28,7 +28,7 @@ import { destination, destinationLabel } from "./send-from-bar.ts";
  */
 export function DockBar(props: { parts: Parts }) {
 	const { dock, underSheet, layout, focusedChat, busy, bar, pills, pickFile, files } = props.parts;
-	const { phone, chatShown, openChat } = layout;
+	const { phone, chatShown, chatOut, openChat } = layout;
 	const { barText, setBarText, agentName, barContext, sendFromBar } = bar;
 	const { titleOf, itemName, showPill } = pills;
 	return (
@@ -50,8 +50,8 @@ export function DockBar(props: { parts: Parts }) {
 					)}
 				</Show>
 
-				{/* Only while nothing else says it: the panel's folded foot does, while the panel is open. */}
-				<Show when={!chatShown() && (phone() || !panelOpen())}>
+				{/* Only while nothing else says it: the panel's folded foot does, while the panel is open, and the folded float does wherever it is. */}
+				<Show when={!chatShown() && (phone() || (!panelOpen() && !chatOut()))}>
 					<StatusPill chat={focusedChat()} identity={state.identities[state.focused ?? ""]} onOpen={openChat} />
 				</Show>
 

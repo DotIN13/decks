@@ -17,6 +17,7 @@ import { createAlerts } from "./alerts.ts";
 import { createAppsPanel } from "./apps-panel.ts";
 import { createBar } from "./bar.ts";
 import type { CanvasHostInputs } from "../tabs/kinds/canvas-host.tsx";
+import { createChatFloat } from "./chat-float.ts";
 import { createChatLayout, createPresenting } from "./chat-layout.ts";
 import { parkOnLeaving, watchPencil } from "./device.ts";
 import { createDock } from "./dock.ts";
@@ -154,6 +155,8 @@ export function createParts() {
 
 	/* The layout: phone or not, the conversation folded or a sheet (`app/chat-layout.ts`). */
 	const layout = createChatLayout();
+	/* The conversation taken out of the side panel, as a float (`app/chat-float.ts`). */
+	const chatFloat = createChatFloat(layout, floats);
 	/* The conversation is not a float on the right edge any more, so the edge is the inspector's alone. */
 	onMount(() => closeHistory());
 	onMount(() => onCleanup(installTooltips()));
@@ -196,5 +199,5 @@ export function createParts() {
 		moveConversation,
 	};
 
-	return { ...onScreen, atTurn, prefs, setPrefs, bar, dock, floats, underSheet, pickFile, files, findAt, layout, presenting, present, apps, editorHandle, penSelected, setPenSelected, pills, canvasHost };
+	return { ...onScreen, atTurn, prefs, setPrefs, bar, dock, floats, underSheet, pickFile, files, findAt, layout, chatFloat, presenting, present, apps, editorHandle, penSelected, setPenSelected, pills, canvasHost };
 }

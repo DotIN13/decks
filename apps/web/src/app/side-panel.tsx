@@ -15,12 +15,12 @@ import { closeAgent, focusAgent, newAgent, panelAsk, setStagesOpen, showPanel } 
 import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
- * The side panel, with the conversation in its lower half; on a phone the conversation is a sheet
- * of its own instead.
+ * The side panel, with the conversation in its lower half; taken out of the panel it is a float over
+ * the canvas (`chat-float.ts`), and on a phone it is a sheet of its own instead.
  */
 export function SidePanel(props: { parts: Parts }) {
-	const { layout, apps, pills, stagePen, stagePages, penSelected, setPenSelected, editorHandle, findAt, focusedChat, transcript, atTurn } = props.parts;
-	const { phone, chatFolded, setChatFolded, phoneChat, setPhoneChat, sheetFrom, sheetLeaving, chatShown, holdHistory } = layout;
+	const { layout, chatFloat, apps, pills, stagePen, stagePages, penSelected, setPenSelected, editorHandle, findAt, focusedChat, transcript, atTurn } = props.parts;
+	const { phone, chatFolded, setChatFolded, chatOut, phoneChat, setPhoneChat, sheetFrom, sheetLeaving, chatShown, holdHistory } = layout;
 	return (
 		<>
 			{/*
@@ -104,20 +104,38 @@ export function SidePanel(props: { parts: Parts }) {
 				onApp={apps.onApp}
 				onAppLogs={apps.onAppLogs}
 				chat={
-					<Show when={!phone()}>
+					<Show when={!phone() && !chatOut()}>
+						<ChatSection
+							chat={focusedChat()}
+							identity={state.identities[state.focused ?? ""]}
+							unread={state.focused ? (unread[state.focused] ?? 0) : 0}
+							folded={chatFolded()}
+							onFold={(folded) => {
+								setChatFolded(folded);
+								holdHistory();
+							}}
+							out={{ headDown: chatFloat.headDown, press: chatFloat.takeOut }}
+						>
+							<FocusedStream shown={chatShown()} items={transcript()} chat={focusedChat()} atTurn={atTurn()} />
+						</ChatSection>
+					</Show>
+				}
+			/>
+			<Show when={!phone() && chatOut()}>
 				<ChatSection
 					chat={focusedChat()}
 					identity={state.identities[state.focused ?? ""]}
 					unread={state.focused ? (unread[state.focused] ?? 0) : 0}
 					folded={chatFolded()}
-					onFold={(folded) => { setChatFolded(folded); holdHistory(); }}
-					
+					onFold={(folded) => {
+						setChatFolded(folded);
+						holdHistory();
+					}}
+					float={{ placed: chatFloat.placed, cornerDown: chatFloat.cornerDown, back: chatFloat.putBack }}
 				>
 					<FocusedStream shown={chatShown()} items={transcript()} chat={focusedChat()} atTurn={atTurn()} />
 				</ChatSection>
-					</Show>
-				}
-			/>
+			</Show>
 			<Show when={phone() && phoneChat()}>
 				<ChatSection
 					chat={focusedChat()}

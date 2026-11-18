@@ -6,7 +6,8 @@ import { panelOpen, setPanelOpen } from "../state/ui.ts";
  *
  * A phone is under 600px wide: its tools are a row above the composer, the top bars are one,
  * and the conversation is a sheet that grows out of the status pill. Everywhere else the
- * conversation is the side panel's lower half, folded or not, remembered on this device.
+ * conversation is the side panel's lower half, folded or not, or taken out of the panel as a float
+ * over the canvas (`chat-float.ts`), each remembered on this device.
  */
 export function createChatLayout() {
 	const [viewWidth, setViewWidth] = createSignal(window.innerWidth);
@@ -16,11 +17,21 @@ export function createChatLayout() {
 		onCleanup(() => window.removeEventListener("resize", resized));
 	});
 	const phone = () => viewWidth() < 600;
-	const [chatFolded, setChatFoldedRaw] = createSignal(readChatFolded());
+	const [chatFolded, setChatFoldedRaw] = createSignal(readFlag(CHAT_FOLDED_KEY));
 	const setChatFolded = (folded: boolean) => {
 		setChatFoldedRaw(folded);
 		try {
 			localStorage.setItem(CHAT_FOLDED_KEY, folded ? "1" : "0");
+		} catch {
+			// Kept for the session.
+		}
+	};
+	/* Out of the side panel, as a float over the canvas: it shows whether the panel is open or not. */
+	const [chatOut, setChatOutRaw] = createSignal(readFlag(CHAT_OUT_KEY));
+	const setChatOut = (out: boolean) => {
+		setChatOutRaw(out);
+		try {
+			localStorage.setItem(CHAT_OUT_KEY, out ? "1" : "0");
 		} catch {
 			// Kept for the session.
 		}
@@ -48,15 +59,15 @@ export function createChatLayout() {
 			setSheetLeaving(false);
 		}, 260);
 	};
-	/** Whether the conversation is on screen: the panel's lower half, or the phone's sheet. */
-	const chatShown = () => (phone() ? phoneChat() : panelOpen() && !chatFolded());
+	/** Whether the conversation is on screen: the panel's lower half, its float, or the phone's sheet. */
+	const chatShown = () => (phone() ? phoneChat() : (chatOut() || panelOpen()) && !chatFolded());
 	const openChat = () => {
 		if (phone()) return void setPhoneChat(true);
-		setPanelOpen(true);
+		if (!chatOut()) setPanelOpen(true);
 		setChatFolded(false);
 		holdHistory();
 	};
-	return { viewWidth, phone, chatFolded, setChatFolded, phoneChat, setPhoneChat, sheetFrom, sheetLeaving, chatShown, openChat, holdHistory };
+	return { viewWidth, phone, chatFolded, setChatFolded, chatOut, setChatOut, phoneChat, setPhoneChat, sheetFrom, sheetLeaving, chatShown, openChat, holdHistory };
 }
 
 /*
@@ -97,11 +108,12 @@ export function createPresenting() {
 }
 
 const CHAT_FOLDED_KEY = "decks.chatFolded";
+const CHAT_OUT_KEY = "decks.chatOut";
 
-/** Whether the panel's conversation was folded on this device. */
-function readChatFolded(): boolean {
+/** Whether the conversation was folded, or out of the panel, on this device. */
+function readFlag(key: string): boolean {
 	try {
-		return localStorage.getItem(CHAT_FOLDED_KEY) === "1";
+		return localStorage.getItem(key) === "1";
 	} catch {
 		return false;
 	}

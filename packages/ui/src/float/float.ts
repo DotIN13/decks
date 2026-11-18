@@ -124,7 +124,7 @@ const SAMPLES = 8;
 export function makeFloat(
 	el: HTMLElement,
 	options: FloatOptions,
-): { restore: () => void; follow: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; dispose: () => void } {
+): { restore: () => void; follow: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; grab: (event: PointerEvent, at: Point) => void; dispose: () => void } {
 	const { key, handle, ignore, home, bounds, size, apply, onChange, storage } = options;
 	const pin: Pin = options.pin ?? "top";
 	const disabled = (): boolean => options.disabled?.() === true;
@@ -536,6 +536,26 @@ export function makeFloat(
 		remember(toFraction(at, size(), bounds(), 6, pin));
 	};
 
+	/**
+	 * Take over a press that began somewhere else: the conversation's head in the side panel, pulled
+	 * out into this float. From here it is an ordinary drag of the float, its top-left at `at` under
+	 * the press, and let go it is thrown, parked and remembered as any drag is.
+	 */
+	const grab = (event: PointerEvent, at: Point): void => {
+		if (disabled() || stowed || drag) return;
+		cancelSettle();
+		el.dataset.dragging = "true";
+		const start = clamp(at, size(), bounds());
+		drag = { pointerId: event.pointerId, startPointer: { x: event.clientX, y: event.clientY }, startPos: start, moved: true, samples: [{ x: event.clientX, y: event.clientY, t: event.timeStamp }] };
+		try {
+			handle.setPointerCapture(event.pointerId);
+		} catch {
+			// A pointer already let go cannot be captured; the window's listeners end the drag.
+		}
+		listen(true);
+		place(start);
+	};
+
 	const onResize = (): void => restore();
 
 	handle.addEventListener("pointerdown", onPointerDown);
@@ -564,6 +584,7 @@ export function makeFloat(
 		unstow,
 		stowed: () => stowed !== undefined,
 		placeAt,
+		grab,
 		dispose() {
 			handle.removeEventListener("pointerdown", onPointerDown);
 			listen(false);

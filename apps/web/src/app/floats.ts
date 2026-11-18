@@ -2,7 +2,8 @@ import { makeFloat } from "@decks/ui/float";
 import { insets, insetsMoving } from "@decks/canvas/camera";
 
 /*
- * The floats: the composer, the conversation, and the canvas's tools (`tabs/kinds/canvas-tools-float.ts`).
+ * The floats: the composer, the conversation taken out of the side panel (`chat-float.ts`), and the
+ * canvas's tools (`tabs/kinds/canvas-tools-float.ts`).
  *
  * All are the app's own chrome, kept where they are by default. Taken by the grip or
  * the header they go where they are put, clamped to the surface, snapping home within
@@ -52,7 +53,7 @@ export function createFloats() {
 	 * a conversation that is shut and a toolbar that is not mounted all say so on their own.
 	 * Of a tucked float only its tab shows, so its tab is what there is to run into.
 	 */
-	const FLOATS = ".dock, .pen-tools:not([data-row='true']), .stream[data-shown='true']";
+	const FLOATS = ".dock, .pen-tools:not([data-row='true']), .v3-chat[data-float='true']";
 	const otherFloats = (el: HTMLElement) => () => {
 		const work = document.querySelector(".work")?.getBoundingClientRect();
 		return [...document.querySelectorAll<HTMLElement>(FLOATS)]
@@ -73,7 +74,7 @@ export function createFloats() {
 	 * dock's own CSS does at home. `read` is what a drag then starts from, because the top
 	 * the float remembers is stale the moment the height changes.
 	 */
-	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }, disabled?: () => boolean) => {
+	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }, disabled?: () => boolean, box: () => { x: number; y: number; w: number; h: number } = workBox) => {
 		/* How tall the tab is (`--stowtab-h`, `shell.css`): a tucked float is only its tab. */
 		const tabHeight = () => parseFloat(getComputedStyle(el).getPropertyValue("--stowtab-h")) || 48;
 		let sized: { w: number; h: number } | undefined;
@@ -88,7 +89,7 @@ export function createFloats() {
 			handle,
 			ignore,
 			home,
-			bounds: workBox,
+			bounds: box,
 			size: () => (sized = { w: el.offsetWidth, h: el.offsetHeight }),
 			pin,
 			read: () => ({ x: el.offsetLeft, y: el.offsetTop }),

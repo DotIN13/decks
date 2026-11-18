@@ -2629,6 +2629,115 @@ body {
 	}
 }
 
+/* ---- the conversation taken out of the panel: a float over the canvas (`app/chat-float.ts`) ---- */
+@layer components {
+	/* Its head is what takes it: out of the panel by a drag, and about the canvas once it is out. */
+	.v3-chat-head {
+		user-select: none;
+		-webkit-user-select: none;
+	}
+	.v3-chat:not([data-sheet="true"]) .v3-chat-head {
+		touch-action: none;
+	}
+	.v3-chat-out {
+		color: var(--v3-fg2);
+	}
+	.v3-chat-out:hover,
+	.v3-chat-out:focus-visible {
+		color: var(--v3-fg);
+	}
+	/*
+	 * At home it stands under the top-right bar, its right edge in line with the bar's. Away from
+	 * home the inline `left` and `top` the float writes place it. Never taller than the canvas has
+	 * room for under the bar.
+	 */
+	.v3-chat[data-float="true"] {
+		position: absolute;
+		z-index: var(--z-float);
+		top: 64px;
+		right: calc(var(--inset-right, 0px) + 12px);
+		width: var(--chat-float-w, 380px);
+		height: var(--chat-float-h, 520px);
+		max-width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 24px);
+		max-height: calc(100% - 76px);
+		flex: none;
+		margin: 0;
+		border: 0;
+		border-radius: 18px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		overflow: hidden;
+		transition: none;
+	}
+	.v3-chat[data-float="true"][data-floating="true"] {
+		right: auto;
+	}
+	/* Folded, the head alone, as wide as it was. */
+	.v3-chat[data-float="true"][data-folded="true"] {
+		height: 44px;
+		min-height: 44px;
+		flex: none;
+	}
+	.v3-chat[data-float="true"] .v3-chat-head {
+		cursor: grab;
+	}
+	.v3-chat[data-float="true"][data-dragging="true"] .v3-chat-head {
+		cursor: grabbing;
+	}
+	/* The corner: a quarter-circle of two short strokes, 20px to take hold of. */
+	.v3-chat-corner {
+		position: absolute;
+		z-index: 21;
+		right: 0;
+		bottom: 0;
+		width: 20px;
+		height: 20px;
+		cursor: nwse-resize;
+		touch-action: none;
+	}
+	.v3-chat-corner::after {
+		position: absolute;
+		right: 5px;
+		bottom: 5px;
+		width: 8px;
+		height: 8px;
+		border-right: 2px solid var(--v3-fg3);
+		border-bottom: 2px solid var(--v3-fg3);
+		border-bottom-right-radius: 5px;
+		content: "";
+		opacity: 0.7;
+	}
+	.v3-chat-corner:hover::after,
+	.v3-chat[data-sizing="true"] .v3-chat-corner::after {
+		border-color: var(--v3-accent);
+		opacity: 1;
+	}
+	.v3-chat[data-sizing="true"] {
+		user-select: none;
+	}
+	/*
+	 * Held over the side panel, the panel shows where the conversation lands: its lower part, at the
+	 * height the conversation has there. No words in it: the float held over it would cover them.
+	 */
+	.panel-shell[data-chat-drop="true"]::after {
+		position: absolute;
+		z-index: 30;
+		right: 6px;
+		bottom: 6px;
+		left: 6px;
+		height: calc(var(--v3-chat-h, 48%) - 12px);
+		min-height: 96px;
+		border: 2px dashed var(--v3-accent);
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--v3-accent) 12%, var(--v3-panel));
+		content: "";
+		pointer-events: none;
+	}
+	.app[data-presenting="true"] .v3-chat[data-float="true"] {
+		display: none !important;
+	}
+}
+
 /* ---- a narrow panel: the strip and the search fit whatever width the panel is dragged to ---- */
 @layer components {
 	.panel-shell.v3-panel {

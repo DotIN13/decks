@@ -214,6 +214,8 @@ const CHECKS = [
 	{ file: "stages.mjs", needsAgent: false },
 	/* The canvas list's small pictures: asked for by the drawing's hash, so a restart never shows an earlier run's. */
 	{ file: "canvas-pictures.mjs", needsAgent: false },
+	/* The conversation taken out of the side panel as a float, by a drag of its head or its button, and put back. */
+	{ file: "chat-out.mjs", needsAgent: false },
 	/* The SDK redesign's view calls in a real browser: reload counted per page, goto, focus on a named canvas. */
 	{ file: "view-calls.mjs", needsAgent: false },
 	/* Measures, not a check: the stage's costs on a 2,000-item canvas (`node scripts/render-perf.mjs`). Run only when named. */

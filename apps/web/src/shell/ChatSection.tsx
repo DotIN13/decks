@@ -2,8 +2,10 @@ import type { AgentChat, AgentState, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronsDownUp from "lucide-solid/icons/chevrons-down-up";
 import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
+import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
+import SquareArrowOutDownLeft from "lucide-solid/icons/square-arrow-out-down-left";
 import { isWorking, workingWords } from "@decks/agent-ui/chat";
-import { onMount, Show, type JSX } from "solid-js";
+import { onCleanup, onMount, Show, type JSX } from "solid-js";
 import { AgentFace } from "../agents/AgentPill.tsx";
 import { Icon } from "@decks/ui";
 
@@ -21,6 +23,10 @@ export function stateWords(state: AgentState, name: string): string | undefined 
  *
  * On a phone the same head tops a sheet over the canvas that grows out of the composer
  * (`sheet`), and its chevron puts it back into the pill.
+ *
+ * Taken out of the panel it is a float over the canvas (`float`; `app/chat-float.ts` moves and sizes
+ * it): the same head, which now moves it, with a button that puts it back, and a corner that sizes
+ * it. In the panel the head has the button that takes it out, and a drag of the head does the same.
  */
 export function ChatSection(props: {
 	chat: AgentChat | undefined;
@@ -33,9 +39,18 @@ export function ChatSection(props: {
 	from?: DOMRect;
 	/** On a phone: the sheet is on its way out. */
 	leaving?: boolean;
+	/** In the side panel: its head pressed (a drag from there takes it out), and the button that takes it out. */
+	out?: { headDown: (event: PointerEvent, section: HTMLElement) => void; press: () => void };
+	/** Out of the side panel, a float: told where it is on the page, its corner pressed, and the button that puts it back. */
+	float?: { placed: (section: HTMLElement, head: HTMLElement) => () => void; cornerDown: (event: PointerEvent) => void; back: () => void };
 	children: JSX.Element;
 }) {
 	let section: HTMLElement | undefined;
+	let head: HTMLDivElement | undefined;
+	onMount(() => {
+		if (!props.float || !section || !head) return;
+		onCleanup(props.float.placed(section, head));
+	});
 	/*
 	 * The conversation's height in the panel is the person's: the line above it is a handle. Dragged,
 	 * it sets the height on the panel (`--v3-chat-h`, `data-chat-sized`), remembered on this device;
@@ -68,7 +83,7 @@ export function ChatSection(props: {
 		}
 	};
 	onMount(() => {
-		if (props.sheet) return;
+		if (props.sheet || props.float) return;
 		const saved = Number(localStorage.getItem(CHAT_HEIGHT_KEY) ?? "");
 		if (saved > 0) applyHeight(saved);
 	});
@@ -216,11 +231,11 @@ export function ChatSection(props: {
 	};
 	const name = () => props.identity?.name ?? props.chat?.name ?? "No agent";
 	return (
-		<section ref={section} class="v3-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} aria-label="The conversation" onPointerDown={startSheetDrag}>
+		<section ref={section} class="v3-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} data-float={props.float ? "true" : undefined} aria-label="The conversation" onPointerDown={startSheetDrag}>
 			<Show when={props.sheet}>
 				<span class="v3-sheet-handle" aria-hidden="true" />
 			</Show>
-			<Show when={!props.sheet && !props.folded}>
+			<Show when={!props.sheet && !props.float && !props.folded}>
 				<div
 					class="v3-chat-resize"
 					role="separator"
@@ -235,13 +250,36 @@ export function ChatSection(props: {
 					}}
 				/>
 			</Show>
-			<div class="v3-chat-head">
+			<div
+				ref={head}
+				class="v3-chat-head"
+				onPointerDown={(event) => section && props.out?.headDown(event, section)}
+				onClick={(event) => {
+					// A float's head holds the pointer while it is pressed (`@decks/ui/float`), so a click on its title arrives here, at the head.
+					if (!props.float || event.target !== event.currentTarget) return;
+					if (document.elementFromPoint(event.clientX, event.clientY)?.closest(".v3-chat-title")) props.onFold(!props.folded);
+				}}
+			>
 				<Show when={props.chat}>{(chat) => <AgentFace chat={chat()} identity={props.identity} unread={props.unread} size={24} ring={1.5} />}</Show>
 				<button type="button" class="v3-chat-title" title={props.folded ? "Show the conversation" : "Fold the conversation"} onClick={() => props.onFold(!props.folded)}>
 					<span class="v3-chat-name">{name()}</span>
 					<Show when={props.chat && stateWords(props.chat.state, name())}>{(words) => <span class="v3-chat-state">{words()}</span>}</Show>
 				</button>
 				<span class="flex-1" />
+				<Show when={props.out}>
+					{(out) => (
+						<button type="button" class="v3-icon v3-chat-out" data-tip="Take it out of the panel" aria-label="Take the conversation out of the side panel" onClick={() => out().press()}>
+							<Icon of={PictureInPicture2} size={16} />
+						</button>
+					)}
+				</Show>
+				<Show when={props.float}>
+					{(float) => (
+						<button type="button" class="v3-icon v3-chat-out" data-tip="Back into the side panel" aria-label="Put the conversation back in the side panel" onClick={() => float().back()}>
+							<Icon of={SquareArrowOutDownLeft} size={16} />
+						</button>
+					)}
+				</Show>
 				<button
 					type="button"
 					class="v3-icon"
@@ -254,6 +292,9 @@ export function ChatSection(props: {
 				</button>
 			</div>
 			<div class="v3-chat-body">{props.children}</div>
+			<Show when={props.float && !props.folded}>
+				<span class="v3-chat-corner" aria-hidden="true" onPointerDown={(event) => props.float?.cornerDown(event)} />
+			</Show>
 		</section>
 	);
 }
