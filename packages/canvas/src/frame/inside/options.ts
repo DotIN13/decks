@@ -158,7 +158,17 @@ export function installHost(ctx: FrameContext): void {
 				const box = ctx.composerBox();
 				return !!box && x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
 			},
-			mark: (on) => end.emit("refer", { over: on }),
+			/*
+			 * Over the composer, this frame takes the focus: the page takes a draft from the frame only
+			 * while the frame has it (`outside/focus.ts`), and a press that starts a drag does not move the
+			 * focus here (it is prevented, so nothing is selected by the drag). With the caret in the
+			 * composer, where it is when a card is dragged in to be talked about, the pill was dropped.
+			 * The composer takes the caret back with the pill.
+			 */
+			mark: (on) => {
+				if (on && !document.hasFocus()) window.focus();
+				end.emit("refer", { over: on });
+			},
 		},
 		// A card's `card.decks` calls: here, on this canvas by the harness, or the page's (`card-calls.ts`).
 		cardCall: cardCalls({

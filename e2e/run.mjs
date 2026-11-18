@@ -218,6 +218,8 @@ const CHECKS = [
 	{ file: "chat-out.mjs", needsAgent: false },
 	/* A card an agent places and focuses is selected quietly: no properties panel until the person presses the canvas. */
 	{ file: "focus-quiet.mjs", needsAgent: false },
+	/* A card dragged onto the composer while the caret is in the composer is mentioned there. */
+	{ file: "card-to-composer.mjs", needsAgent: false },
 	/* The SDK redesign's view calls in a real browser: reload counted per page, goto, focus on a named canvas. */
 	{ file: "view-calls.mjs", needsAgent: false },
 	/* Measures, not a check: the stage's costs on a 2,000-item canvas (`node scripts/render-perf.mjs`). Run only when named. */
