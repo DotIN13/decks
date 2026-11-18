@@ -11,6 +11,9 @@
  * Nothing here touches the stage's own canvas: a canvas that has once had a WebGPU context can
  * never have a WebGL 2 one, and the engine opens it (`crates/web/src/select.rs`).
  */
+import { keptBytes } from "@decks/frame";
+import webgpuWasm from "@decks/stage/wasm?url";
+import webglWasm from "@decks/stage/gl/wasm?url";
 import * as webgpu from "./webgpu.ts";
 import * as webgl from "./webgl.ts";
 
@@ -47,13 +50,23 @@ export class NoBackend extends Error {
 }
 
 const BACKENDS: Record<BackendName, Backend> = {
-	webgpu: { name: "webgpu", load: (compiled) => import("@decks/stage").then((module) => started(module, compiled)), watch: webgpu.watch },
+	webgpu: { name: "webgpu", load: (compiled) => import("@decks/stage").then((module) => started(module, compiled, webgpuWasm)), watch: webgpu.watch },
 	// The same calls; only the wasm's own exports (`InitOutput`) differ between the builds.
-	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
+	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled, webglWasm)), watch: webgl.watch },
 };
 
-async function started(module: StageModule, compiled?: WebAssembly.Module): Promise<StageModule> {
-	await module.default(compiled ? { module_or_path: compiled } : undefined);
+/**
+ * The module started: from `compiled` when given; else from its bytes as the page keeps them, when
+ * this is a frame whose page does (`@decks/frame`, `kept.ts`: a frame has no cache, and the module
+ * is megabytes); else fetched and compiled as it streams in, as before.
+ */
+async function started(module: StageModule, compiled: WebAssembly.Module | undefined, address: string): Promise<StageModule> {
+	if (compiled) {
+		await module.default({ module_or_path: compiled });
+		return module;
+	}
+	const kept = typeof location === "undefined" ? undefined : await keptBytes(new URL(address, location.href).href);
+	await module.default(kept ? { module_or_path: kept.bytes } : undefined);
 	return module;
 }
 

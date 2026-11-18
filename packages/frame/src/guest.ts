@@ -1,5 +1,6 @@
 import { PROTOCOL, type Hello, type StartMessage } from "./hello.ts";
 import { endLife } from "./life.ts";
+import { offerKept } from "./kept.ts";
 
 /** What a kind gives the guest: how to run on a start, and what to clear when it is begun anew. */
 export interface Guest<Start> {
@@ -45,5 +46,7 @@ export function bootGuest<Start>(guest: Guest<Start>): void {
 		});
 	});
 	addEventListener("message", onStart);
+	// The line to what the page keeps (`kept.ts`), offered before hello: what is fetched as this frame starts can come down it.
+	offerKept(parent);
 	parent.postMessage({ t: "hello", protocol: PROTOCOL } satisfies Hello, "*");
 }

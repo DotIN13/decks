@@ -125,12 +125,24 @@ export interface FontNeed {
 	text: string;
 }
 
-/** One file: `key` names it, `family` is what it is registered as, and `fallback` is tried when `url` fails. */
+/** One file: `key` names it, `family` is what it is registered as, `local` is tried first where the app ships the file itself, and `fallback` when `url` fails. */
 export interface FontFile {
 	key: string;
 	family: string;
 	url: string;
+	local?: string;
 	fallback?: string;
+}
+
+/**
+ * The font files the app serves itself, beside its own page: the faces nearly every canvas sets its
+ * words in, so a canvas draws them with no network but the harness's (a harness on a machine that
+ * is offline, or far from the font CDN). Said once by the app's frame as it boots, with where they
+ * are and which (`<id>/<subset>-<weight>-<style>.ttf`); every other file comes from the CDN.
+ */
+let shipped: { base: string; files: ReadonlySet<string> } | undefined;
+export function useShippedFonts(base: string, files: readonly string[]): void {
+	shipped = { base: base.endsWith("/") ? base : `${base}/`, files: new Set(files) };
 }
 
 export const fontsourceId = (family: string) => family.trim().toLowerCase().replace(/\s+/g, "-");
@@ -144,8 +156,9 @@ export function fontFiles(needs: readonly FontNeed[]): FontFile[] {
 		const style = italic ? "italic" : "normal";
 		const key = `${id}/${subset}/${weight}/${style}`;
 		if (wanted.has(key)) return;
-		if (id === "noto-color-emoji") wanted.set(key, { key, family: name, url: EMOJI_URL });
-		else wanted.set(key, { key, family: name, url: `${FONT_CDN}/${id}@latest/${subset}-${weight}-${style}.ttf`, ...(weight !== 400 || italic ? { fallback: `${FONT_CDN}/${id}@latest/${subset}-400-normal.ttf` } : {}) });
+		if (id === "noto-color-emoji") return void wanted.set(key, { key, family: name, url: EMOJI_URL });
+		const file = `${id}/${subset}-${weight}-${style}.ttf`;
+		wanted.set(key, { key, family: name, url: `${FONT_CDN}/${id}@latest/${subset}-${weight}-${style}.ttf`, ...(shipped?.files.has(file) ? { local: `${shipped.base}${file}` } : {}), ...(weight !== 400 || italic ? { fallback: `${FONT_CDN}/${id}@latest/${subset}-400-normal.ttf` } : {}) });
 	};
 	want(fontsourceId(FALLBACK_FAMILY), FALLBACK_FAMILY, "latin", 400, false);
 	for (const need of needs) {

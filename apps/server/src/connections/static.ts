@@ -37,6 +37,8 @@ const TYPES: Record<string, string> = {
 	".webmanifest": "application/manifest+json",
 	// The drawing engine's module: named for streaming compilation, which asks for exactly this type.
 	".wasm": "application/wasm",
+	// The font files the app ships (`apps/web/public/fonts`): a third smaller squeezed.
+	".ttf": "font/ttf",
 	".md": "text/markdown; charset=utf-8",
 	".tex": "text/plain; charset=utf-8",
 };

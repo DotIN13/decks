@@ -3,6 +3,7 @@ import { dismissMenus } from "@decks/ui";
 import { createEffect, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
 import type { CanvasPass } from "./outside/host.tsx";
 import { CallRefused } from "./protocol.ts";
+import { keepForFrames } from "./outside/kept.ts";
 
 /** Light or dark, and how much of the window's foot the page's composer covers: what a frame shows can be scrolled clear of it. */
 export interface ItemLook {
@@ -67,6 +68,8 @@ export function ItemFrame<Own = unknown, Says = unknown, Pass extends ItemPass =
 ): JSX.Element {
 	let gone = false;
 	let stopWaiting = () => {};
+	// What never changes is fetched once by this page for all its frames (`outside/kept.ts`).
+	keepForFrames();
 	const [end, setEnd] = createSignal<ItemPageEnd<Own, Says>>();
 	const begin = (frame: HTMLIFrameElement) => {
 		const pass = untrack(() => props.pass);

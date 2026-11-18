@@ -2,6 +2,7 @@ import { baseTheme } from "@decks/pen";
 import { fontFiles, isFallbackFamily, canvasFontNeeds, type FontFile, type FontNeed } from "../look/font-files.ts";
 import { iconUrl, parseIcon } from "../look/icons.ts";
 import type { CanvasEngine } from "./engine.ts";
+import { fetchKept } from "@decks/frame";
 
 type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array };
 
@@ -38,7 +39,8 @@ export class EngineFaces {
 		const [library = "lucide", name = "", weight = "400"] = key.split("|");
 		const url = iconUrl(library, name, Number(weight));
 		if (!url) return;
-		void fetch(url)
+		// Through the page when this is a frame and the page keeps it (`@decks/frame`, `kept.ts`): a frame has no cache of its own.
+		void fetchKept(url)
 			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
 			.then((svg) => {
 				const shape = parseIcon(svg, Number(weight));
@@ -82,9 +84,9 @@ export class EngineFaces {
 		if (this.of.worker) this.of.post({ type: "fontsDue" });
 		void Promise.all(
 			files.map(async (file) => {
-				for (const url of [file.url, file.fallback].filter(Boolean) as string[]) {
+				for (const url of [file.local, file.url, file.fallback].filter(Boolean) as string[]) {
 					try {
-						const response = await fetch(url);
+						const response = await fetchKept(url);
 						if (!response.ok) continue;
 						const blob = await response.blob();
 						return { file, blob, bytes: new Uint8Array(await blob.arrayBuffer()) };

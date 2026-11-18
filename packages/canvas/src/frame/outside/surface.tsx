@@ -3,6 +3,7 @@ import type { Accessor, Setter } from "solid-js";
 import { createEffect, createSignal, For, on, onCleanup, untrack, type JSX } from "solid-js";
 import { type PageEnd } from "../protocol.ts";
 import { type FramedEditorOptions, } from "./host.tsx";
+import { keepForFrames } from "./kept.ts";
 
 const frameAddress = (): string => {
 	const page = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
@@ -68,6 +69,8 @@ export function createSurface(d: SurfaceNeeds) {
 	 */
 	const surface = (): JSX.Element => {
 		d.keepInStep();
+		// What never changes is fetched once by this page for all its frames (`kept.ts`).
+		keepForFrames();
 		const [held, setHeld] = createSignal<Held[]>([]);
 		const [front, setFront] = createSignal<Held>();
 		let made = 0;
