@@ -11,7 +11,7 @@ import { startStudio, syncWords } from "./index.ts";
 const base: SyncProgress = { state: "syncing", canvases: { done: 3, total: 12 }, files: { done: 40, total: 120 }, bytes: { done: 312e6, total: 840e6 }, sent: 312e6, received: 0, skipped: 0, at: 0, now: { canvas: "plan", path: "files/film.mp4", up: true } };
 
 test("decks studio status says how far the deck is in step, in one sentence", () => {
-	assert.equal(syncWords(base), "Syncing: 312 MB of 840 MB, 40 of 120 files; 3 of 12 canvases, now sending plan/files/film.mp4.");
+	assert.equal(syncWords(base), "Syncing: 312 MB of 840 MB, 40 of 120 files, now sending plan/files/film.mp4.");
 	assert.match(syncWords({ ...base, state: "synced", now: undefined, syncedAt: Date.now(), skipped: 2 }), /^In step with Studio since \d\d:\d\d; 2 files are left out/);
 	assert.equal(syncWords({ ...base, state: "offline", error: "Studio could not be reached." }), "Not syncing: Studio could not be reached.");
 	assert.match(syncWords({ ...base, state: "held", heldUntil: Date.now() + 60_000 }), /^Studio asked for a wait until \d\d:\d\d: 312 MB of 840 MB done/);

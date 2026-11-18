@@ -296,8 +296,7 @@ export function syncWords(p: SyncProgress, now = Date.now()): string {
 		case "syncing": {
 			const moving = p.now?.path ? `, now ${p.now.up === false ? "taking" : "sending"} ${p.now.canvas}/${p.now.path}` : p.now ? `, now ${p.now.canvas}` : "";
 			const files = !p.files.total ? "checking what changed" : p.files.done >= p.files.total ? `finishing, every file of ${mb(p.bytes.total)} done` : `${mb(p.bytes.done)} of ${mb(p.bytes.total)}, ${p.files.done} of ${p.files.total} files`;
-			const canvases = p.canvases.total ? `; ${p.canvases.done} of ${p.canvases.total} canvases` : "";
-			return `Syncing: ${files}${canvases}${moving}${left}.`;
+			return `Syncing: ${files}${moving}${left}.`;
 		}
 	}
 }

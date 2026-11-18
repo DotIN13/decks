@@ -194,9 +194,9 @@ export function SyncRow(props: { sync: StudioSyncRow }) {
 		if (x.state === "synced") return `${x.syncedAt ? `Since ${clock(x.syncedAt)}` : "Every canvas"}${x.canvases.total ? ` · ${x.canvases.total} ${x.canvases.total === 1 ? "canvas" : "canvases"} checked` : ""}${left()}`;
 		if (x.state === "connecting") return "The first pass starts once Studio answers.";
 		const done = x.files.total ? `${bytesWords(x.bytes.done)} of ${bytesWords(x.bytes.total)} · ${x.files.done} of ${x.files.total} files` : "";
-		const canvases = x.canvases.total ? `${x.canvases.done} of ${x.canvases.total} canvases` : "";
 		const until = x.state === "held" && x.heldUntil ? `The rest go at ${clock(x.heldUntil)}` : "";
-		return [done, canvases, until].filter(Boolean).join(" · ") + left();
+		// No count of canvases while it syncs: each pass after a wait walks them all again, so it would fall back; the files and bytes carry on.
+		return [done, until].filter(Boolean).join(" · ") + left();
 	};
 	const now = () => {
 		const at = p().now;
