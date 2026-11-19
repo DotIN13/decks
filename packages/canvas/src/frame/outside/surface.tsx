@@ -10,8 +10,9 @@ const frameAddress = (): string => {
 	const page = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
 	const passed = new URLSearchParams();
 	for (const name of PASSED_ON) if (page.has(name)) passed.set(name, page.get(name)!);
-	const query = passed.toString();
-	return query ? `/canvas-frame.html?${query}` : "/canvas-frame.html";
+	// Which kind this frame is for, so its code is asked for at once (`inside/frame.tsx`).
+	passed.set("kind", "canvas");
+	return `/canvas-frame.html?${passed.toString()}`;
 };
 
 /**

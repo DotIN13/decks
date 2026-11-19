@@ -1,5 +1,5 @@
 import { closeHistory } from "@decks/agent-ui/edge";
-import type { FramedHandle } from "@decks/canvas";
+import type { FramedHandle } from "@decks/canvas/page";
 import { watchInsets } from "@decks/canvas/camera";
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js";

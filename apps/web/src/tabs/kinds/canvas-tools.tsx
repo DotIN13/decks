@@ -1,5 +1,5 @@
-import { PenBar } from "@decks/canvas/host";
-import { frameZoom } from "@decks/canvas";
+import { PenBar } from "@decks/canvas/page";
+import { frameZoom } from "@decks/canvas/page";
 import { drawing, Insert, insertPanel, penPicked, setDrawing, setInsertPanel, setPenTool } from "@decks/canvas/tools";
 import { createEffect, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createToolsFloat } from "./canvas-tools-float.ts";

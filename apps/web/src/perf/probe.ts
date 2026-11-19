@@ -8,7 +8,7 @@
  * to the frame's address (`@decks/canvas`, `frame/outside/host.tsx`), and keeps only a relay
  * (`probe-relay.ts`) through which an inspector of the page runs an expression here.
  */
-import type { Knobs, Probes } from "@decks/canvas/host";
+import type { Knobs, Probes } from "@decks/canvas/page";
 const target = new URLSearchParams(location.search).get("probe");
 
 type Frame = { t: number; gap: number; busy: number; top: string[]; zoom: number; x: number; y: number; tiles: number; sheet: number; pictures: number };

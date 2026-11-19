@@ -2,7 +2,7 @@ import { api } from "../connections/connection.ts";
 import { cardCalls } from "@decks/api";
 import { connect } from "@decks/sdk";
 import { authHeaders } from "../lib/session.ts";
-import type { AppFramePass, CanvasPass } from "@decks/canvas";
+import type { AppFramePass, CanvasPass } from "@decks/canvas/page";
 import { ask } from "../state/confirm.ts";
 import { deckAddress, stageOnScreen } from "../state/decks.ts";
 

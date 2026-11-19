@@ -1,5 +1,5 @@
 import AppWindow from "lucide-solid/icons/app-window";
-import { AppFrame, type AppFramePass } from "@decks/canvas";
+import { AppFrame, type AppFramePass } from "@decks/canvas/page";
 import { Icon } from "@decks/ui";
 import { createResource, For, Match, Switch } from "solid-js";
 import { appFramePass, cardAgentCall } from "../../canvases/pass.ts";

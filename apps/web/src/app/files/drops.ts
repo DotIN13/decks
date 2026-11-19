@@ -1,4 +1,4 @@
-import { probes } from "@decks/canvas/host";
+import { probes } from "@decks/canvas/page";
 import { onCleanup, onMount } from "solid-js";
 import { toWorld } from "@decks/canvas/camera";
 import { camera } from "../../state/camera.ts";

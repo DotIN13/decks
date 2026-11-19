@@ -2,7 +2,7 @@ import X from "lucide-solid/icons/x";
 import { For, Match, Show, Switch } from "solid-js";
 import { Icon } from "@decks/ui";
 import { canHover } from "../lib/media.ts";
-import { tokens } from "@decks/canvas/host";
+import { tokens } from "@decks/canvas/page";
 
 /**
  * Shortcuts: what you can do to the canvas, in one place you can open and close.

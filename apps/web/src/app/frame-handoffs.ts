@@ -1,4 +1,4 @@
-import type { InkRequest } from "@decks/canvas";
+import type { InkRequest } from "@decks/canvas/page";
 import { api } from "../connections/connection.ts";
 import { authHeaders } from "../lib/session.ts";
 import { scheme } from "../lib/theme.ts";

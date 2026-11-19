@@ -1,5 +1,5 @@
 import SquarePen from "lucide-solid/icons/square-pen";
-import { DocumentFrame } from "@decks/canvas";
+import { DocumentFrame } from "@decks/canvas/page";
 import { Icon } from "@decks/ui";
 import { createResource, For, Match, Switch } from "solid-js";
 import { cardAgentCall, documentPass } from "../../canvases/pass.ts";

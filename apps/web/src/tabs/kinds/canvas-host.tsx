@@ -1,6 +1,6 @@
 import type { Camera } from "@decks/protocol";
 import { createSignal, onCleanup, Show, untrack, type JSX } from "solid-js";
-import { createFramedEditor, type FramedEditorOptions, type FramedHandle } from "@decks/canvas";
+import { createFramedEditor, type FramedEditorOptions, type FramedHandle } from "@decks/canvas/page";
 import { drawing } from "@decks/canvas/tools";
 import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
@@ -13,7 +13,7 @@ import { reportCameraSoon } from "../../app/camera-report.ts";
 import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "../../app/frame-handoffs.ts";
 import { CommentPopup } from "../../markup/CommentPopup.tsx";
 import { TOOL_KEYS } from "../../frame/ToolColumn.tsx";
-import type { CanvasComment } from "@decks/canvas";
+import type { CanvasComment } from "@decks/canvas/page";
 import type { createFileDrops } from "../../app/files/drops.ts";
 import { rememberView } from "../../app/heard/view.ts";
 import { openLinkedPage } from "../../app/links.ts";

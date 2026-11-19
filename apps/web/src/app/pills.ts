@@ -1,7 +1,7 @@
 import { onCleanup, untrack } from "solid-js";
 import { canvasBox, fitInto } from "@decks/canvas/camera";
 import { canvasItems, type CanvasItem } from "@decks/canvas/tools";
-import type { FramedHandle } from "@decks/canvas";
+import type { FramedHandle } from "@decks/canvas/page";
 import { setMineReader } from "@decks/agent-ui/chat";
 import { api } from "../connections/connection.ts";
 import { openAuthed } from "../lib/authed.tsx";

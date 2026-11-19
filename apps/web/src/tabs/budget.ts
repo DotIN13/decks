@@ -1,4 +1,4 @@
-import { DEVICE } from "@decks/canvas";
+import { DEVICE } from "@decks/canvas/page";
 
 /**
  * How much a device keeps alive in tabs behind the one in front.

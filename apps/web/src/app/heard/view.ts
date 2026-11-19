@@ -2,7 +2,7 @@ import { stageOf } from "../../state/canvases.ts";
 import type { Camera } from "@decks/protocol";
 import { viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "../../state/views.ts";
-import { runViewCall } from "@decks/canvas/host";
+import { runViewCall } from "@decks/canvas/page";
 import { reportCamera } from "../camera-report.ts";
 import { nameOf, state } from "../../state/deck.ts";
 import { offer } from "../../state/notices.ts";

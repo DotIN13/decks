@@ -1,138 +1,63 @@
-import { probes } from "../../base/debug.ts";
-import { warmCanvasEngine } from "../../render/engine.ts";
-import { createRoot } from "solid-js";
-import { render } from "solid-js/web";
-import { createEditor } from "../../view/editor.tsx";
-import type { Editor } from "../../view/types.ts";
 import type { FrameChromeView } from "../chrome.ts";
-import { openFrame } from "./boot.ts";
-import { createOthersLayer } from "./others-layer.tsx";
-import { editorOptions, installHost } from "./options.ts";
-import { wireFrame } from "./events.ts";
 import { bootGuest } from "@decks/frame";
-import { runCard } from "../card/guest.tsx";
-import { runApp } from "../app/guest.tsx";
 import type { AppEnd, AppStart } from "../app/protocol.ts";
 import type { CardEnd, CardStart } from "../card/protocol.ts";
-import { runDocument } from "../document/guest.tsx";
 import type { DocumentEnd, DocumentStart } from "../document/protocol.ts";
 import { peer, type FrameEnd, type Start } from "../protocol.ts";
-import { forgetMissing } from "../../base/missing.ts";
 
 /**
- * The canvas, run inside its frame: says `hello` to its parent, takes `start` and the port, reads its
- * drawing from the harness on the canvas token (`backend.ts`), makes the editor, follows the canvas's
- * stream and sends your edits itself. With the page it trades only what is the page's: its chrome, the
- * composer, your storage (`protocol.ts`).
+ * What a frame can show, each kind's code loaded when a frame of that kind is wanted and not before.
  *
- * What a host answered with a function (a board's address, its picture, its storage) is worked out
- * here from `start`: the files' ticketed address, the pages' trust, the page's kept values.
- *
- * In parts: what the frame holds once started (`boot.ts`), what the host and the editor are told
- * (`options.ts`), and what the frame hears from the harness, the page and the window (`events.ts`).
+ * A frame has no cache in the browser, so everything its page names is fetched whole each time one
+ * starts. A canvas needs the editor and the drawing engine, megabytes of them; a card, a document or
+ * an app shown whole (`card/`, `document/`, `app/`) needs a small part of that, and used to load it
+ * all. So the frame's own entry holds only this: hello, the start, and which kind's code to ask for.
  */
-export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView } = {}): void {
+const KINDS = {
+	canvas: () => import("./canvas-run.tsx"),
+	card: () => import("../card/guest.tsx"),
+	document: () => import("../document/guest.tsx"),
+	app: () => import("../app/guest.tsx"),
+};
+
+/** The app's own chrome for the canvas, or how to load it: a frame that shows a card needs none. */
+type Chrome = FrameChromeView | (() => Promise<FrameChromeView>);
+
+/**
+ * The frame's own beginning, whatever it goes on to show (`@decks/frame`, `bootGuest`): hello to its
+ * parent, then the page's start and the port, and the kind the start names is run (`KINDS`): a card,
+ * a document or an app whole, or a canvas, whose start names none (`canvas-run.tsx`).
+ *
+ * The page says in the frame's address which kind it means to start (`?kind=`), and that kind's code
+ * is asked for at once, beside hello, so it is on its way while the page fetches the frame's pass.
+ * The page moves a frame to another of your canvases in place (`reset`), rather than making a new
+ * frame: what this canvas started goes (its editor and engine, its cards, its line, its listeners),
+ * and the frame says hello again for the next one, keeping what it loaded (its code, the engine's
+ * compiled module). The page decides when, and makes a new frame for a friend's canvas.
+ */
+export function bootFrame(root: HTMLElement, options: { chrome?: Chrome; /** The font files the app serves itself, beside its own page (`look/font-files.ts`, `useShippedFonts`): where, and which. */ fonts?: { base: string; files: readonly string[] } } = {}): void {
 	// The canvas's own styles are scoped to it (`canvas.css`, `.decks-canvas`), as the editor's root is.
 	root.classList.add("decks-canvas");
-	/*
-	 * Begun as every frame is (`@decks/frame`, `bootGuest`): hello, the page's start and the port. The page
-	 * moves this frame to another of your canvases in place (`reset`), rather than making a new frame:
-	 * what this canvas started goes (its editor and engine, its cards, its line, its listeners), and the
-	 * frame says hello again for the next one, keeping what it loaded (its code, the engine's compiled
-	 * module). The page decides when, and makes a new frame for a friend's canvas.
-	 */
+	/** The chrome, loaded once it is known a canvas is coming: a function that takes no chrome is how to load one. */
+	let chrome: Promise<FrameChromeView | undefined> | undefined;
+	const chromeOf = () => (chrome ??= Promise.resolve(options.chrome === undefined ? undefined : options.chrome.length === 0 ? (options.chrome as () => Promise<FrameChromeView>)() : (options.chrome as FrameChromeView)));
+	const ask = <Kind extends keyof typeof KINDS>(kind: Kind): ReturnType<(typeof KINDS)[Kind]> => {
+		if (kind === "canvas") void chromeOf();
+		return KINDS[kind]() as ReturnType<(typeof KINDS)[Kind]>;
+	};
+	const told = new URLSearchParams(location.search).get("kind");
+	if (told && told in KINDS) void ask(told as keyof typeof KINDS).catch(() => {});
 	bootGuest<Start | CardStart | DocumentStart | AppStart>({
-		// Which kind the page started (`start.kind`): a card, a document or an app whole (`card/`, `document/`, `app/`), or a canvas, whose start names none.
-		run: (start, port) => {
-			if (!("kind" in start)) return run(root, start, peer(port) as FrameEnd, options.chrome);
-			if (start.kind === "card") return runCard(root, start, peer(port) as CardEnd);
-			return start.kind === "document" ? runDocument(root, start, peer(port) as DocumentEnd) : runApp(root, start, peer(port) as AppEnd);
+		run: async (start, port) => {
+			if (!("kind" in start)) return (await ask("canvas")).run(root, start, peer(port) as FrameEnd, await chromeOf(), options.fonts);
+			if (start.kind === "card") return (await ask("card")).runCard(root, start, peer(port) as CardEnd);
+			return start.kind === "document" ? (await ask("document")).runDocument(root, start, peer(port) as DocumentEnd) : (await ask("app")).runApp(root, start, peer(port) as AppEnd);
 		},
 		cleared: () => {
-			forgetMissing();
+			void import("../../base/missing.ts").then((missing) => missing.forgetMissing());
 			root.replaceChildren();
 		},
-		// Kept spare by the page for the next canvas: the drawing engine starts now, with nothing to draw (`render/warm.ts`).
-		warm: warmCanvasEngine,
-	});
-}
-
-/** Run one canvas in the frame, and answer how to stop it: its editor, its views and what they made. */
-async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: FrameChromeView | undefined): Promise<() => void> {
-	const ctx = await openFrame(root, start, end, chrome);
-	return createRoot((disposeRoot) => {
-	const { camera, pages, cursor } = ctx;
-	installHost(ctx);
-
-	const { cursors, rings } = createOthersLayer(ctx);
-	let reread = () => {};
-	const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors, rings));
-	const { handle } = editor;
-	ctx.setMade(editor);
-	ctx.changed();
-	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
-	probes.frameDrawn = () => handle.drawn();
-	probes.frameNews = () => ctx.news();
-	probes.frameSelect = (ids) => handle.select(ids);
-	probes.frameCamera = () => handle.camera();
-	probes.frameState = () => ({ dock: ctx.dock(), agents: Object.keys(ctx.agents()).length, agent: ctx.agent(), cursor: cursor(), pages: pages().length, cardsReads: ctx.cardsReads(), cards: pages().map((page) => ({ path: page.path.split("/").at(-2) ?? page.path, rev: page.rev, sized: page.sized })) });
-
-	reread = wireFrame(ctx).reread;
-
-
-	if (chrome) {
-		const { canWrite, setMode } = ctx;
-		// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
-		// Made inside the render's root, so its effects and its parts' onMount run (a float's grip, the pen's state).
-		const view = () => chrome({
-			handle,
-			revision: ctx.revision,
-			offer: ctx.offer,
-			dismissOffer: () => ctx.setOffer(undefined),
-			camera,
-			mode: ctx.mode,
-			setMode: (next) => {
-				if (next === "edit" && !canWrite()) return;
-				setMode(next);
-			},
-			canWrite,
-			dark: ctx.dark,
-			comment: ctx.comment,
-			setComment: ctx.setComment,
-			compose: (part) => end.emit("composer", part),
-			exportPicture: (ids) => end.emit("export", { ids }),
-			narrow: ctx.narrow,
-			dock: ctx.dock,
-			panel: (name) => end.emit("panel", { name }),
-			storage: ctx.storage,
-			canvas: start.canvas.name,
-		});
-		const unrender = render(() => (
-			<>
-				{editor.surface()}
-				{view()}
-			</>
-		), root);
-		return () => {
-			unrender();
-			editor.dispose();
-			disposeRoot();
-		};
-	}
-
-	/*
-	 * No chrome of its own (Studio, until it brings one): the editor's own bars, or none. Nothing of the
-	 * tools crosses the frame line: an app's chrome lives in the frame beside the canvas.
-	 */
-	const unrender = render(() => (
-		<>
-			{start.look.toolbar ? editor.root() : editor.surface()}
-		</>
-	), root);
-	return () => {
-		unrender();
-		editor.dispose();
-		disposeRoot();
-	};
+		// Kept spare by the page for the next canvas: its code is loaded and its drawing engine started, with nothing to draw.
+		warm: () => void ask("canvas").then((canvas) => canvas.warm()),
 	});
 }

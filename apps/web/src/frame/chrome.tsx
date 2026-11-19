@@ -1,4 +1,4 @@
-import type { FrameChrome } from "@decks/canvas";
+import type { FrameChrome } from "@decks/canvas/page";
 import { insets } from "@decks/canvas/camera";
 import { drawing } from "@decks/canvas/tools";
 import { createEffect, Show } from "solid-js";

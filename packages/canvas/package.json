@@ -6,6 +6,8 @@
 	"description": "The Decks canvas editor as a package: the stage, its camera, the drawing's editor and tools, and the canvas frame that holds them",
 	"exports": {
 		".": "./src/index.ts",
+		"./page": "./src/public/page.ts",
+		"./frame": "./src/public/frame.ts",
 		"./comments": "./src/public/comments.ts",
 		"./tools": "./src/public/tools.ts",
 		"./camera": "./src/public/camera.ts",

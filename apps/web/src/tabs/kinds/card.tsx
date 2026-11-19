@@ -1,5 +1,5 @@
 import FileText from "lucide-solid/icons/file-text";
-import { CardFrame } from "@decks/canvas";
+import { CardFrame } from "@decks/canvas/page";
 import { Icon } from "@decks/ui";
 import { For, Show } from "solid-js";
 import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";

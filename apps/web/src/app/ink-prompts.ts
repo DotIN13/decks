@@ -1,4 +1,4 @@
-import type { InkRequest } from "@decks/canvas";
+import type { InkRequest } from "@decks/canvas/page";
 
 /** What a sketch handed to the agent asks it, in words: a draft for the composer. */
 export const inkAsked = (request: InkRequest): string | undefined => {
