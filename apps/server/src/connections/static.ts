@@ -22,7 +22,7 @@ import type { NextFunction, Request, Response } from "express";
  * files (`squeezedFile`, from `routes/shared.ts`) and a drawing as JSON (`sendSqueezedJson`). A
  * sandboxed frame has no cache in the browser, so each of these is fetched whole every time a
  * frame starts, and from another device every byte is time: the drawing engine's module is 4 MB
- * as built and 1.3 MB squeezed, a large canvas's drawing 865 KB and under 200.
+ * as built and 1.1 MB squeezed, a large canvas's drawing 865 KB and under 200.
  */
 
 const TYPES: Record<string, string> = {
