@@ -35,11 +35,14 @@ export interface Choice {
  * canvases kept behind it change (`surface.tsx` says why frames are kept at all).
  *
  * - A frame already held for the canvas comes forward.
+ * - Else the spare frame takes it, when there is one and it has loaded (it has said hello): its
+ *   drawing engine is started already, where a frame moved in place starts its engine's worker
+ *   again, half a megabyte of script fetched whole.
  * - Else a frame nothing wants, neither on screen nor kept, moves to it in place, when it has
  *   started and both canvases allow it (`inPlace`: yours alone, since a card's script can outlive its
  *   card). The one that was in front first: its place on the page is where the eye is. With nothing
- *   kept this is every move, as it was before frames were kept.
- * - Else the spare frame takes it, when there is one.
+ *   kept and no spare this is every move, as it was before frames were kept: a phone's, an iPad's.
+ * - Else the spare takes it though it is still loading, when there is one.
  * - Else a new frame is made (`make`).
  *
  * Every other frame nothing wants goes. Pure: it changes nothing, and is tested alone (`held.test.ts`).
@@ -51,6 +54,7 @@ export function chooseFrame(d: { held: readonly Held[]; front: Held | undefined;
 	if (!canvas) return { next: undefined, how: "none", gone: unwanted };
 	const held = d.held.find((one) => one.canvas === canvas);
 	if (held) return { next: held, how: "held", gone: unwanted };
+	if (d.spare?.waiting?.said()) return { next: d.spare, how: "spare", gone: unwanted };
 	const moved = [...unwanted].sort((a, b) => Number(b === d.front) - Number(a === d.front)).find((one) => one.frame && one.end && one.canvas !== undefined && d.inPlace(one.canvas, canvas));
 	if (moved) return { next: moved, how: "moved", gone: unwanted.filter((one) => one !== moved) };
 	if (d.spare) return { next: d.spare, how: "spare", gone: unwanted };

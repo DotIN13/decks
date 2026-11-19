@@ -32,16 +32,24 @@ test("a canvas kept behind keeps its frame, and coming back to it is the frame i
 	assert.deepEqual(back.gone, []);
 });
 
-test("the spare frame takes a canvas that has none, before a new frame is made", () => {
+test("the spare frame takes a canvas that has none: before a frame moves in place when it has loaded, after when it has not, and always before a new one is made", () => {
 	const a = on("a");
-	const spare = on(undefined, false);
-	const choice = chooseFrame({ held: [a], front: a, spare, canvas: "b", kept: ["a"], inPlace: yours, make });
-	assert.equal(choice.how, "spare");
-	assert.equal(choice.next, spare);
-	// But a frame nothing wants moves first: it is on the page already, where the eye is.
-	const free = chooseFrame({ held: [a], front: a, spare, canvas: "b", kept: [], inPlace: yours, make });
-	assert.equal(free.how, "moved");
-	assert.equal(free.next, a);
+	const loading: Held = { ...on(undefined, false), waiting: { said: () => false, stop: () => {} } };
+	const loaded: Held = { ...on(undefined, false), waiting: { said: () => true, stop: () => {} } };
+	// Nothing free to move: the spare, loaded or not.
+	for (const spare of [loading, loaded]) {
+		const choice = chooseFrame({ held: [a], front: a, spare, canvas: "b", kept: ["a"], inPlace: yours, make });
+		assert.equal(choice.how, "spare");
+		assert.equal(choice.next, spare);
+	}
+	// A frame nothing wants and a spare that has loaded: the spare, whose engine is started; the other goes.
+	const warm = chooseFrame({ held: [a], front: a, spare: loaded, canvas: "b", kept: [], inPlace: yours, make });
+	assert.equal(warm.how, "spare");
+	assert.deepEqual(warm.gone, [a]);
+	// A spare still loading: the frame on the page moves, as it would with no spare.
+	const cold = chooseFrame({ held: [a], front: a, spare: loading, canvas: "b", kept: [], inPlace: yours, make });
+	assert.equal(cold.how, "moved");
+	assert.equal(cold.next, a);
 });
 
 test("beyond what is kept, the frame nothing wants moves, and the rest that nothing wants go", () => {

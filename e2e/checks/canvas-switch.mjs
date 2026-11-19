@@ -1,16 +1,21 @@
 /**
- * Moving between canvases keeps the canvas frame when both are yours alone, and makes a new one
- * otherwise (`frame/outside/host.tsx`, `inPlace`; `frame/inside/frame.tsx`, `reset`).
+ * Moving between canvases with the canvas list: which frame shows the next one (`@decks/canvas`,
+ * `frame/outside/held.ts`, `chooseFrame`; `frame/inside/frame.tsx`, `reset`).
  *
- * A frame moved in place keeps the code and the engine's module it loaded, so a switch skips the
- * frame's whole start; it ends everything the old canvas started first (`life.ts`). A friend's
- * canvas runs its owner's code, which can outlive its cards, so going to one, and leaving one, makes
- * a new frame: nothing of a friend's canvas is ever in a frame with one of yours.
+ * The canvas left is not a tab of the row, so its frame is not kept. On a computer the page keeps one
+ * frame spare, its code loaded and its drawing engine started: the next canvas starts in that, and the
+ * frame left is taken off the page. With no spare loaded (a phone, an iPad, or a moment after one was
+ * taken) the frame left moves to the next canvas in place, keeping the code and the engine's module
+ * it loaded, when both canvases are yours alone. A friend's canvas runs its owner's code, which can
+ * outlive its cards, so a frame is never moved to one or from one: nothing of a friend's canvas is
+ * ever in a frame with one of yours.
  *
- * What is checked: the iframe element is the same across a switch between two of your canvases, in
- * both directions, and each canvas shows its own drawing and cards after it; it is a new element on
- * the way to the friend's canvas and on the way back; the switch shows on the page before the
- * server answers is left to the timing script (`scripts/switch-timing.mjs`).
+ * What is checked: with the spare loaded, your other canvas shows in the frame that was spare, with
+ * its own drawing and none of the first one's cards, and the frame left is gone; going back shows
+ * the first canvas's cards again, in one frame, without the other's note; the friend's canvas is in
+ * a frame that showed neither of yours, and yours, after it, in a frame that did not show the
+ * friend's. Which frame moves in place, and when, is `held.test.ts`'s; how long a switch takes is
+ * the timing script's (`scripts/switch-timing.mjs`).
  */
 import { API, asPerson, canvasFrame, open, resetStage, say, settle } from "../harness.mjs";
 
@@ -53,6 +58,11 @@ const pick = async (title) => {
 const first = await until(async () => ((await drawn()).cards >= 3 ? await drawn() : undefined));
 say("the fixture's canvas shows its cards", !!first, JSON.stringify(first));
 const start = await iframe();
+/** How many canvas frames show something: the one in front and any kept behind it, not the spare. */
+const showing = () => page.locator("iframe.canvas-frame, iframe.canvas-frame-kept").count();
+// The spare: made a moment after the page goes quiet, and loaded a moment after that.
+const spare = await page.waitForSelector("iframe.canvas-frame-spare", { state: "attached", timeout: 12000 }).catch(() => undefined);
+await settle(page, 2000);
 
 await pick("Switch check");
 const onSecond = await until(async () => {
@@ -60,24 +70,26 @@ const onSecond = await until(async () => {
 	return now.ids.includes("switch-note") ? now : undefined;
 });
 say("switching to your other canvas shows its drawing", !!onSecond, JSON.stringify(onSecond));
-say("…in the same frame", await same(start));
+say("…in the frame the page kept spare, which had loaded already", !!spare && (await same(spare)) && !(await same(start)));
 say("…with none of the first canvas's cards left", onSecond?.cards === 0, String(onSecond?.cards));
+say("…and the frame of the canvas left is off the page: it is no tab of the row", (await until(async () => ((await showing()) === 1 ? true : undefined))) === true, String(await showing()));
 
 await pick("Auth refresh");
 const back = await until(async () => ((await drawn()).cards >= 3 ? await drawn() : undefined));
 say("switching back shows the first canvas's cards again", !!back, JSON.stringify(back));
-say("…still in the same frame", await same(start));
+say("…in one frame", (await until(async () => ((await showing()) === 1 ? true : undefined))) === true, String(await showing()));
 say("…without the second canvas's note", !back?.ids.includes("switch-note"), JSON.stringify(back?.ids));
+const mine = await iframe();
 
 await pick("Ada's old notes");
-await until(async () => !(await same(start)));
-say("a friend's canvas gets a frame of its own", !(await same(start)));
+await until(async () => !(await same(mine)));
+say("a friend's canvas gets a frame that showed none of yours", !(await same(mine)) && !(await same(start)));
 const friendFrame = await iframe();
 await settle(page, 1500);
 
 await pick("Auth refresh");
 await until(async () => !(await same(friendFrame)));
-say("…and leaving it makes a new frame again", !(await same(friendFrame)) && !(await same(start)));
+say("…and leaving it, yours is in a frame that did not show the friend's", !(await same(friendFrame)));
 const last = await until(async () => ((await drawn()).cards >= 3 ? await drawn() : undefined));
 say("…which shows your canvas's cards", !!last, JSON.stringify(last));
 

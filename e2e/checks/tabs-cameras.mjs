@@ -10,7 +10,7 @@
  * takes the tab off it again; its `view goto` moves the camera, and the screen with it when its chat
  * is the one on screen. And a reload finds each agent's tab again.
  */
-import { API, CANVAS as firstCanvasName, asPerson, card, newAgent, open, openAgents, resetStage, rest, say, settle, socket } from "../harness.mjs";
+import { API, CANVAS as firstCanvasName, asPerson, card, newAgent, open, openAgents, resetStage, rest, say, settle, socket, canvasFrame } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -44,6 +44,17 @@ const firstName = await nameOnChip();
 const chips = () => page.locator(".tab-chip[data-tab]:not([data-camera])").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
 const canvasFront = async () => (await page.locator('.v3-topbar .tab-chip[data-camera="true"]').getAttribute("data-front")) === "true";
 const reading = async () => Number((await page.locator(".v3-zoom-value").first().textContent()).replace(/[^0-9.]/g, ""));
+/** Wait for the canvas in front to be there and still: its frame started, and the zoom reading the same over half a second. */
+const arrivedOnCanvas = async () => {
+	await canvasFrame(page);
+	await settle(page, 600);
+	for (let i = 0, last = -1; i < 12; i++) {
+		const now = await reading();
+		if (now === last) return;
+		last = now;
+		await settle(page, 500);
+	}
+};
 /** Open an agent's chat from the agent list, by the name the page shows for it. */
 const openChat = async (name) => {
 	await openAgents(page);
@@ -77,7 +88,8 @@ say("the first agent opened again: its camera is on the card, which is in front"
 await page.locator('.v3-topbar [aria-label="Open a tab"]').click();
 await page.locator('.switcher-canvas:has-text("Tab two")').click();
 say("the first agent's camera goes to the canvas opened: its tab names it, and the one it left is a tab, in its place", (await until(async () => ((await chipName()).includes("Tab two") && JSON.stringify(await chips()) === '["canvas","card"]' ? true : undefined))) === true, JSON.stringify([await chipName(), await chips()]));
-await settle(page, 900);
+// Arrived: the canvas's frame has started (it may be one made for it just now) and the camera has landed, so the zoom reads the same twice.
+await arrivedOnCanvas();
 const arrived = await reading();
 await page.locator('.v3-zoom [aria-label="Zoom in"]').click();
 await page.locator('.v3-zoom [aria-label="Zoom in"]').click();
@@ -87,7 +99,7 @@ await openChat(otherName);
 say("the second agent's camera is where it was: not on that canvas", (await until(async () => ((await canvasFront()) && !(await chipName()).includes("Tab two") ? true : undefined))) === true, await chipName());
 await page.locator('.tab-chip[data-kind="canvas"]', { hasText: "Tab two" }).locator(".tab-chip-name").click();
 await until(async () => ((await chipName()).includes("Tab two") ? true : undefined));
-await settle(page, 1200);
+await arrivedOnCanvas();
 const otherZoom = await reading();
 say("put on the same canvas, the second agent has its own place there, not the first's", Math.abs(otherZoom - firstZoom) > 1 && Math.abs(otherZoom - arrived) <= 1, JSON.stringify({ arrived, firstZoom, otherZoom }));
 await openChat(firstName);

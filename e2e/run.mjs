@@ -194,7 +194,7 @@ const CHECKS = [
 	{ file: "tabs-alive.mjs", needsAgent: false },
 	/* What never changes is fetched once, by the page, for all its frames: a font from the app's own address, never twice, and nothing that needs a pass. */
 	{ file: "kept-fetch.mjs", needsAgent: false },
-	/* Between two of your canvases the frame moves in place; to and from a friend's it is made anew. */
+	/* Your other canvas starts in the frame kept spare; a friend's is never in a frame that showed one of yours, nor yours in one that showed a friend's. */
 	{ file: "canvas-switch.mjs", needsAgent: false },
 	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */
 	{ file: "same-drawing.mjs", needsAgent: false },
