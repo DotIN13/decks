@@ -1,7 +1,7 @@
 import AppWindow from "lucide-solid/icons/app-window";
 import { AppFrame, type AppFramePass } from "@decks/canvas/page";
 import { Icon } from "@decks/ui";
-import { createResource, For, Match, Switch } from "solid-js";
+import { createResource, createSignal, For, Match, Show, Switch } from "solid-js";
 import { appFramePass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { act } from "../../state/decks.ts";
@@ -33,6 +33,11 @@ export const appKind: TabKind = {
 	),
 };
 
+/** How many times each app has been told to load its page again (`apps.reload`), as the harness counts them. */
+const [appReloads, setAppReloads] = createSignal<ReadonlyMap<string, number>>(new Map());
+/** The harness said an app's pages are to load again (`app.changed` with `reload`): its tab is made again, once for each count. */
+export const heardAppReload = (name: string, reload: number) => setAppReloads((was) => (was.get(name) === reload ? was : new Map(was).set(name, reload)));
+
 function AppTab(props: { app: string; shown: boolean; foot: number }) {
 	// Asked for here, once, so a refusal is said in the tab; the frame is handed what came.
 	const [pass] = createResource(
@@ -53,7 +58,12 @@ function AppTab(props: { app: string; shown: boolean; foot: number }) {
 					)}
 				</Match>
 				<Match when={!(pass() instanceof Error) && (pass() as AppFramePass | undefined)}>
-					{(held) => <AppFrame app={props.app} title={props.app} pass={() => Promise.resolve(held())} dark={scheme() === "dark"} foot={props.foot} agent={cardAgentCall} />}
+					{(held) => (
+						// Made again at each reload: a new frame is how a sandboxed page loads again, with what it has saved since.
+						<Show when={[appReloads().get(props.app)]} keyed>
+							{(_load) => <AppFrame app={props.app} title={props.app} pass={() => Promise.resolve(held())} dark={scheme() === "dark"} foot={props.foot} agent={cardAgentCall} />}
+						</Show>
+					)}
 				</Match>
 			</Switch>
 		</div>

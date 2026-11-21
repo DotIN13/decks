@@ -246,6 +246,23 @@ export class Apps {
 	/** Hears each change of an app's status (`app.ts`: told to the canvas frames showing it, `app.state`). */
 	onChange?: (name: string, state: AppState) => void;
 
+	/** How many times each app's pages have been told to load again since the harness started (`reload`). */
+	private readonly reloads = new Map<string, number>();
+	/** Hears that an app's pages are to load again (`app.ts`: told to every window showing it, with the count). */
+	onReload?: (name: string, state: AppState, reload: number) => void;
+
+	/**
+	 * Tell every window showing the app to load its page again: its windows on canvases and its tabs
+	 * (`apps.reload`, and a restart or a build that finished). The app itself is left as it is. The count
+	 * is new each time, so a window told twice of one reload loads once.
+	 */
+	reload(name: string): number {
+		const count = (this.reloads.get(name) ?? 0) + 1;
+		this.reloads.set(name, count);
+		this.onReload?.(name, this.state(name), count);
+		return count;
+	}
+
 	private set(name: string, patch: Partial<Omit<AppState, "name" | "title" | "kind" | "url">>): void {
 		const was = this.states.get(name) ?? { status: this.firstStatus(name) };
 		const next = { ...was, ...patch };

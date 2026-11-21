@@ -55,7 +55,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 	if (about(message, "chat")) return heardChat(message);
 	if (about(message, "view")) return heardView(message, hooks);
 	if (about(message, "harness") || about(message, "web") || about(message, "account")) return heardHarness(message, hooks);
-	if (about(message, "deck") || about(message, "card") || about(message, "doc") || about(message, "canvas")) return heardDeck(message, hooks);
+	if (about(message, "deck") || about(message, "card") || about(message, "doc") || about(message, "canvas") || about(message, "app")) return heardDeck(message, hooks);
 }
 
 /** Open the connection to the harness when the page mounts, and answer what arrives on it. */

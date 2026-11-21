@@ -6,6 +6,7 @@ import { canvasHost, openAppTab, openInTab } from "../base/host.ts";
 import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
+import RefreshCw from "lucide-solid/icons/refresh-cw";
 import Trash from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
@@ -35,6 +36,27 @@ function newTab(board: Page, browser: boolean): void {
 	openInTab(host.fileUrl(board.path));
 }
 
+/** What selected ink can be handed to the agent for, first on its pill and in words: a drawing of it, a card of it, or the ink itself to read and act on. */
+function InkActions(props: { ink: NonNullable<PageCalloutProps["ink"]> }) {
+	return (
+		<>
+			<button type="button" role="menuitem" class="callout-word" title={`${props.ink.agent} redraws it as shapes, words and arrows you can edit`} onClick={() => props.ink.onDrawing()}>
+				<Icon of={Shapes} size={15} />
+				Make a drawing
+			</button>
+			<button type="button" role="menuitem" class="callout-word" title={`${props.ink.agent} builds a card from it, in its place`} onClick={() => props.ink.onCard()}>
+				<Icon of={LayoutTemplate} size={15} />
+				Make a card
+			</button>
+			<button type="button" role="menuitem" class="callout-word callout-ask" title={`${props.ink.agent} reads it and acts on it: what you wrote there is what it does`} onClick={() => props.ink.onSend()}>
+				<Icon of={Send} size={15} />
+				Send to {props.ink.agent}
+			</button>
+			<span class="callout-rule" aria-hidden="true" />
+		</>
+	);
+}
+
 /**
  * A board's title bar, now that boards have none: a small pill over the selected board, as a phone
  * shows over selected text, on every device. Selecting a board — a click or a tap on it — shows it:
@@ -46,6 +68,8 @@ function newTab(board: Page, browser: boolean): void {
  * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
  * actions (a new tab, hide) are not offered. A card's pill is Fit, New tab, Comment, ✕ (hide)
  * and ⋯, a menu of Export as PNG or PDF, Copy path and Delete; drawn items' and a group's end in ⋯ too.
+ * An app's has Reload after New tab, its ✕ closes its window, and its ⋯ has no Delete: an app is
+ * deleted in the Apps tab.
  */
 export function PageCallout(props: PageCalloutProps) {
 	/* The menu's own width, measured, so it is kept on the screen whole and its arrow still points at the board. */
@@ -86,25 +110,7 @@ export function PageCallout(props: PageCalloutProps) {
 			onPointerDown={stop}
 			onClick={stop}
 		>
-			<Show when={props.ink}>
-				{(ink) => (
-					<>
-						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} redraws it as shapes, words and arrows you can edit`} onClick={() => ink().onDrawing()}>
-							<Icon of={Shapes} size={15} />
-							Make a drawing
-						</button>
-						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a card from it, in its place`} onClick={() => ink().onCard()}>
-							<Icon of={LayoutTemplate} size={15} />
-							Make a card
-						</button>
-						<button type="button" role="menuitem" class="callout-word callout-ask" title={`${ink().agent} reads it and acts on it: what you wrote there is what it does`} onClick={() => ink().onSend()}>
-							<Icon of={Send} size={15} />
-							Send to {ink().agent}
-						</button>
-						<span class="callout-rule" aria-hidden="true" />
-					</>
-				)}
-			</Show>
+			<Show when={props.ink}>{(ink) => <InkActions ink={ink()} />}</Show>
 			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? "Fit" : "Zoom to it"} title={props.board ? "Fit the card to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
 				<Icon of={Scan} size={16} />
 			</button>
@@ -114,6 +120,11 @@ export function PageCallout(props: PageCalloutProps) {
 					<Icon of={ExternalLink} size={16} />
 				</a>
 				)}
+			</Show>
+			<Show when={props.onReload}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Reload" title="Reload the app in this window" onClick={() => props.onReload?.()}>
+					<Icon of={RefreshCw} size={16} />
+				</button>
 			</Show>
 			{/* On a touch screen the properties drawer opens from here, not with every selection (`Properties.tsx`). */}
 			<Show when={COARSE && !props.board && !props.ink}>
@@ -143,7 +154,7 @@ export function PageCallout(props: PageCalloutProps) {
 						</Show>
 						<Show when={props.onHide}>
 							<span class="callout-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
+							<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title={props.board?.item === "app" ? "Close the window; the app stays in the deck" : "Hide from the canvas"} onClick={() => props.onHide?.()}>
 								<Icon of={X} size={17} />
 							</button>
 						</Show>
@@ -152,7 +163,7 @@ export function PageCallout(props: PageCalloutProps) {
 			>
 				{/* A card's pill: Fit, New tab, Comment, ✕ to hide it and ⋯ for the rest; drawn items' and a group's: their actions and ⋯. */}
 				<Show when={props.board && props.onHide}>
-					<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
+					<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title={props.board?.item === "app" ? "Close the window; the app stays in the deck" : "Hide from the canvas"} onClick={() => props.onHide?.()}>
 						<Icon of={X} size={17} />
 					</button>
 				</Show>
@@ -186,7 +197,7 @@ export function PageCallout(props: PageCalloutProps) {
 						</Show>
 						<Show when={remove()}>
 							<span class="callout-more-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title={props.board?.item === "app" ? "Take the window off the canvas; the app stays in the deck" : props.board?.item === "document" ? "Take the document off the canvas; its file stays in the deck" : props.board ? "Take the card off the canvas; its folder stays in the deck" : "Delete"} onClick={pick(remove())}>
+							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title={props.board?.item === "document" ? "Take the document off the canvas; its file stays in the deck" : props.board ? "Take the card off the canvas; its folder stays in the deck" : "Delete"} onClick={pick(remove())}>
 								<Icon of={Trash} size={15} />
 								Delete
 							</button>

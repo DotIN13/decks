@@ -56,7 +56,7 @@ export function followLine(d: FollowLineNeeds) {
 		if (message.type.startsWith("doc.")) return d.ctx.hearDoc(message);
 		// An app's state changed: its windows hear it (`apps.watch`), and nothing asks the harness again.
 		if (message.type === "app.changed") {
-			for (const listener of d.ctx.appWatchers.get(message.name) ?? []) listener({ ...(message.title ? { title: message.title } : {}), status: message.status });
+			for (const listener of d.ctx.appWatchers.get(message.name) ?? []) listener({ ...(message.title ? { title: message.title } : {}), status: message.status, ...(message.reload === undefined ? {} : { reload: message.reload }) });
 			return;
 		}
 		// A card's file changed: its record taken, its place kept, as the drawing says it.

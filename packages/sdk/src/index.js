@@ -108,6 +108,7 @@ export const VERBS = [
 	["apps.run",["name"]],
 	["apps.stop",["name"]],
 	["apps.restart",["name"]],
+	["apps.reload",["name"]],
 	["apps.delete",["name"]],
 	["apps.logs",["name","options?"]],
 	["apps.check",["name"]],

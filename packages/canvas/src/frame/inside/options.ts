@@ -110,7 +110,7 @@ export function installHost(ctx: FrameContext): void {
 			},
 			open: (name: string) => end.emit("open-app", { name }),
 			// Its state as the stream says it changed (`app.state`): read once with `status`, then watched.
-			watch: (name: string, listener: (state: { title?: string; status?: string }) => void) => {
+			watch: (name: string, listener: (state: { title?: string; status?: string; reload?: number }) => void) => {
 				const set = ctx.appWatchers.get(name) ?? new Set<typeof listener>();
 				set.add(listener);
 				ctx.appWatchers.set(name, set);

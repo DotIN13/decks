@@ -440,14 +440,26 @@ export interface Verbs {
 		 * yourself: decks.canvas.insert(item) places it.
 		 */
 		item(name: string): Promise<AppItem>;
-		/** Build it, waiting up to 15 s; `pending` means ask its status later. */
+		/**
+		 * Build it, waiting up to 15 s; `pending` means ask its status later, and reload it then. A build
+		 * that finishes in time reloads the windows showing it.
+		 */
 		build(name: string): Promise<AppOutcome>;
 		/** Start it, waiting up to 15 s. */
 		run(name: string): Promise<AppOutcome>;
 		/** Stop it. */
 		stop(name: string): Promise<{ stopped: boolean }>;
-		/** Stop and start again after a code change. The items showing it reload by themselves. */
+		/**
+		 * Stop and start again after a change to a server's code. The windows showing it reload when it is
+		 * back; with `pending`, ask its status later and reload it then.
+		 */
 		restart(name: string): Promise<AppOutcome>;
+		/**
+		 * Load the app's page again in every window showing it, on a canvas or in a tab, without touching
+		 * its server: after you change a static app's files (nothing reloads it for you), or whenever what
+		 * the person sees is stale.
+		 */
+		reload(name: string): Promise<{ reloaded: string }>;
 		/**
 		 * Delete an app: stop it, move its folder to the deck's trash (.decks/trash/apps), and take the
 		 * items showing it off your canvases. The folder can be moved back by hand.

@@ -18,7 +18,7 @@ test("the table has every call of the redesign, each named once", () => {
 		// For a caller with no disk, and for an agent that works outside Decks.
 		"file.list", "file.find", "file.read", "file.write", "file.edit", "file.grep", "file.move", "file.delete", "agent.news",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 88);
+	assert.equal(VERBS.length, 89);
 	assert.equal(VERB_BY_NAME.size, VERBS.length, "a name finds only the table's calls");
 });
 

@@ -6,13 +6,18 @@ import { watchedBeingNamed } from "../watching.ts";
 import { receiveCanvasChanged } from "../../state/pens.ts";
 import { receiveStages } from "../../state/canvases.ts";
 import type { FrameHooks, Of } from "../socket-messages.ts";
+import { heardAppReload } from "../../tabs/kinds/app.tsx";
 
 /**
  * What changed in the deck: the deck itself, one of its cards, a document made for a drop, a canvas's
- * drawing, and the list of canvases.
+ * drawing, the list of canvases, and an app told to load again.
  */
-export function heardDeck(message: Of<"deck"> | Of<"card"> | Of<"doc"> | Of<"canvas">, hooks: FrameHooks): void {
+export function heardDeck(message: Of<"deck"> | Of<"card"> | Of<"doc"> | Of<"canvas"> | Of<"app">, hooks: FrameHooks): void {
 	switch (message.type) {
+		// An app's pages are to load again: its tab here does (its windows on a canvas hear it in their frame).
+		case "app.changed":
+			if (message.reload !== undefined) heardAppReload(message.name, message.reload);
+			return;
 		case "deck.changed":
 			setState("deck", message.deck);
 			/*

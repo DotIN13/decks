@@ -3407,7 +3407,7 @@
   "group": "apps",
   "touches": "outside",
   "effect": "change",
-  "summary": "Build it, waiting up to 15 s; `pending` means ask its status later.",
+  "summary": "Build it, waiting up to 15 s; `pending` means ask its status later, and reload it then. A build that finishes in time reloads the windows showing it.",
   "signature": "apps.build(name: string)",
   "returns": "AppOutcome",
   "params": [
@@ -3473,9 +3473,31 @@
   "group": "apps",
   "touches": "outside",
   "effect": "change",
-  "summary": "Stop and start again after a code change. The items showing it reload by themselves.",
+  "summary": "Stop and start again after a change to a server's code. The windows showing it reload when it is back; with `pending`, ask its status later and reload it then.",
   "signature": "apps.restart(name: string)",
   "returns": "AppOutcome",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.reload",
+  "command": [
+   "apps",
+   "reload"
+  ],
+  "group": "apps",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Load the app's page again in every window showing it, on a canvas or in a tab, without touching its server: after you change a static app's files (nothing reloads it for you), or whenever what the person sees is stale.",
+  "signature": "apps.reload(name: string)",
+  "returns": "{ reloaded: string }",
   "params": [
    {
     "name": "name",

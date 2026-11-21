@@ -188,7 +188,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		return true;
 	}
 	/** Who is watching each app's state (`apps.watch`): its windows on this canvas, told as the stream says (`app.state`). */
-	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
+	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string; reload?: number }) => void>>();
 	return {
 		cardsReads: () => cardsReads,
 		appStored,

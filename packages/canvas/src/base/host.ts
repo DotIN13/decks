@@ -53,7 +53,7 @@ export interface CanvasHost {
 	apps?: {
 		status(name: string): Promise<{ title?: string; status?: string } | undefined>;
 		/** Hear the app's state as it changes, after `status`: the harness says it (`app.state`), so no window polls. Absent: read once. */
-		watch?(name: string, listener: (state: { title?: string; status?: string }) => void): () => void;
+		watch?(name: string, listener: (state: { title?: string; status?: string; /** Its pages are to load again (`apps.reload`): a count, new each time. */ reload?: number }) => void): () => void;
 		open(name: string): void;
 		/**
 		 * The address the app loads at inside the canvas, its pass in the path and its saved browser values

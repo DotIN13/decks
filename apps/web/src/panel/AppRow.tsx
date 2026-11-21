@@ -3,6 +3,7 @@ import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import Play from "lucide-solid/icons/play";
+import RefreshCw from "lucide-solid/icons/refresh-cw";
 import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import Square from "lucide-solid/icons/square";
 import Terminal from "lucide-solid/icons/terminal";
@@ -15,7 +16,7 @@ import { Icon, Popover } from "@decks/ui";
 export type PanelApp = { name: string; title: string; status: string; board: string };
 
 /** What the ⋯ menu and a double-click ask of an app (`App.tsx` carries them out). */
-export type AppAction = "show" | "run-show" | "start" | "stop" | "restart" | "delete";
+export type AppAction = "show" | "run-show" | "start" | "stop" | "restart" | "reload" | "delete";
 
 /** Bright tiles, one per app by its name; no olive. */
 const TILES = ["#2563eb", "#0ea5e9", "#7c3aed", "#14b8a6", "#db2777", "#f97316", "#e11d48", "#9333ea"];
@@ -134,6 +135,10 @@ export function AppRow(props: {
 						<span class="row-label">Stop</span>
 					</button>
 				</Show>
+				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => act("reload"))}>
+					<Icon of={RefreshCw} size={15} class="row-icon" />
+					<span class="row-label">Reload</span>
+				</button>
 				<button type="button" role="menuitem" data-row data-flat="true" disabled={!running() || moving()} onClick={() => menu(() => act("restart"))}>
 					<Icon of={RotateCcw} size={15} class="row-icon" />
 					<span class="row-label">Restart</span>

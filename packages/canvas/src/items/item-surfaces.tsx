@@ -1,6 +1,6 @@
 import { mountDocPage } from "@decks/docs/page";
 import { ALLOW, SANDBOX } from "@decks/frame";
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { ownInput } from "./input.ts";
 import { APP_BAR } from "../render/types.ts";
 import { canvasHost } from "../base/host.ts";
@@ -79,6 +79,11 @@ const markShown = (path: string, on: boolean) =>
 		return next;
 	});
 
+/** How many times each app window has been told to load again by hand, by item path (the pill's Reload). */
+const [windowReloads, setWindowReloads] = createSignal<ReadonlyMap<string, number>>(new Map());
+/** Load one app window's page again: this window alone, as the person's Reload on its pill asks. */
+export const reloadAppWindow = (path: string) => setWindowReloads((was) => new Map(was).set(path, (was.get(path) ?? 0) + 1));
+
 /**
  * An app item (`decks.app`): the app itself, running in a sandboxed iframe below the window bar the
  * engine paints (`engine.rs`, `paint_window`: the bar, lights, name and status, the same in every
@@ -89,12 +94,20 @@ const markShown = (path: string, on: boolean) =>
  * selects it and a wheel pans the canvas. Its cards' scripts may reach it: they are yours. Where the
  * host cannot open it here, its body says so and offers Open, which the host's page does in a tab of
  * its own; the pill's New tab does the same.
+ *
+ * Its page loads again when the harness says so (`apps.reload`, a restart or a build that finished:
+ * `apps.watch` hears the count) and when the person presses Reload on its pill (`reloadAppWindow`).
+ * The address is asked for again, so the page opens with what it has saved since, and the iframe is
+ * made again: the same address set again would only be a move to its own `#`, which loads nothing.
+ * Its picture covers it until the new page has loaded.
  */
 export function AppSurface(props: { app: string; path: string; visible: boolean; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
 	let frame: HTMLIFrameElement | undefined;
 	const [about, setAbout] = createSignal<{ title?: string; status?: string }>();
 	const [address, setAddress] = createSignal<{ url: string } | { tab: string }>();
+	/** Counted up at each reload: the iframe is made again for each. */
+	const [loads, setLoads] = createSignal(0);
 	const open = () => canvasHost().apps?.open(props.app);
 	const inCanvas = () => canvasHost().apps?.inCanvas;
 	// Running here whenever mounted: which apps are mounted is the chooser's (`items/awake.ts`), and a kept one stays until it is let go of.
@@ -121,7 +134,15 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 	let unwatch: (() => void) | undefined;
 	onMount(() => {
 		props.ref?.();
-		unwatch = canvasHost().apps?.watch?.(props.app, (state) => setAbout((was) => ({ ...was, ...state })));
+		unwatch = canvasHost().apps?.watch?.(props.app, (state) => {
+			const { reload: asked, ...rest } = state;
+			setAbout((was) => ({ ...was, ...rest }));
+			// Told to load again, once for each count: the same word reaches every window showing the app.
+			if (asked !== undefined && asked !== heardReload) {
+				heardReload = asked;
+				reload();
+			}
+		});
 		/*
 		 * The same rule on the window's bar and body (`input.ts`); the app's own page inside the iframe is the
 		 * exception, by choice: it takes the pointer only once the item is selected (`pointer-events` below),
@@ -134,6 +155,18 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 	// The window shows the app once its frame has loaded; until then, and when it runs elsewhere, the sheet shows its picture.
 	let saidShown = false;
 	const [loaded, setLoaded] = createSignal(false);
+	let heardReload: number | undefined;
+	const reload = () => {
+		const ask = inCanvas();
+		if (!ask) return;
+		void ask(props.app).then((next) => {
+			setLoaded(false);
+			setAddress(next);
+			setLoads((count) => count + 1);
+		});
+	};
+	// The person's Reload on this window's pill.
+	createEffect(on(() => windowReloads().get(props.path), reload, { defer: true }));
 	createEffect(() => {
 		const on = !!url() && loaded();
 		if (on === saidShown) return;
@@ -170,17 +203,22 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 					</div>
 				}
 			>
-				<iframe
-					ref={(element) => (frame = element)}
-					class="app-surface-frame"
-					title={about()?.title ?? props.app}
-					src={url()}
-					/* The one list every frame has (`@decks/frame`, `sandbox.ts`): no more than the canvas frame around it. */
-					sandbox={SANDBOX}
-					allow={ALLOW}
-					style={{ "pointer-events": props.selected ? "auto" : "none" }}
-					on:load={() => setLoaded(true)}
-				/>
+				{/* Made again at each reload (`loads`): a new iframe is the one sure way to load a sandboxed page again. */}
+				<Show when={[loads()]} keyed>
+					{(_load) => (
+						<iframe
+							ref={(element) => (frame = element)}
+							class="app-surface-frame"
+							title={about()?.title ?? props.app}
+							src={untrack(url)}
+							/* The one list every frame has (`@decks/frame`, `sandbox.ts`): no more than the canvas frame around it. */
+							sandbox={SANDBOX}
+							allow={ALLOW}
+							style={{ "pointer-events": props.selected ? "auto" : "none" }}
+							on:load={() => setLoaded(true)}
+						/>
+					)}
+				</Show>
 			</Show>
 		</div>
 	);

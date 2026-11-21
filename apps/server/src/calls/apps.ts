@@ -144,9 +144,13 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 				},
 				/** The item that shows an app whose folder was written by hand; nothing is written. */
 				item: async (name: string) => appItem(known(name)),
+				/** A built app built again; the windows showing it load the new build once it is done. */
 				build: async (name: string) => {
 					agentOnly("build");
-					return service_().build(known(name));
+					const text = known(name);
+					const outcome = await service_().build(text);
+					if (outcome.ok && !outcome.pending) service_().reload(text);
+					return outcome;
 				},
 				run: async (name: string) => {
 					agentOnly("run");
@@ -156,12 +160,25 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					agentOnly("stop");
 					return { stopped: service_().stop(known(name)) };
 				},
-				/** Stop and start a server app, after its code changed; a built app is built again. The board reloads when it is back. */
+				/** Stop and start a server app, after its code changed; a built app is built again. The windows showing it load again when it is back. */
 				restart: async (name: string) => {
 					agentOnly("restart");
 					const text = known(name);
 					service_().stop(text);
-					return service_().run(text);
+					const outcome = await service_().run(text);
+					if (outcome.ok && !outcome.pending) service_().reload(text);
+					return outcome;
+				},
+				/**
+				 * The app's page loaded again in every window showing it, on a canvas or in a tab, from the person's
+				 * Reload or an agent: what a static app needs after its files change, and anything else whose
+				 * page on screen is stale. The app's own process is not touched.
+				 */
+				reload: async (name: string) => {
+					agentOnly("reload");
+					const text = known(name);
+					service_().reload(text);
+					return { reloaded: text };
 				},
 				/**
 				 * Delete an app, from the person's ⋯ menu or an agent: stop it, move its folder to the deck's

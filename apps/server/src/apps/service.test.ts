@@ -233,3 +233,17 @@ test("a server app that listens beyond this Mac is marked unguarded", async () =
 		assert.equal(apps.state("open").warning, undefined);
 	});
 });
+
+test("an app told to reload says so to whoever listens, with a count that is new each time, and is left as it is", async () => {
+	await withDeck(async ({ deck, apps }) => {
+		writeStarter(join(deck, "apps", "counter"), "static", "Counter");
+		const heard: Array<[string, string, number]> = [];
+		apps.onReload = (name, state, reload) => void heard.push([name, state.status, reload]);
+		assert.equal(apps.reload("counter"), 1);
+		assert.equal(apps.reload("counter"), 2);
+		writeStarter(join(deck, "apps", "other"), "static", "Other");
+		assert.equal(apps.reload("other"), 1, "each app counts its own");
+		assert.deepEqual(heard, [["counter", "running", 1], ["counter", "running", 2], ["other", "running", 1]]);
+		assert.equal(apps.state("counter").status, "running", "the app itself is not touched");
+	});
+});

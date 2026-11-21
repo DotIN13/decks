@@ -7,6 +7,8 @@ import { Show, type Accessor } from "solid-js";
 import { boxOf, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import { PageCallout } from "../ui/Callout.tsx";
+import { canvasHost } from "../base/host.ts";
+import { reloadAppWindow } from "../items/item-surfaces.tsx";
 import { isInk } from "../model/ink.ts";
 import { inkSelection, setInkSelection } from "../ink/ink.ts";
 import { type PenNode } from "@decks/pen";
@@ -69,7 +71,10 @@ export function createPills(d: PillsNeeds) {
 						onCopyPath={() => void navigator.clipboard?.writeText(path).catch(() => {})}
 						{...(d.props.onExport && board().item !== "app" ? { onExport: (format: "png" | "pdf") => d.props.onExport?.([path], format) } : {})}
 						{...(d.props.onHide ? { onHide: () => d.props.onHide?.(path) } : {})}
-						{...(d.props.onDeleteCard ? { onDelete: () => d.props.onDeleteCard?.(path) } : {})}
+						// An app's window is closed here (✕), never deleted: deleting an app is the Apps tab's, where it says what goes.
+						{...(d.props.onDeleteCard && board().item !== "app" ? { onDelete: () => d.props.onDeleteCard?.(path) } : {})}
+						// An app running in its window loads again at a press, this window alone.
+						{...(board().item === "app" && canvasHost().apps?.inCanvas ? { onReload: () => reloadAppWindow(path) } : {})}
 						{...(d.props.onComment
 							? {
 									onComment: () =>

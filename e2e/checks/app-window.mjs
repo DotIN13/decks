@@ -3,7 +3,7 @@
  * three lights on its bar.
  *
  * - the pill's ✕ takes the window off the canvas, and the app stays in the deck;
- * - the pill's ⋯ Delete does the same;
+ * - the pill has Reload and no Delete: an app is deleted in the Apps tab, and nowhere on the canvas;
  * - the red light closes it, as ✕ does;
  * - the yellow light collapses it: the window goes and a link to the app stands where its corner was;
  * - the green light opens the app in a tab;
@@ -78,25 +78,24 @@ const shot = async (name) => process.env.LOOK_SHOTS && (await page.screenshot({ 
 	const canvas = await select(box);
 	await shot("app-pill");
 	const labels = await canvas.locator(".stage-fixed > .card-callout:not([data-hidden]) [aria-label]").evaluateAll((all) => all.map((one) => one.getAttribute("aria-label")));
-	say("its pill has Fit, New tab, Comment, Hide and More", ["Fit", "New tab", "Comment", "Hide", "More"].every((one) => labels.includes(one)), JSON.stringify(labels));
+	say("its pill is Fit, New tab, Reload, Comment, ✕ and ⋯", JSON.stringify(labels) === '["Fit","New tab","Reload","Comment","Hide","More"]', JSON.stringify(labels));
 	await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
 	say("the pill's ✕ takes the window off the canvas", (await gone(id)) === true, JSON.stringify((await windows()).map((one) => one.id)));
 	say("…and the app stays in the deck", await inDeck());
 }
 
-// --- the pill's Delete -------------------------------------------------------------------------------------------------
+// --- no Delete on an app's pill -----------------------------------------------------------------------------------------
 {
 	const { id, box } = await place();
 	const canvas = await select(box);
 	await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="More"]').click();
-	const menu = await canvas.locator(".callout-more [role=menuitem]").evaluateAll((all) => all.map((one) => one.getAttribute("aria-label")));
-	say("⋯ has Copy path and Delete, and no export of a running app", menu.includes("Delete") && !menu.includes("Export as PNG"), JSON.stringify(menu));
-	// The menu fades in: pressed once it stands still, or the browser's own retries scroll the stage under it, which shuts it.
 	await settle(page, 400);
 	await shot("app-pill-more");
-	await canvas.locator('.callout-more [aria-label="Delete"]').click();
-	say("the pill's Delete takes the window off the canvas", (await gone(id)) === true, JSON.stringify((await windows()).map((one) => one.id)));
-	say("…and the app stays in the deck", await inDeck());
+	const menu = await canvas.locator(".callout-more [role=menuitem]").evaluateAll((all) => all.map((one) => one.getAttribute("aria-label")));
+	say("⋯ has Copy path alone: no Delete, and no export of a running app", JSON.stringify(menu) === '["Copy path"]', JSON.stringify(menu));
+	await page.keyboard.press("Escape");
+	await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
+	await gone(id);
 }
 
 // --- a document's ✕: the same rule, an item with no file path of its own ---------------------------------------------------

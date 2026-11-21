@@ -191,8 +191,11 @@ export type ServerMessage =
 	| { type: "harness.runtimes"; list: RuntimeInfo[] }
 	/** A card was written or removed. */
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; /** Only the size in its own tag changed: a page showing it keeps its document. */ sized?: true }
-	/** An app's state changed (`apps/service.ts`): for the canvas frames showing it, instead of each asking again every few seconds. */
-	| { type: "app.changed"; name: string; title?: string; status: string }
+	/**
+	 * An app's state changed (`apps/service.ts`): for the canvas frames showing it, instead of each asking again every few seconds.
+	 * With `reload`, its pages are to load again (`apps.reload`): a count, new each time, so a window that hears it twice loads once.
+	 */
+	| { type: "app.changed"; name: string; title?: string; status: string; reload?: number }
 	/**
 	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
 	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the

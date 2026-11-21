@@ -39,7 +39,7 @@ export type Heard =
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
-	| { type: "app.changed"; name: string; title?: string; status: string }
+	| { type: "app.changed"; name: string; title?: string; status: string; reload?: number }
 	/** An agent at work on a card of this canvas (`server/src/agents/acts.ts`): its cursor follows the work (`presence.ts`). */
 	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: string; ids?: string[]; boxes?: Array<{ x1: number; y1: number; x2: number; y2: number }>; label: string; color: string; at: number }
 	/** Someone else on this canvas moved, selected, looked elsewhere or left (`presence.ts`). */

@@ -290,6 +290,8 @@ export class App {
 		this.apps.passes = this.passes;
 		// A canvas frame showing the app hears its state change (`calls/canvas-frame.ts`, `onCanvas`), instead of asking every ten seconds.
 		this.apps.onChange = (name, state) => this.pages.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status });
+		// Its pages load again (`apps.reload`): every window showing it hears the same word, with the count.
+		this.apps.onReload = (name, state, reload) => this.pages.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status, reload });
 		this.stage.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.

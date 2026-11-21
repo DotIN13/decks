@@ -41,6 +41,8 @@ export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path
 			loadApps();
 			return show();
 		}
+		// Its page loads again in every window showing it, on a canvas or in a tab; the app itself is left running as it is.
+		if (action === "reload") return act("apps.reload", [app.name]);
 		if (action === "delete") {
 			const yes = await ask({ title: `Delete ${app.title}?`, body: `Its folder, apps/${app.name}, moves to the deck's trash, and the items showing it leave the canvases.`, yes: "Delete", no: "Cancel" });
 			if (!yes) return;

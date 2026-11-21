@@ -7,9 +7,9 @@ description: Build an app the person can use on the canvas, as a folder in apps/
 
 An app is a folder, `apps/<name>/`, that you write with your own tools. Decks serves it at
 `/app/<name>/` and shows it on the canvas as an app item, `{ type: "app", app: "<name>" }`, which
-`decks canvas insert` places: a bar (Running, Building, Asleep, Broken; Reload, Restart, Open, Log)
-over the app itself. It reloads the app by itself when you
-change a file, finish a build or restart the server.
+`decks canvas insert` places: a window with the app itself running in it, and it opens whole as a
+tab too. **A window keeps showing the page it loaded until it is told to load again**: after you
+change what the page loads, `decks apps reload <name>` (see "Reload what the person sees").
 
 ## Pick the lowest rung that does the job
 
@@ -55,10 +55,41 @@ await decks.canvas.insert(app.item, { at: { x1: 0, y1: 0 } });  // app.item is {
   show it. Look at its picture when the page is visual.
 - After you change a **server's** code, call `decks.apps.restart(name)`. The old process keeps
   serving the old code until you do. After you change a **built** app, call `build` again.
-  A static app needs nothing.
+  After you change a **static** app's files, call `decks.apps.reload(name)`.
 - `build`, `run`, `restart` and `check` wait up to 15 s. `pending: true` means it is still
   installing or building: ask `decks.apps.status(name)` on your next call. `ok: false` comes with
   the error lines, and `decks.apps.logs(name)` has the rest.
+
+## Reload what the person sees
+
+The person's windows do not follow your edits. An app open on a canvas or in a tab is a page that
+loaded once; a file you change after that is not on their screen until the page loads again.
+
+```sh
+decks apps reload polls     # every window showing polls loads its page again; its server is not touched
+```
+
+| You changed | Call | What reloads the windows |
+| --- | --- | --- |
+| a **static** app's files (HTML, CSS, scripts, data a page fetches once) | `decks apps reload <name>` | that call |
+| a **built** app's source | `decks apps build <name>` | the build, when it finishes within its 15 s |
+| a **server's** code | `decks apps restart <name>` | the restart, when the server is back within its 15 s |
+| only the server's data, which the page fetches as it goes | nothing | nothing is stale |
+
+- When `build` or `restart` answers `pending: true`, nothing has reloaded yet: ask
+  `decks apps status <name>` until it is `running`, then `decks apps reload <name>`.
+- Reload **after** the change is whole (every file written, the build done), once, not after each
+  file: a reload starts the page from nothing, and whatever the person had typed into it is gone
+  unless the app saved it.
+- `decks apps check <name>` looks at the app in the server's own browser, which always loads it
+  fresh: a clean check says the files are right, not that the person's window shows them. Check,
+  then reload.
+- The person can do the same by hand: Reload on the window's pill (that window alone), or Reload in
+  the Apps tab's ⋯ (everywhere), where an app is also deleted. A window's ✕ and its red light only
+  close it; you take a window off a canvas with `decks canvas delete <id>`, and delete an app with
+  `decks apps delete <name>`.
+- A **card** is not an app: its open copies follow its files by themselves, and `decks view reload`
+  is for a card whose data changed where the watcher cannot see.
 
 ## Every app is its own git repo
 
