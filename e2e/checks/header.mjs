@@ -46,6 +46,15 @@ const panel = await rect(".panel-shell");
 const left = await rect(".v3-topbar");
 const right = await rect(".v3-topright");
 say("the header runs from the side panel's edge to the window's, at the top, 56 px tall", Math.abs(head.x - panel.right) < 1.5 && Math.abs(head.right - view.width) < 1 && head.y === 0 && head.h === 56, JSON.stringify({ head, panel: panel.right }));
+// Full width: the side panel's head is the header's left end, as tall as it, their lines at one height, and the panel's edge starts under them.
+const lpHead = await rect(".v3-lp-head");
+const joined = await page.evaluate(() => {
+	const shell = document.querySelector(".panel-shell.v3-panel");
+	const edge = getComputedStyle(shell, "::after");
+	return { border: getComputedStyle(shell).borderRightColor, edgeTop: edge.top, sameGround: getComputedStyle(shell).backgroundColor === getComputedStyle(document.querySelector(".v3-header")).backgroundColor, lineHead: getComputedStyle(document.querySelector(".v3-lp-head")).borderBottomColor, lineHeader: getComputedStyle(document.querySelector(".v3-header")).borderBottomColor };
+});
+say("the header is the full width of the window: the side panel's head is its left end, as tall, on the same ground, with the same line under both", lpHead.x === 0 && lpHead.y === 0 && lpHead.h === 56 && Math.abs(lpHead.right - head.x) <= 1.5 && joined.sameGround && joined.lineHead === joined.lineHeader, JSON.stringify({ lpHead, joined }));
+say("…and the panel's edge starts under it, so nothing cuts the bar", joined.border === "rgba(0, 0, 0, 0)" && joined.edgeTop === "56px", JSON.stringify(joined));
 say("the tabs are at its left end and who is here at its right, both inside it", left.x >= head.x && left.bottom <= head.bottom && right.right <= head.right && right.bottom <= head.bottom && right.x > left.right, JSON.stringify({ left, right }));
 const flat = await page.locator(".v3-topbar, .v3-topright").evaluateAll((all) => all.map((one) => { const s = getComputedStyle(one); return `${s.boxShadow}|${s.backgroundColor}`; }));
 say("neither is a pill any more: no shadow, no ground of its own", flat.every((one) => one === "none|rgba(0, 0, 0, 0)"), JSON.stringify(flat));

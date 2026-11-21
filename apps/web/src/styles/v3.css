@@ -477,6 +477,30 @@ body {
 		translate: 0 -16px;
 		pointer-events: none;
 	}
+	/*
+	 * The header is the full width of the window: the side panel's head is its left end. The head is as
+	 * tall as the header, with its line at the same height, and the panel's edge starts under it, so one
+	 * bar runs from the window's left edge to its right with nothing cutting it.
+	 */
+	.app[data-header] .v3-lp-head {
+		box-sizing: border-box;
+		height: var(--v3-header-h);
+		padding-top: 0;
+		padding-bottom: 0;
+	}
+	.app[data-header] .panel-shell.v3-panel {
+		border-right-color: transparent;
+	}
+	.app[data-header] .panel-shell.v3-panel::after {
+		position: absolute;
+		top: var(--v3-header-h);
+		right: -1px;
+		bottom: 0;
+		width: 1px;
+		background: var(--v3-line);
+		content: "";
+		pointer-events: none;
+	}
 	/* What the tab in front offers, first at the header's right end (`tabs/TabActs.tsx`): two in words, the browser's tab as a mark, then a hairline before who is here. */
 	.tab-acts {
 		display: flex;
