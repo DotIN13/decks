@@ -175,9 +175,14 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	function cardItem(path: string): { id: string; metadata?: { path?: string; scripts?: unknown; from?: unknown; [key: string]: unknown } } | undefined {
 		return ((made?.handle.drawn().children ?? []) as unknown as Array<{ id: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
 	}
-	/** Take a card off the drawing by its path, as an edit of yours: what Studio does for Hide and Delete. */
+	/**
+	 * Take a placed item off the drawing by its page path, as an edit of yours: what the pill's ✕ does, and
+	 * Studio's Delete. A card's path is its file's; an app's or a document's, which has no file of its own,
+	 * is `item:<id>` (`model/drawing.ts`, `pagePath`), and was never found here: ✕ on an app did nothing.
+	 */
 	function takeOff(path: string): boolean {
-		const child = ((handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
+		const children = (handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>;
+		const child = path.startsWith("item:") ? children.find((one) => one.id === path.slice(5)) : children.find((one) => one.metadata?.path === path);
 		if (!child?.id) return false;
 		handle().edit([{ op: "delete", id: child.id }]);
 		return true;

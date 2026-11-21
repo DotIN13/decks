@@ -1,4 +1,4 @@
-import { apply, baseTheme, diff, editDocument, num as penNum, parse, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
+import { apply, baseTheme, deckLinkTo, diff, editDocument, ids, linkChip, newId, num as penNum, parse, type MeasureText, type Op, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
 import type { Page } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
 import { createDrawingEdits } from "./drawing-edits.ts";
@@ -59,6 +59,8 @@ export interface Drawing {
 	resizePage(path: string, size: { w: number; h: number }): void;
 	/** A board taken off the drawing (its file is the host's business): its item deleted. */
 	removePage(path: string): void;
+	/** An app's window collapsed (its yellow light): its item gone and a link to the app where its corner was, as one edit. */
+	collapsePage(path: string): void;
 }
 
 export interface DrawingOptions {
@@ -341,11 +343,36 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			const id = pageId(path);
 			if (id) edit([{ op: "delete", id }]);
 		},
+		collapsePage(path) {
+			const now = untrack(doc);
+			const ops = collapseOps(now, path, newId(ids(now)));
+			if (ops) edit(ops);
+		},
 		resizePage(path, size) {
 			const id = pageId(path);
 			if (id) edit([{ op: "update", id, set: { width: Math.round(size.w), height: Math.round(size.h) } }]);
 		},
 	};
+}
+
+/**
+ * An app's window collapsed to a link: the edits that take its item off the drawing and put a link chip
+ * to the app (`@decks/pen`, `linkChip`) where its top-left corner was, in its place in the order, so one
+ * undo brings the window back. The chip is named as the window is. Nothing for anything but an app.
+ */
+export function collapseOps(doc: PenDocument, path: string, id: string): Op[] | undefined {
+	const children = doc.children ?? [];
+	const index = children.findIndex((node) => isPage(node) && pagePath(node) === path);
+	const node = children[index];
+	if (!node || itemKind(node) !== "app") return undefined;
+	const name = String((node.metadata as { name?: unknown }).name ?? "");
+	if (!name) return undefined;
+	const title = typeof node.name === "string" && node.name.trim() ? node.name.trim() : name;
+	const chip = { ...linkChip({ to: deckLinkTo("app", name), kind: "app", title }), id, x: num(node.x, 0), y: num(node.y, 0) } as unknown as PenNode;
+	return [
+		{ op: "insert", node: chip, parent: null, index },
+		{ op: "delete", id: String(node.id) },
+	];
 }
 
 /** What a document or an app item adds to its board record: its kind, and its file or its app. */

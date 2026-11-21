@@ -135,6 +135,16 @@ export function openInTab(href: string): void {
 	else window.open(href, "_blank", "noopener,noreferrer");
 }
 
+/**
+ * An app in a tab of its own: the host's tab when it has them (`openItem`), the browser's with `browser`
+ * (⌘ or ⌃ held), and the app's own page where the host has no tabs. What the pill's New tab and the
+ * window's green light both do.
+ */
+export function openAppTab(name: string, browser = false): void {
+	if (current.openItem) current.openItem({ kind: "app", target: name, ...(browser ? { browser: true as const } : {}) });
+	else current.apps?.open(name);
+}
+
 /** An address read on the canvas's pass, with the current pass in it (`CanvasHost.freshAddress`). */
 export function freshAddress(url: string): string {
 	return current.freshAddress ? current.freshAddress(url) : url;

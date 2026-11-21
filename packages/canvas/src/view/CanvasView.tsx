@@ -130,6 +130,8 @@ export type CanvasViewProps = {
 	/** The board dragged to a new size, in board units. The file is what changes. */
 	onResize?: (path: string, size: { w: number; h: number }) => void;
 	onHide?: (path: string) => void;
+	/** An app's window collapsed to a link to it, by its yellow light (`model/drawing.ts`, `collapseOps`). Absent: no such light. */
+	onCollapse?: (path: string) => void;
 	/**
 	 * Ink selected, handed to the agent on screen (`inkAgent`): redraw it as a drawing, make a board of it,
 	 * or send it as it is, to be read and acted on. Without both, the pill has no such actions.

@@ -2,6 +2,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "so
 import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
+import { openAppTab } from "../base/host.ts";
 import { APP_BAR } from "../render/types.ts";
 import { COARSE } from "../edit/core/touch-rules.ts";
 import { createFingerDrag } from "./finger-drag.ts";
@@ -10,6 +11,34 @@ import type { ItemSlotExtras, ItemSlotProps } from "./item-slot-props.ts";
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
 const EDGE_OUT_PX = COARSE ? 16 : 8;
 const EDGE_IN_PX = COARSE ? 6 : 4;
+
+/**
+ * The three lights on an app window's bar, as buttons. The engine paints the lights themselves, in every
+ * state (`engine.rs`, `paint_window`: 12 units across, 20 apart, the first 14 from the window's left
+ * edge, in the middle of the bar); these sit over them, each a 20-unit square round its light, and
+ * draw only the mark a Mac shows in a light while the pointer is over the three. Red closes the window
+ * (it leaves the canvas, and the app stays in the deck), yellow collapses it to a link to the app where
+ * it stood, green opens the app in a tab. Red and yellow change the canvas, so they are absent where
+ * the person may not; their lights are still painted, and press nothing. A press on one is never the
+ * bar's: it neither selects nor drags the window.
+ */
+function AppLights(props: { board: ItemSlotProps["board"]; onClose?: (() => void) | undefined; onCollapse?: (() => void) | undefined }) {
+	const mine = (event: Event) => event.stopPropagation();
+	const light = (kind: "close" | "collapse" | "open", label: string, title: string, mark: string, press: (event: MouseEvent) => void) => (
+		<button type="button" class="app-light" data-light={kind} aria-label={label} title={title} onPointerDown={mine} onDblClick={mine} onClick={(event) => { event.stopPropagation(); press(event); }}>
+			<svg viewBox="0 0 12 12" aria-hidden="true">
+				<path d={mark} />
+			</svg>
+		</button>
+	);
+	return (
+		<div class="app-lights" style={{ height: `${APP_BAR}px` }}>
+			<Show when={props.onClose}>{light("close", "Close", "Close: take the window off the canvas", "M3.6 3.6 8.4 8.4M8.4 3.6 3.6 8.4", () => props.onClose?.())}</Show>
+			<Show when={props.onCollapse}>{light("collapse", "Collapse", "Collapse to a link to the app", "M2.8 6H9.2", () => props.onCollapse?.())}</Show>
+			{light("open", "Open in a tab", "Open in a tab", "M4.4 3.2H8.8V7.6M8.8 3.2 3.2 8.8", (event) => props.board.app && openAppTab(props.board.app, event.metaKey || event.ctrlKey))}
+		</div>
+	);
+}
 
 /**
  * One placed item on the stage: a card (`card-surface.tsx`), a document or an app (`item-surfaces.tsx`)
@@ -106,6 +135,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			</Show>
 			<Show when={props.board.item === "app"}>
 				<div class="app-grip" title={props.board.title} style={{ height: `${APP_BAR}px` }} onPointerDown={grip} onDblClick={() => props.onOpen()} />
+				<AppLights board={props.board} onClose={props.onClose} onCollapse={props.onCollapse} />
 			</Show>
 			{/* The band along the edge of an awake item: a press inside it is the item's own, so this moves it. */}
 			<Show when={shown() && !props.asleep && (hovered() || props.selected)}>

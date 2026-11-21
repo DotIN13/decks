@@ -441,3 +441,30 @@ test("a colour picked in the panel: an adaptive one is written as its variable a
 	assert.equal(fill, "#12ab34");
 	assert.equal(resolve(drawing.doc(), fill, baseTheme(drawing.doc(), "dark")), "#12ab34", "and is the same in the dark");
 });
+
+test("an app's window collapses to a link to the app where its corner was, in one edit that one undo takes back", () => {
+	const drawing = createDrawing(
+		{
+			version: "2.6",
+			children: [
+				{ type: "rectangle", id: "under", x: 0, y: 0, width: 10, height: 10 },
+				{ type: "browser", id: "win", name: "Budget", x: 400, y: 300, width: 1100, height: 760, metadata: { type: "decks.app", name: "budget" } },
+				{ type: "rectangle", id: "over", x: 0, y: 0, width: 10, height: 10 },
+				{ type: "browser", id: "card", x: 0, y: 0, width: 400, height: 300, metadata: { type: "decks.card", path: "cards/plan/index.html" } },
+			],
+		} as unknown as PenDocument,
+		{},
+	);
+	drawing.collapsePage("cards/plan/index.html");
+	assert.equal(drawing.doc().children.length, 4, "a card has no link to collapse to here: nothing changes");
+	drawing.collapsePage("item:win");
+	const after = drawing.doc().children;
+	assert.deepEqual(after.map((node) => node.type), ["rectangle", "frame", "rectangle", "browser"], "the chip stands in the window's place in the order");
+	const chip = after[1]!;
+	assert.deepEqual(chip.metadata, { type: "decks.link", to: "#app/budget" });
+	assert.deepEqual([chip.x, chip.y, chip.name], [400, 300, "Budget"]);
+	assert.equal((chip.children ?? []).find((child) => child.type === "text")?.content, "Budget");
+	assert.equal(resolve(drawing.doc(), "$decks-surface", baseTheme(drawing.doc(), "light")) !== undefined, true, "its colours are defined with it");
+	drawing.step("undo");
+	assert.deepEqual(drawing.doc().children.map((node) => node.id), ["under", "win", "over", "card"], "one undo brings the window back");
+});

@@ -262,11 +262,13 @@ say("…and one to a canvas takes the camera there", (await until(async () => ((
 
 // The same card whole, in a tab of its own: its link opens the app's tab from there too.
 await call("view.open", [htmlCard]);
-const cardFrame = page.locator('.surface[data-surface="card"] iframe.card-frame');
+// The tab in front: a card's tab left behind keeps its frame, out of sight (`tabs/kinds/card.tsx`, `data-kept`).
+const cardFrame = page.locator('.surface[data-surface="card"]:not([data-kept]) iframe.card-frame');
 const inTab = await until(async () => {
 	const outer = await cardFrame.boundingBox();
-	if (!outer) return undefined;
-	for (const one of page.frames()) {
+	const shown = await (await cardFrame.elementHandle())?.contentFrame();
+	if (!outer || !shown) return undefined;
+	for (const one of [shown, ...shown.childFrames()]) {
 		const inner = await one.evaluate(() => document.querySelector(".card-tab .card-surface")?.getBoundingClientRect().toJSON()).catch(() => undefined);
 		if (inner && inner.width > 100 && inner.height > 100) return { x: outer.x + inner.x, y: outer.y + inner.y, width: inner.width, height: inner.height };
 	}

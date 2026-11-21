@@ -56,6 +56,8 @@ export function createPageNode(d: PageNodeNeeds) {
 			{...(d.props.onExtent ? { onExtent: (extent) => d.props.onExtent?.(board.path, extent) } : {})}
 			onMove={(x, y) => d.props.onMove(board.path, x, y)}
 			onOpen={() => d.pushCamera(d.frame([boxOf(board)]))}
+			{...(d.props.onHide ? { onClose: () => d.props.onHide?.(board.path) } : {})}
+			{...(d.props.onCollapse ? { onCollapse: () => d.props.onCollapse?.(board.path) } : {})}
 			{...(d.props.onComment
 				? {
 						// Words selected in a card while browsing: a comment on them, as on a board's page before.

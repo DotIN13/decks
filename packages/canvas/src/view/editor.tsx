@@ -77,7 +77,7 @@ export function createEditor(options: EditorOptions): Editor {
 	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */
 	const [ownGlide, setGlideAsk] = createSignal<{ token: number; ms: number }>();
 	let glides = 0;
-	const { doc, edit, step, movePage, resizePage, removePage } = drawing;
+	const { doc, edit, step, movePage, resizePage, removePage, collapsePage } = drawing;
 
 	/** The stage's engine, once the stage is made (`CanvasView` `onEngine`): the layout the handle answers from. */
 	let engine: CanvasEngine | undefined;
@@ -96,6 +96,7 @@ export function createEditor(options: EditorOptions): Editor {
 				onPenEdit: edit,
 				onResize: resizePage,
 				onHide: (path: string) => (options.pages?.onHide ? options.pages.onHide(path) : removePage(path)),
+				onCollapse: collapsePage,
 				...(options.onDeleteCard
 					? {
 							onDeleteCard: (path: string) => {

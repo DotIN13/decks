@@ -38,6 +38,10 @@ export interface ItemSlotProps {
 	/** The stage's editor, as far as this item goes (`editor/dom/pointer.ts`, `PageView`). */
 	view: PageView;
 	onOpen: () => void;
+	/** Take the item off the canvas, as its pill's ✕ does: an app window's red light. Absent where the canvas is not the person's to change. */
+	onClose?: () => void;
+	/** Collapse an app's window to a link to the app, where it stands: its yellow light. Absent as `onClose` is. */
+	onCollapse?: () => void;
 	/** How much room a card's content took, for `decks.canvas.fit`, with the revision it was measured at. */
 	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	/** A link on a card to another board or card of the deck: `true` once the host has opened it. */

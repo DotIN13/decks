@@ -2,7 +2,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { COARSE } from "../edit/core/touch-rules.ts";
 import { setPropsOpen } from "../edit/pen-tools.ts";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
-import { canvasHost, openInTab } from "../base/host.ts";
+import { canvasHost, openAppTab, openInTab } from "../base/host.ts";
 import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
@@ -30,10 +30,9 @@ import { createCalloutMenu } from "./callout-menu.ts";
  */
 function newTab(board: Page, browser: boolean): void {
 	const host = canvasHost();
-	const app = board.item === "app" && board.app ? board.app : undefined;
-	if (host.openItem) return host.openItem({ ...(app ? { kind: "app", target: app } : board.item === "document" ? { kind: "document", target: board.file ?? board.path } : { kind: "card", target: board.path }), ...(browser ? { browser: true } : {}) });
-	if (app) host.apps?.open(app);
-	else openInTab(host.fileUrl(board.path));
+	if (board.item === "app" && board.app) return openAppTab(board.app, browser);
+	if (host.openItem) return host.openItem({ ...(board.item === "document" ? { kind: "document", target: board.file ?? board.path } : { kind: "card", target: board.path }), ...(browser ? { browser: true } : {}) });
+	openInTab(host.fileUrl(board.path));
 }
 
 /**
@@ -187,7 +186,7 @@ export function PageCallout(props: PageCalloutProps) {
 						</Show>
 						<Show when={remove()}>
 							<span class="callout-more-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title={props.board ? "Take the card off the canvas; its folder stays in the deck" : "Delete"} onClick={pick(remove())}>
+							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title={props.board?.item === "app" ? "Take the window off the canvas; the app stays in the deck" : props.board?.item === "document" ? "Take the document off the canvas; its file stays in the deck" : props.board ? "Take the card off the canvas; its folder stays in the deck" : "Delete"} onClick={pick(remove())}>
 								<Icon of={Trash} size={15} />
 								Delete
 							</button>
