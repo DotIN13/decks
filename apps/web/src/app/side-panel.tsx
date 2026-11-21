@@ -2,16 +2,14 @@ import { Show } from "solid-js";
 import { LeftPanel } from "../panel/LeftPanel.tsx";
 import { ChatSection } from "../shell/ChatSection.tsx";
 import { camera } from "../state/camera.ts";
-import { stages } from "../state/canvases.ts";
 import { state } from "../state/deck.ts";
 import { editDrawing } from "../state/decks.ts";
 import { selected } from "../state/selection.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { pagesStarted, panelOpen, setSettings, unread } from "../state/ui.ts";
-import { canvasMenu, type CanvasMenuTrigger } from "./canvas-menu.tsx";
 import { FocusedStream } from "./chat-stream.tsx";
 import type { Parts } from "./parts.ts";
-import { closeAgent, focusAgent, newAgent, panelAsk, setStagesOpen, showPanel } from "./person.ts";
+import { closeAgent, focusAgent, newAgent, panelAsk, showPanel } from "./person.ts";
 import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /**
@@ -50,8 +48,6 @@ export function SidePanel(props: { parts: Parts }) {
 				{...(canvasOnScreen() ? { canvasTitle: canvasOnScreen()!.title } : {})}
 				selectedItems={penSelected()}
 				onPickItem={pills.pickItem}
-				onCanvases={() => void setStagesOpen((was) => !was)}
-				{...(stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
 				onPickArrows={(ids) => {
 					editorHandle()?.select(ids);
 					setPenSelected(ids);

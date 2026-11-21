@@ -22,7 +22,7 @@ import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import SettingsIcon from "lucide-solid/icons/settings";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "@decks/ui";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
@@ -177,16 +177,13 @@ export function LeftPanel(props: {
 	// --- the Canvas tab ---------------------------------------------------------------
 	/** The drawing on screen: the tab lists its top-level items. */
 	canvasDoc?: PenDocument;
+	/** The canvas's title, for the search field's words. */
 	canvasTitle?: string;
 	/** The drawn items selected on the canvas, by id. */
 	selectedItems?: string[];
 	/** A row pressed: select that item and bring it into view. */
 	onPickItem?: (item: CanvasItem) => void;
 	onPickArrows?: (ids: string[]) => void;
-	/** The head's canvas title, pressed: the canvas manager. */
-	onCanvases?: () => void;
-	/** The canvas switcher around the head's canvas title (`canvas/CanvasSwitcher.tsx`). */
-	canvasMenu?: (trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element) => JSX.Element;
 
 	// --- the Apps tab -----------------------------------------------------------------
 	/** The deck's apps; asked for when the tab opens. */
@@ -451,14 +448,6 @@ export function LeftPanel(props: {
 			<span class="v3-item-name truncate">{item.label}</span>
 		</button>
 	);
-	/** The head's second line: what the tab holds. */
-	const headWords = () => {
-		const t = tab();
-		if (t === "canvas") return `${items().items.length} item${items().items.length === 1 ? "" : "s"}`;
-		if (t === "apps") return props.apps === undefined ? "apps" : `${props.apps.length} app${props.apps.length === 1 ? "" : "s"}`;
-		const n = agentCount();
-		return `${n} agent${n === 1 ? "" : "s"}`;
-	};
 
 	/* Every name on the deck but the agent's own: what the edit window checks a new name against
 	   before the server does, so the refusal is a red line under the field rather than a notice. */
@@ -698,47 +687,14 @@ export function LeftPanel(props: {
 						</div>
 					}
 				>
-					{/* Studio's panel head: the canvas, which opens the canvas manager, and under it the deck (its switcher) and what the tab holds. */}
+					{/* The panel's head, one line: the deck (its switcher), then Settings and Hide. The canvas is picked from its tab in the header, not here. */}
 					<div class="v3-lp-head">
 						<span class="v3-lp-mark" aria-hidden="true">
 							<DecksLineMark size={17} />
 						</span>
-						<div class="v3-lp-text">
-							{(() => {
-								const title = (popover?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
-									<button
-										type="button"
-										class="v3-lp-title"
-										ref={popover?.ref}
-										data-tip="Canvases"
-										aria-haspopup="menu"
-										aria-expanded={popover?.open ?? false}
-										data-open={popover?.open ? "true" : undefined}
-										disabled={!props.canvasMenu && !props.onCanvases}
-										onClick={() => (popover ? popover.toggle() : props.onCanvases?.())}
-									>
-										<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
-										<Icon of={ChevronDown} size={13} class="flex-none" />
-									</button>
-								);
-								/*
-								 * The canvas switcher where it is given; the canvas manager straight away otherwise.
-								 * Only whether it is given rebuilds the title, as in the top bar's canvas chip:
-								 * `canvasMenu` is a fresh function on every change to the canvas list.
-								 */
-								return (
-									<Show when={props.canvasMenu !== undefined} fallback={title()}>
-										{untrack(() => props.canvasMenu!((popover) => title(popover)))}
-									</Show>
-								);
-							})()}
-							<div class="v3-lp-status">
-								<span class="v3-lp-deck">
-									<Switcher />
-								</span>
-								<span class="truncate">{headWords()}</span>
-							</div>
-						</div>
+						<span class="v3-lp-deck">
+							<Switcher />
+						</span>
 						<div class="v3-lp-buttons">
 							<Show when={props.onSettings}>
 								<button type="button" class="v3-lp-icon" data-tip="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>

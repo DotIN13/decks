@@ -3014,84 +3014,51 @@ body {
 /* ---- the panel beside the rail, as Studio's editor draws it --------------------------------- */
 @layer components {
 	/*
-	 * The head (the mock-up "The sidebar top, polished"): Decks' mark as a tile, beside it the canvas
-	 * and under that the deck and what the tab holds, then Settings and Hide; its line under it.
+	 * The head, one line: Decks' mark as a tile, the deck (its switcher), then Settings and Hide; its
+	 * line under it. No canvas here: its tab in the header picks it. It is as tall as the header beside
+	 * it, so the two lines meet at the panel's edge, which runs between them from the window's top.
 	 */
 	.v3-lp-head {
 		display: flex;
+		box-sizing: border-box;
+		height: var(--v3-header-h, 56px);
 		flex: none;
 		align-items: center;
 		gap: 10px;
-		padding: 14px 10px 12px 14px;
+		padding: 0 10px 0 14px;
 		border-bottom: 1px solid var(--v3-line);
-	}
-	.v3-lp-text {
-		display: grid;
-		min-width: 0;
-		flex: 1;
-		gap: 2px;
-		/* One column no wider than the head allows, so a long title shortens instead of pushing the buttons. */
-		grid-template-columns: minmax(0, 1fr);
-	}
-	.v3-lp-title > .truncate {
-		min-width: 0;
 	}
 	.v3-lp-buttons {
 		display: flex;
 		flex: none;
 		gap: 2px;
 	}
-	.v3-lp-title {
-		display: inline-flex;
-		max-width: 100%;
-		align-items: center;
-		gap: 4px;
-		margin: -2px -4px;
-		padding: 2px 4px;
-		border: 0;
-		border-radius: 5px;
-		background: none;
-		color: var(--v3-fg);
-		cursor: pointer;
-		font: inherit;
-		font-size: 13.5px;
-		font-weight: 600;
-		justify-self: start;
-	}
-	.v3-lp-title:hover:not(:disabled) {
-		background: var(--v3-bg2);
-	}
-	.v3-lp-title > svg {
-		color: var(--v3-fg2);
-	}
-	.v3-lp-status {
+	/* The deck's switcher: its name and a small chevron, no tile of its own, in the room between the mark and the buttons. */
+	.v3-lp-deck {
 		display: flex;
 		min-width: 0;
-		align-items: center;
-		gap: 8px;
-		color: var(--v3-fg2);
-		font-size: 11.5px;
-	}
-	/* The deck's switcher, said in the status line's own size: its name and a small chevron. */
-	.v3-lp-deck {
-		flex: none;
+		flex: 1;
 	}
 	.v3-lp-deck .switcher {
 		width: auto;
-		height: 18px;
-		gap: 3px;
-		margin: 0 -4px;
-		padding: 0 4px;
-		border-radius: 4px;
-		font-size: 11.5px;
+		max-width: 100%;
+		height: 28px;
+		gap: 4px;
+		margin: 0 -6px;
+		padding: 0 6px;
+		border-radius: 7px;
+	}
+	.v3-lp-deck .switcher:hover,
+	.v3-lp-deck .switcher[data-on] {
+		background: var(--v3-bg2);
 	}
 	.v3-lp-deck .switcher .panel-mark-glyph {
 		display: none;
 	}
 	.v3-lp-deck .switcher-name {
-		color: var(--v3-fg2);
-		font-size: 11.5px;
-		font-weight: 400;
+		color: var(--v3-fg);
+		font-size: 13.5px;
+		font-weight: 600;
 	}
 	/* The live tab strip, 10px under the head's line (a margin: its sliding mark is placed from the top). */
 	.v3-panel[data-desktop="true"] .v3-nav {
