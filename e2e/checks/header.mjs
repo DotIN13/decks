@@ -4,7 +4,9 @@
  * in front, what that tab offers (Reload, On canvas, the browser's tab).
  *
  * - the header runs from the side panel to the window's edge, as tall as the band the two bars floated in,
- *   so the top inset and the tool column under it are where they were;
+ *   so the top inset and the tool column under it are where they were; the side panel is no part of it,
+ *   and stays the full height of the window beside it;
+ * - the agent in it is its face and its name, not its runtime;
  * - an app's tab is named by the app's title;
  * - Reload loads the tab's page again; a document has none;
  * - On canvas goes to where the item sits: an app's window (put on the canvas when it has none), a card;
@@ -46,16 +48,13 @@ const panel = await rect(".panel-shell");
 const left = await rect(".v3-topbar");
 const right = await rect(".v3-topright");
 say("the header runs from the side panel's edge to the window's, at the top, 56 px tall", Math.abs(head.x - panel.right) < 1.5 && Math.abs(head.right - view.width) < 1 && head.y === 0 && head.h === 56, JSON.stringify({ head, panel: panel.right }));
-// Full width: the side panel's head is the header's left end, as tall as it, their lines at one height, and the panel's edge starts under them.
+// The side panel is no part of it: the full height of the window beside the header, its edge between the two from top to foot, and its own head.
 const lpHead = await rect(".v3-lp-head");
-const joined = await page.evaluate(() => {
-	const shell = document.querySelector(".panel-shell.v3-panel");
-	const edge = getComputedStyle(shell, "::after");
-	return { border: getComputedStyle(shell).borderRightColor, edgeTop: edge.top, sameGround: getComputedStyle(shell).backgroundColor === getComputedStyle(document.querySelector(".v3-header")).backgroundColor, lineHead: getComputedStyle(document.querySelector(".v3-lp-head")).borderBottomColor, lineHeader: getComputedStyle(document.querySelector(".v3-header")).borderBottomColor };
-});
-say("the header is the full width of the window: the side panel's head is its left end, as tall, on the same ground, with the same line under both", lpHead.x === 0 && lpHead.y === 0 && lpHead.h === 56 && Math.abs(lpHead.right - head.x) <= 1.5 && joined.sameGround && joined.lineHead === joined.lineHeader, JSON.stringify({ lpHead, joined }));
-say("…and the panel's edge starts under it, so nothing cuts the bar", joined.border === "rgba(0, 0, 0, 0)" && joined.edgeTop === "56px", JSON.stringify(joined));
+const edge = await page.locator(".panel-shell.v3-panel").evaluate((one) => getComputedStyle(one).borderRightWidth);
+say("the side panel stays the full height of the window, apart from the header: its edge runs between them, and its head is its own", panel.x === 0 && panel.y === 0 && Math.abs(panel.bottom - view.height) < 1 && edge === "1px" && lpHead.y === 0 && lpHead.right <= head.x + 0.5 && lpHead.h !== head.h, JSON.stringify({ panel, lpHead, edge }));
 say("the tabs are at its left end and who is here at its right, both inside it", left.x >= head.x && left.bottom <= head.bottom && right.right <= head.right && right.bottom <= head.bottom && right.x > left.right, JSON.stringify({ left, right }));
+const agent = await page.locator(".v3-topbar .v3-agent-chip").first().evaluate((one) => ({ words: one.innerText.trim(), name: one.querySelector(".v3-agent-name")?.textContent?.trim() }));
+say("the agent in the header is its face and its name, not its runtime", Boolean(agent.name) && agent.words.split("\n").at(-1) === agent.name && !/claude|opencode|antigravity/i.test(agent.words), JSON.stringify(agent));
 const flat = await page.locator(".v3-topbar, .v3-topright").evaluateAll((all) => all.map((one) => { const s = getComputedStyle(one); return `${s.boxShadow}|${s.backgroundColor}`; }));
 say("neither is a pill any more: no shadow, no ground of its own", flat.every((one) => one === "none|rgba(0, 0, 0, 0)"), JSON.stringify(flat));
 const inset = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--inset-top").trim());

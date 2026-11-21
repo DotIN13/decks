@@ -11,10 +11,10 @@ import { Icon } from "@decks/ui";
  * The bar at the top left: whose canvas this is, and which canvas.
  *
  * With the side panel folded it also carries the way back to it and the deck's mark, which the
- * panel's head holds while it is open. Then the agent, as one chip (its face, its name and its
- * kind, opening the agent list), a hairline, the canvas (opening the canvas manager), and a `+`
- * for a new canvas. On a phone the kind and the `+` give their room to the canvas's name, which
- * moves to the right end of the bar.
+ * panel's head holds while it is open. Then the agent, as one chip (its face and its name, opening
+ * the agent list; not its runtime, which the agent list says), a hairline, the canvas (opening the
+ * canvas manager), and a `+` for a new canvas. On a phone the `+` gives its room to the canvas's
+ * name, which moves to the right end of the bar.
  */
 export function TopBar(props: {
 	panelOpen: boolean;
@@ -101,9 +101,6 @@ export function TopBar(props: {
 							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} size={22} ring={1.5} />}
 						</Show>
 						<Show when={name()}>{(label) => <span class="v3-agent-name">{label()}</span>}</Show>
-						<Show when={active() && !props.phone}>
-							<span class="v3-agent-kind">{active()!.outside?.client ?? active()!.kind}</span>
-						</Show>
 						<Icon of={ChevronDown} size={13} class="v3-chev" />
 					</button>
 				)}
