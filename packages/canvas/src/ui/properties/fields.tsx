@@ -1,4 +1,5 @@
 import { decksColorOf } from "@decks/pen";
+import { m } from "@decks/i18n";
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { adaptiveTitle, sameColor, swatchPaint } from "../adaptive.ts";
 import { ColorPicker } from "../ColorPicker.tsx";
@@ -57,7 +58,7 @@ export function NumField(props: { label: string; value: number | typeof MIXED | 
 			<input
 				inputmode="decimal"
 				ref={(el) => held(el, shown)}
-				placeholder={props.value === MIXED ? "Mixed" : (props.placeholder ?? "")}
+				placeholder={props.value === MIXED ? m.canvas_props_mixed() : (props.placeholder ?? "")}
 				on:keydown={(event: KeyboardEvent) => {
 					event.stopPropagation();
 					const el = event.currentTarget as HTMLInputElement;
@@ -115,8 +116,8 @@ export function ColorField(props: {
 				data-on={picking() ? "true" : undefined}
 				aria-haspopup="dialog"
 				aria-expanded={picking()}
-				title={`Pick any ${props.label.toLowerCase()}`}
-				aria-label={`Pick any ${props.label.toLowerCase()}`}
+				title={m.canvas_props_pick_any({ what: props.label.toLowerCase() })}
+				aria-label={m.canvas_props_pick_any({ what: props.label.toLowerCase() })}
 				style={{ "--swatch": props.shown ?? (hex().startsWith("$") ? "transparent" : hex() || "transparent") }}
 				onClick={() => setPicking(!picking())}
 			/>
@@ -127,7 +128,7 @@ export function ColorField(props: {
 				<input
 					aria-label={props.label}
 					ref={(el) => held(el, asNamed)}
-					placeholder={props.value === MIXED ? "Mixed" : "#"}
+					placeholder={props.value === MIXED ? m.canvas_props_mixed() : "#"}
 					on:keydown={(event: KeyboardEvent) => {
 						event.stopPropagation();
 						if (event.key === "Enter") commit((event.currentTarget as HTMLInputElement).value);
@@ -151,8 +152,8 @@ export function Swatches(props: { colors: readonly string[]; value: string | typ
 						data-adaptive={decksColorOf(color)}
 						data-on={sameColor(props.value, color) ? "true" : undefined}
 						aria-pressed={sameColor(props.value, color)}
-						title={`${props.label} ${decksColorOf(color) ? adaptiveTitle(decksColorOf(color)!) : color}`}
-						aria-label={`${props.label} ${decksColorOf(color) ? adaptiveTitle(decksColorOf(color)!) : color}`}
+						title={m.canvas_props_swatch({ label: props.label, color: decksColorOf(color) ? adaptiveTitle(decksColorOf(color)!) : color })}
+						aria-label={m.canvas_props_swatch({ label: props.label, color: decksColorOf(color) ? adaptiveTitle(decksColorOf(color)!) : color })}
 						onClick={() => props.onPick(color)}
 					/>
 				)}

@@ -1,4 +1,5 @@
 import type { Token, Tokens } from "marked";
+import { m } from "@decks/i18n";
 import { pageFont } from "../look/look.ts";
 import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "../model/card-syntax.ts";
 
@@ -92,7 +93,7 @@ export function inline(host: WordsHost, parent: Node, tokens: readonly Token[] |
 			case "image": {
 				const im = t as Tokens.Image;
 				const { alt } = sizedAlt(im.text);
-				parent.appendChild(piece(host, "img", im.raw, alt || "image", im.href));
+				parent.appendChild(piece(host, "img", im.raw, alt || m.canvas_card_image(), im.href));
 				break;
 			}
 			case "br":
@@ -160,7 +161,7 @@ function suggestion(raw: string, old: string, now: string, reason?: string): HTM
 	if (old) el.append(h("del", {}, old));
 	if (now) el.append(h("ins", {}, now));
 	if (reason) el.append(h("span", { class: "pce-why" }, "💬"));
-	el.append(h("button", { type: "button", "data-accept": "", title: "Accept" }, "✓"), h("button", { type: "button", "data-reject": "", title: "Reject" }, "✕"));
+	el.append(h("button", { type: "button", "data-accept": "", title: m.canvas_card_accept() }, "✓"), h("button", { type: "button", "data-reject": "", title: m.canvas_card_reject() }, "✕"));
 	return el;
 }
 
@@ -199,7 +200,7 @@ function block(host: WordsHost, t: Token): HTMLElement {
 			if (real.length === 1 && real[0]!.type === "image") {
 				const im = real[0] as Tokens.Image;
 				const { alt, width } = sizedAlt(im.text);
-				return piece(host, "img", raw, alt || "image", im.href, width, true);
+				return piece(host, "img", raw, alt || m.canvas_card_image(), im.href, width, true);
 			}
 			if (real.length === 1 && real[0]!.type === "wiki" && (real[0] as WikiToken).embed) {
 				const w = real[0] as WikiToken;
@@ -261,7 +262,7 @@ function block(host: WordsHost, t: Token): HTMLElement {
 		case "html": {
 			// An item of the card that is not words (a sticky note, a shape): kept in its place.
 			const held = /^<!--decks:item (\S+)-->$/.exec(raw);
-			if (held) return atom(raw, `▢ ${host.held(held[1]!) ?? "item"}`, "pce-atom pce-held", "div");
+			if (held) return atom(raw, `▢ ${host.held(held[1]!) ?? m.canvas_card_held_item()}`, "pce-atom pce-held", "div");
 			break;
 		}
 	}

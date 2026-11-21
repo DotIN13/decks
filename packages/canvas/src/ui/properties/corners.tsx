@@ -1,4 +1,5 @@
 import type { Accessor } from "solid-js";
+import { m } from "@decks/i18n";
 import { isShape, type PenNode } from "@decks/pen";
 import { Show } from "solid-js";
 import { NumField } from "./fields.tsx";
@@ -16,13 +17,13 @@ export interface CornersNeeds {
 export function createCorners(d: CornersNeeds) {
 	const cornersSection = () => (
 		<Show when={d.selected().some((node) => (node.type === "rectangle" || node.type === "frame" || node.type === "polygon") && !isShape(node))}>
-			<Section key="corners" title={d.selected().some((node) => node.type === "polygon") ? "Sides and corners" : "Corners"}>
+			<Section key="corners" title={d.selected().some((node) => node.type === "polygon") ? m.canvas_props_sides_corners() : m.canvas_props_corners()}>
 				<div class="props-row">
 					<Show when={d.selected().some((node) => node.type === "polygon")}>
-						<NumField label="sides" value={shared(d.selected().filter((node) => node.type === "polygon"), (node) => numberOf(node.polygonCount, 3))} min={3} onCommit={(v) => d.set(d.selected().filter((node) => node.type === "polygon"), () => ({ polygonCount: Math.max(3, Math.round(v)) }))} />
+						<NumField label={m.canvas_props_sides()} value={shared(d.selected().filter((node) => node.type === "polygon"), (node) => numberOf(node.polygonCount, 3))} min={3} onCommit={(v) => d.set(d.selected().filter((node) => node.type === "polygon"), () => ({ polygonCount: Math.max(3, Math.round(v)) }))} />
 					</Show>
 					<NumField
-						label="radius"
+						label={m.canvas_props_radius()}
 						value={shared(d.selected().filter((node) => ["rectangle", "frame", "polygon"].includes(node.type) && !isShape(node)), (node) => numberOf(node.cornerRadius, 0))}
 						min={0}
 						onCommit={(v) => d.set(d.selected().filter((node) => ["rectangle", "frame", "polygon"].includes(node.type) && !isShape(node)), () => ({ cornerRadius: v <= 0 ? null : v }))}

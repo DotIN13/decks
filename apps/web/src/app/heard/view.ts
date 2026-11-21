@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { stageOf } from "../../state/canvases.ts";
 import type { Camera } from "@decks/protocol";
 import { viewToPark } from "@decks/canvas/camera";
@@ -45,8 +46,8 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 		const args = (message.call.args ?? {}) as { stage?: unknown; paths?: unknown };
 		if (args.stage === canvasOnScreen()?.name) {
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
-			const what = state.pages.find((page) => page.path === paths[0])?.title ?? "something on the canvas";
-			offer(`${nameOf(message.call.agentId)} wants to show you ${what}`, { label: "Show", run: () => showCanvas() }, "agent-view");
+			const what = state.pages.find((page) => page.path === paths[0])?.title ?? m.app_something_on_canvas();
+			offer(m.app_wants_show({ name: nameOf(message.call.agentId), what }), { label: m.app_show(), run: () => showCanvas() }, "agent-view");
 		}
 	}
 	// An agent going to the canvas its chat's camera is already on, from behind a card, a document or an app: nothing moves at the harness, so it is brought forward here.
@@ -85,7 +86,7 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 		const onScreen = message.call.agentId === state.focused;
 		// The agent's camera goes to that tab: in front when its chat is on screen, waiting there for when it is opened otherwise.
 		aim(message.call.agentId, kind, target);
-		if (!onScreen) offer(`${nameOf(message.call.agentId)} wants to show you ${title ?? target}`, { label: "Open", run: () => openTab(kind, target) }, "agent-view");
+		if (!onScreen) offer(m.app_wants_show({ name: nameOf(message.call.agentId), what: title ?? target }), { label: m.app_open(), run: () => openTab(kind, target) }, "agent-view");
 		send({ type: "view.answered", id: message.call.id, value: onScreen ? { opened: true } : { offered: "another chat is on the person's screen: the tab waits in your chat, where it is in front when they open it, and they were offered a button that opens it now" } });
 		return;
 	}
@@ -121,7 +122,7 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 			 */
 			focused: () => state.focused,
 			canvasOnScreen: () => canvasOnScreen()?.name,
-			offerGoto: (agentId, stage) => offer(`${nameOf(agentId)} wants to take you to the canvas ${stage}`, { label: "Go", run: () => hooks.moveConversation?.(agentId, stage) }, "agent-view"),
+			offerGoto: (agentId, stage) => offer(m.app_wants_goto({ name: nameOf(agentId), canvas: stage }), { label: m.app_go(), run: () => hooks.moveConversation?.(agentId, stage) }, "agent-view"),
 			/*
 			 * What reaches this page is never for the canvas on screen, whose frame carries out its own
 			 * calls (above): a view for another conversation is remembered for it, and nothing on this

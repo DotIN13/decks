@@ -3,6 +3,7 @@ import RefreshCw from "lucide-solid/icons/refresh-cw";
 import ScanSearch from "lucide-solid/icons/scan-search";
 import { Show } from "solid-js";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 import type { Tab } from "./kind.ts";
 import { kindOf } from "./kinds.ts";
 import { openItem } from "./open.ts";
@@ -23,23 +24,23 @@ export function TabActs(props: { onShow: (tab: Tab) => void }) {
 	return (
 		<Show when={item()}>
 			{(tab) => (
-				<span class="tab-acts" role="group" aria-label={`${name(tab())}: actions`}>
+				<span class="tab-acts" role="group" aria-label={m.tabs_actions({ name: name(tab()) })}>
 					<Show when={tab().kind !== "document"}>
-						<button type="button" class="tab-act" data-act="reload" data-tip="Load it again, in this tab" aria-label="Reload" onClick={() => reloadTab(tab().id)}>
+						<button type="button" class="tab-act" data-act="reload" data-tip={m.tabs_reload_tip()} aria-label={m.tabs_reload()} onClick={() => reloadTab(tab().id)}>
 							<Icon of={RefreshCw} size={15} />
-							<span>Reload</span>
+							<span>{m.tabs_reload()}</span>
 						</button>
 					</Show>
-					<button type="button" class="tab-act" data-act="canvas" data-tip="Go to where it sits on a canvas" aria-label="On canvas" onClick={() => props.onShow(tab())}>
+					<button type="button" class="tab-act" data-act="canvas" data-tip={m.tabs_on_canvas_tip()} aria-label={m.tabs_on_canvas()} onClick={() => props.onShow(tab())}>
 						<Icon of={ScanSearch} size={15} />
-						<span>On canvas</span>
+						<span>{m.tabs_on_canvas()}</span>
 					</button>
 					<button
 						type="button"
 						class="v3-icon"
 						data-act="browser"
-						data-tip="Open in the browser's tab"
-						aria-label="Open in the browser's tab"
+						data-tip={m.tabs_open_in_browser()}
+						aria-label={m.tabs_open_in_browser()}
 						onClick={() => openItem({ kind: tab().kind as "card" | "document" | "app", target: tab().target!, browser: true })}
 					>
 						<Icon of={ExternalLink} size={16} />

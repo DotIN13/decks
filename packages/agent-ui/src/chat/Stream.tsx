@@ -10,6 +10,7 @@ import { WorkingSign } from "./StatusLine.tsx";
 import { turnCards, type TurnCard } from "./turn-cards.ts";
 import { signPlacement } from "./working-sign.ts";
 import { Turn } from "./Turn.tsx";
+import { m } from "@decks/i18n";
 
 /**
  * The conversation: a column of cards over the boards.
@@ -513,7 +514,7 @@ export function Stream(props: {
 			class="stream"
 			ref={column}
 			data-shown={shownNow()}
-			aria-label="The conversation"
+			aria-label={m.chat_the_conversation()}
 		>
 			{/*
 			 * No × of its own, deliberately.
@@ -538,8 +539,8 @@ export function Stream(props: {
 			 */}
 			<div class="stream-head" ref={head}>
 				<span class="stream-head-name">{props.name}</span>
-				<span class="stream-head-state">{props.state === "idle" ? "" : props.state}</span>
-				<button type="button" class="icon-button stream-head-x" title="Hide the conversation" aria-label="Hide the conversation" onClick={() => close()}>
+				<span class="stream-head-state">{stateWord(props.state)}</span>
+				<button type="button" class="icon-button stream-head-x" title={m.chat_hide_conversation()} aria-label={m.chat_hide_conversation()} onClick={() => close()}>
 					<Icon of={X} size={13} />
 				</button>
 			</div>
@@ -547,7 +548,7 @@ export function Stream(props: {
 				class="stream-roll"
 				ref={scroller}
 				role="log"
-				aria-label="Conversation history"
+				aria-label={m.chat_conversation_history()}
 				tabindex="0"
 			>
 				<div class="stream-edge" ref={top} aria-hidden="true" />
@@ -557,7 +558,7 @@ export function Stream(props: {
 				 * button for it: a control that does nothing on a fresh agent looks broken.
 				 */}
 				<Show when={cards().length === 0}>
-					<div class="stream-card stream-notice">Nothing said yet. Ask for something and it will show up here.</div>
+					<div class="stream-card stream-notice">{m.chat_empty()}</div>
 				</Show>
 
 				{/*
@@ -661,11 +662,11 @@ export function Stream(props: {
 				data-shown={!pinned() && cards().length > 0 ? "true" : "false"}
 				aria-hidden={pinned() || cards().length === 0}
 				tabindex={pinned() ? -1 : 0}
-				aria-label="Scroll to the latest messages"
+				aria-label={m.chat_scroll_latest()}
 				onClick={toFoot}
 			>
 				<Icon of={ArrowDown} size={12} />
-				Latest messages
+				{m.chat_latest_messages()}
 			</button>
 		</section>
 	);
@@ -682,9 +683,24 @@ function divides(before: number | undefined, at: number | undefined): string | u
 	// Days in the deck's timezone (`lib/time.ts`): "Yesterday" is the person's yesterday.
 	if (dayKey(before) === dayKey(at)) return undefined;
 	const today = Date.now();
-	if (dayKey(at) === dayKey(today)) return "Today";
-	if (dayKey(at) === dayKey(today - 86_400_000)) return "Yesterday";
+	if (dayKey(at) === dayKey(today)) return m.chat_today();
+	if (dayKey(at) === dayKey(today - 86_400_000)) return m.chat_yesterday();
 	const sameYear = yearOf(at) === yearOf(today);
 	return formatDate(at, { day: "numeric", month: "long", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
+/** The agent's state in the header's words: nothing while idle. */
+function stateWord(state: AgentState): string {
+	switch (state) {
+		case "thinking":
+			return m.chat_state_thinking();
+		case "streaming":
+			return m.chat_state_streaming();
+		case "tool":
+			return m.chat_state_tool();
+		case "waiting":
+			return m.chat_state_waiting();
+		default:
+			return "";
+	}
+}

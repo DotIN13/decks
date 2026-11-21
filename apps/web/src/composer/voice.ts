@@ -1,20 +1,21 @@
 import { createSignal } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { authHeaders } from "../lib/session.ts";
+import { m } from "@decks/i18n";
 
 /**
  * This browser's choices for the mic, from Settings: which recogniser, and what language the browser's
  * own listens for. Kept in this browser; the server's model is the deck's (`DeckSettings.sttModel`).
  */
 export type Recogniser = "auto" | "server" | "browser";
-export const RECOGNISERS: ReadonlyArray<{ id: Recogniser; label: string; note: string }> = [
-	{ id: "auto", label: "Automatic", note: "The server's if it has a key, else this browser's." },
-	{ id: "server", label: "Server", note: "OpenAI, through this server: any language." },
-	{ id: "browser", label: "Browser", note: "Free and live, one language at a time." },
+export const recognisers = (): ReadonlyArray<{ id: Recogniser; label: string; note: string }> => [
+	{ id: "auto", label: m.composer_voice_auto(), note: m.composer_voice_auto_note() },
+	{ id: "server", label: m.composer_voice_server(), note: m.composer_voice_server_note() },
+	{ id: "browser", label: m.composer_voice_browser(), note: m.composer_voice_browser_note() },
 ];
-/** The languages offered for the browser's recogniser; empty is the browser's own language. */
-export const VOICE_LANGS: ReadonlyArray<{ id: string; label: string }> = [
-	{ id: "", label: "This browser's language" },
+/** The languages offered for the browser's recogniser; empty is the browser's own language. Each but the first in its own words. */
+export const voiceLangs = (): ReadonlyArray<{ id: string; label: string }> => [
+	{ id: "", label: m.composer_voice_lang_browser() },
 	{ id: "en-US", label: "English (US)" },
 	{ id: "en-GB", label: "English (UK)" },
 	{ id: "zh-CN", label: "中文（普通话）" },
@@ -109,9 +110,9 @@ function browserRecogniser(): (new () => SpeechRecognitionLike) | undefined {
 
 /** Why there is no mic here, in a sentence, or nothing when there is one. */
 export function micMissing(): string | undefined {
-	if (typeof window === "undefined") return "No microphone here.";
-	if (!window.isSecureContext) return "The browser gives the microphone only to an HTTPS address or localhost.";
-	if (!navigator.mediaDevices?.getUserMedia) return "This browser has no microphone to give.";
+	if (typeof window === "undefined") return m.composer_mic_none_here();
+	if (!window.isSecureContext) return m.composer_mic_https();
+	if (!navigator.mediaDevices?.getUserMedia) return m.composer_mic_no_browser_mic();
 	return undefined;
 }
 
@@ -136,15 +137,15 @@ export function joinHeard(before: string, after: string): string {
 export function micError(error: unknown): string {
 	const name = (error as { name?: string } | undefined)?.name ?? "";
 	const message = String((error as { message?: string } | undefined)?.message ?? "");
-	if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "No microphone is connected to this computer.";
+	if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return m.composer_mic_not_connected();
 	if (name === "NotAllowedError" || name === "PermissionDeniedError") {
 		// Chrome says "Permission denied by system" when the operating system holds the microphone back.
-		if (/system/i.test(message)) return "The computer is keeping the microphone from this browser: on a Mac, System Settings › Privacy & Security › Microphone.";
-		return "This site's microphone permission is off: the browser's site settings can change that.";
+		if (/system/i.test(message)) return m.composer_mic_system();
+		return m.composer_mic_site_off();
 	}
-	if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError") return "The microphone could not start: another app may be holding it.";
-	if (name === "SecurityError") return "The browser gives the microphone only to an HTTPS address or localhost.";
-	return `The microphone could not start${name ? ` (${name})` : ""}.`;
+	if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError") return m.composer_mic_busy();
+	if (name === "SecurityError") return m.composer_mic_https();
+	return name ? m.composer_mic_failed_named({ name }) : m.composer_mic_failed();
 }
 
 /** Start listening. Throws a sentence when it cannot: no microphone, no permission, no recogniser. */
@@ -154,10 +155,10 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 	const choice = recogniser();
 	const serverHas = choice === "browser" ? false : await serverTranscribes();
 	const Recogniser = browserRecogniser();
-	if (choice === "server" && !serverHas) throw new Error("This server has no speech recogniser: set OPENAI_API_KEY in its environment, or pick the browser's in Settings.");
-	if (choice === "browser" && !Recogniser) throw new Error("This browser has no speech recogniser: pick the server's in Settings.");
+	if (choice === "server" && !serverHas) throw new Error(m.composer_stt_no_server());
+	if (choice === "browser" && !Recogniser) throw new Error(m.composer_stt_no_browser());
 	const onServer = serverHas;
-	if (!onServer && !Recogniser) throw new Error("This server has no speech recogniser, and nor has this browser: set OPENAI_API_KEY on the server.");
+	if (!onServer && !Recogniser) throw new Error(m.composer_stt_no_either());
 	let stream: MediaStream;
 	try {
 		stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -192,7 +193,7 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 				if (audio.size === 0) return "";
 				const response = await fetch(api("/stt"), { method: "POST", headers: { ...authHeaders(), "content-type": audio.type }, body: audio });
 				const body = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
-				if (!response.ok) throw new Error(body.error ?? `The server could not transcribe it (${response.status}).`);
+				if (!response.ok) throw new Error(body.error ?? m.composer_stt_server_failed({ status: String(response.status) }));
 				return body.text ?? "";
 			},
 			cancel() {
@@ -223,7 +224,7 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 			return new Promise((done, fail) => {
 				recognition.onend = () => {
 					release();
-					if (failed) fail(new Error(`The browser's recogniser stopped: ${failed}.`));
+					if (failed) fail(new Error(m.composer_stt_browser_stopped({ reason: failed })));
 					else done(joinHeard(finals, interim).trim());
 				};
 				recognition.stop();

@@ -12,6 +12,7 @@ import { mayUpload, uploadAsset } from "./upload.ts";
 import { api } from "../../connections/connection.ts";
 import { openBundle } from "../../connections/bundle.ts";
 import { can } from "../../connections/backend.ts";
+import { formatBytes, formatNumber, m } from "@decks/i18n";
 import { switchTo } from "../../connections/connection.ts";
 import { ensureWorker } from "../../connections/worker.ts";
 import { editDrawing, stageOnScreen } from "../../state/decks.ts";
@@ -80,16 +81,17 @@ const fromStage = (asset: string) => {
 const refusedOn = (canvas: string | undefined): boolean => {
 	const row = viewOnly(canvas);
 	if (!row) return false;
-	notice("warn", `${row.title} is shared with you to view, by ${row.shared?.owner ?? "its owner"}: it follows their copy, and only they can change it. To change it, make your own copy: View only · Make a copy, beside the canvas's name.`);
+	notice("warn", row.shared?.owner ? m.files_view_only({ canvas: row.title, owner: row.shared.owner }) : m.files_view_only_owner({ canvas: row.title }));
 	return true;
 };
 
 /** A byte count as a sentence a person reads while waiting. */
 function sizeLabel(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	return formatBytes(bytes);
 }
+
+/** How far a file has gone: "57%", in the language shown. */
+const percent = (fraction: number) => formatNumber(fraction, { style: "percent" });
 
 /**
  * Files arriving from outside: dropped on the canvas (empty or over a board), on the input bar,
@@ -135,13 +137,13 @@ export function createFileDrops() {
 	 * `assets/` first, and the path comes back for whoever asked.
 	 */
 	const addFile = async (file: File): Promise<string | undefined> => {
-		const report = working(`Adding ${file.name}…`);
+		const report = working(m.files_adding_one({ name: file.name }));
 		try {
-			const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`));
-			report.done(`${file.name} added${asset.reused ? " (already in the deck)" : ""}`);
+			const asset = await uploadAsset(file, (fraction) => report.update(m.files_progress({ name: file.name, percent: percent(fraction), size: sizeLabel(file.size) })));
+			report.done(asset.reused ? m.files_added_reused({ name: file.name }) : m.files_added({ name: file.name }));
 			return asset.path;
 		} catch (error) {
-			report.done(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, "warn");
+			report.done(m.files_failed({ name: file.name, error: error instanceof Error ? error.message : String(error) }), "warn");
 			return undefined;
 		}
 	};
@@ -190,18 +192,18 @@ export function createFileDrops() {
 	 * server can draw one, its name and kind under it. In a row centred on `middle`, a stage point.
 	 */
 	const asFileCards = async (files: File[], middle: { x: number; y: number }) => {
-		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
+		const report = working(files.length > 1 ? m.files_adding_many({ count: files.length }) : m.files_adding_one({ name: files[0]?.name ?? "" }));
 		const paths: string[] = [];
 		const failures: string[] = [];
 		for (const file of files) {
 			try {
-				paths.push((await uploadAsset(file, (fraction) => report.update(`${file.name}: ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen())).path);
+				paths.push((await uploadAsset(file, (fraction) => report.update(m.files_progress_colon({ name: file.name, percent: percent(fraction), size: sizeLabel(file.size) })), stageOnScreen())).path);
 			} catch (error) {
-				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+				failures.push(m.files_failed({ name: file.name, error: error instanceof Error ? error.message : String(error) }));
 			}
 		}
 		await placeFileCards(paths, middle);
-		report.done([paths.length ? `${paths.length === 1 ? files[0]?.name : `${paths.length} files`} put on the canvas` : "", ...failures].filter(Boolean).join("; ") || undefined, failures.length ? "warn" : "info");
+		report.done([paths.length ? (paths.length === 1 ? m.files_put_canvas_one({ name: files[0]?.name ?? "" }) : m.files_put_canvas_many({ count: paths.length })) : "", ...failures].filter(Boolean).join("; ") || undefined, failures.length ? "warn" : "info");
 	};
 
 	/** An SVG is a picture shown live on the canvas (`liveFileItem`). */
@@ -238,7 +240,7 @@ export function createFileDrops() {
 	const intoCard = async (files: File[], into: { card: string; index: number; inner: number }) => {
 		const agentId = state.focused;
 		if (!agentId) return;
-		const report = working(files.length > 1 ? `Adding ${files.length} files to the card…` : `Adding ${files[0]?.name ?? "file"} to the card…`);
+		const report = working(files.length > 1 ? m.files_adding_card_many({ count: files.length }) : m.files_adding_card_one({ name: files[0]?.name ?? "" }));
 		const ops: Array<Record<string, unknown>> = [];
 		const failures: string[] = [];
 		const none = () => "";
@@ -249,15 +251,15 @@ export function createFileDrops() {
 					continue;
 				}
 				const natural = isRaster(file) ? await naturalSize(file) : undefined;
-				const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
+				const asset = await uploadAsset(file, (fraction) => report.update(m.files_progress({ name: file.name, percent: percent(fraction), size: sizeLabel(file.size) })), stageOnScreen());
 				if (isRaster(file)) ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: cardPicture(file.name, fromStage(asset.path), into.inner, natural) });
 				else ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: fileItem(fromStage(asset.path), none) });
 			} catch (error) {
-				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+				failures.push(m.files_failed({ name: file.name, error: error instanceof Error ? error.message : String(error) }));
 			}
 		}
 		if (ops.length) void editDrawing(agentId, ops);
-		report.done([ops.length ? `${ops.length === 1 ? files[0]?.name : `${ops.length} files`} put in the card` : "", ...failures].filter(Boolean).join(" · ") || undefined, failures.length ? "warn" : "info");
+		report.done([ops.length ? (ops.length === 1 ? m.files_put_card_one({ name: files[0]?.name ?? "" }) : m.files_put_card_many({ count: ops.length })) : "", ...failures].filter(Boolean).join(" · ") || undefined, failures.length ? "warn" : "info");
 	};
 
 	/**
@@ -269,30 +271,32 @@ export function createFileDrops() {
 	const ontoStage = async (files: File[], middle: { x: number; y: number }) => {
 		const agentId = state.focused;
 		if (!agentId) return;
-		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
+		const report = working(files.length > 1 ? m.files_adding_many({ count: files.length }) : m.files_adding_one({ name: files[0]?.name ?? "" }));
 		const items: DroppedItem[] = [];
 		const failures: string[] = [];
 		for (const [index, file] of files.entries()) {
-			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
 			try {
 				if (isWords(file)) {
 					items.push(wordsCard(file.name, await file.text()));
 					continue;
 				}
 				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };
-				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
+				const asset = await uploadAsset(file, (fraction) => {
+					const said = { name: file.name, percent: percent(fraction), size: sizeLabel(file.size) };
+					report.update(files.length > 1 ? m.files_progress_nth({ ...said, index: formatNumber(index + 1), total: formatNumber(files.length) }) : m.files_progress(said));
+				}, stageOnScreen());
 				// Only a file named as a film or a sound: ffmpeg reads a still picture as a one-frame film.
 				if (asset.media && isPlayable(file)) items.push(mediaItem(file.name, asset.path, asset.media, fromStage, natural));
 				else items.push(pictureItem(file.name, fromStage(asset.path), natural));
 			} catch (error) {
-				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+				failures.push(m.files_failed({ name: file.name, error: error instanceof Error ? error.message : String(error) }));
 			}
 		}
 		if (items.length > 0) {
 			const stamp = Date.now().toString(36);
 			void editDrawing(agentId, rowOps(items, middle, (i) => `drop-${stamp}-${i}`));
 		}
-		const added = items.length === 0 ? "" : `${items.length === 1 ? files[0]?.name : `${items.length} files`} put on the canvas`;
+		const added = items.length === 0 ? "" : items.length === 1 ? m.files_put_canvas_one({ name: files[0]?.name ?? "" }) : m.files_put_canvas_many({ count: items.length });
 		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
 	};
 
@@ -384,7 +388,7 @@ export function createFileDrops() {
 		// A file outside the deck: its bytes, the way a drop brings them.
 		const response = await fetch(api(`/file?path=${encodeURIComponent(picked)}`));
 		if (!response.ok) {
-			notice("warn", `${name} could not be read (${response.status}).`);
+			notice("warn", m.files_unreadable({ name, status: String(response.status) }));
 			return undefined;
 		}
 		const blob = await response.blob();
@@ -452,11 +456,11 @@ export function createFileDrops() {
 			return;
 		}
 		if (!can("write")) {
-			notice("info", "This canvas was opened from a file, so it can only be read.");
+			notice("info", m.files_read_only_bundle());
 			return;
 		}
 		if (dropPreview()) {
-			notice("info", "That is the canvas as it used to be. Let go of the timeline first.");
+			notice("info", m.files_timeline_preview());
 			return;
 		}
 		if (files.length > 0) void onEmptyCanvas(files, at, card);

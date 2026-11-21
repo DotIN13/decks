@@ -1,0 +1,6 @@
+{
+	"state_an_agent": "一个智能体",
+	"state_call_failed": "调用失败。",
+	"state_line_dropped": "与本机服务的连接已断开。",
+	"state_line_dropped_why": "与本机服务的连接已断开：{reason}。"
+}

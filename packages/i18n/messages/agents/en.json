@@ -1,0 +1,170 @@
+{
+	"agents_status_waiting": "Waiting for you",
+	"agents_status_done": "Done, not read yet",
+	"agents_status_idle": "Idle",
+	"agents_status_tool": "Running tools…",
+	"agents_status_typing": "Typing…",
+	"agents_status_thinking": "Thinking…",
+	"agents_outside_waiting": "{count} waiting",
+	"agents_outside_works": "Works in {client}, outside Decks.",
+	"agents_outside_calling": "Calling now.",
+	"agents_outside_last_call": "Its last call was {ago} ago.",
+	"agents_outside_messages_wait": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{shown} message waits for its next call.",
+				"n=other": "{shown} messages wait for its next call."
+			}
+		}
+	],
+	"agents_outside_here": "here",
+	"agents_outside_away": "away · {ago}",
+	"agents_row_new": "new",
+	"agents_row_now": "now",
+	"agents_just_now": "just now",
+	"agents_close_title": "Close {name} — the transcript stays on disk. Delete does the same.",
+	"agents_no_workspace": "No workspace",
+	"agents_section_wants": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{shown} wants you",
+				"n=other": "{shown} want you"
+			}
+		}
+	],
+	"agents_section_working": "{count} working",
+	"agents_dormant": "Dormant",
+	"agents_row_current_title": "{name} — the conversation on screen",
+	"agents_switch_to": "Switch to {name}",
+	"agents_tag_mine": "Your tag: {tag}",
+	"agents_tag_theirs": "{name} is working on {tag}",
+	"agents_row_menu": "{name}'s menu",
+	"agents_row_more_title": "{name}: more",
+	"agents_row_more_label": "More for {name}",
+	"agents_menu_talk": "Talk to it here",
+	"agents_menu_rename": "Rename…",
+	"agents_menu_move": "Move to…",
+	"agents_menu_tags": "Edit tags…",
+	"agents_menu_stop_idle": "Nothing is running",
+	"agents_menu_stop": "Stop its turn",
+	"agents_menu_remove_busy": "It is mid-turn: stop it first",
+	"agents_menu_remove": "Remove agent",
+	"agents_stack_label": "Agents wanting your attention",
+	"agents_stack_switch": "Switch to {name} — {status}",
+	"agents_agents": "Agents",
+	"agents_hover_click": "Click to switch to {name}",
+	"agents_quote": "“{text}”",
+	"agents_ws_name_placeholder": "Name",
+	"agents_ws_name_label": "Workspace name",
+	"agents_ws_create": "Create",
+	"agents_stack_more": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{shown} more agent wanting you",
+				"n=other": "{shown} more agents wanting you"
+			}
+		}
+	],
+	"agents_dialog_allow": "Allow",
+	"agents_dialog_deny": "Deny",
+	"agents_dialog_cancel": "Cancel",
+	"agents_dialog_done": "Done",
+	"agents_dialog_send": "Send",
+	"agents_dialog_other": "Other…",
+	"agents_dialog_dismiss": "Dismiss",
+	"agents_dialog_sign_in": "Sign in",
+	"agents_dialog_something_else": "Something else…",
+	"agents_dialog_custom": "An extension asked for a terminal screen, which this app has no equivalent of.",
+	"agents_dialog_paste_code": "Paste the code from the browser",
+	"agents_edit_label": "Edit {name}",
+	"agents_edit_close": "Close",
+	"agents_edit_name": "Name",
+	"agents_edit_name_label": "Agent name",
+	"agents_edit_name_taken": "Another agent is already called {name}.",
+	"agents_workspace": "Workspace",
+	"agents_edit_tags": "Tags",
+	"agents_edit_remove_tag": "Remove {tag}",
+	"agents_edit_add_tag": "Add a tag",
+	"agents_edit_new_workspace": "New workspace…",
+	"agents_not_installed": "not installed",
+	"agents_add": "Add an agent",
+	"agents_add_title": "{label}: pick its runtime",
+	"agents_find": "Find an agent",
+	"agents_find_none": "No agent matches that",
+	"agents_close": "Close {name}",
+	"agents_menu_more_open": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{shown} more agent — open the Agents panel.",
+				"n=other": "{shown} more agents — open the Agents panel."
+			}
+		}
+	],
+	"agents_menu_more": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{shown} more agent",
+				"n=other": "{shown} more agents"
+			}
+		}
+	],
+	"agents_panel": "Agents panel",
+	"agents_new": "New agent",
+	"agents_side_panel_title": "Side panel (⌘\\)",
+	"agents_side_panel_hide": "Hide the side panel",
+	"agents_side_panel_show": "Show the side panel",
+	"agents_switch": "Switch agent",
+	"agents_pill_label": "Agents — currently {name}",
+	"agents_none": "No agent",
+	"agents_stage_title": "Canvas: {name}",
+	"agents_stages": "Canvases",
+	"agents_stage_label": "Canvases, currently {name}",
+	"agents_stage_none": "Canvases, this chat is on none",
+	"agents_view_only_title": "Shared with you to view by {owner}: it follows their copy. Make your own copy to change it.",
+	"agents_view_only": "View only · Make a copy",
+	"agents_mode": "Mode",
+	"agents_browse_title": "Browse: read the cards, move and retype what is drawn",
+	"agents_browse_label": "Browse the cards",
+	"agents_draw": "Draw on the canvas",
+	"agents_ws_named": "Named"
+}

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { notice } from "../state/notices.ts";
 import { kindOf } from "./kinds.ts";
 import { tabAt, windowAddressOf } from "./remember.ts";
@@ -22,7 +23,16 @@ export function openItem(item: { kind: "canvas" | "card" | "document" | "app"; t
  */
 export function openAt(link: { address: string; browser?: true }): void {
 	const tab = tabAt(link.address);
-	if (!tab) return void notice("warn", `This link opens nothing: ${link.address} is not an address of a canvas, a card, a document or an app.`);
-	if (kindOf(tab.kind)?.has?.(tab.target) === false) return void notice("warn", `This link's ${tab.kind} is not in the deck any more: ${tab.target}.`);
+	if (!tab) return void notice("warn", m.tabs_link_nothing({ address: link.address }));
+	if (kindOf(tab.kind)?.has?.(tab.target) === false) return void notice("warn", goneWords(tab.kind, tab.target));
 	openItem({ kind: tab.kind as "canvas" | "card" | "document" | "app", target: tab.target, ...(link.browser ? { browser: true as const } : {}) });
+}
+
+/** A link whose target is gone, said by its kind. */
+function goneWords(kind: string, target: string): string {
+	if (kind === "canvas") return m.tabs_link_gone_canvas({ target });
+	if (kind === "card") return m.tabs_link_gone_card({ target });
+	if (kind === "document") return m.tabs_link_gone_document({ target });
+	if (kind === "app") return m.tabs_link_gone_app({ target });
+	return m.tabs_link_gone({ target });
 }

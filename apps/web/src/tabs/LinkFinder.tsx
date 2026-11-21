@@ -1,5 +1,6 @@
 import type { JSX } from "solid-js";
 import { CanvasSwitcher } from "../canvases/CanvasSwitcher.tsx";
+import { m } from "@decks/i18n";
 import { scheme } from "../lib/theme.ts";
 import { stages } from "../state/canvases.ts";
 import { placeLink } from "./link.ts";
@@ -26,9 +27,9 @@ export function LinkFinder(): JSX.Element {
 			here={canvasOnScreen()?.name}
 			scheme={scheme()}
 			placement="right-start"
-			label="Link to"
+			label={m.tabs_link_to()}
 			plain
-			findLabel="Link to a canvas, an app, a card or a document"
+			findLabel={m.tabs_link_to_find()}
 			onPick={(name) => void placeLink({ kind: "canvas", target: name })}
 			onNew={() => {}}
 			onAll={() => {}}

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import type { Page } from "@decks/protocol";
 import Eraser from "lucide-solid/icons/eraser";
 import Info from "lucide-solid/icons/info";
@@ -18,7 +19,7 @@ import { setOps, setSettings } from "../state/ui.ts";
  */
 export const moreItems = (stagePages: () => Page[]) => [
 	{
-		label: "Clear the canvas",
+		label: m.app_clear_canvas(),
 		icon: Eraser,
 		disabled: stagePages().length === 0,
 		onPick: () => {
@@ -26,10 +27,10 @@ export const moreItems = (stagePages: () => Page[]) => [
 			if (paths.length) void act("canvas.batch", [paths.map((path) => ({ op: "delete", id: path }))]);
 		},
 	},
-	{ label: "Dark mode", icon: Moon, rule: true, checked: scheme() === "dark", onPick: () => toggleScheme() },
-	{ label: "Shortcuts", icon: Info, onPick: () => setOps(true) },
+	{ label: m.app_dark_mode(), icon: Moon, rule: true, checked: scheme() === "dark", onPick: () => toggleScheme() },
+	{ label: m.app_shortcuts(), icon: Info, onPick: () => setOps(true) },
 	{
-		label: "Settings",
+		label: m.app_settings(),
 		icon: SettingsIcon,
 		onPick: () => {
 			setSettings(true);

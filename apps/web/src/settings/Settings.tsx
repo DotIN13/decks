@@ -1,6 +1,6 @@
 import { chooseShowFps, showFps } from "../perf/fps.tsx";
 import { STT_MODELS, type ClaudeAccount, type PairedRow, type WebStatus } from "@decks/protocol";
-import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../composer/voice.ts";
+import { recogniser, recognisers, setRecogniser, setVoiceLang, voiceLang, voiceLangs } from "../composer/voice.ts";
 import Bell from "lucide-solid/icons/bell";
 import Cloud from "lucide-solid/icons/cloud";
 import Globe from "lucide-solid/icons/globe";
@@ -16,6 +16,7 @@ import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, S
 import { StudioGroup } from "./StudioSignIn.tsx";
 import { SetGroup, SetRow, SetSegments, SetSelect } from "./rows.tsx";
 import { browserZone, clockTime, Icon } from "@decks/ui";
+import { browserLocale, chooseLocale, chosenLocale, formatAgo, formatNumber, LANGUAGES, m, type Locale } from "@decks/i18n";
 import { usageLevel } from "../lib/context-usage.ts";
 import { state } from "../state/deck.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
@@ -29,13 +30,13 @@ import type { AlertPrefs } from "@decks/agent-ui/alerts";
  * this one.
  */
 const SECTIONS = [
-	{ id: "general", label: "General", icon: SlidersHorizontal },
-	{ id: "notifications", label: "Notifications", icon: Bell },
-	{ id: "accounts", label: "Accounts", icon: User },
-	{ id: "claude", label: "Claude", icon: Sparkles },
-	{ id: "voice", label: "Voice", icon: Mic },
-	{ id: "connections", label: "Connections", icon: Plug },
-	{ id: "chrome", label: "Chrome", icon: Puzzle },
+	{ id: "general", label: () => m.settings_section_general(), icon: SlidersHorizontal },
+	{ id: "notifications", label: () => m.settings_section_notifications(), icon: Bell },
+	{ id: "accounts", label: () => m.settings_section_accounts(), icon: User },
+	{ id: "claude", label: () => "Claude", icon: Sparkles },
+	{ id: "voice", label: () => m.settings_section_voice(), icon: Mic },
+	{ id: "connections", label: () => m.settings_section_connections(), icon: Plug },
+	{ id: "chrome", label: () => "Chrome", icon: Puzzle },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
@@ -92,7 +93,7 @@ export function Settings(props: {
 			/* private mode: it opens on Notifications next time */
 		}
 	};
-	const label = () => SECTIONS.find((one) => one.id === section())!.label;
+	const label = () => SECTIONS.find((one) => one.id === section())!.label();
 
 	onMount(() => {
 		const onKey = (event: KeyboardEvent) => {
@@ -108,6 +109,7 @@ export function Settings(props: {
 		<div class="sw-body">
 			<Switch>
 				<Match when={section() === "general"}>
+					<LanguageSettings />
 					<TimeSettings />
 					<CanvasSettings />
 				</Match>
@@ -159,14 +161,14 @@ export function Settings(props: {
 			<Show
 				when={props.phone}
 				fallback={
-					<div class="settings sw-win" role="dialog" aria-label="Settings">
-						<nav class="sw-nav" aria-label="Sections">
-							<span class="sw-nav-title">Settings</span>
+					<div class="settings sw-win" role="dialog" aria-label={m.settings_title()}>
+						<nav class="sw-nav" aria-label={m.settings_sections()}>
+							<span class="sw-nav-title">{m.settings_title()}</span>
 							<For each={sections()}>
 								{(one) => (
 									<button type="button" data-section={one.id} data-on={section() === one.id} aria-current={section() === one.id ? "page" : undefined} onClick={() => open(one.id)}>
 										<Icon of={one.icon} size={15} />
-										{one.label}
+										{one.label()}
 									</button>
 								)}
 							</For>
@@ -175,7 +177,7 @@ export function Settings(props: {
 							<header class="sw-head">
 								<span class="sw-title">{label()}</span>
 								<span class="flex-1" />
-								<button class="sw-x" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+								<button class="sw-x" type="button" title={m.settings_close()} aria-label={m.settings_close()} onClick={props.onClose}>
 									<Icon of={X} size={16} />
 								</button>
 							</header>
@@ -184,12 +186,12 @@ export function Settings(props: {
 					</div>
 				}
 			>
-				<div class="settings sw-sheet" role="dialog" aria-label="Settings">
+				<div class="settings sw-sheet" role="dialog" aria-label={m.settings_title()}>
 					<header class="sw-head">
-						<span class="sw-title">Settings</span>
+						<span class="sw-title">{m.settings_title()}</span>
 						<span class="flex-1" />
 						<button class="sw-done" type="button" onClick={props.onClose}>
-							Done
+							{m.settings_done()}
 						</button>
 					</header>
 					<div class="sw-tabs" role="tablist" ref={tabs}>
@@ -198,7 +200,7 @@ export function Settings(props: {
 							{(one) => (
 								<button type="button" role="tab" data-section={one.id} data-on={section() === one.id} aria-selected={section() === one.id} onClick={() => open(one.id)}>
 									<Icon of={one.icon} size={15} />
-									{one.label}
+									{one.label()}
 								</button>
 							)}
 						</For>
@@ -265,27 +267,27 @@ function TimeSettings() {
 	};
 	const inForce = () => chosen() ?? state.machineZone;
 	return (
-		<SetGroup label="Time" group="time">
+		<SetGroup label={m.settings_time()} group="time">
 			<SetRow
-				title="Timezone"
+				title={m.settings_timezone()}
 				sub={
 					<span data-zone-now>
-						{chosen() ? `Set to ${chosen()}.` : `Not set: the server's own clock, ${state.machineZone || "unknown"}.`} It is {clockTime(tick(), inForce() || undefined)} there.
+						{chosen() ? m.settings_timezone_set({ zone: chosen()! }) : m.settings_timezone_unset({ zone: state.machineZone || m.settings_timezone_unknown() })} {m.settings_timezone_now({ time: clockTime(tick(), inForce() || undefined) })}
 					</span>
 				}
 			>
-				<Show when={chosen()} fallback={<Btn onClick={() => set(mine)}>Use {mine}</Btn>}>
-					<Btn title={`Back to the server's own clock, ${state.machineZone}`} onClick={() => set(null)}>
-						Use the server's
+				<Show when={chosen()} fallback={<Btn onClick={() => set(mine)}>{m.settings_timezone_use({ zone: mine })}</Btn>}>
+					<Btn title={m.settings_timezone_back({ zone: state.machineZone })} onClick={() => set(null)}>
+						{m.settings_timezone_use_server()}
 					</Btn>
 				</Show>
 			</SetRow>
-			<SetRow title="Another timezone" sub="An IANA name, such as Asia/Shanghai.">
+			<SetRow title={m.settings_timezone_other()} sub={m.settings_timezone_other_sub()}>
 				<input
 					class="sw-field"
 					list="set-zones"
 					placeholder="Asia/Shanghai"
-					aria-label="Timezone"
+					aria-label={m.settings_timezone()}
 					value={draft()}
 					onInput={(event) => setDraft(event.currentTarget.value.trim())}
 					onKeyDown={(event) => {
@@ -296,8 +298,25 @@ function TimeSettings() {
 					<For each={zones()}>{(zone) => <option value={zone} />}</For>
 				</datalist>
 				<Btn disabled={!known(draft()) || draft() === chosen()} onClick={() => set(draft())}>
-					Set
+					{m.settings_set()}
 				</Btn>
+			</SetRow>
+		</SetGroup>
+	);
+}
+
+/**
+ * The language the page speaks, kept in this browser: a person may read Chinese on one machine and
+ * English on another, so it is not the deck's. "As the browser" follows the browser's languages.
+ * Choosing reloads the page in the new language.
+ */
+function LanguageSettings() {
+	const BROWSER = "browser";
+	const options = () => [{ id: BROWSER, label: m.settings_language_browser({ name: LANGUAGES.find((one) => one.locale === (browserLocale() ?? "en"))!.name }) }, ...LANGUAGES.map((one) => ({ id: one.locale, label: one.name }))];
+	return (
+		<SetGroup label={m.settings_language()} group="language">
+			<SetRow title={m.settings_language_row()} sub={m.settings_language_sub()}>
+				<SetSelect options={options()} value={chosenLocale() ?? BROWSER} label={m.settings_language()} onPick={(id) => chooseLocale(id === BROWSER ? undefined : (id as Locale))} />
 			</SetRow>
 		</SetGroup>
 	);
@@ -306,9 +325,9 @@ function TimeSettings() {
 /** The frame-rate meter (`perf/fps.tsx`). */
 function CanvasSettings() {
 	return (
-		<SetGroup label="Canvas" group="renderer">
-			<SetRow title="Frame rate" sub="A meter over the canvas: frames a second, the slowest frame, and how many took over 12 ms.">
-				<button class="sw-switch" type="button" role="switch" aria-label="Show the frame rate" aria-checked={showFps()} data-on={showFps()} onClick={() => chooseShowFps(!showFps())} />
+		<SetGroup label={m.settings_canvas()} group="renderer">
+			<SetRow title={m.settings_fps()} sub={m.settings_fps_sub()}>
+				<button class="sw-switch" type="button" role="switch" aria-label={m.settings_fps_show()} aria-checked={showFps()} data-on={showFps()} onClick={() => chooseShowFps(!showFps())} />
 			</SetRow>
 		</SetGroup>
 	);
@@ -324,19 +343,19 @@ function CanvasSettings() {
  */
 function ClaudeAccounts(props: { accounts: ClaudeAccount[]; active: string; onAdd: () => void; onForget: (id: string) => void }) {
 	return (
-		<SetGroup label="Subscriptions" group="claude" foot="Each conversation picks its account in the model menu.">
+		<SetGroup label={m.settings_claude_subscriptions()} group="claude" foot={m.settings_claude_foot()}>
 			<For each={props.accounts}>{(account) => <AccountRow account={account} next={props.active === account.id && account.signedIn} onForget={() => props.onForget(account.id)} />}</For>
 			<button class="sw-add" type="button" onClick={props.onAdd}>
 				<Icon of={Plus} size={15} />
-				Add an account
+				{m.settings_claude_add()}
 			</button>
 		</SetGroup>
 	);
 }
 
 function AccountRow(props: { account: ClaudeAccount; next: boolean; onForget: () => void }) {
-	const name = () => props.account.email ?? (props.account.isDefault ? "Claude Code's own login" : "An account with no name yet");
-	const who = () => [props.account.isDefault && props.account.email ? "Claude Code's own login" : undefined, props.account.orgName].filter(Boolean).join(" · ");
+	const name = () => props.account.email ?? (props.account.isDefault ? m.settings_claude_own_login() : m.settings_claude_no_name());
+	const who = () => [props.account.isDefault && props.account.email ? m.settings_claude_own_login() : undefined, props.account.orgName].filter(Boolean).join(" · ");
 	const used = () => props.account.fiveHour && Math.min(100, props.account.fiveHour.percent);
 	const level = () => (used() === undefined ? undefined : used()! >= 100 ? "high" : usageLevel(used()!));
 	return (
@@ -363,22 +382,22 @@ function AccountRow(props: { account: ClaudeAccount; next: boolean; onForget: ()
 		>
 			<Switch>
 				<Match when={!props.account.signedIn}>
-					<span class="sw-state">Signed out</span>
+					<span class="sw-state">{m.settings_claude_signed_out()}</span>
 				</Match>
 				<Match when={used() !== undefined}>
 					<span class="sw-state" data-level={level()}>
-						{used()}% of 5 h used
+						{m.settings_claude_used({ percent: formatNumber(used()! / 100, { style: "percent" }) })}
 					</span>
 				</Match>
 				<Match when={props.next}>
 					<span class="sw-state" data-tone="accent">
-						Default for new
+						{m.settings_claude_default()}
 					</span>
 				</Match>
 			</Switch>
 			<Show when={!props.account.isDefault}>
-				<Btn tone="danger" title={`Forget ${name()} and remove its credentials from this machine`} onClick={props.onForget}>
-					Remove
+				<Btn tone="danger" title={m.settings_claude_remove_title({ name: name() })} onClick={props.onForget}>
+					{m.settings_claude_remove()}
 				</Btn>
 			</Show>
 		</SetRow>
@@ -393,18 +412,18 @@ function VoiceSettings() {
 	const model = () => state.settings.sttModel ?? STT_MODELS[0]!.id;
 	return (
 		<>
-			<SetGroup label="Voice" group="voice" foot="The mic in the composer, or Ctrl+M. Nothing is sent until you send it.">
-				<SetRow title="Recogniser" sub={RECOGNISERS.find((one) => one.id === recogniser())?.note}>
-					<SetSegments label="Recogniser" options={RECOGNISERS} value={recogniser()} onPick={setRecogniser} />
+			<SetGroup label={m.settings_section_voice()} group="voice" foot={m.settings_voice_foot()}>
+				<SetRow title={m.settings_voice_recogniser()} sub={recognisers().find((one) => one.id === recogniser())?.note}>
+					<SetSegments label={m.settings_voice_recogniser()} options={recognisers()} value={recogniser()} onPick={setRecogniser} />
 				</SetRow>
 				<Show when={recogniser() !== "browser"}>
-					<SetRow title="The server's model" sub={state.sttKey ? STT_MODELS.find((one) => one.id === model())?.note : "No key yet: set OPENAI_API_KEY on the server."}>
-						<SetSelect label="The server's speech model" options={STT_MODELS} value={model()} onPick={(id) => void call("harness.configure", [{ sttModel: id === STT_MODELS[0]!.id ? null : id }]).then(warnIfFailed)} />
+					<SetRow title={m.settings_voice_model()} sub={state.sttKey ? sttNote(model()) : m.settings_voice_no_key()}>
+						<SetSelect label={m.settings_voice_model_label()} options={STT_MODELS} value={model()} onPick={(id) => void call("harness.configure", [{ sttModel: id === STT_MODELS[0]!.id ? null : id }]).then(warnIfFailed)} />
 					</SetRow>
 				</Show>
 				<Show when={recogniser() !== "server"}>
-					<SetRow title="Language" sub="What the browser's recogniser listens for.">
-						<SetSelect label="The browser's speech language" options={VOICE_LANGS} value={voiceLang()} onPick={setVoiceLang} />
+					<SetRow title={m.settings_language()} sub={m.settings_voice_lang_sub()}>
+						<SetSelect label={m.settings_voice_lang_label()} options={voiceLangs()} value={voiceLang()} onPick={setVoiceLang} />
 					</SetRow>
 				</Show>
 			</SetGroup>
@@ -415,14 +434,16 @@ function VoiceSettings() {
 /* ---------------------------------------------------------------------------------------- */
 /* Connections                                                                                */
 
-/** How long ago, in the row's words. */
-const ago = (at: number) => {
-	const minutes = Math.round((Date.now() - at) / 60_000);
-	if (minutes < 2) return "just now";
-	if (minutes < 120) return `${minutes} min ago`;
-	const hours = Math.round(minutes / 60);
-	return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
-};
+/** What the server's speech model is like, from its id (`STT_MODELS` in `@decks/protocol`), in the language shown. */
+const sttNote = (id: string): string | undefined =>
+	(
+		({
+			"gpt-4o-mini-transcribe": () => m.settings_voice_stt_mini(),
+			"gpt-transcribe": () => m.settings_voice_stt_gpt(),
+			"gpt-4o-transcribe": () => m.settings_voice_stt_4o(),
+			"whisper-1": () => m.settings_voice_stt_whisper(),
+		}) as Record<string, () => string>
+	)[id]?.() ?? STT_MODELS.find((one) => one.id === id)?.note;
 
 /** The paired front ends, one row per name and site: 44 sessions from one Studio are one row. */
 function foldPaired(rows: PairedRow[]): { label: string; origin: string; ids: string[]; last: number }[] {
@@ -448,35 +469,35 @@ function Connections() {
 	const { copied, copy } = useCopy();
 	return (
 		<>
-			<SetGroup label="Decks connection" group="this-deck" foot="For another Decks, the iPad app or a terminal connecting to this one. Decks Studio needs neither: its login is under Accounts.">
-				<SetRow title="Address" sub={<span class="sw-mono">{location.origin}</span>}>
-					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? "Copied" : "Copy"}</Btn>
+			<SetGroup label={m.settings_conn_group()} group="this-deck" foot={m.settings_conn_foot()}>
+				<SetRow title={m.settings_conn_address()} sub={<span class="sw-mono">{location.origin}</span>}>
+					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? m.settings_copied() : m.settings_copy()}</Btn>
 				</SetRow>
 				<SetRow
-					title="Pairing code"
+					title={m.settings_conn_code()}
 					sub={
 						<>
-							Asked for when connecting over the internet. Make one on this machine: <span class="sw-mono">decks pair code</span>
+							{m.settings_conn_code_sub()} <span class="sw-mono">decks pair code</span>
 						</>
 					}
 				/>
 			</SetGroup>
 			<Show when={can("share")}>
-				<SetGroup label="Connected to this Decks" group="other-decks">
-					<For each={foldPaired(pairing().paired)} fallback={<SetRow title="Nothing else is connected" />}>
+				<SetGroup label={m.settings_conn_connected()} group="other-decks">
+					<For each={foldPaired(pairing().paired)} fallback={<SetRow title={m.settings_conn_none()} />}>
 						{(row) => (
 							<SetRow
 								lead={<span class="sw-mark">{/studio/i.test(row.label) ? <Icon of={Cloud} size={14} /> : <Icon of={Globe} size={14} />}</span>}
 								title={
 									<span class="truncate">
 										{row.label}
-										{row.ids.length > 1 ? ` · ${row.ids.length} sessions` : ""}
+										{row.ids.length > 1 ? ` · ${m.settings_conn_sessions({ count: row.ids.length })}` : ""}
 									</span>
 								}
-								sub={<span class="truncate">{`${row.origin || "unknown site"} · used ${ago(row.last)}`}</span>}
+								sub={<span class="truncate">{m.settings_conn_used({ site: row.origin || m.settings_conn_unknown_site(), ago: formatAgo(row.last) })}</span>}
 							>
-								<Btn tone="danger" title="It will have to connect again" onClick={() => row.ids.forEach((id) => void call("harness.revoke", [id]))}>
-									{row.ids.length > 1 ? "Revoke all" : "Revoke"}
+								<Btn tone="danger" title={m.settings_conn_revoke_title()} onClick={() => row.ids.forEach((id) => void call("harness.revoke", [id]))}>
+									{row.ids.length > 1 ? m.settings_conn_revoke_all() : m.settings_conn_revoke()}
 								</Btn>
 							</SetRow>
 						)}
@@ -500,16 +521,16 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 	const status = () => props.web?.status;
 	const note = () => {
 		const now = status();
-		if (!now) return "Waiting for the server.";
-		if (now.connected) return `Sharing ${now.tabs.length === 1 ? "one tab" : `${now.tabs.length} tabs`}. Submitting asks you first.`;
-		if (now.paired) return "Paired. Press the Decks button on a tab to share it.";
-		return "Not paired. Paste the address and code below into the extension.";
+		if (!now) return m.settings_chrome_waiting();
+		if (now.connected) return m.settings_chrome_sharing({ count: now.tabs.length });
+		if (now.paired) return m.settings_chrome_paired();
+		return m.settings_chrome_not_paired();
 	};
 	return (
 		<>
-			<SetGroup label="Your Chrome" group="web">
+			<SetGroup label={m.settings_chrome_yours()} group="web">
 				<SetRow
-					title="The Decks extension"
+					title={m.settings_chrome_extension()}
 					sub={
 						<span class="sw-status" data-on={status()?.paired || status()?.connected || undefined}>
 							<i />
@@ -518,21 +539,21 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 					}
 				>
 					<Show when={status()?.connected}>
-						<Btn onClick={props.onStop}>Stop sharing</Btn>
+						<Btn onClick={props.onStop}>{m.settings_chrome_stop()}</Btn>
 					</Show>
 				</SetRow>
-				<For each={status()?.tabs ?? []}>{(tab) => <SetRow title={<span class="truncate">{tab.title || "(untitled)"}</span>} sub={<span class="sw-mono truncate">{tab.url}</span>} />}</For>
+				<For each={status()?.tabs ?? []}>{(tab) => <SetRow title={<span class="truncate">{tab.title || m.settings_chrome_untitled()}</span>} sub={<span class="sw-mono truncate">{tab.url}</span>} />}</For>
 			</SetGroup>
-			<SetGroup label="To pair a Chrome" group="pair-chrome">
-				<SetRow title="Decks address" sub={<span class="sw-mono">{location.origin}</span>}>
-					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? "Copied" : "Copy"}</Btn>
+			<SetGroup label={m.settings_chrome_to_pair()} group="pair-chrome">
+				<SetRow title={m.settings_chrome_address()} sub={<span class="sw-mono">{location.origin}</span>}>
+					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? m.settings_copied() : m.settings_copy()}</Btn>
 				</SetRow>
-				<SetRow title="Pairing code" sub={<span class="sw-mono">{props.web?.code ?? "…"}</span>}>
+				<SetRow title={m.settings_conn_code()} sub={<span class="sw-mono">{props.web?.code ?? "…"}</span>}>
 					<Btn disabled={!props.web?.code} onClick={() => props.web?.code && void copy("code", props.web.code)}>
-						{copied() === "code" ? "Copied" : "Copy"}
+						{copied() === "code" ? m.settings_copied() : m.settings_copy()}
 					</Btn>
-					<Btn title="Mint a fresh code; the extension has to be paired again" onClick={props.onRepair}>
-						New code
+					<Btn title={m.settings_chrome_new_code_title()} onClick={props.onRepair}>
+						{m.settings_chrome_new_code()}
 					</Btn>
 				</SetRow>
 			</SetGroup>

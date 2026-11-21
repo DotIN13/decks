@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { createSignal } from "solid-js";
 import type { PanelTab } from "../panel/LeftPanel.tsx";
 import { moveTo, stageOf, viewOnly } from "../state/canvases.ts";
@@ -122,7 +123,7 @@ export const copyShared = (name: string) => {
 	void act<{ name: string; title: string }>("canvas.copyShared", [{ canvas: name }]).then((made) => {
 		if (!made) return;
 		setStagesOpen(false);
-		notice("info", `${made.title} is your own copy: change it as you like. It never changes theirs.`);
+		notice("info", m.app_own_copy({ name: made.title }));
 		if (agentId) void act("agent.update", [{ canvas: made.name }], agentId);
 	});
 };

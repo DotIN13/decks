@@ -1,5 +1,6 @@
 import { commentLabel, type Draft, type DraftMention, mentionAddress, type PillAbout, shortLabel } from "@decks/agent-ui/composer";
 import type { MessageMention, MessagePart } from "@decks/protocol";
+import { m } from "@decks/i18n";
 import { commentItem } from "../markup/comments.ts";
 import type { WaitingComment } from "../state/comments.ts";
 
@@ -58,13 +59,20 @@ export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleO
 	const drawn = !!comment.items?.length;
 	const name = commentName(comment, titleOf, itemName);
 	// Where on it, never its name again: the tooltip and the card name it already.
-	const where = drawn ? `, on ${pathName(comment.board.replace(/\/canvas\.pen$/, ""))}` : comment.component ? `, #${comment.component}` : "";
+	const canvas = comment.from === "canvas";
+	const source = drawn
+		? (canvas ? m.composer_pill_canvas_on : m.composer_pill_yours_on)({ name: pathName(comment.board.replace(/\/canvas\.pen$/, "")) })
+		: comment.component
+			? (canvas ? m.composer_pill_canvas_in : m.composer_pill_yours_in)({ component: comment.component })
+			: canvas
+				? m.composer_pill_canvas()
+				: m.composer_pill_yours();
 	return {
 		name,
 		of: drawn ? "shape" : "card",
 		...(comment.quote ? { quote: comment.quote } : {}),
 		note: comment.text,
-		source: comment.from === "canvas" ? `From the canvas${where}` : `Your comment${where}`,
+		source,
 		exact: commentItem(comment, n),
 		...(comment.from === "canvas" ? { canvas: true } : {}),
 	};
@@ -81,9 +89,9 @@ function addressName(node: DraftMention, titleOf: TitleOf = none, itemName: Item
 export function aboutAddress(node: DraftMention, titleOf?: TitleOf, itemName?: ItemName): PillAbout {
 	const exact = mentionAddress(node);
 	const name = addressName(node, titleOf, itemName);
-	if (node.kind === "file") return { name, of: "file", source: `File, in the deck as ${node.id}`, exact };
-	if (node.kind === "item") return { name, of: "shape", source: "On the canvas, a drawn item", exact };
-	return { name, of: "card", source: `On the canvas, a board or card: ${node.id}`, exact };
+	if (node.kind === "file") return { name, of: "file", source: m.composer_pill_file({ path: node.id }), exact };
+	if (node.kind === "item") return { name, of: "shape", source: m.composer_pill_item(), exact };
+	return { name, of: "card", source: m.composer_pill_card({ path: node.id }), exact };
 }
 
 // --- a sent message, kept as its parts --------------------------------------------------

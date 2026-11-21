@@ -1,0 +1,224 @@
+{
+	"docs_opening": "Opening…",
+	"docs_source": "Source",
+	"docs_source_title": "Show the file as its source",
+	"docs_history": "History",
+	"docs_history_title": "Earlier versions of this file",
+	"docs_pdf_title": "Typeset this file and show the PDF beside it",
+	"docs_changes_title": "Edits from agents, to accept or reject",
+	"docs_comments_title": "The Doc's comments",
+	"docs_git_title": "Pull and push this file's git repository",
+	"docs_google_title": "This page is a Google Doc",
+	"docs_drag_resize": "Drag to resize",
+	"docs_pdf_not_yet": "Not typeset yet",
+	"docs_paragraph_style": "Paragraph style",
+	"docs_style_body": "Body",
+	"docs_style_body_text": "Body text",
+	"docs_style_section": "Section",
+	"docs_style_subsection": "Subsection",
+	"docs_style_subsubsection": "Subsubsection",
+	"docs_style_paragraph_heading": "Paragraph heading",
+	"docs_style_heading": "Heading {level}",
+	"docs_style_normal": "Normal text",
+	"docs_style_title": "Title",
+	"docs_style_subtitle": "Subtitle",
+	"docs_tool_bold": "Bold ({key})",
+	"docs_tool_italic": "Italic ({key})",
+	"docs_tool_underline": "Underline ({key})",
+	"docs_tool_strike": "Strikethrough ({key})",
+	"docs_tool_code": "Code ({key})",
+	"docs_tool_highlight": "Highlight ({key})",
+	"docs_tool_link": "Link ({key})",
+	"docs_tool_math": "Inline maths ({key})",
+	"docs_tool_bullets": "Bulleted list ({key})",
+	"docs_tool_numbers": "Numbered list ({key})",
+	"docs_tool_tasks": "Task list",
+	"docs_tool_quote": "Quote",
+	"docs_tool_codeblock": "Code block",
+	"docs_tool_table": "Table",
+	"docs_tool_rule": "Horizontal rule",
+	"docs_tool_numbered": "Numbered list",
+	"docs_tool_equation": "Equation",
+	"docs_tool_undo": "Undo ({key})",
+	"docs_tool_redo": "Redo ({key})",
+	"docs_tool_font": "Font",
+	"docs_tool_font_size": "Font size",
+	"docs_tool_smaller": "Decrease font size",
+	"docs_tool_bigger": "Increase font size",
+	"docs_tool_text_colour": "Text colour",
+	"docs_tool_highlight_colour": "Highlight colour",
+	"docs_tool_align_left": "Left align",
+	"docs_tool_align_centre": "Centre align",
+	"docs_tool_align_right": "Right align",
+	"docs_tool_justify": "Justify",
+	"docs_tool_outdent": "Decrease indent ({key})",
+	"docs_tool_indent": "Increase indent ({key})",
+	"docs_tool_insert_table": "Insert a table (3 by 3)",
+	"docs_tool_row_above": "Insert row above",
+	"docs_tool_row_below": "Insert row below",
+	"docs_tool_col_left": "Insert column left",
+	"docs_tool_col_right": "Insert column right",
+	"docs_tool_delete_row": "Delete row",
+	"docs_tool_delete_col": "Delete column",
+	"docs_tool_comment": "Comment on the selected words",
+	"docs_tool_clear": "Clear formatting ({key})",
+	"docs_link_prompt": "Link to",
+	"docs_google_doc_named": "{title}, a Google Doc",
+	"docs_read_only": "Read-only",
+	"docs_saved": "Saved",
+	"docs_saving": "Saving…",
+	"docs_changes": "Changes",
+	"docs_another_program": "Another program",
+	"docs_close": "Close",
+	"docs_accept_all_title": "Keep every edit",
+	"docs_accept_all": "Accept all",
+	"docs_reject_all_title": "Take every edit back",
+	"docs_reject_all": "Reject all",
+	"docs_nothing_to_review": "Nothing to review.",
+	"docs_accept": "Accept",
+	"docs_reject": "Reject",
+	"docs_comments": "Comments",
+	"docs_comment": "Comment",
+	"docs_cancel": "Cancel",
+	"docs_no_comments": "No open comments. Select words and press the comment button to add one.",
+	"docs_someone": "Someone",
+	"docs_resolve": "Resolve",
+	"docs_reply": "Reply",
+	"docs_no_versions": "No versions yet.",
+	"docs_show_version": "Show this version",
+	"docs_restore_version": "Restore this version",
+	"docs_restore": "Restore",
+	"docs_back_to_now": "Back to now",
+	"docs_earlier_version": "Earlier version",
+	"docs_typeset_again": "Typeset again",
+	"docs_open_pdf": "Open the PDF in a new tab",
+	"docs_close_pdf": "Close the PDF",
+	"docs_typesetting": "Typesetting…",
+	"docs_errors": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} error",
+				"n=other": "{count} errors"
+			}
+		}
+	],
+	"docs_go_to_line": "Go to this line",
+	"docs_line": "Line {line}",
+	"docs_typeset": "Typeset",
+	"docs_typeset_errors": "Typeset with errors",
+	"docs_typeset_when": "{time}, {seconds} s",
+	"docs_not_typeset": "Did not typeset",
+	"docs_pdf_unreadable": "The PDF was made but could not be read.",
+	"docs_latex_stopped": "LaTeX stopped before writing a page. The errors above say where.",
+	"docs_git_pulling": "Pulling…",
+	"docs_git_pushing": "Pushing…",
+	"docs_git_not_pushed": "Commits not pushed yet",
+	"docs_git_button_title": "{branch}: pull and push",
+	"docs_git_changed": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} file edited since the last commit",
+				"n=other": "{count} files edited since the last commit"
+			}
+		}
+	],
+	"docs_git_ahead": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} commit to push",
+				"n=other": "{count} commits to push"
+			}
+		}
+	],
+	"docs_git_behind": "{count} to pull",
+	"docs_git_state": "{parts}.",
+	"docs_git_in_step": "In step with {name} as of the last pull.",
+	"docs_git_no_remote": "This branch has no remote branch to pull from or push to.",
+	"docs_git_pull": "Pull",
+	"docs_git_push": "Push",
+	"docs_git_pull_title": "Commit what is edited here, and merge in what changed on {name}",
+	"docs_git_push_title": "Pull, then send the commits made here to {name}",
+	"docs_git_note": "Edits here are committed as \"Edited in Decks\" before each pull. What a pull brings in is highlighted as a change.",
+	"docs_git_done": "Done.",
+	"docs_git_stopped": "git stopped.",
+	"docs_google_sign_in": "Sign in with Google",
+	"docs_google_paste": "Paste the address Google sent you to",
+	"docs_google_paste_label": "Address after signing in",
+	"docs_done": "Done",
+	"docs_google_signed_in": "Signed in as {email}.",
+	"docs_google_failed": "That did not work.",
+	"docs_google_syncing": "Syncing…",
+	"docs_google_signin": "Sign in",
+	"docs_google_error": "Not in step",
+	"docs_google_open": "Open in Google Docs",
+	"docs_google_in_step": "In step with the Doc. Edits here reach Google in about two seconds; others' edits arrive highlighted.",
+	"docs_google_in_step_since": "In step with the Doc since {time}. Edits here reach Google in about two seconds; others' edits arrive highlighted.",
+	"docs_google_sending": "Sending your edits to Google…",
+	"docs_google_fake": "A stand-in for Google on this server: no Google account is connected.",
+	"docs_google_signed_in_as": "Signed in to Google as {email}.",
+	"docs_reading": "Reading…",
+	"docs_first_typeset": "Typesetting the paper for the first time can take a minute while LaTeX fetches its packages.",
+	"docs_tex_no_title": "No \\title in the preamble",
+	"docs_tex_preamble": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "Preamble, {count} line",
+				"n=other": "Preamble, {count} lines"
+			}
+		}
+	],
+	"docs_md_front_matter": "Front matter",
+	"docs_empty": "This document is empty.",
+	"docs_start_writing": "Start writing…",
+	"docs_katex_unknown": "{command} is not a command KaTeX knows",
+	"docs_not_drawn_because": "Not drawn: {reason}",
+	"docs_not_drawn": "Not drawn",
+	"docs_edited": "Edited",
+	"docs_edited_outside": "Edited by another program at {time}",
+	"docs_edited_by": "Edited by {who} at {time}",
+	"docs_empty_click": "Empty. Click to write.",
+	"docs_word_preamble": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "Preamble · {count} line",
+				"n=other": "Preamble · {count} lines"
+			}
+		}
+	],
+	"docs_word_failed": "Word could not be drawn: {message}. Open Source."
+}

@@ -8,13 +8,16 @@
  * schedules and agents say it is.
  *
  * Until a zone is chosen, `undefined` is passed to `Intl`, which means the browser's own:
- * exactly what every call site did before this file existed.
+ * exactly what every call site did before this file existed. The language is the one the person
+ * chose for Decks (`getLocale()` from `@decks/i18n`), so a date's words follow the words around it.
  *
  * The zone is a plain module variable rather than a signal on purpose. These functions are
  * called from pure helpers that are unit-tested without Solid, and the places that draw a
  * time re-run when the settings frame lands because they read `state.settings` themselves
  * (`deckZone()` in `state/deck.ts`).
  */
+
+import { getLocale } from "@decks/i18n";
 
 let zone: string | undefined;
 
@@ -59,15 +62,15 @@ const withZone = (options: Intl.DateTimeFormatOptions, inZone = zone): Intl.Date
 
 /** "2:05 PM", or "14:05" where the locale says so. */
 export function clockTime(at: number | Date, inZone?: string): string {
-	return new Date(at).toLocaleTimeString(undefined, withZone({ hour: "numeric", minute: "2-digit" }, inZone ?? zone));
+	return new Date(at).toLocaleTimeString(getLocale(), withZone({ hour: "numeric", minute: "2-digit" }, inZone ?? zone));
 }
 
 export function formatDate(at: number | Date, options: Intl.DateTimeFormatOptions = {}): string {
-	return new Date(at).toLocaleDateString(undefined, withZone(options));
+	return new Date(at).toLocaleDateString(getLocale(), withZone(options));
 }
 
 export function formatDateTime(at: number | Date, options: Intl.DateTimeFormatOptions): string {
-	return new Date(at).toLocaleString(undefined, withZone(options));
+	return new Date(at).toLocaleString(getLocale(), withZone(options));
 }
 
 /** A key that is equal for two instants on the same calendar day in the deck's zone. */

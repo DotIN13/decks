@@ -3,6 +3,7 @@ import { batch } from "solid-js";
 import { BundleBackend } from "../connections/bundle.ts";
 import { active, lineUrl, socketToken } from "../connections/connection.ts";
 import { sessionStale } from "../lib/session.ts";
+import { m } from "@decks/i18n";
 
 /**
  * The one connection to the harness: the line (`/api/v1/socket`), the same socket the canvas frame
@@ -91,7 +92,7 @@ function connect(onStateChange: (connected: boolean) => void): Line {
 			if (message.type === "call.answered") {
 				const done = pending.get(message.id);
 				pending.delete(message.id);
-				done?.(message.ok ? { ok: true, value: message.value, notes: message.notes ?? [] } : { ok: false, error: message.error ?? "The call failed.", notes: message.notes ?? [] });
+				done?.(message.ok ? { ok: true, value: message.value, notes: message.notes ?? [] } : { ok: false, error: message.error ?? m.state_call_failed(), notes: message.notes ?? [] });
 				return;
 			}
 			arrived.push(message);
@@ -104,7 +105,7 @@ function connect(onStateChange: (connected: boolean) => void): Line {
 			if (closed) return;
 			onStateChange(false);
 			// A call never answered: the line dropped, and the caller hears so rather than waiting for ever.
-			for (const done of pending.values()) done({ ok: false, error: `The line to the harness dropped${event?.reason ? `: ${event.reason}` : ""}.`, notes: [] });
+			for (const done of pending.values()) done({ ok: false, error: event?.reason ? m.state_line_dropped_why({ reason: event.reason }) : m.state_line_dropped(), notes: [] });
 			pending.clear();
 			// Back off, but not far: this is localhost, and the common cause is a server that is three seconds from being back.
 			const delay = Math.min(2000, 150 * 2 ** attempt++);

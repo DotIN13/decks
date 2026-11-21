@@ -1,4 +1,5 @@
 import { type Outline } from "../edit/core/overlay.ts";
+import { m } from "@decks/i18n";
 import { type SceneQuery } from "../edit/core/scene.ts";
 import type { Op } from "@decks/pen";
 import type { Page } from "@decks/protocol";
@@ -150,7 +151,7 @@ export function createPills(d: PillsNeeds) {
 						view={d.view()}
 						onOpen={() => d.pushCamera(d.frame([held().box]))}
 						ink={{
-							agent: d.props.inkAgent ?? "the agent",
+							agent: d.props.inkAgent ?? m.canvas_pill_the_agent(),
 							onDrawing: () => d.props.onInk?.({ action: "drawing", ids: held().ids, canvas: d.props.canvasName ?? "", box: held().box }),
 							onCard: () => d.props.onInk?.({ action: "card", ids: held().ids, canvas: d.props.canvasName ?? "", box: held().box }),
 							onSend: () => d.props.onInk?.({ action: "send", ids: held().ids, canvas: d.props.canvasName ?? "", box: held().box }),
@@ -163,7 +164,7 @@ export function createPills(d: PillsNeeds) {
 											path: d.canvasPenPath() ?? "the canvas",
 											items: held().ids,
 											quote: "",
-											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,
+											title: m.canvas_pill_strokes({ count: held().ids.length }),
 											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
 											open: true,
 										}),

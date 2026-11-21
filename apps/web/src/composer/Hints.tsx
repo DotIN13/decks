@@ -1,4 +1,25 @@
-import { Show } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
+import { m } from "@decks/i18n";
+
+/** Where a key goes in a hint's sentence: the message is asked with this in each key's place, then split around it. */
+const KEY = "\u0001";
+
+/** A hint, one element and a whole phrase in the language shown, with its key drawn as a keycap where the phrase puts it. */
+function Hint(props: { words: (key: string) => string; keys: JSX.Element }) {
+	const parts = () => props.words(KEY).split(KEY);
+	return (
+		<span class="hint">
+			<For each={parts()}>
+				{(part, index) => (
+					<>
+						{part}
+						{index() < parts().length - 1 ? props.keys : null}
+					</>
+				)}
+			</For>
+		</span>
+	);
+}
 
 /**
  * What the keyboard can do here, under the box.
@@ -30,51 +51,49 @@ export function Hints(props: {
 				when={props.menuOpen}
 				fallback={
 					<>
-						<Show
-							when={props.busy}
-							fallback={
-								<span class="hint">
-									<kbd>⏎</kbd> to send
-								</span>
-							}
-						>
-							<span class="hint">
-								<kbd>⏎</kbd> to steer
-							</span>
-							<span class="hint">
-								<kbd>{/Mac/.test(navigator.platform) ? "⌘" : "Ctrl"}</kbd>+<kbd>⏎</kbd> to queue
-							</span>
+						<Show when={props.busy} fallback={<Hint words={(key) => m.composer_hint_send({ key })} keys={<kbd>⏎</kbd>} />}>
+							<Hint words={(key) => m.composer_hint_steer({ key })} keys={<kbd>⏎</kbd>} />
+							<Hint
+								words={(key) => m.composer_hint_queue({ key })}
+								keys={
+									<>
+										<kbd>{/Mac/.test(navigator.platform) ? "⌘" : "Ctrl"}</kbd>+<kbd>⏎</kbd>
+									</>
+								}
+							/>
 						</Show>
-						<span class="hint">
-							<kbd>/</kbd> for commands
-						</span>
+						<Hint words={(key) => m.composer_hint_commands({ key })} keys={<kbd>/</kbd>} />
 						<Show
 							when={props.mentions}
 							fallback={
-								<span class="hint">
-									<kbd>⇧</kbd>+<kbd>⏎</kbd> for a new line
-								</span>
+								<Hint
+									words={(key) => m.composer_hint_newline({ key })}
+									keys={
+										<>
+											<kbd>⇧</kbd>+<kbd>⏎</kbd>
+										</>
+									}
+								/>
 							}
 						>
-							<span class="hint">
-								<kbd>@</kbd> for an agent
-							</span>
+							<Hint words={(key) => m.composer_hint_mention({ key })} keys={<kbd>@</kbd>} />
 						</Show>
 					</>
 				}
 			>
 				{/* The same three slots, re-labelled: while a menu owns the arrow keys, what
 				    Enter and Escape do is the thing worth knowing and "⏎ to send" is wrong. */}
-				<span class="hint">
-					<kbd>↑</kbd>
-					<kbd>↓</kbd> to choose
-				</span>
-				<span class="hint">
-					<kbd>Tab</kbd> to complete
-				</span>
-				<span class="hint">
-					<kbd>Esc</kbd> to dismiss
-				</span>
+				<Hint
+					words={(key) => m.composer_hint_choose({ key })}
+					keys={
+						<>
+							<kbd>↑</kbd>
+							<kbd>↓</kbd>
+						</>
+					}
+				/>
+				<Hint words={(key) => m.composer_hint_complete({ key })} keys={<kbd>Tab</kbd>} />
+				<Hint words={(key) => m.composer_hint_dismiss({ key })} keys={<kbd>Esc</kbd>} />
 			</Show>
 		</span>
 	);

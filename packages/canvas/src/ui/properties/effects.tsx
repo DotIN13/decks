@@ -1,4 +1,5 @@
 import { type PenNode } from "@decks/pen";
+import { m } from "@decks/i18n";
 import { Show } from "solid-js";
 import { ColorField, NumField } from "./fields.tsx";
 import { hexOf, numberOf } from "./values.ts";
@@ -32,8 +33,8 @@ export function Effects(props: {
 	return (
 		<>
 			<div class="props-row">
-				<span class="props-label">Shadow</span>
-				<input type="checkbox" class="props-check" aria-label="Shadow" checked={!!shadow()} onChange={(event) => setShadow(event.currentTarget.checked ? {} : null)} />
+				<span class="props-label">{m.canvas_props_shadow()}</span>
+				<input type="checkbox" class="props-check" aria-label={m.canvas_props_shadow()} checked={!!shadow()} onChange={(event) => setShadow(event.currentTarget.checked ? {} : null)} />
 			</div>
 			<Show when={shadow()}>
 				{(s) => (
@@ -41,19 +42,19 @@ export function Effects(props: {
 						<div class="props-nums">
 							<NumField label="x" value={numberOf(s().offset?.x, 0)} onCommit={(v) => setShadow({ offset: { x: v, y: numberOf(s().offset?.y, 4) } })} />
 							<NumField label="y" value={numberOf(s().offset?.y, 4)} onCommit={(v) => setShadow({ offset: { x: numberOf(s().offset?.x, 0), y: v } })} />
-							<NumField label="blur" value={numberOf(s().blur, 12)} min={0} onCommit={(v) => setShadow({ blur: Math.max(0, v) })} />
-							<NumField label="sprd" value={numberOf(s().spread, 0)} onCommit={(v) => setShadow({ spread: v })} />
+							<NumField label={m.canvas_props_blur_short()} value={numberOf(s().blur, 12)} min={0} onCommit={(v) => setShadow({ blur: Math.max(0, v) })} />
+							<NumField label={m.canvas_props_spread_short()} value={numberOf(s().spread, 0)} onCommit={(v) => setShadow({ spread: v })} />
 						</div>
 						<div class="props-row">
-							<span class="props-label">Colour</span>
-							<ColorField value={hexOf(s().color)} adaptive={false} onCommit={(color) => setShadow({ color: shadowColor(color) })} onLive={props.onLive((color) => setShadow({ color: shadowColor(color) }, true))} label="Shadow colour" />
+							<span class="props-label">{m.canvas_props_colour()}</span>
+							<ColorField value={hexOf(s().color)} adaptive={false} onCommit={(color) => setShadow({ color: shadowColor(color) })} onLive={props.onLive((color) => setShadow({ color: shadowColor(color) }, true))} label={m.canvas_props_shadow_colour()} />
 						</div>
 					</>
 				)}
 			</Show>
 			<div class="props-row">
-				<span class="props-label">Blur</span>
-				<input type="range" class="props-range" min="0" max="24" step="1" aria-label="Blur" value={blurOf(first())} onChange={(event) => props.set(props.targets, (node) => write(node, { blur: Number(event.currentTarget.value) }))} />
+				<span class="props-label">{m.canvas_props_blur()}</span>
+				<input type="range" class="props-range" min="0" max="24" step="1" aria-label={m.canvas_props_blur()} value={blurOf(first())} onChange={(event) => props.set(props.targets, (node) => write(node, { blur: Number(event.currentTarget.value) }))} />
 			</div>
 		</>
 	);

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import type { ExtensionUiPrompt } from "@decks/protocol";
 import Check from "lucide-solid/icons/check";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
@@ -65,10 +66,10 @@ export function Dialog(props: {
 					<div class="mt-[3px] text-ui whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
-							Allow
+							{m.agents_dialog_allow()}
 						</button>
 						<button class="btn" type="button" onClick={() => props.onAnswer({ confirmed: false })}>
-							Deny
+							{m.agents_dialog_deny()}
 						</button>
 					</div>
 				</Match>
@@ -84,7 +85,7 @@ export function Dialog(props: {
 							)}
 						</For>
 						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Cancel
+							{m.agents_dialog_cancel()}
 						</button>
 					</div>
 				</Match>
@@ -156,7 +157,7 @@ export function Dialog(props: {
 							<input
 								ref={focusOnMount}
 								value={text()}
-								placeholder="Something else…"
+								placeholder={m.agents_dialog_something_else()}
 								onInput={(event) => setText(event.currentTarget.value)}
 								onKeyDown={(event) => {
 									if (event.key === "Enter" && text().trim()) props.onAnswer({ value: text().trim() });
@@ -175,21 +176,21 @@ export function Dialog(props: {
 								disabled={ticked().length === 0}
 								onClick={() => props.onAnswer({ value: ticked().join(", ") })}
 							>
-								Done
+								{m.agents_dialog_done()}
 							</button>
 						</Show>
 						<Show when={otherOpen()}>
 							<button class="btn" type="button" data-primary="true" disabled={!text().trim()} onClick={() => props.onAnswer({ value: text().trim() })}>
-								Send
+								{m.agents_dialog_send()}
 							</button>
 						</Show>
 						<Show when={choose().other && !otherOpen()}>
 							<button class="btn" type="button" onClick={() => setOtherOpen(true)}>
-								Other…
+								{m.agents_dialog_other()}
 							</button>
 						</Show>
 						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Cancel
+							{m.agents_dialog_cancel()}
 						</button>
 					</div>
 				</Match>
@@ -210,20 +211,20 @@ export function Dialog(props: {
 					</label>
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ value: text() })}>
-							Send
+							{m.agents_dialog_send()}
 						</button>
 						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Cancel
+							{m.agents_dialog_cancel()}
 						</button>
 					</div>
 				</Match>
 
 				{/* `custom` is a terminal screen; there is nothing here that could be one. */}
 				<Match when={props.prompt.method === "custom"}>
-					<div class="font-semibold">An extension asked for a terminal screen, which this app has no equivalent of.</div>
+					<div class="font-semibold">{m.agents_dialog_custom()}</div>
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Dismiss
+							{m.agents_dialog_dismiss()}
 						</button>
 					</div>
 				</Match>
@@ -258,7 +259,7 @@ export function Dialog(props: {
 							value={text()}
 							autocomplete="off"
 							spellcheck={false}
-							placeholder={(props.prompt as { placeholder?: string }).placeholder ?? "Paste the code from the browser"}
+							placeholder={(props.prompt as { placeholder?: string }).placeholder ?? m.agents_dialog_paste_code()}
 							onInput={(event) => setText(event.currentTarget.value)}
 							onKeyDown={(event) => {
 								// Enter on a code that is not there yet would cancel the sign-in by
@@ -276,10 +277,10 @@ export function Dialog(props: {
 							disabled={!text().trim()}
 							onClick={() => props.onAnswer({ value: text() })}
 						>
-							Sign in
+							{m.agents_dialog_sign_in()}
 						</button>
 						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Cancel
+							{m.agents_dialog_cancel()}
 						</button>
 					</div>
 				</Match>

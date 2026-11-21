@@ -1,3 +1,4 @@
+import { formatAgo, m } from "@decks/i18n";
 import type { StageRow } from "@decks/protocol";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Plus from "lucide-solid/icons/plus";
@@ -51,7 +52,7 @@ export function CanvasSwitcher(props: {
 	return (
 		<Popover
 			placement={props.placement ?? "bottom-start"}
-			label={props.label ?? "Canvases"}
+			label={props.label ?? m.canvases_canvases()}
 			class="w-[320px]"
 			onOpenChange={(open) => {
 				if (!open) setFind("");
@@ -63,10 +64,10 @@ export function CanvasSwitcher(props: {
 		>
 			<label class="field menu-find">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
-				<input type="text" placeholder={props.findLabel ?? "Find a canvas"} aria-label={props.findLabel ?? "Find a canvas"} value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
+				<input type="text" placeholder={props.findLabel ?? m.canvases_find()} aria-label={props.findLabel ?? m.canvases_find()} value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
 			</label>
-			<div class="menu-label">{find().trim() ? "Canvases" : "Recent"}</div>
-			<Show when={listed().length > 0} fallback={<p class="m-0 px-2 py-2 text-note text-faint">No canvas matches that</p>}>
+			<div class="menu-label">{find().trim() ? m.canvases_canvases() : m.canvases_recent()}</div>
+			<Show when={listed().length > 0} fallback={<p class="m-0 px-2 py-2 text-note text-faint">{m.canvases_find_none()}</p>}>
 				<For each={listed()}>
 					{(stage) => (
 						<button type="button" role="menuitem" data-row data-flat="true" class="switcher-canvas" data-current={stage.name === props.here ? "true" : undefined} onClick={() => pick(() => props.onPick(stage.name))}>
@@ -89,11 +90,11 @@ export function CanvasSwitcher(props: {
 				<div class="rule" aria-hidden="true" />
 				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(props.onNew)}>
 					<Icon of={Plus} size={15} class="row-icon" />
-					<span class="row-label flex-1">New canvas</span>
+					<span class="row-label flex-1">{m.canvases_new()}</span>
 				</button>
 				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(props.onAll)}>
 					<Icon of={LayoutGrid} size={15} class="row-icon" />
-					<span class="row-label flex-1">All canvases</span>
+					<span class="row-label flex-1">{m.canvases_all()}</span>
 				</button>
 			</Show>
 		</Popover>
@@ -103,9 +104,5 @@ export function CanvasSwitcher(props: {
 /** How long ago, in the switcher's short words: 28m, 16h, 2d. */
 function ago(at: number | undefined, now = Date.now()): string {
 	if (!at) return "";
-	const minutes = Math.max(0, Math.floor((now - at) / 60_000));
-	if (minutes < 60) return `${minutes}m`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}h`;
-	return `${Math.floor(hours / 24)}d`;
+	return formatAgo(Math.min(at, now), now, "narrow");
 }

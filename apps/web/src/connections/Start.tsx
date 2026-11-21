@@ -1,5 +1,6 @@
 import { DecksMark } from "@decks/ui";
 import { Switcher } from "./Switcher.tsx";
+import { m } from "@decks/i18n";
 
 /**
  * What a tab shows when it is on no backend it can open: the public Decks before anything has been
@@ -16,7 +17,7 @@ export function Start(props: { why: string }) {
 				<h1>Decks</h1>
 				<p>{props.why}</p>
 				<div class="panel-mark start-switcher">
-					<Switcher label="Open a file or connect a server" />
+					<Switcher label={m.connections_start_switcher()} />
 				</div>
 			</div>
 		</div>

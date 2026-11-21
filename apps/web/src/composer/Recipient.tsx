@@ -3,6 +3,7 @@ import { createMemo, Show } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 import type { Destination } from "../app/send-from-bar.ts";
 
 export interface RecipientProps {
@@ -39,8 +40,8 @@ export function Recipient(props: RecipientProps) {
 	};
 	const name = () => {
 		if (props.dest.kind === "prompt") return props.dest.name;
-		if (props.dest.kind === "note") return "a board";
-		return "No agent";
+		if (props.dest.kind === "note") return m.composer_recipient_board();
+		return m.composer_recipient_none();
 	};
 	/*
 	 * The face stays mounted while the recipient stays the same. The destination is worked out
@@ -56,7 +57,7 @@ export function Recipient(props: RecipientProps) {
 	return (
 		<span class="dock-to" data-dest={props.label} data-kind={props.dest.kind} data-compact={props.compact ? "true" : undefined}>
 			<Show when={!props.compact}>
-				<span class="dock-to-word">To</span>
+				<span class="dock-to-word">{m.composer_recipient_to()}</span>
 			</Show>
 			<AgentMenu
 				chats={props.chats}
@@ -68,7 +69,7 @@ export function Recipient(props: RecipientProps) {
 				{...(props.onMore ? { onMore: props.onMore } : {})}
 				onNew={props.onNew}
 				placement="top-start"
-				label="Who gets the line"
+				label={m.composer_recipient_label()}
 				trigger={(api) => (
 					<button
 						type="button"
@@ -77,7 +78,7 @@ export function Recipient(props: RecipientProps) {
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						title={props.label}
-						aria-label={`Who gets the line: ${props.label}. Press to choose.`}
+						aria-label={m.composer_recipient_chip({ label: props.label })}
 						onClick={api.toggle}
 					>
 						{face}

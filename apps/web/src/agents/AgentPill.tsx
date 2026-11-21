@@ -1,3 +1,4 @@
+import { formatNumber, m } from "@decks/i18n";
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -115,7 +116,7 @@ function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
 					</span>
 					<span class="row-label flex-1">{runtime.label}</span>
 					<Show when={!runtime.available}>
-						<span class="menu-note">not installed</span>
+						<span class="menu-note">{m.agents_not_installed()}</span>
 					</Show>
 				</button>
 			)}
@@ -143,7 +144,7 @@ export function NewAgentButton(props: {
 	return (
 		<Popover
 			placement={props.placement ?? "bottom-start"}
-			label="Add an agent"
+			label={m.agents_add()}
 			class="w-[248px]"
 			trigger={(api) => {
 				dismiss = () => api.open && api.toggle();
@@ -155,8 +156,8 @@ export function NewAgentButton(props: {
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
-						title={`${props.label ?? "Add an agent"}: pick its runtime`}
-						aria-label={props.label ?? "Add an agent"}
+						title={m.agents_add_title({ label: props.label ?? m.agents_add() })}
+						aria-label={props.label ?? m.agents_add()}
 						onClick={api.toggle}
 					>
 						<Icon of={Plus} size={props.size ?? 15} />
@@ -337,7 +338,7 @@ export function AgentMenu(props: {
 	return (
 		<Popover
 			placement={props.placement ?? "bottom-start"}
-			label={props.label ?? "Agents"}
+			label={props.label ?? m.agents_agents()}
 			class="w-[280px]"
 			onOpenChange={(open) => {
 				if (!open) setFind("");
@@ -349,10 +350,10 @@ export function AgentMenu(props: {
 		>
 			<label class="field menu-find">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
-				<input type="text" placeholder="Find an agent" aria-label="Find an agent" value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
+				<input type="text" placeholder={m.agents_find()} aria-label={m.agents_find()} value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
 			</label>
 			<Show when={find().trim() && found().length === 0}>
-				<p class="m-0 px-2 py-2 text-note text-faint">No agent matches that</p>
+				<p class="m-0 px-2 py-2 text-note text-faint">{m.agents_find_none()}</p>
 			</Show>
 			<For each={runs()}>
 				{(run) => (
@@ -461,7 +462,7 @@ export function AgentMenu(props: {
 										class="close"
 										type="button"
 										title={words()}
-										aria-label={`Close ${name()}`}
+										aria-label={m.agents_close({ name: name() })}
 										onClick={(event) => {
 											event.stopPropagation();
 											props.onClose(chat.id);
@@ -495,7 +496,7 @@ export function AgentMenu(props: {
 					when={props.onMore}
 					fallback={
 						<p class="m-0 px-2 py-1.5 text-note leading-normal text-faint">
-							{listed().more} more {listed().more === 1 ? "agent" : "agents"} — open the Agents panel.
+							{m.agents_menu_more_open({ count: listed().more, shown: formatNumber(listed().more) })}
 						</p>
 					}
 				>
@@ -503,9 +504,9 @@ export function AgentMenu(props: {
 						<button type="button" role="menuitem" data-row data-flat="true" class="agent-menu-more" onClick={() => more()()}>
 							<Icon of={PanelLeft} size={13} class="flex-none text-muted" />
 							<span class="row-label flex-1 whitespace-nowrap">
-								{listed().more} more {listed().more === 1 ? "agent" : "agents"}
+								{m.agents_menu_more({ count: listed().more, shown: formatNumber(listed().more) })}
 							</span>
-							<span class="meta flex-none text-micro">Agents panel</span>
+							<span class="meta flex-none text-micro">{m.agents_panel()}</span>
 						</button>
 					)}
 				</Show>
@@ -521,7 +522,7 @@ export function AgentMenu(props: {
 						<div class="rule" aria-hidden="true" />
 						<Popover
 							placement="right-start"
-							label="New agent"
+							label={m.agents_new()}
 							class="w-[248px]"
 							trigger={(api) => (
 								<button
@@ -537,7 +538,7 @@ export function AgentMenu(props: {
 									onClick={api.toggle}
 								>
 									<Icon of={Plus} size={13} class="flex-none text-muted" />
-									<span class="row-label flex-1">New agent</span>
+									<span class="row-label flex-1">{m.agents_new()}</span>
 									<Icon of={ChevronRight} size={13} class="flex-none text-faint" />
 								</button>
 							)}
@@ -666,8 +667,8 @@ export function AgentPill(props: {
 				class="icon-button"
 				data-on={props.panelOpen ? "soft" : undefined}
 				aria-pressed={props.panelOpen}
-				title="Side panel (⌘\)"
-				aria-label={props.panelOpen ? "Hide the side panel" : "Show the side panel"}
+				title={m.agents_side_panel_title()}
+				aria-label={props.panelOpen ? m.agents_side_panel_hide() : m.agents_side_panel_show()}
 				onClick={() => props.onTogglePanel()}
 			>
 				<Icon of={PanelLeft} size={15} />
@@ -690,7 +691,7 @@ export function AgentPill(props: {
 				onFocus={props.onFocus}
 				onClose={props.onClose}
 				{...(props.onMoreAgents ? { onMore: props.onMoreAgents } : {})}
-				label="Agents"
+				label={m.agents_agents()}
 				trigger={(api) => (
 					<button
 						type="button"
@@ -699,11 +700,11 @@ export function AgentPill(props: {
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
-						title="Switch agent"
-						aria-label={name() ? `Agents — currently ${name()}` : "Agents"}
+						title={m.agents_switch()}
+						aria-label={name() ? m.agents_pill_label({ name: name()! }) : m.agents_agents()}
 						onClick={api.toggle}
 					>
-						<Show when={active()} fallback={<span class="pill-agent-name">No agent</span>}>
+						<Show when={active()} fallback={<span class="pill-agent-name">{m.agents_none()}</span>}>
 							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} size={20} ring={1.5} />}
 						</Show>
 						<Show when={name()}>{(label) => <span class="pill-agent-name">{label()}</span>}</Show>
@@ -731,8 +732,8 @@ export function AgentPill(props: {
 							data-on={props.stagesOpen ? "soft" : undefined}
 							aria-haspopup="dialog"
 							aria-expanded={props.stagesOpen ?? false}
-							title={props.stage ? `Canvas: ${props.stage}` : "Canvases"}
-							aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
+							title={props.stage ? m.agents_stage_title({ name: props.stage }) : m.agents_stages()}
+							aria-label={props.stage ? m.agents_stage_label({ name: props.stage }) : m.agents_stage_none()}
 							onClick={() => props.onStages?.()}
 						>
 							{/* The app's own mark, not a drawing of it: a stage is what the mark is a picture of. */}
@@ -747,10 +748,10 @@ export function AgentPill(props: {
 								<button
 									type="button"
 									class="chip-button pill-agent pill-view-only"
-									title={`Shared with you to view by ${owner()}: it follows their copy. Make your own copy to change it.`}
+									title={m.agents_view_only_title({ owner: owner() })}
 									onClick={() => props.onCopy?.()}
 								>
-									<span class="pill-agent-name">View only · Make a copy</span>
+									<span class="pill-agent-name">{m.agents_view_only()}</span>
 								</button>
 							)}
 						</Show>
@@ -770,14 +771,14 @@ export function AgentPill(props: {
 				No confirmation. A single press is right for something this reversible, and what guards
 				against an accidental one is that the pressed button changes where you can see it.
 			*/}
-			<div class="mode-set" role="group" aria-label="Mode">
+			<div class="mode-set" role="group" aria-label={m.agents_mode()}>
 				<button
 					type="button"
 					class="icon-button"
 					data-on={props.mode === "browse" && !props.drawing ? "true" : undefined}
 					aria-pressed={props.mode === "browse" && !props.drawing}
-					title="Browse: read the cards, move and retype what is drawn"
-					aria-label="Browse the cards"
+					title={m.agents_browse_title()}
+					aria-label={m.agents_browse_label()}
 					onClick={() => {
 						props.onDrawing(false);
 						props.onMode("browse");
@@ -791,8 +792,8 @@ export function AgentPill(props: {
 					class="icon-button"
 					data-on={props.drawing ? "true" : undefined}
 					aria-pressed={props.drawing}
-					title="Draw on the canvas"
-					aria-label="Draw on the canvas"
+					title={m.agents_draw()}
+					aria-label={m.agents_draw()}
 					onClick={() => {
 						// The pen is out only while browsing.
 						if (props.mode === "edit") props.onMode("browse");

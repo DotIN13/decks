@@ -1,0 +1,49 @@
+{
+	"tabs_link_to": "Link to",
+	"tabs_link_to_find": "Link to a canvas, an app, a card or a document",
+	"tabs_actions": "{name}: actions",
+	"tabs_reload_tip": "Load it again, in this tab",
+	"tabs_reload": "Reload",
+	"tabs_on_canvas_tip": "Go to where it sits on a canvas",
+	"tabs_on_canvas": "On canvas",
+	"tabs_open_in_browser": "Open in the browser's tab",
+	"tabs_cards": "Cards",
+	"tabs_card_gone": "This card is not in the deck any more.",
+	"tabs_document": "Document",
+	"tabs_documents": "Documents",
+	"tabs_document_gone": "This document is not in the deck any more.",
+	"tabs_apps": "Apps",
+	"tabs_no_canvas": "No canvas",
+	"tabs_close_named": "Close {name}",
+	"tabs_close_tab": "Close the tab",
+	"tabs_canvases": "Canvases",
+	"tabs_a_tab": "{name}, a tab",
+	"tabs_tabs": "Tabs",
+	"tabs_all_tabs": "All tabs",
+	"tabs_open_count": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} tab open",
+				"n=other": "{count} tabs open"
+			}
+		}
+	],
+	"tabs_find": "Find a canvas, an app, a card or a document",
+	"tabs_open_a_tab": "Open a tab",
+	"tabs_link_nothing": "This link opens nothing: {address} is not an address of a canvas, a card, a document or an app.",
+	"tabs_link_gone_canvas": "This link's canvas is not in the deck any more: {target}.",
+	"tabs_link_gone_card": "This link's card is not in the deck any more: {target}.",
+	"tabs_link_gone_document": "This link's document is not in the deck any more: {target}.",
+	"tabs_link_gone_app": "This link's app is not in the deck any more: {target}.",
+	"tabs_link_gone": "This link's target is not in the deck any more: {target}.",
+	"tabs_document_no_canvas": "This document is kept in the deck's own docs, on no canvas.",
+	"tabs_on_no_canvas": "This is on no canvas.",
+	"tabs_not_on_canvas": "It is not on {canvas} any more."
+}

@@ -1,4 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { m } from "@decks/i18n";
 import { clockOf, filmLayout, SOUND_INK, soundLayout, waveBars } from "../look/media-look.ts";
 
 /**
@@ -163,7 +164,7 @@ export default function MediaPlayer(props: MediaPlayerProps) {
 				<audio ref={wire} src={props.src} preload="auto" />
 				<button
 					class="pen-player-disc"
-					aria-label={paused() ? "Play" : "Pause"}
+					aria-label={paused() ? m.canvas_media_play() : m.canvas_media_pause()}
 					style={{ left: `${look().disc.cx - look().disc.r}px`, top: `${look().disc.cy - look().disc.r}px`, width: `${look().disc.r * 2}px`, height: `${look().disc.r * 2}px`, background: ink().disc, color: ink().glyph }}
 					onPointerDown={hold}
 					onClick={toggle}
@@ -179,7 +180,7 @@ export default function MediaPlayer(props: MediaPlayerProps) {
 				<div
 					class="pen-player-wave"
 					role="slider"
-					aria-label="Seek"
+					aria-label={m.canvas_media_seek()}
 					aria-valuemin={0}
 					aria-valuemax={Math.round(length())}
 					aria-valuenow={Math.round(at())}
@@ -235,7 +236,7 @@ export default function MediaPlayer(props: MediaPlayerProps) {
 			<video ref={wire} src={props.src} playsinline preload="auto" />
 			<button
 				class="pen-player-big"
-				aria-label="Play"
+				aria-label={m.canvas_media_play()}
 				style={{ left: `${look().disc.cx - look().disc.r}px`, top: `${look().disc.cy - look().disc.r}px`, width: `${look().disc.r * 2}px`, height: `${look().disc.r * 2}px` }}
 				onPointerDown={hold}
 				onClick={toggle}
@@ -243,15 +244,15 @@ export default function MediaPlayer(props: MediaPlayerProps) {
 				<Glyph paused />
 			</button>
 			<div class="pen-player-bar" onPointerDown={hold}>
-				<button aria-label={paused() ? "Play" : "Pause"} onClick={toggle}>
+				<button aria-label={paused() ? m.canvas_media_play() : m.canvas_media_pause()} onClick={toggle}>
 					<Glyph paused={paused()} />
 				</button>
 				<span class="pen-player-clock">{clock()}</span>
-				<div class="pen-player-track" role="slider" aria-label="Seek" aria-valuemin={0} aria-valuemax={Math.round(length())} aria-valuenow={Math.round(at())} onPointerDown={scrub}>
+				<div class="pen-player-track" role="slider" aria-label={m.canvas_media_seek()} aria-valuemin={0} aria-valuemax={Math.round(length())} aria-valuenow={Math.round(at())} onPointerDown={scrub}>
 					<i style={{ width: `${progress() * 100}%` }} />
 				</div>
 				<button
-					aria-label={muted() ? "Sound on" : "Mute"}
+					aria-label={muted() ? m.canvas_media_unmute() : m.canvas_media_mute()}
 					onClick={(event) => {
 						event.stopPropagation();
 						element.muted = !element.muted;
@@ -263,7 +264,7 @@ export default function MediaPlayer(props: MediaPlayerProps) {
 					</svg>
 				</button>
 				<button
-					aria-label="Full screen"
+					aria-label={m.canvas_media_fullscreen()}
 					onClick={(event) => {
 						event.stopPropagation();
 						const video = element as HTMLVideoElement;

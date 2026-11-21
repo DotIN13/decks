@@ -1,4 +1,5 @@
 import { INK_COLORS } from "@decks/ink";
+import { formatNumber, m } from "@decks/i18n";
 import type { LucideIcon } from "lucide-solid";
 import Eraser from "lucide-solid/icons/eraser";
 import Highlighter from "lucide-solid/icons/highlighter";
@@ -21,14 +22,14 @@ import { inkKey } from "../ink/ink-keys.ts";
  * most are on the left, what they look like is in the middle, and taking things back is at
  * the far end where a resting hand does not press it.
  */
-const TOOLS: Array<{ tool: InkTool; icon: LucideIcon; label: string }> = [
-	{ tool: "pen", icon: PenLine, label: "Pen: draws, and presses harder with a pencil" },
-	{ tool: "marker", icon: Highlighter, label: "Marker: wide and see-through, for marking words" },
-	{ tool: "eraser", icon: Eraser, label: "Eraser: removes each stroke it touches" },
-	{ tool: "lasso", icon: Lasso, label: "Lasso: loop round strokes to select them, then drag or delete" },
+const TOOLS: Array<{ tool: InkTool; icon: LucideIcon; label: () => string }> = [
+	{ tool: "pen", icon: PenLine, label: () => m.canvas_ink_pen() },
+	{ tool: "marker", icon: Highlighter, label: () => m.canvas_ink_marker() },
+	{ tool: "eraser", icon: Eraser, label: () => m.canvas_ink_eraser() },
+	{ tool: "lasso", icon: Lasso, label: () => m.canvas_ink_lasso() },
 ];
 
-const COLOR_NAMES: Record<(typeof INK_COLORS)[number], string> = { ink: "Black or white, with the theme", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };
+const COLOR_NAMES: Record<(typeof INK_COLORS)[number], () => string> = { ink: () => m.canvas_ink_color_ink(), red: () => m.canvas_ink_color_red(), blue: () => m.canvas_ink_color_blue(), green: () => m.canvas_ink_color_green(), yellow: () => m.canvas_ink_color_yellow() };
 
 /**
  * What is drawn goes on the stage (`canvas/pen/CanvasInk.tsx`), so undo and redo are the stage's
@@ -72,7 +73,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 	const paints = () => inkTool() === "pen" || inkTool() === "marker";
 
 	return (
-		<div class="ink-bar float pill" role="toolbar" aria-label="Drawing tools">
+		<div class="ink-bar float pill" role="toolbar" aria-label={m.canvas_tools_label()}>
 			<For each={TOOLS}>
 				{(entry) => (
 					<button
@@ -80,8 +81,8 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 						class="icon-button"
 						data-on={inkTool() === entry.tool ? "true" : undefined}
 						aria-pressed={inkTool() === entry.tool}
-						title={entry.label}
-						aria-label={entry.label}
+						title={entry.label()}
+						aria-label={entry.label()}
 						onClick={() => {
 							setInkTool(entry.tool);
 							if (entry.tool !== "lasso") setInkSelection(undefined);
@@ -94,7 +95,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 
 			<Show when={paints()}>
 				<span class="pill-sep" aria-hidden="true" />
-				<span class="inkbar-swatches" role="group" aria-label="Colour">
+				<span class="inkbar-swatches" role="group" aria-label={m.canvas_props_colour()}>
 					<For each={INK_COLORS}>
 						{(color) => (
 							<button
@@ -102,8 +103,8 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 								class="inkbar-swatch"
 								data-on={inkColor() === color ? "true" : undefined}
 								aria-pressed={inkColor() === color}
-								title={COLOR_NAMES[color]}
-								aria-label={COLOR_NAMES[color]}
+								title={COLOR_NAMES[color]()}
+								aria-label={COLOR_NAMES[color]()}
 								style={{ "--swatch": inkSwatch(color) }}
 								onClick={() => setInkColor(color)}
 							/>
@@ -111,7 +112,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 					</For>
 				</span>
 				<span class="pill-sep" aria-hidden="true" />
-				<span class="inkbar-widths" role="group" aria-label="Width">
+				<span class="inkbar-widths" role="group" aria-label={m.canvas_props_width()}>
 					<For each={[0, 1, 2]}>
 						{(index) => (
 							<button
@@ -119,8 +120,8 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 								class="icon-button inkbar-width"
 								data-on={inkWidth() === index ? "soft" : undefined}
 								aria-pressed={inkWidth() === index}
-								title={`${widths()[index]} pixels wide`}
-								aria-label={`${widths()[index]} pixels wide`}
+								title={m.canvas_ink_width({ px: formatNumber(widths()[index]!) })}
+								aria-label={m.canvas_ink_width({ px: formatNumber(widths()[index]!) })}
 								onClick={() => setInkWidth(index)}
 							>
 								<span style={{ height: `${2 + index * 3}px` }} />
@@ -132,20 +133,20 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 
 			<Show when={inkSelection()}>
 				<span class="pill-sep" aria-hidden="true" />
-				<button type="button" class="icon-button" title="Delete the selected strokes (Delete)" aria-label="Delete the selected strokes" onClick={deleteSelection}>
+				<button type="button" class="icon-button" title={m.canvas_ink_delete_title()} aria-label={m.canvas_ink_delete()} onClick={deleteSelection}>
 					<Icon of={Trash2} size={15} />
 				</button>
 			</Show>
 
 			<span class="pill-sep" aria-hidden="true" />
-			<button type="button" class="icon-button" title="Undo your last change to the canvas (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
+			<button type="button" class="icon-button" title={m.canvas_ink_undo_title()} aria-label={m.canvas_undo()} onClick={() => props.onStep("undo")}>
 				<Icon of={Undo2} size={15} />
 			</button>
-			<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
+			<button type="button" class="icon-button" title={m.canvas_redo_title()} aria-label={m.canvas_redo()} onClick={() => props.onStep("redo")}>
 				<Icon of={Redo2} size={15} />
 			</button>
 			<span class="pill-sep" aria-hidden="true" />
-			<button type="button" class="icon-button" title="Stop drawing (Escape)" aria-label="Stop drawing" onClick={props.onDone}>
+			<button type="button" class="icon-button" title={m.canvas_ink_stop_title()} aria-label={m.canvas_ink_stop()} onClick={props.onDone}>
 				<Icon of={X} size={15} />
 			</button>
 		</div>

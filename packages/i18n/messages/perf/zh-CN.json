@@ -1,0 +1,6 @@
+{
+	"perf_plot_label": "最近四秒内每一帧所用的时间",
+	"perf_summary": "最慢 {worst} 毫秒 · {missed} 超过 12 毫秒",
+	"perf_key_120": "8.3 毫秒，120 Hz",
+	"perf_key_60": "16.7 毫秒，60 Hz"
+}

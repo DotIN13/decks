@@ -1,0 +1,14 @@
+{
+	"markup_comment_label": "评论选中的文字",
+	"markup_comment": "评论",
+	"markup_whole_card": "针对整张卡片",
+	"markup_whole_card_titled": "针对整张卡片：{title}",
+	"markup_comment_placeholder": "你想对此说些什么？",
+	"markup_close_title": "关闭（Esc）",
+	"markup_close": "关闭",
+	"markup_keep_title": "放在输入框上方，随下一条消息一起发送（Enter）",
+	"markup_keep": "随下一条消息",
+	"markup_send_title": "立即作为单独的消息发给智能体（⌘Enter）",
+	"markup_pick_agent": "请先选择一个智能体",
+	"markup_send": "立即发送"
+}

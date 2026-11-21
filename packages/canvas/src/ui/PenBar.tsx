@@ -1,4 +1,5 @@
 import type { PenDocument } from "@decks/pen";
+import { m } from "@decks/i18n";
 import type { LucideIcon } from "lucide-solid";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
@@ -31,14 +32,14 @@ import { Properties } from "./Properties.tsx";
  * the properties panel (`Properties.tsx`), in the board inspector's corner, only while something in
  * the drawing is selected. Every control sends a pen operation, the same one an agent would.
  */
-export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key?: string; after?: boolean; panel?: "shapes" | "icons" }> = [
-	{ tool: "shape", icon: Shapes, label: "Shapes: basic, flowchart, arrows and callouts", panel: "shapes" },
-	{ tool: "icon", icon: SmilePlus, label: "Icons: Lucide, Phosphor, Material and Feather", panel: "icons" },
-	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
-	{ tool: "note", icon: StickyNote, label: "Note", key: "N", after: true },
-	{ tool: "card", icon: FileText, label: "Card: write markdown, see headings, lists, bold and links", key: "C" },
-	{ tool: "text", icon: Type, label: "Text", key: "T" },
-	{ tool: "arrow", icon: ArrowUpRight, label: "Arrow: drag from one thing to another and it stays joined", key: "A" },
+export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: () => string; key?: string; after?: boolean; panel?: "shapes" | "icons" }> = [
+	{ tool: "shape", icon: Shapes, label: () => m.canvas_tool_shapes(), panel: "shapes" },
+	{ tool: "icon", icon: SmilePlus, label: () => m.canvas_tool_icons(), panel: "icons" },
+	{ tool: "frame", icon: FrameIcon, label: () => m.canvas_tool_frame(), key: "F" },
+	{ tool: "note", icon: StickyNote, label: () => m.canvas_tool_note(), key: "N", after: true },
+	{ tool: "card", icon: FileText, label: () => m.canvas_tool_card(), key: "C" },
+	{ tool: "text", icon: Type, label: () => m.canvas_tool_text(), key: "T" },
+	{ tool: "arrow", icon: ArrowUpRight, label: () => m.canvas_tool_arrow(), key: "A" },
 ];
 
 export function PenBar(props: {
@@ -71,9 +72,9 @@ export function PenBar(props: {
 	return (
 		<>
 		<Show when={props.tools !== false}>
-		<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
+		<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label={m.canvas_tools_label()}>
 			{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
-			<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
+			<div ref={gripEl} class="pen-grip" title={m.canvas_tools_grip()} aria-hidden="true">
 				<Icon of={GripHorizontal} size={14} />
 			</div>
 			<For each={TOOLS}>
@@ -81,7 +82,7 @@ export function PenBar(props: {
 					<>
 					{/* A file of any kind, chosen in the file picker and placed by what it is (`app/files.ts`, `fileAt`). */}
 					<Show when={entry.tool === "arrow" && props.onOpenFile}>
-						<button type="button" class="icon-button" data-writes data-file-button title="A file: a document, a picture, a film, a sound, anything" aria-label="Add a file" onClick={() => props.onOpenFile?.()}>
+						<button type="button" class="icon-button" data-writes data-file-button title={m.canvas_tool_file_title()} aria-label={m.canvas_tool_file()} onClick={() => props.onOpenFile?.()}>
 							<Icon of={Paperclip} size={15} />
 						</button>
 					</Show>
@@ -97,8 +98,8 @@ export function PenBar(props: {
 						data-on={penTool() === entry.tool || (entry.panel && besideTab() === entry.panel) ? "true" : undefined}
 						aria-pressed={penTool() === entry.tool}
 						aria-haspopup={entry.panel ? "dialog" : undefined}
-						title={entry.key ? `${entry.label} (${entry.key})` : entry.label}
-						aria-label={entry.label}
+						title={entry.key ? m.canvas_tool_with_key({ label: entry.label(), key: entry.key }) : entry.label()}
+						aria-label={entry.label()}
 						onClick={() => {
 							// Shapes and icons are picked in the insert panel first, which arms the tool (`Insert.tsx`).
 							if (entry.panel) {
@@ -119,14 +120,14 @@ export function PenBar(props: {
 				)}
 			</For>
 			<span class="pen-rule" aria-hidden="true" />
-			<button type="button" class="icon-button" title="Undo your last change to the drawing (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
+			<button type="button" class="icon-button" title={m.canvas_tools_undo_title()} aria-label={m.canvas_undo()} onClick={() => props.onStep("undo")}>
 				<Icon of={Undo2} size={15} />
 			</button>
-			<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
+			<button type="button" class="icon-button" title={m.canvas_redo_title()} aria-label={m.canvas_redo()} onClick={() => props.onStep("redo")}>
 				<Icon of={Redo2} size={15} />
 			</button>
 			{/* Put away behind an edge, this is the part left showing, and the way back. */}
-			<button type="button" class="stowtab" data-stowtab aria-label="Bring the drawing tools back" title="Bring the drawing tools back" onClick={() => unstow()}>
+			<button type="button" class="stowtab" data-stowtab aria-label={m.canvas_tools_unstow()} title={m.canvas_tools_unstow()} onClick={() => unstow()}>
 				<Icon of={ChevronLeft} size={14} />
 			</button>
 		</div>

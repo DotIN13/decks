@@ -1,4 +1,5 @@
 import { createSignal, onCleanup, Show } from "solid-js";
+import { formatNumber, m } from "@decks/i18n";
 
 /**
  * A frame-rate meter over the canvas, for judging a pan by eye and by number (Settings, Boards).
@@ -111,13 +112,11 @@ export function FpsMeter() {
 				<span class="fps-n">{shown().fps}</span>
 				<span class="fps-u">fps</span>
 			</div>
-			<canvas class="fps-plot" ref={canvas} aria-label="Time each frame took over the last four seconds" />
-			<div class="fps-d">
-				slowest {shown().worst} ms · {shown().missed}% over 12 ms
-			</div>
+			<canvas class="fps-plot" ref={canvas} aria-label={m.perf_plot_label()} />
+			<div class="fps-d">{m.perf_summary({ worst: formatNumber(shown().worst), missed: formatNumber(shown().missed / 100, { style: "percent" }) })}</div>
 			<div class="fps-key">
-				<span class="k120">8.3 ms, 120 Hz</span>
-				<span class="k60">16.7 ms, 60 Hz</span>
+				<span class="k120">{m.perf_key_120()}</span>
+				<span class="k60">{m.perf_key_60()}</span>
 			</div>
 		</div>
 	);

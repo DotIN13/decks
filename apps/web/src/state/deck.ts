@@ -1,6 +1,7 @@
 import { AGENT_KINDS, type AgentChat, type AgentKind, type Page, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
 import { trackZoneWith } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
 
 /**
@@ -168,7 +169,7 @@ export const ensureAgent = (id: string): void => {
 };
 
 /** What to call an agent in a sentence, without the sentence being about an id. */
-export const nameOf = (id: string | undefined): string => (id ? (state.identities[id]?.name ?? "An agent") : "An agent");
+export const nameOf = (id: string | undefined): string => (id ? (state.identities[id]?.name ?? m.state_an_agent()) : m.state_an_agent());
 
 /** The focused agent's question, if it has one. */
 export const dialog = () => (state.focused ? state.agents[state.focused]?.dialog : undefined);

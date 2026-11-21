@@ -8,6 +8,7 @@ import { LiveEditor, type BlockStyle, type FormatState, type InlineStyle } from 
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
 import type { DocsRequest } from "../gdoc/types.ts";
+import { formatList, formatNumber, getLocale, m } from "@decks/i18n";
 
 /**
  * `@decks/docs/page`: a document drawn as a page you type into, in plain DOM.
@@ -475,7 +476,7 @@ const dir = (path: string) => path.replace(/[\\/][^\\/]*$/, "");
 const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const keyName = (k: string) => (mac ? k.replace("Mod+", "⌘").replace("Shift+", "⇧") : k.replace("Mod+", "Ctrl+"));
 
-const when = (at: number) => new Date(at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+const when = (at: number) => new Date(at).toLocaleString(getLocale(), { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
 const clip = (text: string, n = 70) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
 
 export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPage {
@@ -484,7 +485,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	host.replaceChildren();
 	const bar = el("div", { class: "dp-bar" });
 	const name = el("span", { class: "dp-name" }, base(options.path));
-	const status = el("span", { class: "dp-status" }, "Opening…");
+	const status = el("span", { class: "dp-status" }, m.docs_opening());
 	const spacer = el("span", { class: "dp-spacer" });
 	const iconButton = (icon: string, label: string, cls = "dp-ib") => {
 		const b = el("button", { type: "button", class: cls, title: label, "aria-label": label, "aria-pressed": "false" });
@@ -496,20 +497,20 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		b.innerHTML = `${svg(icon)}<span>${label}</span>`;
 		return b;
 	};
-	const sourceButton = labelled("source", "Source", "Show the file as its source");
-	const historyButton = labelled("clock", "History", "Earlier versions of this file");
-	const pdfButton = labelled("pdf", "PDF", "Typeset this file and show the PDF beside it");
+	const sourceButton = labelled("source", m.docs_source(), m.docs_source_title());
+	const historyButton = labelled("clock", m.docs_history(), m.docs_history_title());
+	const pdfButton = labelled("pdf", "PDF", m.docs_pdf_title());
 	pdfButton.hidden = true;
-	const changesButton = el("button", { type: "button", class: "dp-btn dp-changes", "aria-pressed": "false", title: "Edits from agents, to accept or reject", hidden: "" });
-	const commentsButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", title: "The Doc's comments", hidden: "" });
+	const changesButton = el("button", { type: "button", class: "dp-btn dp-changes", "aria-pressed": "false", title: m.docs_changes_title(), hidden: "" });
+	const commentsButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", title: m.docs_comments_title(), hidden: "" });
 	// Git: shown once the server says the file is in a repository, with Pull and Push in a popover.
 	const gitBox = el("div", { class: "dp-git", hidden: "" });
-	const gitButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: "Pull and push this file's git repository" });
+	const gitButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_git_title() });
 	const gitMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
 	gitBox.append(gitButton, gitMenu);
 	// A Google Doc: where it lives, how the link stands, and signing in; in place of Git, which a Doc has none of.
 	const googleBox = el("div", { class: "dp-git", hidden: "" });
-	const googleButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: "This page is a Google Doc" });
+	const googleButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_google_title() });
 	const googleMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
 	googleBox.append(googleButton, googleMenu);
 	bar.append(name, status, spacer, changesButton, commentsButton, gitBox, googleBox, pdfButton, sourceButton, historyButton);
@@ -522,10 +523,10 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	const old = el("div", { class: "dp-old", hidden: "" });
 	const pill = el("div", { class: "dp-pill", hidden: "" });
 	scroll.append(banner, text);
-	const divider = el("div", { class: "dp-divider", hidden: "", role: "separator", "aria-orientation": "vertical", title: "Drag to resize" });
+	const divider = el("div", { class: "dp-divider", hidden: "", role: "separator", "aria-orientation": "vertical", title: m.docs_drag_resize() });
 	const pdfPane = el("div", { class: "dp-pdf", hidden: "" });
 	const pdfBar = el("div", { class: "dp-pdfbar" });
-	const pdfState = el("span", { class: "dp-pdfstate" }, "Not typeset yet");
+	const pdfState = el("span", { class: "dp-pdfstate" }, m.docs_pdf_not_yet());
 	const errButton = el("button", { type: "button", class: "dp-btn dp-sm dp-errs", hidden: "", "aria-pressed": "false" });
 	const errList = el("div", { class: "dp-errlist", hidden: "" });
 	const pdfBody = el("div", { class: "dp-pdfbody" });
@@ -649,14 +650,14 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	const buttons = new Map<string, HTMLButtonElement>();
 	// The paragraph style: a button naming it, and a menu drawing each style as it reads.
 	const styleBox = el("div", { class: "dp-style" });
-	const styleButton = el("button", { type: "button", class: "dp-btn", title: "Paragraph style", "aria-haspopup": "menu", "aria-expanded": "false" });
+	const styleButton = el("button", { type: "button", class: "dp-btn", title: m.docs_paragraph_style(), "aria-haspopup": "menu", "aria-expanded": "false" });
 	const styleMenu = el("div", { class: "dp-menu", role: "menu", hidden: "" });
 	styleBox.append(styleButton, styleMenu);
 	let styles: Array<[string, string]> = [];
 	let styleNow = "p";
 	const styleLabel = () => {
 		styleButton.innerHTML = "";
-		styleButton.append(el("span", {}, styles.find(([v]) => v === styleNow)?.[1] ?? "Body"));
+		styleButton.append(el("span", {}, styles.find(([v]) => v === styleNow)?.[1] ?? m.docs_style_body()));
 		styleButton.insertAdjacentHTML("beforeend", svg("chevron"));
 	};
 	const closeMenu = () => {
@@ -705,37 +706,37 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			group = el("div", { class: "dp-group" });
 		};
 		styles = tex
-			? [["p", "Body text"], ["h1", "Section"], ["h2", "Subsection"], ["h3", "Subsubsection"], ["h4", "Paragraph heading"]]
-			: [["p", "Body text"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"], ["h4", "Heading 4"], ["h5", "Heading 5"], ["h6", "Heading 6"]];
+			? [["p", m.docs_style_body_text()], ["h1", m.docs_style_section()], ["h2", m.docs_style_subsection()], ["h3", m.docs_style_subsubsection()], ["h4", m.docs_style_paragraph_heading()]]
+			: [["p", m.docs_style_body_text()], ["h1", m.docs_style_heading({ level: 1 })], ["h2", m.docs_style_heading({ level: 2 })], ["h3", m.docs_style_heading({ level: 3 })], ["h4", m.docs_style_heading({ level: 4 })], ["h5", m.docs_style_heading({ level: 5 })], ["h6", m.docs_style_heading({ level: 6 })]];
 		styleLabel();
 		tools.append(styleBox);
 		const inline = (key: InlineStyle, title: string) => button(key, title, () => live.toggle(key));
-		inline("bold", `Bold (${keyName("Mod+B")})`);
-		inline("italic", `Italic (${keyName("Mod+I")})`);
-		inline("underline", `Underline (${keyName("Mod+U")})`);
-		if (!tex) inline("strike", `Strikethrough (${keyName("Mod+Shift+X")})`);
+		inline("bold", m.docs_tool_bold({ key: keyName("Mod+B") }));
+		inline("italic", m.docs_tool_italic({ key: keyName("Mod+I") }));
+		inline("underline", m.docs_tool_underline({ key: keyName("Mod+U") }));
+		if (!tex) inline("strike", m.docs_tool_strike({ key: keyName("Mod+Shift+X") }));
 		sep();
-		inline("code", `Code (${keyName("Mod+E")})`);
-		if (!tex) inline("mark", `Highlight (${keyName("Mod+Shift+H")})`);
-		button("link", `Link (${keyName("Mod+K")})`, () => live.link());
-		inline("math", `Inline maths (${keyName("Mod+Shift+M")})`);
+		inline("code", m.docs_tool_code({ key: keyName("Mod+E") }));
+		if (!tex) inline("mark", m.docs_tool_highlight({ key: keyName("Mod+Shift+H") }));
+		button("link", m.docs_tool_link({ key: keyName("Mod+K") }), () => live.link());
+		inline("math", m.docs_tool_math({ key: keyName("Mod+Shift+M") }));
 		sep();
-		button("ul", `Bulleted list (${keyName("Mod+Shift+8")})`, () => live.setBlock("ul"));
+		button("ul", m.docs_tool_bullets({ key: keyName("Mod+Shift+8") }), () => live.setBlock("ul"));
 		if (!tex) {
-			button("ol", `Numbered list (${keyName("Mod+Shift+7")})`, () => live.setBlock("ol"));
-			button("task", "Task list", () => live.setBlock("task"));
-			button("quote", "Quote", () => live.setBlock("quote"));
-			button("codeblock", "Code block", () => live.setBlock("code"));
+			button("ol", m.docs_tool_numbers({ key: keyName("Mod+Shift+7") }), () => live.setBlock("ol"));
+			button("task", m.docs_tool_tasks(), () => live.setBlock("task"));
+			button("quote", m.docs_tool_quote(), () => live.setBlock("quote"));
+			button("codeblock", m.docs_tool_codeblock(), () => live.setBlock("code"));
 			sep();
-			button("table", "Table", () => live.insertBlock("table"));
-			button("hr", "Horizontal rule", () => live.insertBlock("hr"));
+			button("table", m.docs_tool_table(), () => live.insertBlock("table"));
+			button("hr", m.docs_tool_rule(), () => live.insertBlock("hr"));
 		} else {
-			button("ol", "Numbered list", () => live.setBlock("ol"));
-			button("display", "Equation", () => live.insertBlock("math"));
+			button("ol", m.docs_tool_numbered(), () => live.setBlock("ol"));
+			button("display", m.docs_tool_equation(), () => live.insertBlock("math"));
 		}
 		sep();
-		button("undo", `Undo (${keyName("Mod+Z")})`, () => live.undo());
-		button("redo", `Redo (${keyName("Mod+Shift+Z")})`, () => live.redo());
+		button("undo", m.docs_tool_undo({ key: keyName("Mod+Z") }), () => live.undo());
+		button("redo", m.docs_tool_redo({ key: keyName("Mod+Shift+Z") }), () => live.redo());
 		sep();
 	}
 
@@ -759,14 +760,14 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			group.append(b);
 			return b;
 		};
-		button("undo", `Undo (${keyName("Mod+Z")})`, () => gview.undo());
-		button("redo", `Redo (${keyName("Mod+Shift+Z")})`, () => gview.redo());
+		button("undo", m.docs_tool_undo({ key: keyName("Mod+Z") }), () => gview.undo());
+		button("redo", m.docs_tool_redo({ key: keyName("Mod+Shift+Z") }), () => gview.redo());
 		sep();
-		styles = [["NORMAL_TEXT", "Normal text"], ["TITLE", "Title"], ["SUBTITLE", "Subtitle"], ["HEADING_1", "Heading 1"], ["HEADING_2", "Heading 2"], ["HEADING_3", "Heading 3"], ["HEADING_4", "Heading 4"]];
+		styles = [["NORMAL_TEXT", m.docs_style_normal()], ["TITLE", m.docs_style_title()], ["SUBTITLE", m.docs_style_subtitle()], ["HEADING_1", m.docs_style_heading({ level: 1 })], ["HEADING_2", m.docs_style_heading({ level: 2 })], ["HEADING_3", m.docs_style_heading({ level: 3 })], ["HEADING_4", m.docs_style_heading({ level: 4 })]];
 		styleNow = "NORMAL_TEXT";
 		styleLabel();
 		tools.append(styleBox);
-		const font = el("select", { class: "dp-select", title: "Font", "aria-label": "Font" });
+		const font = el("select", { class: "dp-select", title: m.docs_tool_font(), "aria-label": m.docs_tool_font() });
 		for (const f of FONTS) font.append(el("option", { value: f, style: `font-family: "${f}"` }, f));
 		font.onchange = () => {
 			gview.setText("weightedFontFamily", { fontFamily: font.value });
@@ -775,25 +776,25 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		gcontrols.font = font;
 		group.append(font);
 		sep();
-		const size = el("input", { class: "dp-size", type: "text", inputmode: "numeric", title: "Font size", "aria-label": "Font size" });
+		const size = el("input", { class: "dp-size", type: "text", inputmode: "numeric", title: m.docs_tool_font_size(), "aria-label": m.docs_tool_font_size() });
 		const setSize = (value: number) => {
 			const v = Math.max(1, Math.min(400, Math.round(value)));
 			size.value = String(v);
 			gview.setText("fontSize", { magnitude: v, unit: "PT" });
 		};
-		button("smaller", "Decrease font size", () => setSize(Number(size.value || 11) - 1), "minus");
+		button("smaller", m.docs_tool_smaller(), () => setSize(Number(size.value || 11) - 1), "minus");
 		group.append(size);
-		button("bigger", "Increase font size", () => setSize(Number(size.value || 11) + 1), "plus");
+		button("bigger", m.docs_tool_bigger(), () => setSize(Number(size.value || 11) + 1), "plus");
 		size.onchange = () => {
 			setSize(Number(size.value) || 11);
 			gview.focus();
 		};
 		gcontrols.size = size;
 		sep();
-		button("bold", `Bold (${keyName("Mod+B")})`, () => gview.toggle("bold"));
-		button("italic", `Italic (${keyName("Mod+I")})`, () => gview.toggle("italic"));
-		button("underline", `Underline (${keyName("Mod+U")})`, () => gview.toggle("underline"));
-		button("strike", `Strikethrough (${keyName("Mod+Shift+X")})`, () => gview.toggle("strikethrough"));
+		button("bold", m.docs_tool_bold({ key: keyName("Mod+B") }), () => gview.toggle("bold"));
+		button("italic", m.docs_tool_italic({ key: keyName("Mod+I") }), () => gview.toggle("italic"));
+		button("underline", m.docs_tool_underline({ key: keyName("Mod+U") }), () => gview.toggle("underline"));
+		button("strike", m.docs_tool_strike({ key: keyName("Mod+Shift+X") }), () => gview.toggle("strikethrough"));
 		const colour = (key: string, title: string, field: "foregroundColor" | "backgroundColor") => {
 			const input = el("input", { type: "color", class: "dp-colour", "aria-label": title, value: field === "foregroundColor" ? "#000000" : "#ffff00" });
 			const b = button(key, title, () => input.click(), field === "foregroundColor" ? "textcolour" : "mark");
@@ -805,39 +806,39 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 				gview.focus();
 			};
 		};
-		colour("colour", "Text colour", "foregroundColor");
-		colour("highlight", "Highlight colour", "backgroundColor");
+		colour("colour", m.docs_tool_text_colour(), "foregroundColor");
+		colour("highlight", m.docs_tool_highlight_colour(), "backgroundColor");
 		sep();
-		button("link", `Link (${keyName("Mod+K")})`, () => askLink());
+		button("link", m.docs_tool_link({ key: keyName("Mod+K") }), () => askLink());
 		sep();
 		const align = (key: string, title: string, value: string) => button(key, title, () => gview.setParagraph({ alignment: value }, "alignment"));
-		align("alignleft", "Left align", "START");
-		align("aligncenter", "Centre align", "CENTER");
-		align("alignright", "Right align", "END");
-		align("justify", "Justify", "JUSTIFIED");
+		align("alignleft", m.docs_tool_align_left(), "START");
+		align("aligncenter", m.docs_tool_align_centre(), "CENTER");
+		align("alignright", m.docs_tool_align_right(), "END");
+		align("justify", m.docs_tool_justify(), "JUSTIFIED");
 		sep();
-		button("ul", `Bulleted list (${keyName("Mod+Shift+8")})`, () => gview.list(false));
-		button("ol", `Numbered list (${keyName("Mod+Shift+7")})`, () => gview.list(true));
-		button("outdent", `Decrease indent (${keyName("Mod+[")})`, () => gview.indent(-1));
-		button("indent", `Increase indent (${keyName("Mod+]")})`, () => gview.indent(1));
+		button("ul", m.docs_tool_bullets({ key: keyName("Mod+Shift+8") }), () => gview.list(false));
+		button("ol", m.docs_tool_numbers({ key: keyName("Mod+Shift+7") }), () => gview.list(true));
+		button("outdent", m.docs_tool_outdent({ key: keyName("Mod+[") }), () => gview.indent(-1));
+		button("indent", m.docs_tool_indent({ key: keyName("Mod+]") }), () => gview.indent(1));
 		sep();
-		button("table", "Insert a table (3 by 3)", () => gview.table("insert"));
+		button("table", m.docs_tool_insert_table(), () => gview.table("insert"));
 		// Rows and columns, for the cell the caret is in.
-		button("rowabove", "Insert row above", () => gview.table("rowAbove"));
-		button("rowbelow", "Insert row below", () => gview.table("rowBelow"));
-		button("colleft", "Insert column left", () => gview.table("colLeft"));
-		button("colright", "Insert column right", () => gview.table("colRight"));
-		button("rowdelete", "Delete row", () => gview.table("deleteRow"));
-		button("coldelete", "Delete column", () => gview.table("deleteCol"));
+		button("rowabove", m.docs_tool_row_above(), () => gview.table("rowAbove"));
+		button("rowbelow", m.docs_tool_row_below(), () => gview.table("rowBelow"));
+		button("colleft", m.docs_tool_col_left(), () => gview.table("colLeft"));
+		button("colright", m.docs_tool_col_right(), () => gview.table("colRight"));
+		button("rowdelete", m.docs_tool_delete_row(), () => gview.table("deleteRow"));
+		button("coldelete", m.docs_tool_delete_col(), () => gview.table("deleteCol"));
 		sep();
-		button("comment", "Comment on the selected words", () => newComment());
-		button("clear", `Clear formatting (${keyName("Mod+\\")})`, () => gview.clearFormatting());
+		button("comment", m.docs_tool_comment(), () => newComment());
+		button("clear", m.docs_tool_clear({ key: keyName("Mod+\\") }), () => gview.clearFormatting());
 		sep();
 		gpressed();
 	}
 
 	function askLink(): void {
-		const url = window.prompt("Link to", "https://");
+		const url = window.prompt(m.docs_link_prompt(), "https://");
 		if (url !== null) gview.link(url.trim() && url.trim() !== "https://" ? url.trim() : undefined);
 		gview.focus();
 	}
@@ -863,7 +864,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		const type = state.type === "TITLE" || state.type === "SUBTITLE" || state.type.startsWith("HEADING_") ? state.type : "NORMAL_TEXT";
 		if (type !== styleNow) {
 			styleNow = type;
-			if (!styles.some(([v]) => v === type)) styles.push([type, type.replace("HEADING_", "Heading ")]);
+			if (!styles.some(([v]) => v === type)) styles.push([type, type.startsWith("HEADING_") ? m.docs_style_heading({ level: type.slice("HEADING_".length) }) : type]);
 			styleLabel();
 		}
 	}
@@ -983,7 +984,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			text.setAttribute("contenteditable", sync.readOnly ? "false" : "plaintext-only");
 			// A Google Doc goes by its own title; its mirror's file name is this server's business.
 			name.textContent = sync.remote?.title ?? base(sync.path);
-			name.title = sync.remote ? `${sync.remote.title}, a Google Doc` : sync.path;
+			name.title = sync.remote ? m.docs_google_doc_named({ title: sync.remote.title }) : sync.path;
 			reading.root.dataset.format = sync.format;
 			live.root.toggleAttribute("data-tex", isTex());
 			pdfButton.hidden = !isTex() || sync.format === "docx";
@@ -1030,17 +1031,17 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			status.textContent = sync.error;
 		} else if (sync.readOnly) {
 			status.dataset.state = "idle";
-			status.textContent = "Read-only";
+			status.textContent = m.docs_read_only();
 		} else if (!sync.ready) {
 			status.dataset.state = "idle";
-			status.textContent = "Opening…";
+			status.textContent = m.docs_opening();
 		} else {
 			status.dataset.state = sync.settled ? "" : "saving";
-			status.textContent = sync.settled ? "Saved" : "Saving…";
+			status.textContent = sync.settled ? m.docs_saved() : m.docs_saving();
 		}
 		const n = sync.changes.length;
 		changesButton.hidden = n === 0 && view !== "changes";
-		changesButton.innerHTML = `${svg("changes")}<span>Changes</span>${n ? `<span class="dp-count">${n}</span>` : ""}`;
+		changesButton.innerHTML = `${svg("changes")}<span>${m.docs_changes()}</span>${n ? `<span class="dp-count">${n}</span>` : ""}`;
 		// Only when the list changed: redrawing it every tick replaced the button under the pointer, and its hover flickered.
 		if (view === "changes" && changesDrawn !== changesKey()) drawChanges();
 	}
@@ -1055,17 +1056,17 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		if (view === "changes") drawChanges();
 		if (view === "comments") drawComments();
 		if (view === "history") {
-			panel.replaceChildren(header("History"), el("p", { class: "dp-empty" }, "Reading…"));
+			panel.replaceChildren(header(m.docs_history()), el("p", { class: "dp-empty" }, m.docs_reading()));
 			sync.versions();
 		}
 		refresh();
 	}
 
-	const whoOf = (by: string) => (by === "outside" ? "Another program" : by);
+	const whoOf = (by: string) => (by === "outside" ? m.docs_another_program() : by);
 
 	function header(title: string, ...extra: HTMLElement[]): HTMLElement {
 		const head = el("div", { class: "dp-head" });
-		const close = iconButton("x", "Close", "dp-ib dp-sm");
+		const close = iconButton("x", m.docs_close(), "dp-ib dp-sm");
 		close.onclick = () => show(view);
 		head.append(el("h3", {}, title), ...extra, close);
 		return head;
@@ -1080,22 +1081,22 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		changesDrawn = changesKey();
 		const extra: HTMLElement[] = [];
 		if (sync.changes.length > 0 && !sync.readOnly) {
-			const all = el("button", { type: "button", class: "dp-btn dp-sm dp-primary", title: "Keep every edit" }, "Accept all");
-			const none = el("button", { type: "button", class: "dp-btn dp-sm dp-outline", title: "Take every edit back" }, "Reject all");
+			const all = el("button", { type: "button", class: "dp-btn dp-sm dp-primary", title: m.docs_accept_all_title() }, m.docs_accept_all());
+			const none = el("button", { type: "button", class: "dp-btn dp-sm dp-outline", title: m.docs_reject_all_title() }, m.docs_reject_all());
 			all.onclick = () => sync.accept("*");
 			none.onclick = () => sync.reject("*");
 			extra.push(all, none);
 		}
-		panel.replaceChildren(header("Changes", ...extra));
-		if (sync.changes.length === 0) panel.append(el("p", { class: "dp-empty" }, "Nothing to review."));
+		panel.replaceChildren(header(m.docs_changes(), ...extra));
+		if (sync.changes.length === 0) panel.append(el("p", { class: "dp-empty" }, m.docs_nothing_to_review()));
 		for (const change of [...sync.changes].reverse()) {
 			const item = el("div", { class: "dp-change", "data-change": change.id });
 			const who = el("div", { class: "dp-who" });
-			who.append(el("span", { class: "dp-av" }, initial(change.by)), el("b", {}, whoOf(change.by)), new Date(change.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+			who.append(el("span", { class: "dp-av" }, initial(change.by)), el("b", {}, whoOf(change.by)), new Date(change.at).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit" }));
 			if (!sync.readOnly) {
 				const acts = el("div", { class: "dp-acts" });
-				const yes = iconButton("check", "Accept", "dp-ib dp-sm dp-yes");
-				const no = iconButton("x", "Reject", "dp-ib dp-sm dp-no");
+				const yes = iconButton("check", m.docs_accept(), "dp-ib dp-sm dp-yes");
+				const no = iconButton("x", m.docs_reject(), "dp-ib dp-sm dp-no");
 				yes.onclick = (event) => (event.stopPropagation(), sync.accept(change.id));
 				no.onclick = (event) => (event.stopPropagation(), sync.reject(change.id));
 				acts.append(yes, no);
@@ -1121,7 +1122,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	function drawCommentsButton(): void {
 		commentsButton.hidden = !isGoogle();
 		const n = comments.length;
-		commentsButton.innerHTML = `${svg("comment")}<span>Comments</span>${n ? `<span class="dp-count dp-count-soft">${n}</span>` : ""}`;
+		commentsButton.innerHTML = `${svg("comment")}<span>${m.docs_comments()}</span>${n ? `<span class="dp-count dp-count-soft">${n}</span>` : ""}`;
 	}
 
 	function sendComment(action: "create" | "reply" | "resolve", fields: { comment?: string; content?: string; quote?: string }): void {
@@ -1139,7 +1140,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	}
 
 	function drawComments(): void {
-		const parts: HTMLElement[] = [header("Comments")];
+		const parts: HTMLElement[] = [header(m.docs_comments())];
 		if (commentsError) {
 			parts.push(el("p", { class: "dp-empty" }, commentsError));
 			if (remoteStatus?.paste !== undefined || options.api) parts.push(...signInParts());
@@ -1147,9 +1148,9 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		if (drafting !== undefined) {
 			const box = el("div", { class: "dp-comment dp-comment-new" });
 			box.append(el("div", { class: "dp-quote" }, clip(drafting, 120)));
-			const input = el("textarea", { class: "dp-reply", rows: "3", placeholder: "Comment" });
-			const post = el("button", { type: "button", class: "dp-btn dp-sm dp-primary" }, "Comment");
-			const cancel = el("button", { type: "button", class: "dp-btn dp-sm" }, "Cancel");
+			const input = el("textarea", { class: "dp-reply", rows: "3", placeholder: m.docs_comment() });
+			const post = el("button", { type: "button", class: "dp-btn dp-sm dp-primary" }, m.docs_comment());
+			const cancel = el("button", { type: "button", class: "dp-btn dp-sm" }, m.docs_cancel());
 			post.onclick = () => {
 				if (!input.value.trim()) return;
 				sendComment("create", { content: input.value.trim(), quote: drafting });
@@ -1166,16 +1167,16 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			parts.push(box);
 			setTimeout(() => input.focus(), 0);
 		}
-		if (!commentsError && comments.length === 0 && drafting === undefined) parts.push(el("p", { class: "dp-empty" }, "No open comments. Select words and press the comment button to add one."));
+		if (!commentsError && comments.length === 0 && drafting === undefined) parts.push(el("p", { class: "dp-empty" }, m.docs_no_comments()));
 		for (const c of comments) {
 			const card = el("div", { class: "dp-comment", "data-comment": c.id });
 			const who = (a: GComment["author"], at?: string) => {
 				const row = el("div", { class: "dp-who" });
-				row.append(el("span", { class: "dp-av" }, initial(a?.displayName ?? "?")), el("b", {}, a?.displayName ?? "Someone"), at ? new Date(at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
+				row.append(el("span", { class: "dp-av" }, initial(a?.displayName ?? "?")), el("b", {}, a?.displayName ?? m.docs_someone()), at ? new Date(at).toLocaleString(getLocale(), { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
 				return row;
 			};
 			const head = who(c.author, c.createdTime);
-			const resolve = iconButton("check", "Resolve", "dp-ib dp-sm dp-yes");
+			const resolve = iconButton("check", m.docs_resolve(), "dp-ib dp-sm dp-yes");
 			resolve.onclick = (event) => {
 				event.stopPropagation();
 				sendComment("resolve", { comment: c.id, content: "" });
@@ -1191,7 +1192,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 				card.append(who(r.author, r.createdTime), el("div", { class: "dp-comment-body" }, r.content));
 			}
 			const form = el("form", { class: "dp-reply-row" });
-			const input = el("input", { class: "dp-reply", placeholder: "Reply" });
+			const input = el("input", { class: "dp-reply", placeholder: m.docs_reply() });
 			form.append(input);
 			form.onsubmit = (event) => {
 				event.preventDefault();
@@ -1237,12 +1238,12 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		clearTimeout(pillTimer);
 		if (pillFor !== id) {
 			pillFor = id;
-			const yes = iconButton("check", "Accept", "dp-ib dp-sm dp-yes");
-			const no = iconButton("x", "Reject", "dp-ib dp-sm dp-no");
+			const yes = iconButton("check", m.docs_accept(), "dp-ib dp-sm dp-yes");
+			const no = iconButton("x", m.docs_reject(), "dp-ib dp-sm dp-no");
 			yes.onclick = () => (sync.accept(id), hidePill(true));
 			no.onclick = () => (sync.reject(id), hidePill(true));
 			const who = el("span", { class: "p-who" });
-			who.append(el("span", { class: "dp-av" }, initial(change.by)), el("b", {}, whoOf(change.by)), new Date(change.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+			who.append(el("span", { class: "dp-av" }, initial(change.by)), el("b", {}, whoOf(change.by)), new Date(change.at).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit" }));
 			pill.replaceChildren(who, yes, no);
 		}
 		pill.hidden = false;
@@ -1279,17 +1280,17 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	// --- history: looking at a kept version ------------------------------------------------------
 
 	function drawHistory(): void {
-		panel.replaceChildren(header("History"));
-		if (versions.length === 0) panel.append(el("p", { class: "dp-empty" }, "No versions yet."));
+		panel.replaceChildren(header(m.docs_history()));
+		if (versions.length === 0) panel.append(el("p", { class: "dp-empty" }, m.docs_no_versions()));
 		const today = new Date().toDateString();
 		for (const [i, version] of [...versions].reverse().entries()) {
 			const date = new Date(version.at);
-			const item = el("div", { class: i === 0 ? "dp-time t-latest" : "dp-time", "aria-current": String(viewing?.sha === version.sha && viewing.at === version.at), title: "Show this version" });
-			const label = el("span", { class: "t-when" }, date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }));
-			if (date.toDateString() !== today) label.append(el("small", {}, date.toLocaleDateString([], { month: "short", day: "numeric" })));
+			const item = el("div", { class: i === 0 ? "dp-time t-latest" : "dp-time", "aria-current": String(viewing?.sha === version.sha && viewing.at === version.at), title: m.docs_show_version() });
+			const label = el("span", { class: "t-when" }, date.toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit", second: "2-digit" }));
+			if (date.toDateString() !== today) label.append(el("small", {}, date.toLocaleDateString(getLocale(), { month: "short", day: "numeric" })));
 			item.append(label);
 			if (!sync.readOnly) {
-				const restore = iconButton("restore", "Restore this version", "dp-ib dp-sm");
+				const restore = iconButton("restore", m.docs_restore_version(), "dp-ib dp-sm");
 				restore.onclick = (event) => (event.stopPropagation(), restoreTo(version.sha));
 				item.append(restore);
 			}
@@ -1341,13 +1342,13 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			viewing.editor = editor;
 			live.root.after(editor.root);
 		}
-		const restore = el("button", { type: "button", class: "dp-btn dp-sm dp-primary" }, "Restore");
-		const back = iconButton("x", "Back to now", "dp-ib dp-sm");
+		const restore = el("button", { type: "button", class: "dp-btn dp-sm dp-primary" }, m.docs_restore());
+		const back = iconButton("x", m.docs_back_to_now(), "dp-ib dp-sm");
 		restore.onclick = () => restoreTo(sha);
 		back.onclick = () => closeVersion();
 		const icon = el("span");
 		icon.innerHTML = svg("clock");
-		banner.replaceChildren(icon.firstElementChild!, el("b", {}, at ? when(at) : "Earlier version"), el("span", { class: "dp-spacer" }), ...(sync.readOnly ? [] : [restore]), back);
+		banner.replaceChildren(icon.firstElementChild!, el("b", {}, at ? when(at) : m.docs_earlier_version()), el("span", { class: "dp-spacer" }), ...(sync.readOnly ? [] : [restore]), back);
 		banner.hidden = false;
 		scroll.scrollTop = 0;
 		if (view === "history") drawHistory();
@@ -1381,9 +1382,9 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	let pdfPath: string | undefined;
 	let pdfBytes: ArrayBuffer | undefined;
 	let pdfDrawn = 0;
-	const recompile = iconButton("refresh", "Typeset again", "dp-ib dp-sm");
-	const openPdf = iconButton("external", "Open the PDF in a new tab", "dp-ib dp-sm");
-	const closePdf = iconButton("x", "Close the PDF", "dp-ib dp-sm");
+	const recompile = iconButton("refresh", m.docs_typeset_again(), "dp-ib dp-sm");
+	const openPdf = iconButton("external", m.docs_open_pdf(), "dp-ib dp-sm");
+	const closePdf = iconButton("x", m.docs_close_pdf(), "dp-ib dp-sm");
 	pdfBar.append(pdfState, errButton, recompile, openPdf, closePdf);
 	openPdf.disabled = true;
 
@@ -1399,7 +1400,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		}
 		pdfBusy = true;
 		pdfState.dataset.state = "busy";
-		pdfState.textContent = "Typesetting…";
+		pdfState.textContent = m.docs_typesetting();
 		pdfBody.toggleAttribute("data-stale", pdfDrawn > 0);
 		sync.compile();
 	}
@@ -1417,7 +1418,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		pdfPane.hidden = !open;
 		divider.hidden = !open;
 		if (open) {
-			if (!pdfDrawn) pdfBody.replaceChildren(el("div", { class: "dp-pdfempty" }, "Typesetting the paper for the first time can take a minute while LaTeX fetches its packages."));
+			if (!pdfDrawn) pdfBody.replaceChildren(el("div", { class: "dp-pdfempty" }, m.docs_first_typeset()));
 			compileNow();
 		} else clearTimeout(pdfTimer);
 	}
@@ -1467,11 +1468,11 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 
 	function showErrors(errors: CompileError[]): void {
 		errButton.hidden = errors.length === 0;
-		errButton.textContent = `${errors.length} ${errors.length === 1 ? "error" : "errors"}`;
+		errButton.textContent = m.docs_errors({ count: errors.length });
 		errList.replaceChildren(
 			...errors.map((error) => {
-				const row = el("div", { class: "dp-err", title: error.line ? "Go to this line" : "" });
-				row.append(el("span", { class: "e-line" }, error.line ? `Line ${error.line}` : "—"), el("span", { class: "e-msg" }, error.message));
+				const row = el("div", { class: "dp-err", title: error.line ? m.docs_go_to_line() : "" });
+				row.append(el("span", { class: "e-line" }, error.line ? m.docs_line({ line: error.line }) : "—"), el("span", { class: "e-msg" }, error.message));
 				if (error.line) row.onclick = () => live.goto(lineOffset(error.line!));
 				return row;
 			}),
@@ -1484,20 +1485,20 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 
 	function compiled(message: Extract<DocServerMessage, { type: "doc.compiled" }>): void {
 		pdfBusy = false;
-		const when = new Date(message.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+		const when = new Date(message.at).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit" });
 		pdfState.dataset.state = message.ok ? "ok" : "failed";
 		pdfState.replaceChildren();
 		if (message.error && !message.pdf) pdfState.textContent = message.error;
-		else if (message.pdf) pdfState.append(el("b", {}, message.ok ? "Typeset" : "Typeset with errors"), `${when}, ${(message.ms / 1000).toFixed(1)} s`);
-		else pdfState.append(el("b", {}, "Did not typeset"), when);
+		else if (message.pdf) pdfState.append(el("b", {}, message.ok ? m.docs_typeset() : m.docs_typeset_errors()), m.docs_typeset_when({ time: when, seconds: formatNumber(message.ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }));
+		else pdfState.append(el("b", {}, m.docs_not_typeset()), when);
 		showErrors(message.errors);
 		openPdf.disabled = !message.pdf;
 		if (message.pdf) {
 			pdfPath = message.pdf;
-			void drawPdf(message.pdf).catch(() => (pdfState.textContent = "The PDF was made but could not be read."));
+			void drawPdf(message.pdf).catch(() => (pdfState.textContent = m.docs_pdf_unreadable()));
 		} else {
 			pdfBody.removeAttribute("data-stale");
-			if (!pdfDrawn) pdfBody.replaceChildren(el("div", { class: "dp-pdfempty" }, message.error ?? "LaTeX stopped before writing a page. The errors above say where."));
+			if (!pdfDrawn) pdfBody.replaceChildren(el("div", { class: "dp-pdfempty" }, message.error ?? m.docs_latex_stopped()));
 			if (message.errors.length) {
 				errList.hidden = false;
 				errButton.setAttribute("aria-pressed", "true");
@@ -1519,31 +1520,31 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		gitBox.hidden = !repo;
 		if (!repo) return;
 		const name = repo.label ?? "Git";
-		gitButton.innerHTML = `${svg("branch")}<span>${gitBusy ? (gitBusy === "pull" ? "Pulling…" : "Pushing…") : name}</span>${repo.ahead && !gitBusy ? `<span class="dp-ahead" title="Commits not pushed yet">↑${repo.ahead}</span>` : ""}`;
-		gitButton.title = `${repo.branch}${repo.upstream ? ` ↔ ${repo.upstream}` : ""}: pull and push`;
+		gitButton.innerHTML = `${svg("branch")}<span>${gitBusy ? (gitBusy === "pull" ? m.docs_git_pulling() : m.docs_git_pushing()) : name}</span>${repo.ahead && !gitBusy ? `<span class="dp-ahead" title="${m.docs_git_not_pushed()}">↑${repo.ahead}</span>` : ""}`;
+		gitButton.title = m.docs_git_button_title({ branch: `${repo.branch}${repo.upstream ? ` ↔ ${repo.upstream}` : ""}` });
 		if (gitMenu.hidden) return;
 		const where = el("div", { class: "g-where" });
 		where.innerHTML = svg("branch");
 		where.append(repo.branch, ...(repo.upstream ? [el("span", { style: "font-weight:400;color:var(--b-muted,#666)" }, `↔ ${repo.upstream}`)] : []));
 		const parts: string[] = [];
-		if (repo.changed) parts.push(`${repo.changed} file${repo.changed === 1 ? "" : "s"} edited since the last commit`);
-		if (repo.ahead) parts.push(`${repo.ahead} commit${repo.ahead === 1 ? "" : "s"} to push`);
-		if (repo.behind) parts.push(`${repo.behind} to pull`);
-		const state = el("div", { class: "g-state" }, repo.upstream ? (parts.length ? `${parts.join(", ")}.` : `In step with ${name} as of the last pull.`) : "This branch has no remote branch to pull from or push to.");
+		if (repo.changed) parts.push(m.docs_git_changed({ count: repo.changed }));
+		if (repo.ahead) parts.push(m.docs_git_ahead({ count: repo.ahead }));
+		if (repo.behind) parts.push(m.docs_git_behind({ count: repo.behind }));
+		const state = el("div", { class: "g-state" }, repo.upstream ? (parts.length ? m.docs_git_state({ parts: formatList(parts) }) : m.docs_git_in_step({ name })) : m.docs_git_no_remote());
 		const pull = el("button", { type: "button", class: "dp-btn dp-outline" });
-		pull.innerHTML = `${svg("pull")}<span>${gitBusy === "pull" ? "Pulling…" : "Pull"}</span>`;
+		pull.innerHTML = `${svg("pull")}<span>${gitBusy === "pull" ? m.docs_git_pulling() : m.docs_git_pull()}</span>`;
 		const push = el("button", { type: "button", class: "dp-btn dp-primary" });
-		push.innerHTML = `${svg("push")}<span>${gitBusy === "push" ? "Pushing…" : "Push"}</span>`;
+		push.innerHTML = `${svg("push")}<span>${gitBusy === "push" ? m.docs_git_pushing() : m.docs_git_push()}</span>`;
 		pull.disabled = push.disabled = !!gitBusy || !repo.upstream;
-		pull.title = `Commit what is edited here, and merge in what changed on ${name}`;
-		push.title = `Pull, then send the commits made here to ${name}`;
+		pull.title = m.docs_git_pull_title({ name });
+		push.title = m.docs_git_push_title({ name });
 		pull.onclick = () => runGit("pull");
 		push.onclick = () => runGit("push");
 		const acts = el("div", { class: "g-acts" });
 		acts.append(pull, push);
 		const said = el("div", { class: "g-said", "data-ok": String(gitSaid?.ok ?? true) }, gitSaid?.message ?? "");
 		said.hidden = !gitSaid;
-		const note = el("div", { class: "g-note" }, `Edits here are committed as "Edited in Decks" before each pull. What a pull brings in is highlighted as a change.`);
+		const note = el("div", { class: "g-note" }, m.docs_git_note());
 		gitMenu.replaceChildren(where, ...(repo.remote ? [el("div", { class: "g-remote", title: repo.remote }, repo.remote)] : []), state, acts, said, note);
 	}
 
@@ -1560,7 +1561,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		else {
 			gitBusy = undefined;
 			if (message.status) repo = message.status;
-			gitSaid = { ok: message.ok, message: message.message ?? (message.ok ? "Done." : "git stopped.") };
+			gitSaid = { ok: message.ok, message: message.message ?? (message.ok ? m.docs_git_done() : m.docs_git_stopped()) };
 			// The PDF follows what the pull brought in.
 			if (message.ok && pdfOpen) compileSoon();
 		}
@@ -1593,21 +1594,21 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	function signInParts(): HTMLElement[] {
 		if (!options.api) return [];
 		const parts: HTMLElement[] = [];
-		const signIn = el("button", { type: "button", class: "dp-btn dp-primary" }, "Sign in with Google");
+		const signIn = el("button", { type: "button", class: "dp-btn dp-primary" }, m.docs_google_sign_in());
 		signIn.style.justifyContent = "center";
 		signIn.onclick = () => window.open(`${options.api}/google/signin?origin=${encodeURIComponent(location.origin)}`, "_blank", "noopener");
 		parts.push(signIn);
 		if (remoteStatus?.paste !== false) {
 			const form = el("form", { class: "g-paste" });
-			const input = el("input", { type: "url", placeholder: "Paste the address Google sent you to", "aria-label": "Address after signing in" });
-			const done = el("button", { type: "submit", class: "dp-btn dp-outline" }, "Done");
+			const input = el("input", { type: "url", placeholder: m.docs_google_paste(), "aria-label": m.docs_google_paste_label() });
+			const done = el("button", { type: "submit", class: "dp-btn dp-outline" }, m.docs_done());
 			form.append(input, done);
 			form.onsubmit = (event) => {
 				event.preventDefault();
 				void fetch(`${options.api}/google/code`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: input.value }) })
 					.then((r) => r.json() as Promise<{ ok: boolean; email?: string; message?: string }>)
 					.then((answer) => {
-						pasteSaid = answer.ok ? `Signed in as ${answer.email}.` : (answer.message ?? "That did not work.");
+						pasteSaid = answer.ok ? m.docs_google_signed_in({ email: answer.email ?? "" }) : (answer.message ?? m.docs_google_failed());
 						drawGoogle();
 						if (view === "comments") drawComments();
 					});
@@ -1623,23 +1624,23 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		googleBox.hidden = !remote;
 		if (!remote) return;
 		const state = remoteStatus?.state ?? "syncing";
-		const words = { synced: "Google Docs", syncing: "Syncing…", signin: "Sign in", error: "Not in step" }[state];
+		const words = { synced: "Google Docs", syncing: m.docs_google_syncing(), signin: m.docs_google_signin(), error: m.docs_google_error() }[state];
 		googleButton.innerHTML = `${svg(state === "signin" || state === "error" ? "cloudoff" : "cloud")}<span>${words}</span><span class="dp-dot" data-state="${state}"></span>`;
 		if (googleMenu.hidden) return;
 		const head = el("div", { class: "g-where" });
 		head.innerHTML = svg("cloud");
 		head.append(remote.title);
-		const open = el("a", { class: "g-open", href: remote.url, target: "_blank", rel: "noopener" }, "Open in Google Docs");
+		const open = el("a", { class: "g-open", href: remote.url, target: "_blank", rel: "noopener" }, m.docs_google_open());
 		open.insertAdjacentHTML("beforeend", svg("external"));
-		const when = remoteStatus?.at ? new Date(remoteStatus.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+		const when = remoteStatus?.at ? new Date(remoteStatus.at).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit" }) : "";
 		const line =
-			state === "synced" ? `In step with the Doc${when ? ` since ${when}` : ""}. Edits here reach Google in about two seconds; others' edits arrive highlighted.`
-			: state === "syncing" ? "Sending your edits to Google…"
+			state === "synced" ? (when ? m.docs_google_in_step_since({ time: when }) : m.docs_google_in_step())
+			: state === "syncing" ? m.docs_google_sending()
 			: (remoteStatus?.message ?? "");
 		const said = el("div", { class: "g-said", "data-ok": String(state === "synced" || state === "syncing") }, line);
 		const parts: HTMLElement[] = [head, open, said];
 		if (state === "signin" && options.api) parts.push(...signInParts());
-		const who = remoteStatus?.mode === "fake" ? "A stand-in for Google on this server: no Google account is connected." : remoteStatus?.email ? `Signed in to Google as ${remoteStatus.email}.` : "";
+		const who = remoteStatus?.mode === "fake" ? m.docs_google_fake() : remoteStatus?.email ? m.docs_google_signed_in_as({ email: remoteStatus.email }) : "";
 		if (who) parts.push(el("div", { class: "g-note" }, who));
 		googleMenu.replaceChildren(...parts);
 	}

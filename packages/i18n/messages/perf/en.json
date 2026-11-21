@@ -1,0 +1,6 @@
+{
+	"perf_plot_label": "Time each frame took over the last four seconds",
+	"perf_summary": "slowest {worst} ms · {missed} over 12 ms",
+	"perf_key_120": "8.3 ms, 120 Hz",
+	"perf_key_60": "16.7 ms, 60 Hz"
+}

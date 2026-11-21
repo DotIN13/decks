@@ -1,4 +1,5 @@
 import { life } from "./life.ts";
+import { formatList, m } from "@decks/i18n";
 import { isDeckLink, baseTheme, CLIP_TYPE, clipFromHtml, clipHtml, clipItems, clipText, ids as idsOf, isArrow, parseClip, pastedItems, placements, walk, type Clip, type PenNode } from "@decks/pen";
 import { toWorld } from "../../camera/camera.ts";
 import { wordsSelectedInCards } from "../../items/card.ts";
@@ -53,9 +54,9 @@ function wordsSelected(): boolean {
 /** Whether an item needs a file copied to land on another canvas: a card, a picture, a film, a file piece. */
 function needsFiles(node: PenNode, sameCanvas: boolean): string | undefined {
 	const meta = (node.metadata ?? {}) as Record<string, unknown>;
-	if (node.type === "browser" && meta.type === "decks.card") return "an HTML card";
+	if (node.type === "browser" && meta.type === "decks.card") return m.canvas_paste_kind_card();
 	if (sameCanvas) return undefined;
-	if (node.type === "browser" && meta.type === "decks.document") return "a document";
+	if (node.type === "browser" && meta.type === "decks.document") return m.canvas_paste_kind_document();
 	let picture = false;
 	const visit = (value: unknown): void => {
 		if (Array.isArray(value)) value.forEach(visit);
@@ -67,8 +68,8 @@ function needsFiles(node: PenNode, sameCanvas: boolean): string | undefined {
 			}
 	};
 	visit(node);
-	if (picture) return "a picture";
-	if (!isArrow(node) && ["path", "file", "poster"].some((key) => typeof meta[key] === "string" && (meta[key] as string).includes("/"))) return "a file";
+	if (picture) return m.canvas_paste_kind_picture();
+	if (!isArrow(node) && ["path", "file", "poster"].some((key) => typeof meta[key] === "string" && (meta[key] as string).includes("/"))) return m.canvas_paste_kind_file();
 	return undefined;
 }
 
@@ -125,7 +126,7 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 		// The harness holds the copy before a cut takes the items off: what it holds is read off the drawing.
 		void deps.call("canvas.clip", [ids, { id }]).then((answer) => {
 			if (answer.ok) return takeOff();
-			deps.say(`The copy was not made: ${answer.error ?? "the harness did not answer"}`);
+			deps.say(m.canvas_copy_failed({ why: answer.error ?? m.canvas_copy_no_answer() }));
 		});
 	};
 	addEventListener("copy", (event) => copy(event, false), { signal: life() });
@@ -143,14 +144,14 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 		const at = worldAt();
 		if (deps.call) {
 			const answer = await deps.call("canvas.paste", [{ v: 1, id: clip.id, canvas: clip.canvas }, { at }]);
-			if (!answer.ok) return deps.say(answer.error ?? "Nothing was pasted.");
+			if (!answer.ok) return deps.say(answer.error ?? m.canvas_paste_nothing());
 			if (answer.notes?.length) deps.say(answer.notes.join(" "));
 			return selectWhenDrawn(((answer.value ?? []) as Array<{ id?: string }>).map((one) => one.id).filter((one): one is string => !!one));
 		}
 		// Studio: what needs no file, put in here with ids of its own.
 		const same = clip.canvas === deps.canvas;
 		const needing = [...new Set(clip.items.flatMap((item) => [...walk([item])].map((one) => needsFiles(one, same)).filter((one): one is string => !!one)))];
-		if (needing.length) return deps.say(`Not pasted: ${needing.join(", ")} needs its files copied to this canvas, which Studio cannot do yet. Copy notes, shapes, text, arrows and markdown cards on their own, or paste on the harness.`);
+		if (needing.length) return deps.say(m.canvas_paste_needs_files({ what: formatList(needing) }));
 		const pasted = pastedItems(clip.items, new Set(idsOf(handle.drawn())), { dx: at.x - clip.box.x, dy: at.y - clip.box.y });
 		handle.edit(pasted.items.map((node) => ({ op: "insert", node })));
 		handle.select(pasted.items.map((one) => one.id));
@@ -160,13 +161,13 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 	const pasteLink = async (to: string) => {
 		const at = worldAt();
 		const answer = await deps.call!("canvas.insert", [{ type: "link", to }, { at: { x1: at.x, y1: at.y } }]);
-		if (!answer.ok) return deps.say(answer.error ?? "The link was not placed.");
+		if (!answer.ok) return deps.say(answer.error ?? m.canvas_paste_link_failed());
 		const id = (answer.value as { id?: unknown } | undefined)?.id;
 		if (typeof id === "string") selectWhenDrawn([id]);
 	};
 
 	const paste = (data: { clip?: Clip | undefined; text?: string | undefined }) => {
-		if (!deps.canWrite()) return deps.say("This canvas can only be read, so nothing is pasted on it.");
+		if (!deps.canWrite()) return deps.say(m.canvas_paste_read_only());
 		if (data.clip && data.clip.harness === deps.harness() && (data.clip.id || !deps.call)) return void pasteClip(data.clip);
 		const words = (data.clip ? clipText(data.clip.items) : data.text ?? "").trim();
 		if (!words) return;
@@ -183,7 +184,7 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 		const files = Array.from(event.clipboardData.files ?? []);
 		if (files.length) {
 			event.preventDefault();
-			if (!deps.canWrite()) return deps.say("This canvas can only be read, so nothing is pasted on it.");
+			if (!deps.canWrite()) return deps.say(m.canvas_paste_read_only());
 			return deps.upload(files, screenAt());
 		}
 		const clip = parseClip(event.clipboardData.getData(CLIP_TYPE)) ?? clipFromHtml(event.clipboardData.getData("text/html"));

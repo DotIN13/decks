@@ -4,6 +4,7 @@ import { invert } from "../merge.ts";
 import { blocks } from "./blocks.ts";
 import { spliceBetween, type Mark } from "./marks.ts";
 import { readTabular, texMeta, TEXT_ENVS, THEOREMS, withMacros, type TexMeta } from "./tex.ts";
+import { getLocale, m } from "@decks/i18n";
 
 /**
  * The page you type into, for markdown and LaTeX: the file's own text, drawn as it reads.
@@ -716,7 +717,7 @@ class Builder {
 		const meta = this.meta;
 		if (!meta?.title && !meta?.author) {
 			box.classList.add("lv-notitle");
-			box.textContent = "No \\title in the preamble";
+			box.textContent = m.docs_tex_no_title();
 			return box;
 		}
 		const part = (cls: string, source: string | undefined) => {
@@ -788,7 +789,7 @@ class Builder {
 			node.dataset.kind = "front";
 			node.append(raw("lv-src lv-frontbox", body));
 			const chip = widget("div", "lv-chip", "open");
-			chip.textContent = kind === "preamble" ? `Preamble, ${body.length} lines` : "Front matter";
+			chip.textContent = kind === "preamble" ? m.docs_tex_preamble({ count: body.length }) : m.docs_md_front_matter();
 			node.append(chip);
 		} else if (!this.tex && fence) {
 			node.dataset.kind = "code";
@@ -1094,7 +1095,7 @@ export class LiveEditor {
 		// A last, empty line to type on after a closing newline, and in an empty document.
 		if (text.length === 0 || text.endsWith("\n")) kids.push(this.end);
 		this.end.classList.toggle("lv-placeholder", text.length === 0);
-		this.end.dataset.placeholder = this.sync.readOnly ? "This document is empty." : "Start writing…";
+		this.end.dataset.placeholder = this.sync.readOnly ? m.docs_empty() : m.docs_start_writing();
 		let i = 0;
 		for (; i < kids.length; i++) {
 			const want = kids[i]!;
@@ -1120,10 +1121,10 @@ export class LiveEditor {
 					const failed = item.el.querySelector<HTMLElement>(".katex-error") ?? [...item.el.querySelectorAll<HTMLElement>(".katex-html [style]")].find((e) => /cc0000|204,\s*0,\s*0/i.test(e.style.color));
 					if (failed || item.el.textContent === item.source) {
 						if (!failed && !/\$|\\[([]/.test(item.source)) return;
-						const unknown = failed && !failed.classList.contains("katex-error") ? `${failed.textContent} is not a command KaTeX knows` : "";
+						const unknown = failed && !failed.classList.contains("katex-error") ? m.docs_katex_unknown({ command: failed.textContent ?? "" }) : "";
 						const reason = unknown || (failed?.title ?? "").replace(/^KaTeX parse error:\s*/, "").replace(/ at position \d+:[\s\S]*$/, "");
 						const plain = h("span", "lv-matherr", (item.shows ?? item.source).trim());
-						plain.title = reason ? `Not drawn: ${reason}` : "Not drawn";
+						plain.title = reason ? m.docs_not_drawn_because({ reason }) : m.docs_not_drawn();
 						item.el.replaceChildren(plain);
 					}
 					this.mathCache.set(item.source, item.el.innerHTML);
@@ -1164,9 +1165,9 @@ export class LiveEditor {
 		}
 		const title = (id: string) => {
 			const change = changes.find((c) => c.id === id);
-			if (!change) return "Edited";
-			const who = change.by === "outside" ? "another program" : change.by;
-			return `Edited by ${who} at ${new Date(change.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+			if (!change) return m.docs_edited();
+			const time = new Date(change.at).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit" });
+			return change.by === "outside" ? m.docs_edited_outside({ time }) : m.docs_edited_by({ who: change.by, time });
 		};
 		const local = marks.filter((m) => (m.kind === "ins" ? m.end > start && m.start < start + total : m.at >= start && m.at <= start + total));
 		if (local.length === 0) return;

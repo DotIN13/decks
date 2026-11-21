@@ -6,6 +6,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { setCommentDirty, type CommentTarget } from "../state/comments.ts";
 import { Icon, onDismiss } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { popupPlace } from "./comments.ts";
 
 /**
@@ -85,7 +86,7 @@ export function CommentPopup(props: {
 			class="comment-popup floatcard"
 			data-open={open()}
 			role="dialog"
-			aria-label="Comment on the selected words"
+			aria-label={m.markup_comment_label()}
 			style={{ left: `${at()?.left ?? -9999}px`, top: `${at()?.top ?? -9999}px` }}
 			// The press must not take the selection out of the board before it is quoted.
 			onPointerDown={(event) => {
@@ -104,13 +105,13 @@ export function CommentPopup(props: {
 						}}
 					>
 						<Icon of={MessageSquarePlus} size={14} />
-						<span>Comment</span>
+						<span>{m.markup_comment()}</span>
 					</button>
 				}
 			>
 				<Show
 					when={props.target.quote}
-					fallback={<div class="comment-quote" data-whole="true">On the whole card{props.target.title ? `: ${props.target.title}` : ""}</div>}
+					fallback={<div class="comment-quote" data-whole="true">{props.target.title ? m.markup_whole_card_titled({ title: props.target.title }) : m.markup_whole_card()}</div>}
 				>
 					<div class="comment-quote" title={props.target.quote}>
 						{props.target.quote}
@@ -120,7 +121,7 @@ export function CommentPopup(props: {
 					ref={field}
 					class="comment-field"
 					rows={3}
-					placeholder="What do you want to say about this?"
+					placeholder={m.markup_comment_placeholder()}
 					value={text()}
 					onInput={(event) => {
 						setText(event.currentTarget.value);
@@ -139,13 +140,13 @@ export function CommentPopup(props: {
 					}}
 				/>
 				<div class="comment-acts">
-					<button type="button" class="icon-button [--control:24px]" title="Close (Escape)" aria-label="Close" onClick={props.onClose}>
+					<button type="button" class="icon-button [--control:24px]" title={m.markup_close_title()} aria-label={m.markup_close()} onClick={props.onClose}>
 						<Icon of={X} size={14} />
 					</button>
 					<span class="flex-1" />
-					<button type="button" class="comment-act" disabled={text().trim() === ""} title="Keep it over the input bar and send it with your next message (Enter)" onClick={keep}>
+					<button type="button" class="comment-act" disabled={text().trim() === ""} title={m.markup_keep_title()} onClick={keep}>
 						<Icon of={ListPlus} size={14} />
-						<span>With next message</span>
+						<span>{m.markup_keep()}</span>
 						<kbd>
 							<Icon of={CornerDownLeft} size={11} />
 						</kbd>
@@ -155,11 +156,11 @@ export function CommentPopup(props: {
 						class="comment-act"
 						data-primary="true"
 						disabled={text().trim() === "" || !props.canSend}
-						title={props.canSend ? "Send it to the agent now, as a message of its own (⌘Enter)" : "Pick an agent first"}
+						title={props.canSend ? m.markup_send_title() : m.markup_pick_agent()}
 						onClick={sendNow}
 					>
 						<Icon of={Send} size={14} />
-						<span>Send now</span>
+						<span>{m.markup_send()}</span>
 					</button>
 				</div>
 			</Show>

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { api } from "../connections/connection.ts";
 import { cardCalls } from "@decks/api";
 import { connect } from "@decks/sdk";
@@ -76,10 +77,10 @@ export async function appFramePass(name: string): Promise<AppFramePass> {
 /** A card's calls the page answers (`@decks/api`, a verb's `card: "page"`; `@decks/canvas`, `frame/card-calls.ts`): the agents, and showing another canvas. */
 const FOR_CARDS = cardCalls("page");
 /** The ones that put words in front of an agent, or make one: each waits for your OK. */
-const ASKS_FIRST: Record<string, (args: unknown[]) => string> = {
-	"agent.send": (args) => `send ${String(args[0] ?? "an agent")} this message now: “${clip((args[1] as { task?: unknown } | undefined)?.task)}”`,
-	"agent.queue": (args) => `give ${String(args[0] ?? "an agent")} this task: “${clip((args[1] as { task?: unknown } | undefined)?.task)}”`,
-	"agent.create": (args) => `start a new agent called ${String((args[0] as { name?: unknown } | undefined)?.name ?? "something")}`,
+const ASKS_FIRST: Record<string, (args: unknown[], card: string) => string> = {
+	"agent.send": (args, card) => m.canvases_ask_send({ card, agent: String(args[0] ?? m.canvases_ask_an_agent()), task: clip((args[1] as { task?: unknown } | undefined)?.task) }),
+	"agent.queue": (args, card) => m.canvases_ask_queue({ card, agent: String(args[0] ?? m.canvases_ask_an_agent()), task: clip((args[1] as { task?: unknown } | undefined)?.task) }),
+	"agent.create": (args, card) => m.canvases_ask_create({ card, name: String((args[0] as { name?: unknown } | undefined)?.name ?? m.canvases_ask_something()) }),
 };
 const clip = (text: unknown) => {
 	const words = String(text ?? "").trim().replace(/\s+/g, " ");
@@ -96,7 +97,7 @@ export async function cardAgentCall(call: { verb: string; args: unknown[]; card:
 	if (!FOR_CARDS.has(call.verb)) throw new Error(`${call.verb} is not a card's to call.`);
 	const asking = ASKS_FIRST[call.verb];
 	if (asking) {
-		const yes = await ask({ title: "Let this card message an agent?", body: `${call.card} wants to ${asking(call.args)}.`, yes: "Allow", no: "Don't allow" });
+		const yes = await ask({ title: m.canvases_ask_title(), body: asking(call.args, call.card), yes: m.canvases_ask_allow(), no: m.canvases_ask_deny() });
 		if (!yes) throw new Error(`You did not let ${call.card} ${call.verb === "agent.create" ? "start an agent" : "message an agent"}.`);
 	}
 	const answer = await connect({ url: deckAddress(), stage: () => stageOnScreen(), notes: () => {}, headers: authHeaders() }).call(call.verb, call.args);

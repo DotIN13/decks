@@ -1,4 +1,5 @@
 import type { Offset } from "../edit/core/model.ts";
+import { m } from "@decks/i18n";
 import { type Outline } from "../edit/core/overlay.ts";
 import { type PageHandles } from "../edit/core/overlay.ts";
 import { type SceneQuery } from "../edit/core/scene.ts";
@@ -72,12 +73,13 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 		const cards = all.filter((one) => one.id.startsWith("page:")).map((one) => one.id.slice(5));
 		const words = ids.map((id) => d.quoteOf(d.penLayer.placed.get(id)?.node)).filter(Boolean).join(" / ").slice(0, 160);
 		const first = d.penLayer.placed.get(ids[0]!)?.node;
-		const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 		const name = boards
-			? [count(boards, "card"), ids.length ? count(ids.length, "item") : ""].filter(Boolean).join(", ")
+			? ids.length
+				? m.canvas_pill_cards_and_items({ cards: m.canvas_pill_cards({ count: boards }), items: m.canvas_props_items({ count: ids.length }) })
+				: m.canvas_pill_cards({ count: boards })
 			: ids.length > 1
-				? `${ids.length} items`
-				: words || (typeof first?.name === "string" ? first.name : first?.type) || "item";
+				? m.canvas_props_items({ count: ids.length })
+				: words || (typeof first?.name === "string" ? first.name : first?.type) || m.canvas_card_held_item();
 		return { box, ids, cards, words, name };
 	});
 

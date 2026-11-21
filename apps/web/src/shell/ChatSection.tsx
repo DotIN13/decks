@@ -7,10 +7,11 @@ import { isWorking, workingWords } from "@decks/agent-ui/chat";
 import { onCleanup, onMount, Show, type JSX } from "solid-js";
 import { AgentFace } from "../agents/AgentPill.tsx";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 
 /** What an agent is doing, said after its name: "running tools…", "waiting for you", or nothing. */
 export function stateWords(state: AgentState, name: string): string | undefined {
-	if (state === "waiting") return "waiting for you";
+	if (state === "waiting") return m.shell_waiting_for_you();
 	const words = workingWords(state, name);
 	return words && isWorking(state) ? words : undefined;
 }
@@ -232,9 +233,9 @@ export function ChatSection(props: {
 		window.addEventListener("pointerup", end, true);
 		window.addEventListener("pointercancel", end, true);
 	};
-	const name = () => props.identity?.name ?? props.chat?.name ?? "No agent";
+	const name = () => props.identity?.name ?? props.chat?.name ?? m.shell_no_agent();
 	return (
-		<section ref={section} class="v3-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} data-float={props.float ? "true" : undefined} aria-label="The conversation" onPointerDown={startSheetDrag}>
+		<section ref={section} class="v3-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} data-float={props.float ? "true" : undefined} aria-label={m.shell_the_conversation()} onPointerDown={startSheetDrag}>
 			<Show when={props.sheet}>
 				<span class="v3-sheet-handle" aria-hidden="true" />
 			</Show>
@@ -243,7 +244,7 @@ export function ChatSection(props: {
 					class="v3-chat-resize"
 					role="separator"
 					aria-orientation="horizontal"
-					aria-label="Conversation height"
+					aria-label={m.shell_conversation_height()}
 					tabindex="0"
 					onPointerDown={startResize}
 					onKeyDown={keyResize}
@@ -255,7 +256,7 @@ export function ChatSection(props: {
 			</Show>
 			{/* Only drawn while the float is put away behind an edge: the one part of it left on screen, and the way back. */}
 			<Show when={props.float}>
-				<button type="button" class="stowtab" data-stowtab aria-label="Bring the conversation back" title="Bring the conversation back" onClick={() => unstow()}>
+				<button type="button" class="stowtab" data-stowtab aria-label={m.shell_bring_back()} title={m.shell_bring_back()} onClick={() => unstow()}>
 					<Icon of={ChevronLeft} size={16} />
 				</button>
 			</Show>
@@ -265,12 +266,12 @@ export function ChatSection(props: {
 						ref={grip}
 						class="v3-chat-grip"
 						aria-hidden="true"
-						title={props.float ? "Drag to move; let go over the side panel, or double-click, to put it back; throw at either edge to put away" : "Drag to take the conversation out of the side panel"}
+						title={props.float ? m.shell_grip_float() : m.shell_grip_panel()}
 						onPointerDown={(event) => section && props.out?.gripDown(event, section)}
 					/>
 				</Show>
 				<Show when={props.chat}>{(chat) => <AgentFace chat={chat()} identity={props.identity} unread={props.unread} size={24} ring={1.5} />}</Show>
-				<button type="button" class="v3-chat-title" title={props.folded ? "Show the conversation" : "Fold the conversation"} onClick={() => props.onFold(!props.folded)}>
+				<button type="button" class="v3-chat-title" title={props.folded ? m.shell_show_conversation() : m.shell_fold_conversation()} onClick={() => props.onFold(!props.folded)}>
 					<span class="v3-chat-name">{name()}</span>
 					<Show when={props.chat && stateWords(props.chat.state, name())}>{(words) => <span class="v3-chat-state">{words()}</span>}</Show>
 				</button>
@@ -279,8 +280,8 @@ export function ChatSection(props: {
 					type="button"
 					class="v3-icon"
 					aria-expanded={!props.folded}
-					data-tip={props.sheet ? "Back into the pill" : props.folded ? "Show the conversation" : "Fold the conversation"}
-					aria-label={props.folded ? "Show the conversation" : "Fold the conversation"}
+					data-tip={props.sheet ? m.shell_back_into_pill() : props.folded ? m.shell_show_conversation() : m.shell_fold_conversation()}
+					aria-label={props.folded ? m.shell_show_conversation() : m.shell_fold_conversation()}
 					onClick={() => props.onFold(!props.folded)}
 				>
 					<Icon of={props.sheet ? ChevronDown : props.folded ? ChevronsUpDown : ChevronsDownUp} size={16} />
@@ -304,12 +305,12 @@ export function StatusPill(props: { chat: AgentChat | undefined; identity: Ident
 	return (
 		<Show when={words()}>
 			{(said) => (
-				<button type="button" class="v3-status float" data-waiting={props.chat?.state === "waiting" ? "true" : undefined} title="Show the conversation" onClick={() => props.onOpen()} aria-live="polite">
+				<button type="button" class="v3-status float" data-waiting={props.chat?.state === "waiting" ? "true" : undefined} title={m.shell_show_conversation()} onClick={() => props.onOpen()} aria-live="polite">
 					<span class="v3-status-sign" aria-hidden="true">
 						✻
 					</span>
 					<span class="truncate">
-						{name()} is {said()}
+						{m.shell_status({ name: name(), state: said() })}
 					</span>
 				</button>
 			)}

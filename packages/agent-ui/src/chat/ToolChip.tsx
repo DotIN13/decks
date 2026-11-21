@@ -4,6 +4,7 @@ import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { createSignal, Show } from "solid-js";
 import { Icon } from "@decks/ui";
 import { askFullResult, awaitingResult, fullResult } from "./tool-results.ts";
+import { formatNumber, m } from "@decks/i18n";
 
 /**
  * A tool call, as one line: what happened, what ran, what it ran on, and a way in.
@@ -54,7 +55,7 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 				data-open={open()}
 				aria-expanded={openable() ? open() : undefined}
 				disabled={!openable()}
-				title={openable() ? (open() ? "Hide the output" : "Show the output") : undefined}
+				title={openable() ? (open() ? m.chat_tool_hide_output() : m.chat_tool_show_output()) : undefined}
 				onClick={() => {
 					const opening = !open();
 					// The preview is there at once; the rest is asked for the first time it is wanted —
@@ -75,7 +76,7 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 				</span>
 				<span class="name">{props.item.name}</span>
 				<span class="title">{props.item.title}</span>
-				<Show when={props.item.images}>{(count) => <span class="imgs">{count()} img</span>}</Show>
+				<Show when={props.item.images}>{(count) => <span class="imgs">{m.chat_tool_images({ count: count() })}</span>}</Show>
 				<Show when={openable()}>
 					{/* Turned rather than swapped for a second glyph, which is this app's
 					    convention everywhere a row opens — picone swaps `chevron-down` for
@@ -88,8 +89,8 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 				<Show when={partial()}>
 					<p class="more">
 						{awaitingResult(props.item.id)
-							? "Loading the rest…"
-							: `The first ${result().length.toLocaleString()} of ${(props.item.full ?? 0).toLocaleString()} characters.`}
+							? m.chat_tool_loading_rest()
+							: m.chat_tool_first_characters({ shown: formatNumber(result().length), total: formatNumber(props.item.full ?? 0) })}
 					</p>
 				</Show>
 			</Show>

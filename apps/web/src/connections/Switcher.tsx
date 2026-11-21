@@ -7,6 +7,7 @@ import X from "lucide-solid/icons/x";
 import { createSignal, For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { DecksMark, Icon, Popover } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { state } from "../state/deck.ts";
 import { backend, can } from "./backend.ts";
 import { forget, openBundle } from "./bundle.ts";
@@ -52,7 +53,7 @@ async function reachable(one: Connection): Promise<Reach> {
 function kindNote(one: Connection): string {
 	if (one.kind === "here") return location.host;
 	if (one.kind === "server") return new URL(one.base).host;
-	return `file · ${one.boards} card${one.boards === 1 ? "" : "s"}`;
+	return m.connections_file_cards({ count: one.boards });
 }
 
 export function Switcher(props: { label?: string } = {}) {
@@ -125,7 +126,7 @@ export function Switcher(props: { label?: string } = {}) {
 			base = serverBase(address());
 			new URL(base);
 		} catch {
-			setError("That is not an address.");
+			setError(m.connections_not_address());
 			return;
 		}
 		setBusy(true);
@@ -138,14 +139,14 @@ export function Switcher(props: { label?: string } = {}) {
 				credentials: "omit",
 			});
 			const said = (await response.json().catch(() => ({}))) as { token?: string; name?: string; error?: string };
-			if (!response.ok || !said.token) throw new Error(said.error ?? `The server answered ${response.status}.`);
+			if (!response.ok || !said.token) throw new Error(said.error ?? m.connections_server_answered({ status: String(response.status) }));
 			const id = newId();
 			const given = label().replace(/\s+/g, " ").trim().slice(0, 60);
 			saveConnections([...connections(), { id, kind: "server", label: said.name ?? new URL(base).host, ...(given ? { name: given } : {}), base, token: said.token, added: Date.now() }]);
 			await go(id);
 		} catch (failed) {
 			const text = (failed as Error).message;
-			setError(text === "Failed to fetch" || text.startsWith("NetworkError") ? `Could not reach ${base}. It must be a Decks server on HTTPS (or localhost) that this browser can reach.` : text);
+			setError(text === "Failed to fetch" || text.startsWith("NetworkError") ? m.connections_unreachable({ base }) : text);
 		} finally {
 			setBusy(false);
 		}
@@ -155,7 +156,7 @@ export function Switcher(props: { label?: string } = {}) {
 		if (!file) return;
 		setError(undefined);
 		if (!available()) {
-			setError("Opening a canvas file needs this page on HTTPS or localhost.");
+			setError(m.connections_file_needs_https());
 			return;
 		}
 		setBusy(true);
@@ -178,7 +179,7 @@ export function Switcher(props: { label?: string } = {}) {
 			</Portal>
 			<Popover
 				placement="bottom-start"
-				label="Connections"
+				label={m.connections_label()}
 				class="switcher-card w-[280px]"
 				onOpenChange={opened}
 				trigger={(popover) => (
@@ -189,7 +190,7 @@ export function Switcher(props: { label?: string } = {}) {
 						aria-haspopup="menu"
 						aria-expanded={popover.open}
 						data-on={popover.open ? "soft" : undefined}
-						title="Switch between servers and canvas files"
+						title={m.connections_switch_title()}
 						onClick={popover.toggle}
 					>
 						<span class="panel-mark-glyph" aria-hidden="true">
@@ -197,7 +198,7 @@ export function Switcher(props: { label?: string } = {}) {
 						</span>
 						<span class="switcher-name">{props.label ?? name()}</span>
 						<Show when={current()?.kind === "bundle"}>
-							<span class="switcher-tag">read only</span>
+							<span class="switcher-tag">{m.connections_read_only()}</span>
 						</Show>
 						<Icon of={ChevronDown} size={12} class="flex-none text-faint" />
 					</button>
@@ -212,7 +213,7 @@ export function Switcher(props: { label?: string } = {}) {
 								borderless, 16px on a touch keyboard so focusing it does not zoom the page.
 							*/}
 							<div class="switcher-label">
-								<span>Server address</span>
+								<span>{m.connections_address()}</span>
 								<label class="field h-8 flex-none rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
 									<input
 										type="text"
@@ -229,7 +230,7 @@ export function Switcher(props: { label?: string } = {}) {
 							</div>
 							<div class="switcher-label">
 								<span>
-									Pairing code <span class="text-faint">· only over the internet</span>
+									{m.connections_code()} <span class="text-faint">· {m.connections_code_hint()}</span>
 								</span>
 								<label class="field h-8 flex-none rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
 									<input
@@ -238,7 +239,7 @@ export function Switcher(props: { label?: string } = {}) {
 										autocomplete="one-time-code"
 										maxLength={6}
 										class="min-w-0 flex-1 border-0 bg-none text-ui tracking-[0.12em] text-fg outline-none placeholder:tracking-normal placeholder:text-faint pointer-coarse:text-[16px]"
-										placeholder="From decks pair code on that machine"
+										placeholder={m.connections_code_placeholder()}
 										value={code()}
 										onInput={(event) => setCode(event.currentTarget.value)}
 										data-connect-code
@@ -247,7 +248,7 @@ export function Switcher(props: { label?: string } = {}) {
 							</div>
 							<div class="switcher-label">
 								<span>
-									Name <span class="text-faint">· optional</span>
+									{m.connections_name()} <span class="text-faint">· {m.connections_optional()}</span>
 								</span>
 								<label class="field h-8 flex-none rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
 									<input
@@ -255,7 +256,7 @@ export function Switcher(props: { label?: string } = {}) {
 										autocomplete="off"
 										maxLength={60}
 										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
-										placeholder="What the server calls itself"
+										placeholder={m.connections_name_placeholder()}
 										value={label()}
 										onInput={(event) => setLabel(event.currentTarget.value)}
 										data-connect-name
@@ -265,10 +266,10 @@ export function Switcher(props: { label?: string } = {}) {
 							<Show when={error()}>{(text) => <p class="switcher-error">{text()}</p>}</Show>
 							<div class="switcher-actions">
 								<button type="button" class="btn" onClick={() => setView("list")}>
-									Back
+									{m.connections_back()}
 								</button>
 								<button type="submit" class="btn" data-primary="true" disabled={busy() || !address().trim()}>
-									{busy() ? "Connecting…" : "Connect"}
+									{busy() ? m.connections_connecting() : m.connections_connect()}
 								</button>
 							</div>
 						</form>
@@ -280,7 +281,7 @@ export function Switcher(props: { label?: string } = {}) {
 							{(one, index) => (
 								<>
 								<Show when={index() === 1}>
-									<div class="menu-label">Other decks</div>
+									<div class="menu-label">{m.connections_other_decks()}</div>
 								</Show>
 								<div class="row-act" data-on={one.id === current()?.id ? "true" : undefined} data-here={one.id === current()?.id ? "true" : undefined}>
 									<Show
@@ -294,15 +295,15 @@ export function Switcher(props: { label?: string } = {}) {
 														<span class="row-note w-full truncate text-left text-faint">
 															{kindNote(one)}
 															{one.name && one.kind !== "here" && one.name !== one.label ? ` · ${one.label}` : ""}
-															{reached()[one.id] === "off" ? " · not reachable" : reached()[one.id] === "unpaired" ? " · pairing revoked" : ""}
+															{reached()[one.id] === "off" ? ` · ${m.connections_not_reachable()}` : reached()[one.id] === "unpaired" ? ` · ${m.connections_pairing_revoked()}` : ""}
 														</span>
 													</span>
 												</button>
-												<button type="button" class="close" title="Rename" aria-label={`Rename ${rowName(one)}`} onClick={() => startRename(one)} data-rename={one.id}>
+												<button type="button" class="close" title={m.connections_rename()} aria-label={m.connections_rename_label({ name: rowName(one) })} onClick={() => startRename(one)} data-rename={one.id}>
 													<Icon of={Pencil} size={12} />
 												</button>
 												<Show when={one.kind !== "here" && one.id !== current()?.id}>
-													<button type="button" class="close" title={one.kind === "bundle" ? "Remove this canvas from this browser" : "Forget this server"} aria-label={`Forget ${rowName(one)}`} onClick={() => void forget(one.id)}>
+													<button type="button" class="close" title={one.kind === "bundle" ? m.connections_remove_bundle() : m.connections_forget_server()} aria-label={m.connections_forget_label({ name: rowName(one) })} onClick={() => void forget(one.id)}>
 														<Icon of={X} size={12} />
 													</button>
 												</Show>
@@ -319,7 +320,7 @@ export function Switcher(props: { label?: string } = {}) {
 												type="text"
 												maxLength={60}
 												class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
-												placeholder={one.kind === "here" ? (ownName() ?? "This server") : one.label}
+												placeholder={one.kind === "here" ? (ownName() ?? m.connections_this_server()) : one.label}
 												value={draftName()}
 												onInput={(event) => setDraftName(event.currentTarget.value)}
 												/* `on:` binds to the field itself; Solid's `onKeyDown` is delegated to the
@@ -342,17 +343,17 @@ export function Switcher(props: { label?: string } = {}) {
 					<div class="rule" aria-hidden="true" />
 					<button type="button" role="menuitem" data-row data-flat="true" onClick={() => setView("connect")} data-connect data-keep-open>
 						<Icon of={Plug} size={13} class="flex-none text-muted" />
-						<span class="row-label flex-1">Connect a server…</span>
+						<span class="row-label flex-1">{m.connections_connect_server()}</span>
 					</button>
 					<button type="button" role="menuitem" data-row data-flat="true" onClick={() => picker?.click()} data-open-bundle data-keep-open>
 						<Icon of={FileUp} size={13} class="flex-none text-muted" />
-						<span class="row-label flex-1">Open a canvas file…</span>
+						<span class="row-label flex-1">{m.connections_open_file()}</span>
 					</button>
 					<Show when={can("share") && stage()}>
 						{(one) => (
 							<a role="menuitem" data-row data-flat="true" href={api(`/bundle/${encodeURIComponent(one().name)}`)} download="" data-download-bundle>
 								<Icon of={Download} size={13} class="flex-none text-muted" />
-								<span class="row-label flex-1 truncate">Download this canvas</span>
+								<span class="row-label flex-1 truncate">{m.connections_download()}</span>
 								<span class="meta flex-none text-micro">.decks</span>
 							</a>
 						)}

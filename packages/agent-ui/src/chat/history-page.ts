@@ -1,4 +1,5 @@
 import type { ChatItem } from "@decks/protocol";
+import { m } from "@decks/i18n";
 
 /**
  * How much of a long conversation is in the DOM, and how it grows (DESIGN §6.2).
@@ -88,8 +89,8 @@ export function hasEarlier(state: { total: number; hidden: number; more: boolean
 
 /** The label on the way back: the count when it is known, the invitation when it is not. */
 export function earlierLabel(hidden: number): string {
-	if (hidden <= 0) return "Earlier messages";
-	return `${hidden} earlier ${hidden === 1 ? "message" : "messages"}`;
+	if (hidden <= 0) return m.chat_earlier_messages();
+	return m.chat_earlier_count({ count: hidden });
 }
 
 /**

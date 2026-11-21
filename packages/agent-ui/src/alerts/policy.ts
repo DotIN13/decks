@@ -1,5 +1,6 @@
 import type { AgentState } from "@decks/protocol";
 import { isSound, SILENT, type SoundChoice } from "./sound.ts";
+import { m } from "@decks/i18n";
 
 /**
  * What the app interrupts you for, and the rules about when.
@@ -41,11 +42,35 @@ export type AlertKind = "done" | "ask" | "problem";
 
 export const ALERT_KINDS: AlertKind[] = ["done", "ask", "problem"];
 
-/** How each kind is described in Settings. The wording is the feature's documentation. */
-export const ALERT_LABELS: Record<AlertKind, { label: string; note: string }> = {
-	done: { label: "An agent finishes", note: "It left you something to read." },
-	ask: { label: "An agent asks you something", note: "It waits until you answer." },
-	problem: { label: "Something goes wrong", note: "A turn failed, or an edit was refused." },
+/**
+ * How each kind is described in Settings. The wording is the feature's documentation. Getters, so
+ * the words are read when they are drawn, in the language chosen, and never at module load.
+ */
+export const ALERT_LABELS: Record<AlertKind, { readonly label: string; readonly note: string }> = {
+	done: {
+		get label() {
+			return m.chat_alert_done();
+		},
+		get note() {
+			return m.chat_alert_done_note();
+		},
+	},
+	ask: {
+		get label() {
+			return m.chat_alert_ask();
+		},
+		get note() {
+			return m.chat_alert_ask_note();
+		},
+	},
+	problem: {
+		get label() {
+			return m.chat_alert_problem();
+		},
+		get note() {
+			return m.chat_alert_problem_note();
+		},
+	},
 };
 
 export interface AlertPrefs {

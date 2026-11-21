@@ -1,4 +1,17 @@
 import { dayKey, formatDateTime } from "@decks/ui";
+import { formatAgo, formatNumber, getLocale, m } from "@decks/i18n";
+
+/** "1h 5m" in English, "1小时5分钟" in Chinese: the shortest way the language shown writes a length of time. */
+function narrow(parts: { days?: number; hours?: number; minutes?: number; seconds?: number }): string {
+	const Duration = (Intl as unknown as { DurationFormat?: new (locale: string, options: { style: string }) => { format(value: object): string } }).DurationFormat;
+	// Nothing at all is "" to `DurationFormat`, so zero is written by the unit fallback below.
+	const written = Duration ? new Duration(getLocale(), { style: "narrow" }).format(parts) : "";
+	if (written) return written;
+	const units = { days: "day", hours: "hour", minutes: "minute", seconds: "second" } as const;
+	return Object.entries(parts)
+		.map(([unit, value]) => formatNumber(value, { style: "unit", unit: units[unit as keyof typeof units], unitDisplay: "narrow" }))
+		.join(" ");
+}
 /**
  * Numbers in the usage panel, said the way a person would say them.
  *
@@ -20,7 +33,7 @@ export function tokens(count: number): string {
 
 /** Every digit, for the one figure that is a count and not a magnitude. */
 export function exact(count: number): string {
-	return Math.round(count).toLocaleString("en-US");
+	return formatNumber(Math.round(count));
 }
 
 /**
@@ -44,13 +57,13 @@ export function money(usd: number): string {
  * roughly how long, not exactly.
  */
 export function duration(ms: number): string {
-	if (!Number.isFinite(ms) || ms <= 0) return "0s";
+	if (!Number.isFinite(ms) || ms <= 0) return narrow({ seconds: 0 });
 	const seconds = Math.round(ms / 1000);
-	if (seconds < 60) return `${seconds}s`;
+	if (seconds < 60) return narrow({ seconds });
 	const minutes = Math.floor(seconds / 60);
-	if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+	if (minutes < 60) return narrow({ minutes, seconds: seconds % 60 });
 	const hours = Math.floor(minutes / 60);
-	return `${hours}h ${minutes % 60}m`;
+	return narrow({ hours, minutes: minutes % 60 });
 }
 
 /**
@@ -67,11 +80,11 @@ export function resetsIn(iso: string | null, now: number): string | null {
 	if (Number.isNaN(at)) return null;
 
 	const minutes = Math.round((at - now) / 60_000);
-	if (minutes <= 0) return "now";
-	if (minutes < 60) return `${minutes}m`;
+	if (minutes <= 0) return m.settings_usage_now();
+	if (minutes < 60) return narrow({ minutes });
 	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}h ${minutes % 60}m`;
-	return `${Math.round(hours / 24)}d`;
+	if (hours < 24) return narrow({ hours, minutes: minutes % 60 });
+	return narrow({ days: Math.round(hours / 24) });
 }
 
 /**
@@ -97,25 +110,20 @@ export function resetsAt(iso: string | null, now: number): string | null {
  * only question it answers is whether what is on screen is a minute old or an hour old.
  */
 export function ago(at: number, now: number): string {
-	const minutes = Math.floor(Math.max(0, now - at) / 60_000);
-	if (minutes < 1) return "a moment ago";
-	if (minutes < 60) return `${minutes}m ago`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}h ago`;
-	return `${Math.round(hours / 24)}d ago`;
+	return formatAgo(Math.min(at, now), now, "narrow");
 }
 
 /** What the runtime's behaviour keys mean in words. */
-const BEHAVIOR_LABEL: Record<string, string> = {
-	cache_miss: "Cache misses",
-	long_context: "Long context",
-	subagent_heavy: "Subagent-heavy",
-	high_parallel: "Highly parallel",
-	cron: "Scheduled runs",
+const BEHAVIOR_LABEL: Record<string, () => string> = {
+	cache_miss: () => m.settings_usage_behavior_cache_miss(),
+	long_context: () => m.settings_usage_behavior_long_context(),
+	subagent_heavy: () => m.settings_usage_behavior_subagent_heavy(),
+	high_parallel: () => m.settings_usage_behavior_high_parallel(),
+	cron: () => m.settings_usage_behavior_cron(),
 };
 
 export function behaviorLabel(key: string): string {
-	return BEHAVIOR_LABEL[key] ?? key.replace(/_/g, " ");
+	return BEHAVIOR_LABEL[key]?.() ?? key.replace(/_/g, " ");
 }
 
 /**
@@ -126,7 +134,7 @@ export function behaviorLabel(key: string): string {
  */
 export function planLabel(subscription: string | null): string | null {
 	if (!subscription) return null;
-	return `${subscription.charAt(0).toUpperCase()}${subscription.slice(1)} plan`;
+	return m.settings_usage_plan({ name: `${subscription.charAt(0).toUpperCase()}${subscription.slice(1)}` });
 }
 
 /**

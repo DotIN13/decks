@@ -2,6 +2,7 @@ import type { Page } from "@decks/protocol";
 import { flyToPages } from "../app/links.ts";
 import { stages } from "../state/canvases.ts";
 import { act } from "../state/decks.ts";
+import { m } from "@decks/i18n";
 import { notice } from "../state/notices.ts";
 import { setSelected } from "../state/selection.ts";
 import type { Tab } from "./kind.ts";
@@ -21,7 +22,7 @@ import { canvasOnScreen, onCanvas, openTab, showCanvas } from "./tabs.ts";
 export async function showOnCanvas(tab: Tab, d: { frameWhenPlaced: (path: string) => void }): Promise<void> {
 	const target = tab.target ?? "";
 	const canvas = tab.kind === "app" ? canvasOnScreen()?.name : canvasOfPath(target);
-	if (!canvas) return void notice("info", tab.kind === "document" ? "This document is kept in the deck's own docs, on no canvas." : "This is on no canvas.");
+	if (!canvas) return void notice("info", tab.kind === "document" ? m.tabs_document_no_canvas() : m.tabs_on_no_canvas());
 	const forward = () => (canvas === canvasOnScreen()?.name ? showCanvas() : openTab("canvas", canvas));
 	if (tab.kind === "card") {
 		forward();
@@ -36,7 +37,7 @@ export async function showOnCanvas(tab: Tab, d: { frameWhenPlaced: (path: string
 		const at = await act<{ x1: number; y1: number }>("canvas.space", [{ w: 1100, h: 760 }, { canvas }]);
 		item = await act<Placed>("canvas.insert", [{ type: "app", app: target }, { canvas, ...(at ? { at } : {}) }]);
 	}
-	if (!item?.id || !item.box) return void notice("info", `It is not on ${stages().find((one) => one.name === canvas)?.title ?? canvas} any more.`);
+	if (!item?.id || !item.box) return void notice("info", m.tabs_not_on_canvas({ canvas: stages().find((one) => one.name === canvas)?.title ?? canvas }));
 	forward();
 	if (!(await inFront(canvas))) return;
 	const { x1, y1, x2, y2 } = item.box;

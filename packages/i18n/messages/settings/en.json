@@ -1,0 +1,281 @@
+{
+	"settings_section_general": "General",
+	"settings_section_notifications": "Notifications",
+	"settings_section_accounts": "Accounts",
+	"settings_section_voice": "Voice",
+	"settings_section_connections": "Connections",
+	"settings_set": "Set",
+	"settings_time": "Time",
+	"settings_timezone": "Timezone",
+	"settings_timezone_set": "Set to {zone}.",
+	"settings_timezone_unset": "Not set: the server's own clock, {zone}.",
+	"settings_timezone_unknown": "unknown",
+	"settings_timezone_now": "It is {time} there.",
+	"settings_timezone_use": "Use {zone}",
+	"settings_timezone_back": "Back to the server's own clock, {zone}",
+	"settings_timezone_use_server": "Use the server's",
+	"settings_timezone_other": "Another timezone",
+	"settings_timezone_other_sub": "An IANA name, such as Asia/Shanghai.",
+	"settings_language": "Language",
+	"settings_language_sub": "The words Decks shows, on this browser. Choosing one reloads the page.",
+	"settings_language_browser": "As the browser ({name})",
+	"settings_title": "Settings",
+	"settings_sections": "Sections",
+	"settings_close": "Close",
+	"settings_done": "Done",
+	"settings_copy": "Copy",
+	"settings_copied": "Copied",
+	"settings_canvas": "Canvas",
+	"settings_fps": "Frame rate",
+	"settings_fps_sub": "A meter over the canvas: frames a second, the slowest frame, and how many took over 12 ms.",
+	"settings_fps_show": "Show the frame rate",
+	"settings_claude_subscriptions": "Subscriptions",
+	"settings_claude_foot": "Each conversation picks its account in the model menu.",
+	"settings_claude_add": "Add an account",
+	"settings_claude_own_login": "Claude Code's own login",
+	"settings_claude_no_name": "An account with no name yet",
+	"settings_claude_signed_out": "Signed out",
+	"settings_claude_used": "{percent} of 5 h used",
+	"settings_claude_default": "Default for new",
+	"settings_claude_remove": "Remove",
+	"settings_claude_remove_title": "Forget {name} and remove its credentials from this machine",
+	"settings_voice_foot": "The mic in the composer, or Ctrl+M. Nothing is sent until you send it.",
+	"settings_voice_recogniser": "Recogniser",
+	"settings_voice_model": "The server's model",
+	"settings_voice_model_label": "The server's speech model",
+	"settings_voice_no_key": "No key yet: set OPENAI_API_KEY on the server.",
+	"settings_voice_lang_sub": "What the browser's recogniser listens for.",
+	"settings_voice_lang_label": "The browser's speech language",
+	"settings_voice_stt_mini": "$0.003 a minute; mixes languages well.",
+	"settings_voice_stt_gpt": "$0.0045 a minute; the newest.",
+	"settings_voice_stt_4o": "$0.006 a minute; the most accurate.",
+	"settings_voice_stt_whisper": "$0.006 a minute; the older model.",
+	"settings_conn_group": "Decks connection",
+	"settings_conn_foot": "For another Decks, the iPad app or a terminal connecting to this one. Decks Studio needs neither: its login is under Accounts.",
+	"settings_conn_address": "Address",
+	"settings_conn_code": "Pairing code",
+	"settings_conn_code_sub": "Asked for when connecting over the internet. Make one on this machine:",
+	"settings_conn_connected": "Connected to this Decks",
+	"settings_conn_none": "Nothing else is connected",
+	"settings_conn_sessions": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} session",
+				"n=other": "{count} sessions"
+			}
+		}
+	],
+	"settings_conn_used": "{site} · used {ago}",
+	"settings_conn_unknown_site": "unknown site",
+	"settings_conn_revoke_title": "It will have to connect again",
+	"settings_conn_revoke": "Revoke",
+	"settings_conn_revoke_all": "Revoke all",
+	"settings_chrome_waiting": "Waiting for the server.",
+	"settings_chrome_sharing": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "Sharing one tab. Submitting asks you first.",
+				"n=other": "Sharing {count} tabs. Submitting asks you first."
+			}
+		}
+	],
+	"settings_chrome_paired": "Paired. Press the Decks button on a tab to share it.",
+	"settings_chrome_not_paired": "Not paired. Paste the address and code below into the extension.",
+	"settings_chrome_yours": "Your Chrome",
+	"settings_chrome_extension": "The Decks extension",
+	"settings_chrome_stop": "Stop sharing",
+	"settings_chrome_untitled": "(untitled)",
+	"settings_chrome_to_pair": "To pair a Chrome",
+	"settings_chrome_address": "Decks address",
+	"settings_chrome_new_code_title": "Mint a fresh code; the extension has to be paired again",
+	"settings_chrome_new_code": "New code",
+	"settings_usage_now": "now",
+	"settings_usage_behavior_cache_miss": "Cache misses",
+	"settings_usage_behavior_long_context": "Long context",
+	"settings_usage_behavior_subagent_heavy": "Subagent-heavy",
+	"settings_usage_behavior_high_parallel": "Highly parallel",
+	"settings_usage_behavior_cron": "Scheduled runs",
+	"settings_usage_plan": "{name} plan",
+	"settings_five_hour_title": "5-hour window. Read {ago}.",
+	"settings_five_hour_title_again": "5-hour window, starts again at {time}. Read {ago}.",
+	"settings_five_hour_used": "{percent} used",
+	"settings_usage_title": "Usage",
+	"settings_usage_read_again": "Read again",
+	"settings_usage_failed": "Could not read usage: {message}",
+	"settings_usage_reading_again": "Reading again — figures from {ago}.",
+	"settings_usage_conversation": "This conversation",
+	"settings_usage_conversation_note": "what it has spent, and how full its window is",
+	"settings_usage_no_reading": "No reading yet. An agent reports its context after its first reply.",
+	"settings_usage_of_context": "of the context window",
+	"settings_usage_tokens_of": "{used} of {window} tokens",
+	"settings_usage_model": "Model",
+	"settings_usage_in": "In",
+	"settings_usage_out": "Out",
+	"settings_usage_cache_rw": "Cache r/w",
+	"settings_usage_cost": "Cost",
+	"settings_usage_cache_read": "Cache read",
+	"settings_usage_cache_write": "Cache write",
+	"settings_usage_elapsed": "Elapsed",
+	"settings_usage_api_time": "API time",
+	"settings_usage_lines": "Lines",
+	"settings_usage_limits": "Plan limits",
+	"settings_usage_limits_note": "what the subscription has left",
+	"settings_usage_per_token": "A {kind} agent bills per token and has no plan windows to run out of.",
+	"settings_usage_no_plan": "This agent is not running against a claude.ai plan, so there are no windows to report.",
+	"settings_usage_no_windows": "The plan reports no active windows.",
+	"settings_usage_behaviors": "What's using it",
+	"settings_usage_behaviors_note": "as the runtime scans this machine",
+	"settings_usage_day": "24 hours",
+	"settings_usage_week": "7 days",
+	"settings_usage_reading": "Reading…",
+	"settings_usage_nothing": "Nothing to report.",
+	"settings_usage_dormant": "not in force",
+	"settings_usage_dormant_turns": "not in force · turns over in {left}",
+	"settings_usage_resetting": "resetting now",
+	"settings_usage_resets_in": "resets in {left}",
+	"settings_usage_dormant_title": "A window this plan carries and this account is not on right now",
+	"settings_usage_requests_across": [
+		{
+			"declarations": [
+				"input requests",
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{requests} requests across {count} session.",
+				"n=other": "{requests} requests across {count} sessions."
+			}
+		}
+	],
+	"settings_usage_window_empty": "Nothing recorded for this window.",
+	"settings_usage_requests": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{shown} request",
+				"n=other": "{shown} requests"
+			}
+		}
+	],
+	"settings_usage_agents": "Agents",
+	"settings_usage_skills": "Skills",
+	"settings_usage_plugins": "Plugins",
+	"settings_usage_mcp": "MCP servers",
+	"settings_alert_volume_off": "Off",
+	"settings_alert_volume_quiet": "Quiet",
+	"settings_alert_volume_medium": "Medium",
+	"settings_alert_volume_loud": "Loud",
+	"settings_alert_when": "When",
+	"settings_alert_sound": "Sound",
+	"settings_alert_banner": "Banner",
+	"settings_alert_volume": "Volume",
+	"settings_alert_volume_off_sub": "Off silences all three and keeps the choices.",
+	"settings_alert_silent": "Silent",
+	"settings_alert_not_asked": "The browser has not been asked for permission yet.",
+	"settings_alert_allow": "Allow",
+	"settings_alert_denied": "This browser blocks banners for this site; turn them on in its site settings.",
+	"settings_alert_insecure": "Banners need a secure page and this one is plain http. Sounds work here; for banners, open the deck on localhost or behind TLS.",
+	"settings_alert_unsupported": "This browser has no notifications. The sounds and the tab count still work.",
+	"settings_studio_group": "Decks Studio login",
+	"settings_studio_sign_in_title": "Sign in to Decks Studio",
+	"settings_studio_sign_in_sub": "This deck's canvases sync there, and you reach your agents from anywhere.",
+	"settings_studio_address": "Studio's address",
+	"settings_studio_sign_in": "Sign in",
+	"settings_studio_showing_code": "Studio is showing a code",
+	"settings_studio_code_sends_back": "At {host}, in the tab that opened. Press Sign it in there, or copy the code and paste it below.",
+	"settings_studio_code_copy": "Open Studio at {host}, copy the code it shows, and paste it below.",
+	"settings_studio_open": "Open Studio",
+	"settings_studio_cancel": "Cancel",
+	"settings_studio_code": "Code from Studio",
+	"settings_studio_code_label": "The code Studio shows",
+	"settings_studio_signed_in_as": "Signed in to Decks Studio as {email}",
+	"settings_studio_signed_in": "Signed in to Decks Studio",
+	"settings_studio_env_key": "{host} · its key is set by DECKS_STUDIO_KEY",
+	"settings_studio_syncs_there": "{host} · this deck syncs there",
+	"settings_studio_sign_out_title": "Delete this harness's Studio key: the deck stops syncing, and every browser signed in to Studio loses its way here",
+	"settings_studio_sign_out": "Sign out",
+	"settings_sync_amounts": "{done} of {total} · {filesDone} of {filesTotal} files",
+	"settings_sync_connecting": "Reaching Studio",
+	"settings_sync_finishing": "Finishing",
+	"settings_sync_syncing": "Syncing to Studio",
+	"settings_sync_checking": "Checking what changed",
+	"settings_sync_held": "Paused by Studio",
+	"settings_sync_offline": "Not syncing",
+	"settings_sync_synced": "In step with Studio",
+	"settings_sync_unreachable": "Studio could not be reached.",
+	"settings_sync_offline_sub": "{why} Your work is safe here, and Decks tries again by itself.",
+	"settings_sync_offline_sub_since": "{why} Your work is safe here, and Decks tries again by itself. Last in step at {time}.",
+	"settings_sync_synced_sub_checked": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} canvas checked. A change here goes up within a second.",
+				"n=other": "{count} canvases checked. A change here goes up within a second."
+			}
+		}
+	],
+	"settings_sync_synced_sub": "A change here goes up within a second.",
+	"settings_sync_connecting_sub": "The first pass starts once Studio answers.",
+	"settings_sync_comparing": "Comparing this deck with Studio's copy.",
+	"settings_sync_with_speed": "{amounts} · {speed}/s",
+	"settings_sync_left": "{time} left",
+	"settings_sync_since": "Since {time}",
+	"settings_sync_retry": "Try again",
+	"settings_sync_label": "Sync",
+	"settings_sync_held_sub": "Studio limits how much one machine sends a minute and an hour. The rest go up when the wait ends; nothing is lost.",
+	"settings_sync_left_out": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} file left out",
+				"n=other": "{count} files left out"
+			}
+		}
+	],
+	"settings_sync_hide": "Hide",
+	"settings_sync_show": "Show",
+	"settings_sync_left_out_sub": "Over 50 MB, or refused by Studio: they stay on this machine.",
+	"settings_alert_banner_done": "Show a banner when an agent finishes",
+	"settings_alert_banner_ask": "Show a banner when an agent asks you something",
+	"settings_alert_banner_problem": "Show a banner when something goes wrong",
+	"settings_alert_sound_done": "Sound for when an agent finishes",
+	"settings_alert_sound_ask": "Sound for when an agent asks you something",
+	"settings_alert_sound_problem": "Sound for when something goes wrong",
+	"settings_language_row": "Display language"
+}

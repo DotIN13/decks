@@ -1,4 +1,5 @@
 import type { Accessor } from "solid-js";
+import { m } from "@decks/i18n";
 import { type PenNode } from "@decks/pen";
 import { For, Show } from "solid-js";
 import { ColorField, NumField, Swatches } from "./fields.tsx";
@@ -47,30 +48,30 @@ export function createFill(d: FillNeeds) {
 
 	const fillSection = () => (
 		<Show when={d.fillTargets().length > 0}>
-			<Section key="fill" title={d.has("note") && d.fillTargets().every((node) => TEXTY.has(node.type)) ? "Paper" : "Fill"}>
-				<div class="seg-set" role="group" aria-label="Fill">
+			<Section key="fill" title={d.has("note") && d.fillTargets().every((node) => TEXTY.has(node.type)) ? m.canvas_props_paper() : m.canvas_props_fill()}>
+				<div class="seg-set" role="group" aria-label={m.canvas_props_fill()}>
 					<For each={["none", "solid", "linear", "radial"] as const}>
 						{(mode) => (
 							<button type="button" data-on={fillMode() === mode ? "true" : undefined} aria-pressed={fillMode() === mode} onClick={() => setFillMode(mode)}>
-								{mode === "none" ? "None" : mode === "solid" ? "Solid" : mode === "linear" ? "Linear" : "Radial"}
+								{mode === "none" ? m.canvas_props_fill_none() : mode === "solid" ? m.canvas_props_fill_solid() : mode === "linear" ? m.canvas_props_fill_linear() : m.canvas_props_fill_radial()}
 							</button>
 						)}
 					</For>
 				</div>
 				<Show when={fillMode() !== "none"}>
-					<Swatches colors={SWATCHES} value={fillHex()} onPick={(color) => setFillColor(color)} label="Fill" />
+					<Swatches colors={SWATCHES} value={fillHex()} onPick={(color) => setFillColor(color)} label={m.canvas_props_fill()} />
 					<div class="props-row">
-						<span class="props-label">{fillMode() === "linear" || fillMode() === "radial" ? "From" : "Colour"}</span>
-						<ColorField value={fillHex()} shown={d.shownOf(fillHex())} onCommit={(color) => setFillColor(color)} onLive={d.live((color) => setFillColor(color, 0, true))} label="Fill colour" />
+						<span class="props-label">{fillMode() === "linear" || fillMode() === "radial" ? m.canvas_props_from() : m.canvas_props_colour()}</span>
+						<ColorField value={fillHex()} shown={d.shownOf(fillHex())} onCommit={(color) => setFillColor(color)} onLive={d.live((color) => setFillColor(color, 0, true))} label={m.canvas_props_fill_colour()} />
 					</div>
 					<Show when={fillMode() === "linear" || fillMode() === "radial"}>
 						<div class="props-row">
-							<span class="props-label">To</span>
-							<ColorField value={gradientEnd()} shown={d.shownOf(gradientEnd())} onCommit={(color) => setFillColor(color, 1)} onLive={d.live((color) => setFillColor(color, 1, true))} label="Second colour" />
+							<span class="props-label">{m.canvas_props_to()}</span>
+							<ColorField value={gradientEnd()} shown={d.shownOf(gradientEnd())} onCommit={(color) => setFillColor(color, 1)} onLive={d.live((color) => setFillColor(color, 1, true))} label={m.canvas_props_second_colour()} />
 						</div>
 						<Show when={fillMode() === "linear"}>
 							<div class="props-row">
-								<span class="props-label">Angle</span>
+								<span class="props-label">{m.canvas_props_angle()}</span>
 								<NumField label="°" value={gradientTurn()} onCommit={(v) => d.set(d.fillTargets(), (node) => ({ fill: { ...gradientOf(node.fill), rotation: Math.round(v) % 360 } }))} />
 							</div>
 						</Show>

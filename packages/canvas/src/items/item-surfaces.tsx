@@ -1,4 +1,5 @@
 import { mountDocPage } from "@decks/docs/page";
+import { m } from "@decks/i18n";
 import { ALLOW, SANDBOX } from "@decks/frame";
 import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { ownInput } from "./input.ts";
@@ -51,7 +52,7 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 		ownInput(host, host, { selected: () => props.selected, onSelect: props.onSelect });
 		const line = canvasHost().documents;
 		if (!line) {
-			host.textContent = "Documents open in the canvas frame.";
+			host.textContent = m.canvas_document_needs_frame();
 			return;
 		}
 		const lib = line.lib;
@@ -189,15 +190,15 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 				when={url()}
 				fallback={
 					<div class="app-surface-body">
-						<Show when={canvasHost().apps} fallback={<p>This app opens from the Decks app.</p>}>
+						<Show when={canvasHost().apps} fallback={<p>{m.canvas_app_needs_decks()}</p>}>
 							<p>{(() => {
 								const got = address();
 								if (got && "tab" in got) return got.tab;
-								if (live()) return `Opening ${about()?.title ?? props.app}…`;
-								return `${about()?.title ?? props.app} runs in a tab of its own.`;
+								if (live()) return m.canvas_app_opening({ name: about()?.title ?? props.app });
+								return m.canvas_app_own_tab({ name: about()?.title ?? props.app });
 							})()}</p>
 							<button type="button" class="app-surface-open" on:click={open}>
-								Open
+								{m.canvas_app_open()}
 							</button>
 						</Show>
 					</div>

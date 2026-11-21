@@ -1,4 +1,5 @@
 import type { Accessor } from "solid-js";
+import { m } from "@decks/i18n";
 import { isShape, type PenNode } from "@decks/pen";
 import { For, Show } from "solid-js";
 import { penBoxes } from "../../edit/pen-tools.ts";
@@ -69,7 +70,7 @@ export function createLayout(d: LayoutNeeds) {
 	 */
 	const layoutSection = () => (
 		<Show when={frames().length > 0}>
-			<Section key="layout" title="Layout">
+			<Section key="layout" title={m.canvas_props_layout()}>
 				{/*
 				 * Named in CSS, not in our own words: pen's layout pass is flexbox, and every field
 				 * here has a CSS property that means exactly it. Someone who knows flexbox needs no

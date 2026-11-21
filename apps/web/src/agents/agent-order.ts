@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import type { AgentChat, AgentState, Identity } from "@decks/protocol";
+import { formatNumber, m } from "@decks/i18n";
 
 /**
  * Which agents want you, and in what order.
@@ -152,12 +153,12 @@ function sortByUrgency(chats: AgentChat[], unread: Record<string, number>): Agen
  * the same thing in English beside it.
  */
 export function statusWords(status: AgentStatus, state: AgentState): string {
-	if (status === "waiting") return "Waiting for you";
-	if (status === "done") return "Done, not read yet";
-	if (status === "idle") return "Idle";
-	if (state === "tool") return "Running tools…";
-	if (state === "streaming") return "Typing…";
-	return "Thinking…";
+	if (status === "waiting") return m.agents_status_waiting();
+	if (status === "done") return m.agents_status_done();
+	if (status === "idle") return m.agents_status_idle();
+	if (state === "tool") return m.agents_status_tool();
+	if (state === "streaming") return m.agents_status_typing();
+	return m.agents_status_thinking();
 }
 
 /**
@@ -180,17 +181,24 @@ export function statusWords(status: AgentStatus, state: AgentState): string {
  */
 export function outsideWords(outside: { client: string; seen: number; waiting: number }, long = false): string {
 	const ago = since(outside.seen);
-	const here = ago === "just now";
-	const waiting = outside.waiting > 0 ? `${outside.waiting} waiting` : "";
-	if (long) return `Works in ${outside.client}, outside Decks. ${here ? "Calling now." : `Its last call was ${ago} ago.`}${outside.waiting > 0 ? ` ${outside.waiting} message${outside.waiting === 1 ? " waits" : "s wait"} for its next call.` : ""}`;
-	return [here ? "here" : `away · ${ago}`, waiting].filter(Boolean).join(" · ");
+	const here = isJustNow(outside.seen);
+	const count = formatNumber(outside.waiting);
+	const waiting = outside.waiting > 0 ? m.agents_outside_waiting({ count }) : "";
+	if (long)
+		return [
+			m.agents_outside_works({ client: outside.client }),
+			here ? m.agents_outside_calling() : m.agents_outside_last_call({ ago }),
+			outside.waiting > 0 ? m.agents_outside_messages_wait({ count: outside.waiting, shown: count }) : "",
+		]
+			.filter(Boolean)
+			.join(" ");
+	return [here ? m.agents_outside_here() : m.agents_outside_away({ ago }), waiting].filter(Boolean).join(" · ");
 }
 
 export function rowWords(status: AgentStatus, state: AgentState, at: number | undefined): string {
 	if (status === "done" || status === "idle") {
-		if (at === undefined) return "new";
-		const ago = since(at);
-		return ago === "just now" ? "now" : ago;
+		if (at === undefined) return m.agents_row_new();
+		return isJustNow(at) ? m.agents_row_now() : since(at);
 	}
 	return statusWords(status, state).toLowerCase();
 }
@@ -234,12 +242,20 @@ const clock = (): number => {
 export function since(at: number | undefined, now: number = clock()): string {
 	if (at === undefined) return "";
 	const seconds = Math.max(0, Math.round((now - at) / 1000));
-	if (seconds < 45) return "just now";
+	if (seconds < 45) return m.agents_just_now();
 	const minutes = Math.round(seconds / 60);
-	if (minutes < 60) return `${Math.max(1, minutes)}m`;
+	if (minutes < 60) return narrow(Math.max(1, minutes), "minute");
 	const hours = Math.round(minutes / 60);
-	if (hours < 24) return `${hours}h`;
-	return `${Math.round(hours / 24)}d`;
+	if (hours < 24) return narrow(hours, "hour");
+	return narrow(Math.round(hours / 24), "day");
+}
+
+/** "2m", "3h", "2d" in English; "2分钟", "3小时", "2天" in Chinese. */
+const narrow = (value: number, unit: "minute" | "hour" | "day") => formatNumber(value, { style: "unit", unit, unitDisplay: "narrow" });
+
+/** Whether `since` would say "just now": under 45 seconds ago. */
+function isJustNow(at: number, now: number = clock()): boolean {
+	return Math.max(0, Math.round((now - at) / 1000)) < 45;
 }
 
 /**
@@ -264,7 +280,7 @@ export function since(at: number | undefined, now: number = clock()): string {
  */
 export function closeWords(state: AgentState, name: string): string | undefined {
 	if (state !== "idle") return undefined;
-	return `Close ${name} — the transcript stays on disk. Delete does the same.`;
+	return m.agents_close_title({ name });
 }
 
 /**
@@ -296,7 +312,7 @@ export function workspaceRuns(
 	const runs = new Map<string, { label: string | undefined; chats: AgentChat[] }>();
 	for (const chat of chats) {
 		const name = at(chat) ?? "";
-		const run = runs.get(name) ?? { label: name || "No workspace", chats: [] };
+		const run = runs.get(name) ?? { label: name || m.agents_no_workspace(), chats: [] };
 		run.chats.push(chat);
 		runs.set(name, run);
 	}

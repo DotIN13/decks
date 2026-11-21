@@ -1,0 +1,14 @@
+{
+	"markup_comment_label": "Comment on the selected words",
+	"markup_comment": "Comment",
+	"markup_whole_card": "On the whole card",
+	"markup_whole_card_titled": "On the whole card: {title}",
+	"markup_comment_placeholder": "What do you want to say about this?",
+	"markup_close_title": "Close (Escape)",
+	"markup_close": "Close",
+	"markup_keep_title": "Keep it over the input bar and send it with your next message (Enter)",
+	"markup_keep": "With next message",
+	"markup_send_title": "Send it to the agent now, as a message of its own (⌘Enter)",
+	"markup_pick_agent": "Pick an agent first",
+	"markup_send": "Send now"
+}

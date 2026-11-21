@@ -1,0 +1,120 @@
+{
+	"chat_working": "working…",
+	"chat_typing": "typing…",
+	"chat_running_tools": "running tools…",
+	"chat_waiting_for_you": "{name} is waiting for you",
+	"chat_earlier_messages": "Earlier messages",
+	"chat_earlier_count": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} earlier message",
+				"n=other": "{count} earlier messages"
+			}
+		}
+	],
+	"chat_show_conversation": "Show the conversation",
+	"chat_tool_hide_output": "Hide the output",
+	"chat_tool_show_output": "Show the output",
+	"chat_tool_images": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} img",
+				"n=other": "{count} img"
+			}
+		}
+	],
+	"chat_tool_loading_rest": "Loading the rest…",
+	"chat_tool_first_characters": "The first {shown} of {total} characters.",
+	"chat_tool_group_tools": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} tool",
+				"n=other": "{count} tools"
+			}
+		}
+	],
+	"chat_tool_group_done": "{count} done",
+	"chat_tool_group_label": [
+		{
+			"declarations": [
+				"input count",
+				"input names",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} finished tool call: {names}",
+				"n=other": "{count} finished tool calls: {names}"
+			}
+		}
+	],
+	"chat_tool_group_hide": "Hide these calls",
+	"chat_tool_group_show": "Show these calls",
+	"chat_rewind_title": "Rewind to here: take back everything after it, and these words go back into the input bar",
+	"chat_rewind_label": "Rewind to here",
+	"chat_rewind": "Rewind",
+	"chat_fork_title": "Fork from here: a new conversation that remembers everything up to this message",
+	"chat_fork_label": "Fork from here",
+	"chat_fork": "Fork",
+	"chat_hide_thinking": "hide thinking",
+	"chat_thinking": "thinking…",
+	"chat_tm_go_back": "Go back to this message",
+	"chat_tm_title": "Preview, rewind, fork or restore from this message",
+	"chat_tm_stop_previewing": "Stop previewing",
+	"chat_tm_preview": "Preview",
+	"chat_tm_preview_note": "Show the canvas as it was at this message. Nothing is written, and Escape puts it back.",
+	"chat_tm_rewind_note": "Take back everything after it, and these words go back into the input bar.",
+	"chat_tm_fork_note": "Keep this history and start a second agent from this point.",
+	"chat_tm_restore": "Restore",
+	"chat_tm_restore_note": "Write the boards back to how they were here. The conversation stays where it is.",
+	"chat_the_conversation": "The conversation",
+	"chat_hide_conversation": "Hide the conversation",
+	"chat_conversation_history": "Conversation history",
+	"chat_empty": "Nothing said yet. Ask for something and it will show up here.",
+	"chat_scroll_latest": "Scroll to the latest messages",
+	"chat_latest_messages": "Latest messages",
+	"chat_today": "Today",
+	"chat_yesterday": "Yesterday",
+	"chat_state_thinking": "thinking",
+	"chat_state_streaming": "streaming",
+	"chat_state_tool": "tool",
+	"chat_state_waiting": "waiting",
+	"chat_pill_sub": "{source} · click to read all",
+	"chat_pill_sub_named": "{name} · {source} · click to read all",
+	"chat_pill_open_file": "{name} — open the file",
+	"chat_pill_show_on_canvas": "{name} — show it on the canvas",
+	"chat_pill_close": "Close",
+	"chat_pill_exact_text": "Exact text",
+	"chat_pill_as_shown": "As shown",
+	"chat_pill_remove": "Remove",
+	"chat_alert_done": "An agent finishes",
+	"chat_alert_done_note": "It left you something to read.",
+	"chat_alert_ask": "An agent asks you something",
+	"chat_alert_ask_note": "It waits until you answer.",
+	"chat_alert_problem": "Something goes wrong",
+	"chat_alert_problem_note": "A turn failed, or an edit was refused.",
+	"chat_sound_silent": "Silent"
+}

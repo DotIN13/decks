@@ -1,4 +1,6 @@
 import { SHAPE_GROUPS, SHAPES } from "@decks/pen";
+import { formatNumber, m } from "@decks/i18n";
+import { shapeGroupName, shapeName } from "./shape-names.ts";
 import Search from "lucide-solid/icons/search";
 import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../edit/pen-tools.ts";
@@ -45,7 +47,7 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 
 	const shapes = createMemo(() => {
 		const q = query().trim().toLowerCase();
-		return SHAPE_GROUPS.map((group) => ({ group, list: SHAPES.filter((shape) => shape.group === group && (!q || shape.name.toLowerCase().includes(q))) })).filter((one) => one.list.length > 0);
+		return SHAPE_GROUPS.map((group) => ({ group, list: SHAPES.filter((shape) => shape.group === group && (!q || shape.name.toLowerCase().includes(q) || shapeName(shape.name).toLowerCase().includes(q))) })).filter((one) => one.list.length > 0);
 	});
 
 	const [icons] = createResource(
@@ -87,7 +89,7 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 			ref={panel}
 			class="panel-float float insert-panel"
 			role="dialog"
-			aria-label={props.open.tab === "shapes" ? "Shapes" : "Icons"}
+			aria-label={props.open.tab === "shapes" ? m.canvas_insert_shapes() : m.canvas_insert_icons()}
 			style={{ left: `${place().left}px`, top: `${place().top}px` }}
 		>
 			<label class="field insert-search">
@@ -96,14 +98,14 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 					type="text"
 					autocomplete="off"
 					spellcheck={false}
-					placeholder={props.open.tab === "shapes" ? "Search shapes" : "Search icons"}
+					placeholder={props.open.tab === "shapes" ? m.canvas_insert_search_shapes() : m.canvas_insert_search_icons()}
 					value={query()}
 					onInput={(event) => setQuery(event.currentTarget.value)}
 					data-insert-search
 				/>
 			</label>
 			<Show when={props.open.tab === "icons"}>
-				<div class="insert-libs" role="group" aria-label="Library">
+				<div class="insert-libs" role="group" aria-label={m.canvas_props_icon_library()}>
 					<For each={ICON_LIBRARIES}>
 						{(lib) => (
 							<button type="button" class="chip-button" data-on={library() === lib.id ? "soft" : undefined} aria-pressed={library() === lib.id} onClick={() => setLibrary(lib.id)}>
@@ -119,22 +121,22 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 					fallback={
 						<>
 							<Show when={recent().length > 0}>
-								<p class="insert-group">Used lately</p>
+								<p class="insert-group">{m.canvas_insert_recent()}</p>
 								<div class="insert-grid icons">
 									<For each={recent()}>{(one) => <IconCell library={one.library} name={one.name} picked={penIcon().library === one.library && penIcon().name === one.name} onPick={pickIcon} />}</For>
 								</div>
 							</Show>
 							<Show
 								when={!icons.error}
-								fallback={<p class="insert-note">The icon list could not be fetched. Icons come from the internet; already drawn ones stay drawn.</p>}
+								fallback={<p class="insert-note">{m.canvas_insert_icons_failed()}</p>}
 							>
-								<Show when={!icons.loading} fallback={<p class="insert-note">Fetching the list of icons…</p>}>
-									<p class="insert-group">{query().trim() ? `${found().length === 120 ? "120+" : found().length} found` : recent().length ? "More" : "Icons"}</p>
+								<Show when={!icons.loading} fallback={<p class="insert-note">{m.canvas_insert_icons_loading()}</p>}>
+									<p class="insert-group">{query().trim() ? m.canvas_insert_found({ count: found().length === 120 ? `${formatNumber(120)}+` : formatNumber(found().length) }) : recent().length ? m.canvas_insert_more() : m.canvas_insert_icons()}</p>
 									<div class="insert-grid icons">
 										<For each={found()}>{(one) => <IconCell library={library()} name={one.name} picked={penIcon().library === library() && penIcon().name === one.name} onPick={pickIcon} />}</For>
 									</div>
 									<Show when={query().trim() && found().length === 0}>
-										<p class="insert-note">No icon is called that.</p>
+										<p class="insert-note">{m.canvas_insert_no_icon()}</p>
 									</Show>
 								</Show>
 							</Show>
@@ -144,11 +146,11 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 					<For each={shapes()}>
 						{(section) => (
 							<>
-								<p class="insert-group">{section.group}</p>
+								<p class="insert-group">{shapeGroupName(section.group)}</p>
 								<div class="insert-grid">
 									<For each={section.list}>
 										{(shape) => (
-											<button type="button" class="insert-cell" data-shape={shape.name} data-on={penShape() === shape.name ? "true" : undefined} title={shape.name} aria-label={shape.name} onClick={() => pickShape(shape.name)}>
+											<button type="button" class="insert-cell" data-shape={shape.name} data-on={penShape() === shape.name ? "true" : undefined} title={shapeName(shape.name)} aria-label={shapeName(shape.name)} onClick={() => pickShape(shape.name)}>
 												<svg viewBox="-4 -4 108 108" preserveAspectRatio="none" aria-hidden="true">
 													<path d={shape.geometry} fill-rule={shape.fillRule ?? "nonzero"} data-line={shape.line ? "true" : undefined} />
 												</svg>
@@ -160,11 +162,11 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 						)}
 					</For>
 					<Show when={shapes().length === 0}>
-						<p class="insert-note">No shape is called that.</p>
+						<p class="insert-note">{m.canvas_insert_no_shape()}</p>
 					</Show>
 				</Show>
 			</div>
-			<p class="insert-note">{props.open.replace ? "Pick one to put in the selected icon's place." : props.open.at ? "Pick one to put it where you double-clicked." : "Pick one, then click or drag on the canvas."}</p>
+			<p class="insert-note">{props.open.replace ? m.canvas_insert_hint_replace() : props.open.at ? m.canvas_insert_hint_at() : m.canvas_insert_hint()}</p>
 		</div>
 	);
 }

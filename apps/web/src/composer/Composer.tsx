@@ -10,6 +10,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
 import { Icon, ScribbleCatch } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { joinHeard, micMissing, startRecording, type Recording } from "./voice.ts";
 import { notice } from "../state/notices.ts";
 import { carriesFiles } from "../app/files/file-drop.ts";
@@ -518,7 +519,7 @@ export function Composer(props: {
 	/** Who the line goes to, for the placeholder and the queue's head. */
 	const recipientName = () => {
 		const dest = props.recipient?.dest;
-		return dest?.kind === "prompt" ? dest.name : "the agent";
+		return dest?.kind === "prompt" ? dest.name : m.composer_the_agent();
 	};
 
 	return (
@@ -557,26 +558,26 @@ export function Composer(props: {
 			{/* What you queued with Ctrl+Enter, on top of the box: sent one per turn as each ends. */}
 			<Show when={props.queued?.items.length ? props.queued : undefined}>
 				{(queued) => (
-					<div class="composer-queue" role="list" aria-label="Queued messages" data-folded={queueFolded() ? "true" : undefined}>
+					<div class="composer-queue" role="list" aria-label={m.composer_queue_label()} data-folded={queueFolded() ? "true" : undefined}>
 						<div class="composer-queue-head">
-							<button type="button" class="v3-icon composer-queue-fold" aria-expanded={!queueFolded()} title={queueFolded() ? "Show the queue" : "Fold the queue"} aria-label={queueFolded() ? "Show the queue" : "Fold the queue"} onClick={() => setQueueFolded(!queueFolded())}>
+							<button type="button" class="v3-icon composer-queue-fold" aria-expanded={!queueFolded()} title={queueFolded() ? m.composer_queue_show() : m.composer_queue_fold()} aria-label={queueFolded() ? m.composer_queue_show() : m.composer_queue_fold()} onClick={() => setQueueFolded(!queueFolded())}>
 								<Icon of={queueFolded() ? ChevronRight : ChevronDown} size={14} />
 							</button>
 							<span class="composer-queue-title">
-								{queued().items.length} queued for {recipientName()}
+								{m.composer_queue_title({ count: queued().items.length, name: recipientName() })}
 							</span>
-							<span class="composer-queue-note truncate">{queued().held ? "held by Stop" : queueFolded() ? `next: ${queued().items[0]?.text ?? ""}` : "sent one per turn"}</span>
+							<span class="composer-queue-note truncate">{queued().held ? m.composer_queue_held() : queueFolded() ? m.composer_queue_next({ text: queued().items[0]?.text ?? "" }) : m.composer_queue_one_per_turn()}</span>
 							<span class="flex-1" />
 							<button
 								type="button"
 								class="composer-queue-release"
-								title={queued().held ? "Send the held queue" : "Send every queued line now, as steers"}
+								title={queued().held ? m.composer_queue_release_held() : m.composer_queue_release_all()}
 								onClick={() => {
 									if (queued().held) return props.onQueueAction?.("release");
 									for (const item of queued().items) props.onQueueAction?.("send", item.id);
 								}}
 							>
-								Send all now
+								{m.composer_queue_send_all()}
 							</button>
 						</div>
 						{/* Folded by its height, so the rows slide shut rather than vanish (`styles/v3.css`). */}
@@ -591,8 +592,8 @@ export function Composer(props: {
 									<button
 										type="button"
 										class="icon-button"
-										aria-label="Edit"
-										title="Put it back in the box"
+										aria-label={m.composer_queue_edit()}
+										title={m.composer_queue_edit_title()}
 										onClick={() => {
 											props.onQueueAction?.("remove", item.id);
 											put([...nodes(), { type: "text", text: (draftIsEmpty(nodes()) ? "" : " ") + item.text }]);
@@ -601,10 +602,10 @@ export function Composer(props: {
 									>
 										<Icon of={Pencil} size={14} />
 									</button>
-									<button type="button" class="icon-button" aria-label="Send now" title="Send now, as a steer" onClick={() => props.onQueueAction?.("send", item.id)}>
+									<button type="button" class="icon-button" aria-label={m.composer_queue_send_now()} title={m.composer_queue_send_now_title()} onClick={() => props.onQueueAction?.("send", item.id)}>
 										<Icon of={ArrowUp} size={14} />
 									</button>
-									<button type="button" class="icon-button" aria-label="Remove" title="Remove" onClick={() => props.onQueueAction?.("remove", item.id)}>
+									<button type="button" class="icon-button" aria-label={m.composer_queue_remove()} title={m.composer_queue_remove()} onClick={() => props.onQueueAction?.("remove", item.id)}>
 										<Icon of={X} size={14} />
 									</button>
 								</div>
@@ -653,10 +654,10 @@ export function Composer(props: {
 					draft={nodes()}
 					pills={pills}
 					// The field had no accessible name at all; the placeholder is not one.
-					label="Message this agent"
+					label={m.composer_field_label()}
 					/* A turn in progress does not stop you talking to it. Text sent now steers this turn rather than
 					   starting another one, and the field is the honest place to say so. */
-					placeholder={props.busy ? `Steer ${recipientName()}'s turn…` : `Ask ${recipientName()} to draw, plan or build…`}
+					placeholder={props.busy ? m.composer_placeholder_steer({ name: recipientName() }) : m.composer_placeholder_ask({ name: recipientName() })}
 					onDraft={(draft) => {
 						setNodes(draft);
 						if (held !== undefined) parked.set(held, draft);
@@ -742,7 +743,7 @@ export function Composer(props: {
 				{/* What the browser's recogniser has heard so far: settled words dark, the rest grey. */}
 				<Show when={recording()}>
 					<p class="composer-live" aria-live="polite">
-						<Show when={settled() || pending()} fallback={<span class="composer-live-wait">Listening…</span>}>
+						<Show when={settled() || pending()} fallback={<span class="composer-live-wait">{m.composer_listening()}</span>}>
 							<span>{settled()}</span>
 							<Show when={pending()}>
 								<span class="composer-live-pending">{joinHeard(settled(), pending()).length > settled().length + pending().length ? " " : ""}{pending()}</span>
@@ -756,15 +757,15 @@ export function Composer(props: {
 					<Show
 						when={!recording()}
 						fallback={
-							<div class="composer-recording" role="group" aria-label="Recording">
-								<button class="icon-button composer-discard" type="button" title="Throw this take away (Esc)" aria-label="Discard recording" onClick={() => cancelVoice()}>
+							<div class="composer-recording" role="group" aria-label={m.composer_recording()}>
+								<button class="icon-button composer-discard" type="button" title={m.composer_recording_discard_title()} aria-label={m.composer_recording_discard()} onClick={() => cancelVoice()}>
 									<Icon of={X} size={16} />
 								</button>
 								<span class="composer-wave" aria-hidden="true">
 									<For each={levels()}>{(level) => <i style={{ height: `${Math.round(4 + level * 18)}px` }} />}</For>
 								</span>
 								<span class="composer-clock">{clockText()}</span>
-								<button class="send-button composer-done" type="button" title="Keep the words: they go in the box (Ctrl+M)" aria-label="Done recording" onClick={() => void stopVoice()}>
+								<button class="send-button composer-done" type="button" title={m.composer_recording_done_title()} aria-label={m.composer_recording_done()} onClick={() => void stopVoice()}>
 									<Icon of={Check} size={15} />
 								</button>
 							</div>
@@ -774,7 +775,7 @@ export function Composer(props: {
 						{(recipient) => <Recipient {...recipient()} compact />}
 					</Show>
 					<Show when={props.onAttach}>
-						<button class="icon-button" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>
+						<button class="icon-button" type="button" aria-label={m.composer_attach()} title={m.composer_attach()} onClick={() => props.onAttach?.()}>
 							<Icon of={Paperclip} size={15} />
 						</button>
 					</Show>
@@ -805,8 +806,8 @@ export function Composer(props: {
 						type="button"
 						data-busy={transcribing() || listening() ? "true" : undefined}
 						disabled={transcribing()}
-						title={micMissing() ?? (transcribing() ? "Turning it into words…" : "Speak instead of typing (Ctrl+M)")}
-						aria-label="Speak"
+						title={micMissing() ?? (transcribing() ? m.composer_mic_transcribing() : m.composer_mic_title())}
+						aria-label={m.composer_mic_speak()}
 						onClick={() => void startVoice()}
 					>
 						<Icon of={Mic} size={15} />
@@ -830,8 +831,8 @@ export function Composer(props: {
 								class="send-button"
 								type="button"
 								disabled={!sendable()}
-								title={props.busy ? "Steer this turn" : "Send"}
-								aria-label={props.busy ? "Steer this turn" : "Send"}
+								title={props.busy ? m.composer_steer() : m.composer_send()}
+								aria-label={props.busy ? m.composer_steer() : m.composer_send()}
 								onClick={() => send()}
 							>
 								<Icon of={ArrowUp} size={15} />
@@ -842,8 +843,8 @@ export function Composer(props: {
 							class="send-button"
 							type="button"
 							data-stop="true"
-							title="Stop this turn"
-							aria-label="Stop this turn"
+							title={m.composer_stop()}
+							aria-label={m.composer_stop()}
 							onClick={() => props.onAbort()}
 						>
 							<Icon of={Square} size={11} class="fill-current" />

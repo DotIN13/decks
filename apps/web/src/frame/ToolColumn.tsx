@@ -42,6 +42,7 @@ import {
 	type PenTool,
 } from "@decks/canvas/tools";
 import { Icon, onDismiss } from "@decks/ui";
+import { m } from "@decks/i18n";
 
 /**
  * The tool column of the v3 harness: select and hand, then what you can put on the canvas
@@ -168,24 +169,24 @@ export function ToolColumn(props: {
 	const choices = (family: Family): Choice[] => {
 		if (family === "view")
 			return [
-				{ id: "hand", label: "Hand", icon: Hand, key: "H", pick: () => view("hand") },
-				{ id: "highlight", label: "Select with highlights", icon: SquareDashedMousePointer, key: "E", pick: () => view("highlight") },
+				{ id: "hand", label: m.frame_tool_hand(), icon: Hand, key: "H", pick: () => view("hand") },
+				{ id: "highlight", label: m.frame_tool_highlight(), icon: SquareDashedMousePointer, key: "E", pick: () => view("highlight") },
 			];
 		if (family === "card")
 			return [
-				{ id: "document", label: "Markdown card", icon: FileText, key: "D", pick: () => arm("card") },
-				{ id: "app", label: "App", icon: AppWindow, pick: () => props.onApps() },
-				...(props.onLink ? [{ id: "link", label: "Link to…", icon: Link2, rule: true, pick: () => (select(), props.onLink?.(column?.querySelector<HTMLElement>('[data-tool="card"]') ?? column!)) }] : []),
+				{ id: "document", label: m.frame_tool_markdown_card(), icon: FileText, key: "D", pick: () => arm("card") },
+				{ id: "app", label: m.frame_tool_app(), icon: AppWindow, pick: () => props.onApps() },
+				...(props.onLink ? [{ id: "link", label: m.frame_tool_link(), icon: Link2, rule: true, pick: () => (select(), props.onLink?.(column?.querySelector<HTMLElement>('[data-tool="card"]') ?? column!)) }] : []),
 			];
 		if (family === "arrow")
 			return [
-				{ id: "straight", label: "Arrow", icon: ArrowUpRight, key: "A", pick: () => arrow({ route: "straight" }) },
-				{ id: "elbow", label: "Elbow connector", icon: CornerDownRight, pick: () => arrow({ route: "elbow" }) },
-				{ id: "curved", label: "Curved connector", icon: Spline, pick: () => arrow({ route: "curved" }) },
+				{ id: "straight", label: m.frame_tool_arrow(), icon: ArrowUpRight, key: "A", pick: () => arrow({ route: "straight" }) },
+				{ id: "elbow", label: m.frame_tool_elbow(), icon: CornerDownRight, pick: () => arrow({ route: "elbow" }) },
+				{ id: "curved", label: m.frame_tool_curved(), icon: Spline, pick: () => arrow({ route: "curved" }) },
 			];
 		const named = (name: "Triangle" | "Diamond" | "Star"): Choice => ({
 			id: name,
-			label: name,
+			label: name === "Triangle" ? m.frame_tool_triangle() : name === "Diamond" ? m.frame_tool_diamond() : m.frame_tool_star(),
 			icon: SHAPE_ICONS[name]!,
 			pick: () => {
 				setLastShape(name);
@@ -194,16 +195,16 @@ export function ToolColumn(props: {
 			},
 		});
 		return [
-			{ id: "rectangle", label: "Rectangle", icon: Square, key: "R", pick: () => (setLastShape("rectangle"), arm("rectangle")) },
-			{ id: "ellipse", label: "Ellipse", icon: Circle, key: "O", pick: () => (setLastShape("ellipse"), arm("ellipse")) },
+			{ id: "rectangle", label: m.frame_tool_rectangle(), icon: Square, key: "R", pick: () => (setLastShape("rectangle"), arm("rectangle")) },
+			{ id: "ellipse", label: m.frame_tool_ellipse(), icon: Circle, key: "O", pick: () => (setLastShape("ellipse"), arm("ellipse")) },
 			named("Triangle"),
 			named("Diamond"),
 			named("Star"),
-			{ id: "line", label: "Line", icon: Minus, key: "L", rule: true, pick: line },
-			{ id: "frame", label: "Frame", icon: FrameIcon, key: "F", rule: true, pick: () => (setLastShape("frame"), arm("frame")) },
+			{ id: "line", label: m.frame_tool_line(), icon: Minus, key: "L", rule: true, pick: line },
+			{ id: "frame", label: m.frame_tool_frame(), icon: FrameIcon, key: "F", rule: true, pick: () => (setLastShape("frame"), arm("frame")) },
 			{
 				id: "more",
-				label: "More shapes…",
+				label: m.frame_tool_more_shapes(),
 				icon: Shapes,
 				pick: () => {
 					setLastShape("more");
@@ -213,7 +214,7 @@ export function ToolColumn(props: {
 			},
 			{
 				id: "icons",
-				label: "Icons…",
+				label: m.frame_tool_icons(),
 				icon: Smile,
 				pick: () => {
 					setLastShape("icons");
@@ -355,9 +356,9 @@ export function ToolColumn(props: {
 
 	return (
 		<>
-			<div ref={column} class="pen-tools float v3-tools" data-row={props.row ? "true" : undefined} role="toolbar" aria-orientation={props.row ? "horizontal" : "vertical"} aria-label="Tools">
+			<div ref={column} class="pen-tools float v3-tools" data-row={props.row ? "true" : undefined} role="toolbar" aria-orientation={props.row ? "horizontal" : "vertical"} aria-label={m.frame_tools()}>
 				<span ref={mark} class="v3-tool-mark" aria-hidden="true" />
-				<div ref={grip} class="v3-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
+				<div ref={grip} class="v3-grip" title={m.frame_tools_grip()} aria-hidden="true">
 					<i />
 					<i />
 					<i />
@@ -365,24 +366,24 @@ export function ToolColumn(props: {
 					<i />
 					<i />
 				</div>
-				{tool({ id: "select", label: "Select", key: "V", icon: () => MousePointer, on: on.select, onClick: () => select(false) })}
-				{tool({ id: "view", label: "Hand or highlight", icon: viewIcon, on: on.view, family: "view", onClick: (b) => openMenu("view", b) })}
+				{tool({ id: "select", label: m.frame_tool_select(), key: "V", icon: () => MousePointer, on: on.select, onClick: () => select(false) })}
+				{tool({ id: "view", label: m.frame_tool_view(), icon: viewIcon, on: on.view, family: "view", onClick: (b) => openMenu("view", b) })}
 				<span class="v3-rule" aria-hidden="true" />
-				{tool({ id: "card", label: "Card", key: "D", icon: () => SquarePlus, on: on.card, family: "card", onClick: (b) => openMenu("card", b) })}
-				{tool({ id: "note", label: "Note", key: "N", icon: () => StickyNote, on: on.note, onClick: () => (on.note() ? select() : arm("note")) })}
-				{tool({ id: "text", label: "Text", key: "T", icon: () => Type, on: on.text, onClick: () => (on.text() ? select() : arm("text")) })}
-				{tool({ id: "shape", label: "Shape", key: "R", icon: shapeIcon, on: on.shape, family: "shape", onClick: (b) => openMenu("shape", b) })}
-				{tool({ id: "pen", label: "Pen", key: "P", icon: () => PencilLine, on: on.pen, onClick: pen })}
-				{tool({ id: "arrow", label: "Arrow", key: "A", icon: arrowIcon, on: on.arrow, family: "arrow", onClick: (b) => openMenu("arrow", b) })}
+				{tool({ id: "card", label: m.frame_tool_card(), key: "D", icon: () => SquarePlus, on: on.card, family: "card", onClick: (b) => openMenu("card", b) })}
+				{tool({ id: "note", label: m.frame_tool_note(), key: "N", icon: () => StickyNote, on: on.note, onClick: () => (on.note() ? select() : arm("note")) })}
+				{tool({ id: "text", label: m.frame_tool_text(), key: "T", icon: () => Type, on: on.text, onClick: () => (on.text() ? select() : arm("text")) })}
+				{tool({ id: "shape", label: m.frame_tool_shape(), key: "R", icon: shapeIcon, on: on.shape, family: "shape", onClick: (b) => openMenu("shape", b) })}
+				{tool({ id: "pen", label: m.frame_pen(), key: "P", icon: () => PencilLine, on: on.pen, onClick: pen })}
+				{tool({ id: "arrow", label: m.frame_tool_arrow(), key: "A", icon: arrowIcon, on: on.arrow, family: "arrow", onClick: (b) => openMenu("arrow", b) })}
 				<Show when={props.onOpenFile}>
-					{tool({ id: "file", label: "Add a file", icon: () => Paperclip, on: () => false, onClick: () => props.onOpenFile?.() })}
+					{tool({ id: "file", label: m.frame_tool_file(), icon: () => Paperclip, on: () => false, onClick: () => props.onOpenFile?.() })}
 				</Show>
 				<Show when={!props.row}>
 					<span class="v3-rule" aria-hidden="true" />
-					{tool({ id: "undo", label: "Undo", key: "⌘Z", icon: () => Undo2, on: () => false, onClick: () => props.onStep("undo") })}
-					{tool({ id: "redo", label: "Redo", key: "⇧⌘Z", icon: () => Redo2, on: () => false, onClick: () => props.onStep("redo") })}
+					{tool({ id: "undo", label: m.frame_undo(), key: "⌘Z", icon: () => Undo2, on: () => false, onClick: () => props.onStep("undo") })}
+					{tool({ id: "redo", label: m.frame_redo(), key: "⇧⌘Z", icon: () => Redo2, on: () => false, onClick: () => props.onStep("redo") })}
 				</Show>
-				<button type="button" class="stowtab" data-stowtab aria-label="Bring the tools back" title="Bring the tools back" onClick={() => unstow()}>
+				<button type="button" class="stowtab" data-stowtab aria-label={m.frame_bring_tools_back()} title={m.frame_bring_tools_back()} onClick={() => unstow()}>
 					<Icon of={ChevronLeft} size={14} />
 				</button>
 			</div>

@@ -1,4 +1,5 @@
 import { DECKS_COLORS, decksColorOf } from "@decks/pen";
+import { m } from "@decks/i18n";
 import { ADAPTIVE, adaptiveTitle, swatchPaint } from "./adaptive.ts";
 import Pipette from "lucide-solid/icons/pipette";
 import { createSignal, For, Show } from "solid-js";
@@ -55,16 +56,16 @@ export function ColorPicker(props: ColorPickerProps) {
 
 	return (
 		<Portal mount={portalLayer()}>
-			<div ref={card} class="panel-float color-picker" role="dialog" aria-label={`${props.label}: pick a colour`} style={{ left: `${place().left}px`, top: `${place().top}px` }}>
+			<div ref={card} class="panel-float color-picker" role="dialog" aria-label={m.canvas_color_picker({ label: props.label })} style={{ left: `${place().left}px`, top: `${place().top}px` }}>
 				<div
 					class="color-sv"
 					style={{ "--hue": `hsl(${hsv().h} 100% 50%)` }}
 					onPointerDown={(event) => dragOver(event, event.currentTarget, (fx, fy) => setHsv({ ...hsv(), s: fx, v: 1 - fy }))}
-					aria-label="Shade and brightness"
+					aria-label={m.canvas_color_shade()}
 				>
 					<span class="color-knob" style={{ left: `${hsv().s * 100}%`, top: `${(1 - hsv().v) * 100}%`, background: hex() }} />
 				</div>
-				<div class="color-hue" onPointerDown={(event) => dragOver(event, event.currentTarget, (fx) => setHsv({ ...hsv(), h: Math.min(359.9, fx * 360) }))} aria-label="Hue">
+				<div class="color-hue" onPointerDown={(event) => dragOver(event, event.currentTarget, (fx) => setHsv({ ...hsv(), h: Math.min(359.9, fx * 360) }))} aria-label={m.canvas_color_hue()}>
 					<span class="color-knob" style={{ left: `${(hsv().h / 360) * 100}%`, top: "50%", background: `hsl(${hsv().h} 100% 50%)` }} />
 				</div>
 				<div class="color-row">
@@ -73,7 +74,7 @@ export function ColorPicker(props: ColorPickerProps) {
 						<span class="text-faint">#</span>
 						<input
 							ref={field}
-							aria-label={`${props.label}, as hex`}
+							aria-label={m.canvas_color_hex({ label: props.label })}
 							value={hex().slice(1)}
 							spellcheck={false}
 							on:keydown={(event: KeyboardEvent) => {
@@ -88,14 +89,14 @@ export function ColorPicker(props: ColorPickerProps) {
 						/>
 					</label>
 					<Show when={dropper}>
-						<button type="button" class="icon-button" title="Pick a colour from the screen" aria-label="Pick a colour from the screen" onClick={() => void pickFromScreen()}>
+						<button type="button" class="icon-button" title={m.canvas_color_dropper()} aria-label={m.canvas_color_dropper()} onClick={() => void pickFromScreen()}>
 							<Icon of={Pipette} size={14} />
 						</button>
 					</Show>
 				</div>
 				<Show when={props.adaptive !== false}>
-				<div class="color-palette" role="group" aria-label="Adaptive colours">
-					<span class="color-caption text-faint">Adaptive</span>
+				<div class="color-palette" role="group" aria-label={m.canvas_color_adaptive_group()}>
+					<span class="color-caption text-faint">{m.canvas_color_adaptive()}</span>
 					<For each={ADAPTIVE}>
 						{(row) => (
 							<>
@@ -123,7 +124,7 @@ export function ColorPicker(props: ColorPickerProps) {
 					</For>
 				</div>
 				</Show>
-				<div class="color-palette" role="group" aria-label="Colours">
+				<div class="color-palette" role="group" aria-label={m.canvas_color_colours()}>
 					<For each={PALETTE}>
 						{(color) => (
 							<button

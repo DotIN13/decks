@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { Icon } from "@decks/ui";
 import type { ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
@@ -35,7 +36,7 @@ export function DockBar(props: { parts: Parts }) {
 			<div class="dock" ref={dock.watchDock} data-under={underSheet() ? "true" : undefined}>
 				{/* Only drawn while the bar is put away behind the right edge (a hard throw
 				    at it, `float.ts`): the one part of it left on screen, and the way back. */}
-				<button type="button" class="stowtab" data-stowtab aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => dock.unstow()}>
+				<button type="button" class="stowtab" data-stowtab aria-label={m.app_stow_back()} title={m.app_stow_back()} onClick={() => dock.unstow()}>
 					<Icon of={ChevronLeft} size={16} />
 				</button>
 				<Show when={dialog()}>

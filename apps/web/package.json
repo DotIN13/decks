@@ -15,8 +15,9 @@
 	"dependencies": {
 		"@decks/agent-ui": "*",
 		"@decks/api": "*",
-		"@decks/ink": "*",
 		"@decks/canvas": "*",
+		"@decks/i18n": "*",
+		"@decks/ink": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
 		"@decks/sdk": "*",

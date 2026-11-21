@@ -3,6 +3,10 @@
 import "../perf/probe.ts";
 import { bootFrame } from "@decks/canvas/frame";
 import "../index.css";
+import { markDocumentLanguage } from "@decks/i18n";
+
+// The page's language, passed in the address (`?lang=`, kept by the head script) since a sandboxed frame keeps nothing.
+markDocumentLanguage();
 
 /*
  * The faces nearly every canvas sets its words in are served by the app itself (`public/fonts`, as

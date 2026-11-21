@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import type { Page } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import type { AppAction, PanelApp } from "../panel/AppRow.tsx";
@@ -44,7 +45,7 @@ export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path
 		// Its page loads again in every window showing it, on a canvas or in a tab; the app itself is left running as it is.
 		if (action === "reload") return act("apps.reload", [app.name]);
 		if (action === "delete") {
-			const yes = await ask({ title: `Delete ${app.title}?`, body: `Its folder, apps/${app.name}, moves to the deck's trash, and the items showing it leave the canvases.`, yes: "Delete", no: "Cancel" });
+			const yes = await ask({ title: m.app_delete_app_title({ name: app.title }), body: m.app_delete_app_body({ folder: app.name }), yes: m.app_delete(), no: m.app_cancel(), danger: true });
 			if (!yes) return;
 			await act("apps.delete", [app.name]);
 			return loadApps();

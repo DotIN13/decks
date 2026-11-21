@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import { sessionToken } from "../lib/session.ts";
+import { m } from "@decks/i18n";
 
 /**
  * Which backend this tab is talking to, and every one it knows.
@@ -40,7 +41,7 @@ const [hereName, setHereName] = createSignal<string | undefined>(typeof localSto
 
 function here(): Connection {
 	const name = hereName();
-	return { id: "here", kind: "here", label: "This server", ...(name ? { name } : {}) };
+	return { id: "here", kind: "here", label: m.connections_this_server(), ...(name ? { name } : {}) };
 }
 
 function readList(): Connection[] {

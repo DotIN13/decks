@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { onCleanup, untrack } from "solid-js";
 import { canvasBox, fitInto } from "@decks/canvas/camera";
 import { canvasItems, type CanvasItem } from "@decks/canvas/tools";
@@ -59,7 +60,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 	 */
 	const showPill = (node: DraftMention, comment?: WaitingComment) => {
 		// Read with this tab's token, as every file is (`lib/authed.tsx`).
-		if (node.kind === "file") return void openAuthed(api(`/file?path=${encodeURIComponent(node.id)}`)).catch((error: unknown) => notice("warn", `${node.id} could not be opened: ${(error as Error).message}`));
+		if (node.kind === "file") return void openAuthed(api(`/file?path=${encodeURIComponent(node.id)}`)).catch((error: unknown) => notice("warn", m.app_file_open_failed({ name: node.id, error: (error as Error).message })));
 		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
 		const name = canvasOnScreen()?.name;
 		const item = canvasItems(stagePen()?.doc).items.find(
@@ -68,7 +69,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 		if (item) return pickItem(item);
 		const board = state.pages.find((one) => one.path === target);
 		if (board) return flyTo(board);
-		notice("info", "That is not on this canvas.");
+		notice("info", m.app_not_on_canvas());
 	};
 	// A message you sent, read back into its pills: from the parts kept with it, or, sent before they were, from its text.
 	setMineReader((text, parts) => {

@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { m } from "@decks/i18n";
 import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
@@ -33,9 +34,9 @@ function AppLights(props: { board: ItemSlotProps["board"]; onClose?: (() => void
 	);
 	return (
 		<div class="app-lights" style={{ height: `${APP_BAR}px` }}>
-			<Show when={props.onClose}>{light("close", "Close", "Close: take the window off the canvas", "M3.6 3.6 8.4 8.4M8.4 3.6 3.6 8.4", () => props.onClose?.())}</Show>
-			<Show when={props.onCollapse}>{light("collapse", "Collapse", "Collapse to a link to the app", "M2.8 6H9.2", () => props.onCollapse?.())}</Show>
-			{light("open", "Open in a tab", "Open in a tab", "M4.4 3.2H8.8V7.6M8.8 3.2 3.2 8.8", (event) => props.board.app && openAppTab(props.board.app, event.metaKey || event.ctrlKey))}
+			<Show when={props.onClose}>{light("close", m.canvas_props_close(), m.canvas_app_close_title(), "M3.6 3.6 8.4 8.4M8.4 3.6 3.6 8.4", () => props.onClose?.())}</Show>
+			<Show when={props.onCollapse}>{light("collapse", m.canvas_app_collapse(), m.canvas_app_collapse_title(), "M2.8 6H9.2", () => props.onCollapse?.())}</Show>
+			{light("open", m.canvas_app_open_tab(), m.canvas_app_open_tab(), "M4.4 3.2H8.8V7.6M8.8 3.2 3.2 8.8", (event) => props.board.app && openAppTab(props.board.app, event.metaKey || event.ctrlKey))}
 		</div>
 	);
 }
@@ -143,8 +144,8 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			</Show>
 			{/* Always shown while they are off: it says why the card sits still, and turns them on. */}
 			<Show when={props.onScriptsOn && props.board.card}>
-				<button type="button" class="card-scripts-off" title="This card came from a friend's canvas, so its scripts do not run until you turn them on" onPointerDown={(event) => event.stopPropagation()} onClick={() => props.onScriptsOn?.()}>
-					Scripts off · Turn on
+				<button type="button" class="card-scripts-off" title={m.canvas_card_scripts_off_title()} onPointerDown={(event) => event.stopPropagation()} onClick={() => props.onScriptsOn?.()}>
+					{m.canvas_card_scripts_off()}
 				</button>
 			</Show>
 			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => (!shown() || props.asleep) && press(event)}>

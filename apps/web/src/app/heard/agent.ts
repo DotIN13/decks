@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { receiveQueued } from "../../state/queued.ts";
 import type { AgentState } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
@@ -36,14 +37,14 @@ function heardState(id: string, state_: AgentState, hooks: FrameHooks): void {
 	mine.lastState = state_;
 	if (finished(was, state_)) {
 		hooks.raise("done", {
-			title: `${nameOf(id)} finished`,
+			title: m.app_finished({ name: nameOf(id) }),
 			// The deck's name, so a banner from one of three windows says which one.
 			body: state.deck?.name,
 			tag: `done:${id}`,
 			agent: id,
 		});
 	} else if (startedAsking(was, state_)) {
-		hooks.raise("ask", { title: `${nameOf(id)} is waiting for you`, tag: `ask:${id}`, agent: id });
+		hooks.raise("ask", { title: m.app_waiting({ name: nameOf(id) }), tag: `ask:${id}`, agent: id });
 	}
 }
 
@@ -224,7 +225,7 @@ export function heardAgent(message: Of<"agent">, hooks: FrameHooks): void {
 			 * switches to that conversation rather than to whichever was on screen.
 			 */
 			hooks.raise("ask", {
-				title: `${nameOf(message.agentId)} is waiting for you`,
+				title: m.app_waiting({ name: nameOf(message.agentId) }),
 				body: "title" in message.prompt ? message.prompt.title : undefined,
 				tag: `prompt:${message.prompt.id}`,
 				agent: message.agentId,

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { onMount, Show } from "solid-js";
 import { workspaceSlug } from "../lib/slug.ts";
 
@@ -23,8 +24,8 @@ export function WorkspaceField(props: { value: string; onInput: (value: string) 
 						ref={field}
 						type="text"
 						class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
-						placeholder="Name"
-						aria-label="Workspace name"
+						placeholder={m.agents_ws_name_placeholder()}
+						aria-label={m.agents_ws_name_label()}
 						spellcheck={false}
 						value={props.value}
 						onInput={(event) => props.onInput(event.currentTarget.value)}
@@ -36,12 +37,12 @@ export function WorkspaceField(props: { value: string; onInput: (value: string) 
 					/>
 				</label>
 				<button type="button" class="ws-new-create" disabled={slugged() === ""} onClick={props.onCreate}>
-					Create
+					{m.agents_ws_create()}
 				</button>
 			</div>
 			<Show when={slugged() !== "" && slugged() !== props.value.trim()}>
 				<p class="ws-new-slug">
-					Named <code>{slugged()}</code>
+					{m.agents_ws_named()} <code>{slugged()}</code>
 				</p>
 			</Show>
 		</div>

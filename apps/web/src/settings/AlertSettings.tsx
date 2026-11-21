@@ -3,6 +3,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import { createSignal, For, Show } from "solid-js";
 import { Icon, Popover } from "@decks/ui";
 import { SetGroup, SetRow, SetSegments } from "./rows.tsx";
+import { m } from "@decks/i18n";
 import { ALERT_KINDS, ALERT_LABELS, type AlertKind, type AlertPrefs, availability, type Availability, play, request, SILENT, SOUND_FAMILIES, type SoundChoice, soundName } from "@decks/agent-ui/alerts";
 
 /**
@@ -22,12 +23,24 @@ import { ALERT_KINDS, ALERT_LABELS, type AlertKind, type AlertPrefs, availabilit
  */
 
 /** The stops, loudest last. Linear on `audio.volume`, which is what an `<audio>` element takes. */
-const VOLUMES: { label: string; value: number }[] = [
-	{ label: "Off", value: 0 },
-	{ label: "Quiet", value: 0.3 },
-	{ label: "Medium", value: 0.65 },
-	{ label: "Loud", value: 1 },
+const VOLUMES: { label: () => string; value: number }[] = [
+	{ label: () => m.settings_alert_volume_off(), value: 0 },
+	{ label: () => m.settings_alert_volume_quiet(), value: 0.3 },
+	{ label: () => m.settings_alert_volume_medium(), value: 0.65 },
+	{ label: () => m.settings_alert_volume_loud(), value: 1 },
 ];
+
+/** Each moment's switch and sound picker, named in a whole sentence of their own: a moment's name is not spliced into another sentence. */
+const BANNER_LABEL: Record<AlertKind, () => string> = {
+	done: () => m.settings_alert_banner_done(),
+	ask: () => m.settings_alert_banner_ask(),
+	problem: () => m.settings_alert_banner_problem(),
+};
+const SOUND_LABEL: Record<AlertKind, () => string> = {
+	done: () => m.settings_alert_sound_done(),
+	ask: () => m.settings_alert_sound_ask(),
+	problem: () => m.settings_alert_sound_problem(),
+};
 
 export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: AlertPrefs) => void }) {
 	/*
@@ -61,9 +74,9 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 			    On a phone the heads go and each moment's sound and switch sit under its name. */}
 			<section class="sw-group sw-moments" data-group="notifications">
 				<div class="sw-cols sw-cols-head" aria-hidden="true">
-					<span>When</span>
-					<span>Sound</span>
-					<span>Banner</span>
+					<span>{m.settings_alert_when()}</span>
+					<span>{m.settings_alert_sound()}</span>
+					<span>{m.settings_alert_banner()}</span>
 				</div>
 				<div class="sw-rows">
 					<For each={ALERT_KINDS}>
@@ -72,15 +85,15 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 								<span class="sw-name" title={ALERT_LABELS[kind].note}>
 									{ALERT_LABELS[kind].label}
 								</span>
-								<SoundPicker id={props.prefs.sound[kind]} label={ALERT_LABELS[kind].label} onPick={(next) => setSound(kind, next)} />
+								<SoundPicker id={props.prefs.sound[kind]} label={SOUND_LABEL[kind]()} onPick={(next) => setSound(kind, next)} />
 								<span class="sw-banner">
-									<span class="sw-banner-word">Banner</span>
+									<span class="sw-banner-word">{m.settings_alert_banner()}</span>
 									<button
 										class="sw-switch"
 										type="button"
 										role="switch"
 										aria-checked={props.prefs.notify[kind]}
-										aria-label={`Show a banner when ${ALERT_LABELS[kind].label.toLowerCase()}`}
+										aria-label={BANNER_LABEL[kind]()}
 										data-on={props.prefs.notify[kind]}
 										/* Dim when the browser will refuse it anyway, but still pressable, so the
 										   setting survives moving to an origin where it works. */
@@ -95,8 +108,8 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 			</section>
 
 			<SetGroup group="volume">
-				<SetRow title="Volume" sub={props.prefs.volume === 0 ? "Off silences all three and keeps the choices." : undefined}>
-					<SetSegments label="Volume" options={VOLUMES.map((stop) => ({ id: stop.value, label: stop.label }))} value={props.prefs.volume} onPick={setVolume} />
+				<SetRow title={m.settings_alert_volume()} sub={props.prefs.volume === 0 ? m.settings_alert_volume_off_sub() : undefined}>
+					<SetSegments label={m.settings_alert_volume()} options={VOLUMES.map((stop) => ({ id: stop.value, label: stop.label() }))} value={props.prefs.volume} onPick={setVolume} />
 				</SetRow>
 			</SetGroup>
 
@@ -119,7 +132,7 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 		<Popover
 			placement="bottom-start"
 			class="set-sounds"
-			label={`Sound for when ${props.label.toLowerCase()}`}
+			label={props.label}
 			/*
 			 * Nothing is preloaded on open, deliberately.
 			 *
@@ -137,7 +150,7 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 			)}
 		>
 			<button type="button" data-row data-flat="true" data-current={props.id === SILENT} onClick={() => props.onPick(SILENT)}>
-				<span class="row-label">Silent</span>
+				<span class="row-label">{m.settings_alert_silent()}</span>
 			</button>
 			<For each={SOUND_FAMILIES}>
 				{(family) => (
@@ -193,21 +206,19 @@ function PermissionLine(props: { state: Availability; onAsk: () => void }) {
 			<div class="sw-strip" data-tone={props.state === "ask" ? "ask" : "warn"}>
 				<Icon of={BellOff} size={14} />
 				<Show when={props.state === "ask"}>
-					<span class="flex-1">The browser has not been asked for permission yet.</span>
+					<span class="flex-1">{m.settings_alert_not_asked()}</span>
 					<button class="sw-btn" type="button" onClick={props.onAsk}>
-						Allow
+						{m.settings_alert_allow()}
 					</button>
 				</Show>
 				<Show when={props.state === "denied"}>
-					<span class="flex-1">This browser blocks banners for this site; turn them on in its site settings.</span>
+					<span class="flex-1">{m.settings_alert_denied()}</span>
 				</Show>
 				<Show when={props.state === "insecure"}>
-					<span class="flex-1">
-						Banners need a secure page and this one is plain <code>http</code>. Sounds work here; for banners, open the deck on <code>localhost</code> or behind TLS.
-					</span>
+					<span class="flex-1">{m.settings_alert_insecure()}</span>
 				</Show>
 				<Show when={props.state === "unsupported"}>
-					<span class="flex-1">This browser has no notifications. The sounds and the tab count still work.</span>
+					<span class="flex-1">{m.settings_alert_unsupported()}</span>
 				</Show>
 			</div>
 		</Show>

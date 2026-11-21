@@ -2,10 +2,11 @@ import type { AgentUsage } from "@decks/protocol";
 import Gauge from "lucide-solid/icons/gauge";
 import { Show } from "solid-js";
 import { Icon } from "@decks/ui";
+import { formatNumber, m } from "@decks/i18n";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 
 /** Thousands separated, because these are read at a glance and not counted digit by digit. */
-const figure = (value: number) => value.toLocaleString("en-US");
+const figure = (value: number) => formatNumber(value);
 
 /**
  * How full the context is, and what the conversation has cost — inside the corner's `⋯`.
@@ -39,23 +40,23 @@ export function ContextSummary(props: {
 				<>
 					{/* Reading is the common case, so the numbers come before the one thing to do. */}
 					<div class="flex items-baseline gap-2 px-2 pt-1 pb-2">
-						<span class="big">{Math.round(value())}%</span>
-						<span class="meta flex-1">of the context window</span>
+						<span class="big">{formatNumber(Math.round(value()) / 100, { style: "percent" })}</span>
+						<span class="meta flex-1">{m.settings_usage_of_context()}</span>
 					</div>
 					<div class="track mx-2 mb-2" data-level={contextLevel(props.usage)}>
 						<i style={{ width: `${Math.min(value(), 100)}%` }} />
 					</div>
 
 					<div class="pair">
-						<span class="kv-key">Used</span>
+						<span class="kv-key">{m.composer_context_used()}</span>
 						<span class="kv-value">{figure(props.usage?.contextTokens ?? 0)}</span>
 					</div>
 					<div class="pair">
-						<span class="kv-key">Window</span>
+						<span class="kv-key">{m.composer_context_window()}</span>
 						<span class="kv-value">{figure(props.usage?.contextWindow ?? 0)}</span>
 					</div>
 					<div class="pair">
-						<span class="kv-key">This session</span>
+						<span class="kv-key">{m.composer_context_session()}</span>
 						<span class="kv-value">${(props.usage?.cost ?? 0).toFixed(3)}</span>
 					</div>
 
@@ -91,7 +92,7 @@ export function ContextSummary(props: {
 						onClick={() => props.onUsage()}
 					>
 						<Icon of={Gauge} size={14} class="shrink-0 text-muted" />
-						<span class="row-label">Usage and limits</span>
+						<span class="row-label">{m.composer_context_usage()}</span>
 					</button>
 				</>
 			)}

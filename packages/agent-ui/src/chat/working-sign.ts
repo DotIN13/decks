@@ -1,4 +1,5 @@
 import type { AgentState } from "@decks/protocol";
+import { m } from "@decks/i18n";
 
 /**
  * Where the working sign goes: over the input bar, at the foot of the conversation, or
@@ -62,13 +63,13 @@ export function isWorking(state: AgentState): boolean {
 export function workingWords(state: AgentState, name: string): string | undefined {
 	switch (state) {
 		case "thinking":
-			return "working…";
+			return m.chat_working();
 		case "streaming":
-			return "typing…";
+			return m.chat_typing();
 		case "tool":
-			return "running tools…";
+			return m.chat_running_tools();
 		case "waiting":
-			return `${name} is waiting for you`;
+			return m.chat_waiting_for_you({ name });
 		default:
 			return undefined;
 	}

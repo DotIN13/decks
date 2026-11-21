@@ -25,6 +25,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
@@ -96,7 +97,7 @@ export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
 const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
-const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
+const PANEL_TAB_LABEL: Record<PanelTab, () => string> = { recent: () => m.panel_tab_recent(), canvas: () => m.panel_tab_canvas(), agents: () => m.panel_tab_agents(), apps: () => m.panel_tab_apps() };
 const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
 const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
@@ -635,7 +636,7 @@ export function LeftPanel(props: {
 				data-inset={props.open ? "left" : undefined}
 				data-open={props.open ? "true" : "false"}
 				aria-hidden={!props.open}
-				aria-label="Side panel"
+				aria-label={m.panel_side_panel()}
 				/*
 				 * A stationary column, not a card: it runs the full height of the window at the
 				 * left edge, with the deck mark on top, and never moves while the middle slides.
@@ -652,12 +653,12 @@ export function LeftPanel(props: {
 					class="panel-resize"
 					role="separator"
 					aria-orientation="vertical"
-					aria-label="Sidebar width"
+					aria-label={m.panel_sidebar_width()}
 					aria-valuemin={PANEL_MIN}
 					aria-valuemax={PANEL_MAX}
 					aria-valuenow={width()}
 					tabindex={props.open ? 0 : -1}
-					title="Drag to resize. Double-click to reset."
+					title={m.panel_resize_title()}
 					onPointerDown={onHandleDown}
 					onKeyDown={onHandleKey}
 					onDblClick={() => {
@@ -681,7 +682,7 @@ export function LeftPanel(props: {
 								<Switcher />
 							</div>
 							<span class="flex-1" />
-							<button type="button" class="v3-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
+							<button type="button" class="v3-icon" data-tip={m.panel_hide()} data-key="⌘\" aria-label={m.panel_hide()} onClick={() => props.onOpenChange(false)}>
 								<Icon of={PanelLeftClose} size={17} />
 							</button>
 						</div>
@@ -697,18 +698,18 @@ export function LeftPanel(props: {
 						</span>
 						<div class="v3-lp-buttons">
 							<Show when={props.onSettings}>
-								<button type="button" class="v3-lp-icon" data-tip="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>
+								<button type="button" class="v3-lp-icon" data-tip={m.panel_settings()} aria-label={m.panel_settings()} onClick={() => props.onSettings?.()}>
 									<Icon of={SettingsIcon} size={16} />
 								</button>
 							</Show>
-							<button type="button" class="v3-lp-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
+							<button type="button" class="v3-lp-icon" data-tip={m.panel_hide()} data-key="⌘\" aria-label={m.panel_hide()} onClick={() => props.onOpenChange(false)}>
 								<Icon of={PanelLeftClose} size={16} />
 							</button>
 						</div>
 					</div>
 				</Show>
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
-				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav}>
+				<div class="v3-nav" role="tablist" aria-label={m.panel_panel()} ref={nav}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
 					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (
@@ -732,7 +733,7 @@ export function LeftPanel(props: {
 								}}
 							>
 								<Icon of={PANEL_TAB_ICON[name]} size={16} />
-								{PANEL_TAB_LABEL[name]}
+								{PANEL_TAB_LABEL[name]()}
 							</button>
 						)}
 					</For>
@@ -744,7 +745,7 @@ export function LeftPanel(props: {
 							ref={field}
 							type="text"
 							spellcheck={false}
-							placeholder={tab() === "agents" || tab() === "recent" ? "Search agents and tags" : tab() === "apps" ? "Search apps" : `Search ${props.canvasTitle ?? "this canvas"}`}
+							placeholder={tab() === "agents" || tab() === "recent" ? m.panel_search_agents() : tab() === "apps" ? m.panel_search_apps() : props.canvasTitle ? m.panel_search_named({ name: props.canvasTitle }) : m.panel_search_canvas()}
 							value={query()}
 							onInput={(event) => type(event.currentTarget.value)}
 							onKeyDown={(event) => {
@@ -767,7 +768,7 @@ export function LeftPanel(props: {
 							<button
 								type="button"
 								class="v3-icon v3-search-clear"
-								aria-label="Clear the search"
+								aria-label={m.panel_clear_search()}
 								onClick={() => {
 									type("");
 									field?.focus();
@@ -844,7 +845,7 @@ export function LeftPanel(props: {
 									}}
 								>
 									<div class="v3-folder-head" data-folded={folded().has(section.id) ? "true" : undefined}>
-										<button type="button" class="v3-folder-toggle" aria-expanded={!folded().has(section.id)} title={folded().has(section.id) ? `Show ${section.label}` : `Fold ${section.label}`} onClick={() => toggleFolder(section.id)}>
+										<button type="button" class="v3-folder-toggle" aria-expanded={!folded().has(section.id)} title={folded().has(section.id) ? m.panel_folder_show({ name: section.label }) : m.panel_folder_fold({ name: section.label })} onClick={() => toggleFolder(section.id)}>
 											<Icon of={folded().has(section.id) ? ChevronRight : ChevronDown} size={13} class="v3-folder-chev" />
 											<Icon of={Folder} size={15} class="v3-folder-icon" />
 											<span class="v3-folder-name truncate">{section.label}</span>
@@ -853,7 +854,7 @@ export function LeftPanel(props: {
 										<Show when={props.onNewAgent}>
 											<NewAgentButton
 												onNew={(kind) => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined, kind)}
-												label={section.kind === "workspace" ? `Add an agent in ${section.label}` : "Add an agent in no workspace"}
+												label={section.kind === "workspace" ? m.panel_add_agent_in({ name: section.label }) : m.panel_add_agent_none()}
 												class="v3-folder-add"
 												size={14}
 											/>
@@ -896,14 +897,14 @@ export function LeftPanel(props: {
 							)}
 						</For>
 						<Show when={props.onNewAgent}>
-							<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label="New agent" class="v3-new-agent" size={15} text="New agent" />
+							<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label={m.panel_new_agent()} class="v3-new-agent" size={15} text={m.panel_new_agent()} />
 						</Show>
 
 						{/* The same shape of empty state the boards list has, and the same reasoning:
 						    a panel that is blank for a good reason still looks broken without it. */}
 						<Show when={agentList.length === 0}>
 							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
-								{agentCount() === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
+								{agentCount() === 0 ? m.panel_no_agents_start() : m.panel_no_agent_matches({ query: query().trim() })}
 							</p>
 						</Show>
 					</Show>
@@ -912,7 +913,7 @@ export function LeftPanel(props: {
 						<div class="panel-section" data-kind="recent">
 							<Show when={recentList.length > 0}>
 								<div class="v3-sec">
-									<span>Recent</span>
+									<span>{m.panel_tab_recent()}</span>
 								</div>
 							</Show>
 							<div class="row-list agent-list" data-lines={lines()}>
@@ -938,7 +939,7 @@ export function LeftPanel(props: {
 							</div>
 						</div>
 						<Show when={recentList.length === 0}>
-							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{agentCount() === 0 ? "No agents yet." : `No agent matches “${query().trim()}”.`}</p>
+							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{agentCount() === 0 ? m.panel_no_agents() : m.panel_no_agent_matches({ query: query().trim() })}</p>
 						</Show>
 					</Show>
 
@@ -946,7 +947,7 @@ export function LeftPanel(props: {
 						<div class="panel-section v3-items" data-kind="canvas">
 							<Show when={cardItems().length > 0}>
 								<div class="v3-sec">
-									<span>Cards</span>
+									<span>{m.panel_cards()}</span>
 									<span class="flex-1" />
 									<span class="v3-sec-n tabular-nums">{cardItems().length}</span>
 								</div>
@@ -954,7 +955,7 @@ export function LeftPanel(props: {
 							</Show>
 							<Show when={drawnItems().length > 0 || items().arrows.length > 0}>
 								<div class="v3-sec">
-									<span>Drawing</span>
+									<span>{m.panel_drawing()}</span>
 									<span class="flex-1" />
 									<span class="v3-sec-n tabular-nums">{drawnItems().length}</span>
 								</div>
@@ -962,13 +963,13 @@ export function LeftPanel(props: {
 								<Show when={items().arrows.length > 0}>
 									<button type="button" class="v3-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
 										<Icon of={MoveUpRight} size={14} class="v3-item-icon" />
-										<span class="v3-item-name truncate">Arrows</span>
+										<span class="v3-item-name truncate">{m.panel_arrows()}</span>
 										<span class="v3-item-n tabular-nums">{items().arrows.length}</span>
 									</button>
 								</Show>
 							</Show>
 							<Show when={items().items.length === 0 && items().arrows.length === 0}>
-								<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{query().trim() ? `Nothing on this canvas matches “${query().trim()}”.` : "Nothing on this canvas yet."}</p>
+								<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{query().trim() ? m.panel_canvas_no_match({ query: query().trim() }) : m.panel_canvas_empty()}</p>
 							</Show>
 						</div>
 					</Show>
@@ -988,7 +989,7 @@ export function LeftPanel(props: {
 							</For>
 							<Show when={apps().length === 0}>
 								<p class="m-0 px-2 py-2 text-ui leading-normal text-faint">
-									{props.apps === undefined ? "Looking for apps…" : query().trim() ? `No app matches “${query().trim()}”.` : "This deck has no apps yet. Ask an agent for one."}
+									{props.apps === undefined ? m.panel_apps_looking() : query().trim() ? m.panel_app_no_match({ query: query().trim() }) : m.panel_apps_none()}
 								</p>
 							</Show>
 							<Show when={logsOf()}>

@@ -9,6 +9,7 @@ import { ContextRing } from "./ContextRing.tsx";
 import { PictureProgress } from "./PictureProgress.tsx";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 import { Icon, Popover } from "@decks/ui";
+import { formatNumber, m } from "@decks/i18n";
 
 type MoreItem = { label: string; icon: LucideIcon; note?: string; onPick: () => void; rule?: boolean; checked?: boolean; disabled?: boolean };
 
@@ -38,7 +39,7 @@ export function TopRight(props: {
 	const menu = () => (
 		<Popover
 			placement="bottom-end"
-			label="More"
+			label={m.shell_more()}
 			class="w-max min-w-[200px] max-w-[260px]"
 			trigger={(api) => (
 				<button
@@ -49,8 +50,8 @@ export function TopRight(props: {
 					aria-expanded={api.open}
 					data-on={api.open ? "soft" : undefined}
 					data-level={contextLevel(props.usage)}
-					data-tip="More"
-					aria-label="More"
+					data-tip={m.shell_more()}
+					aria-label={m.shell_more()}
 					onClick={api.toggle}
 				>
 					<Icon of={MoreHorizontal} size={17} />
@@ -63,8 +64,8 @@ export function TopRight(props: {
 					<span class="row-icon">
 						<ContextRing usage={props.usage} size={15} />
 					</span>
-					<span class="row-label flex-1">Context usage</span>
-					<span class="meta flex-none tabular-nums">{Math.round(contextPercent(props.usage) ?? 0)}%</span>
+					<span class="row-label flex-1">{m.shell_context_usage()}</span>
+					<span class="meta flex-none tabular-nums">{formatNumber(Math.round(contextPercent(props.usage) ?? 0) / 100, { style: "percent" })}</span>
 				</button>
 				<span class="rule block" />
 			</Show>
@@ -107,12 +108,12 @@ export function TopRight(props: {
 			<div class="v3-bar v3-topright float pill" data-inset="top">
 				{props.acts}
 				<Show when={props.here.length > 0}>
-					<span class="v3-here" role="group" aria-label="Agents on this canvas">
+					<span class="v3-here" role="group" aria-label={m.shell_agents_here()}>
 						<For each={props.here.slice(0, 5)}>
 							{(chat) => {
 								const name = () => props.identities[chat.id]?.name ?? chat.name;
 								return (
-									<button type="button" class="v3-here-face" data-current={props.focused === chat.id ? "true" : undefined} data-tip={`${name()} is on this canvas`} aria-label={`Talk to ${name()}`} onClick={() => props.onFocus(chat.id)}>
+									<button type="button" class="v3-here-face" data-current={props.focused === chat.id ? "true" : undefined} data-tip={m.shell_agent_here({ name: name() })} aria-label={m.shell_talk_to({ name: name() })} onClick={() => props.onFocus(chat.id)}>
 										<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={24} ring={1.5} />
 									</button>
 								);
@@ -124,7 +125,7 @@ export function TopRight(props: {
 					</span>
 					<span class="v3-sep" aria-hidden="true" />
 				</Show>
-				<button type="button" class="v3-icon" data-tip="Present" data-key="⌥P" aria-label="Present" onClick={() => props.onPresent()}>
+				<button type="button" class="v3-icon" data-tip={m.shell_present()} data-key="⌥P" aria-label={m.shell_present()} onClick={() => props.onPresent()}>
 					<Icon of={Play} size={17} />
 				</button>
 				{menu()}

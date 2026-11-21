@@ -1,4 +1,5 @@
 import { pageFont } from "../look/look.ts";
+import { m } from "@decks/i18n";
 import type { CardEditorProps } from "./card-editor-props.ts";
 import { createCardDrag } from "./card-drag.ts";
 import { BLOCK_MENU, SIZE_MENU } from "./card-menus.ts";
@@ -78,10 +79,10 @@ export function createCardBar(d: CardBarNeeds) {
 			if (el) el.textContent = text;
 		};
 		const kind = d.blockKind();
-		label("block", BLOCK_MENU.find(([k]) => k === kind)?.[1] ?? "Body text");
+		label("block", (BLOCK_MENU.find(([k]) => k === kind)?.[1] ?? m.canvas_card_block_body)());
 		const face = (at?.closest("span[data-font]") as HTMLElement | null)?.dataset.font;
 		label("font", face ?? "Inter");
-		label("size", SIZE_MENU.find(([k]) => k === ((at?.closest("span[data-size]") as HTMLElement | null)?.dataset.size ?? "normal"))?.[1] ?? "Normal");
+		label("size", (SIZE_MENU.find(([k]) => k === ((at?.closest("span[data-size]") as HTMLElement | null)?.dataset.size ?? "normal"))?.[1] ?? m.canvas_card_size_normal)());
 		const on: Record<string, boolean> = {
 			bold: !!at?.closest("strong, b"),
 			italic: !!at?.closest("em, i"),

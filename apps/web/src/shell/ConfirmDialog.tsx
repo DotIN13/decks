@@ -3,9 +3,10 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import { question, type Question } from "../state/confirm.ts";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 
 /** Whether the answer removes something. */
-const danger = (q: Question) => q.danger ?? /^(delete|remove|forget)\b/i.test(q.yes);
+const danger = (q: Question) => q.danger ?? (/^(delete|remove|forget)\b/i.test(q.yes) || /^(删除|移除|忘记)/.test(q.yes));
 
 /** The app's one yes-or-no question (`state/confirm.ts`), over everything, answered with a press or Enter and Escape. */
 export function ConfirmDialog() {
@@ -42,7 +43,7 @@ export function ConfirmDialog() {
 								</Show>
 								<span class="confirm-title">{q().title}</span>
 								<span class="flex-1" />
-								<button class="confirm-x" type="button" aria-label="Close" onClick={() => q().answer(false)}>
+								<button class="confirm-x" type="button" aria-label={m.shell_close()} onClick={() => q().answer(false)}>
 									<Icon of={X} size={16} />
 								</button>
 							</div>

@@ -1,6 +1,7 @@
 import SquarePen from "lucide-solid/icons/square-pen";
 import { DocumentFrame } from "@decks/canvas/page";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { createResource, For, Match, Switch } from "solid-js";
 import { cardAgentCall, documentPass } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
@@ -11,7 +12,7 @@ import { aliveAmong } from "../tabs.ts";
 import { openAt } from "../open.ts";
 
 /** What a document is called in the row: its file's name. */
-const nameOf = (path: string | undefined) => path?.split("/").pop() ?? "Document";
+const nameOf = (path: string | undefined) => path?.split("/").pop() ?? m.tabs_document();
 
 /**
  * A document, as a kind of tab: the document whole, with its editor, its history and its review, in a
@@ -25,7 +26,9 @@ export const documentKind: TabKind = {
 	address: "doc",
 	title: (tab) => nameOf(tab.target),
 	offers: {
-		label: "Documents",
+		get label() {
+			return m.tabs_documents();
+		},
 		// The files a document can be, by their endings, wherever they are in the deck.
 		list: async () => {
 			const found = await Promise.all(["*.md", "*.tex", "*.docx"].map((pattern) => act<Array<{ path: string; dir?: true }>>("file.find", [pattern, { limit: 500 }])));
@@ -48,7 +51,7 @@ function DocumentTab(props: { tab: Tab; shown: boolean; foot: number }) {
 		<div class="surface" data-surface="document" data-kept={props.shown ? undefined : "true"} style={{ visibility: props.shown ? undefined : "hidden", "pointer-events": props.shown ? undefined : "none" }}>
 			<Switch>
 				<Match when={first() instanceof Error}>
-					<p class="tab-missing">This document is not in the deck any more.</p>
+					<p class="tab-missing">{m.tabs_document_gone()}</p>
 				</Match>
 				<Match when={first()}>
 					{(held) => (

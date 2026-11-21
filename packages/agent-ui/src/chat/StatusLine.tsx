@@ -3,6 +3,7 @@ import { Show } from "solid-js";
 import { historyShown, toggleHistory } from "../edge.ts";
 import { AgentMark } from "@decks/ui";
 import { isWorking, signPlacement, workingWords } from "./working-sign.ts";
+import { m } from "@decks/i18n";
 
 /**
  * The mark and the words, without any chrome of its own.
@@ -99,7 +100,7 @@ export function StatusLine(props: {
 						class="statusline pointer-events-auto"
 						type="button"
 						data-working={working()}
-						title="Show the conversation"
+						title={m.chat_show_conversation()}
 						onClick={toggleHistory}
 					>
 						<WorkingSign state={props.state} name={props.name} agent={props.agent} />

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 /**
  * Where a line typed into the bar goes.
  *
@@ -74,11 +75,11 @@ function pageName(board: string): string {
 export function destinationLabel(dest: Destination): string {
 	switch (dest.kind) {
 		case "note":
-			return `note on ${pageName(dest.board)}`;
+			return m.app_dest_note({ card: pageName(dest.board) });
 		case "prompt":
-			return `to ${dest.name}`;
+			return m.app_dest_to({ name: dest.name });
 		case "nowhere":
-			return "no agent";
+			return m.app_dest_none();
 	}
 }
 

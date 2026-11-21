@@ -1,0 +1,22 @@
+{
+	"name": "@decks/i18n",
+	"version": "0.1.0",
+	"description": "Every word Decks shows a person, in each language it speaks: the messages, the typed functions Paraglide compiles from them, the person's language, and dates and numbers in it",
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"compile": "node compile.mjs",
+		"check": "node compile.mjs --check",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "node --import tsx --test \"src/**/*.test.ts\""
+	},
+	"devDependencies": {
+		"@inlang/paraglide-js": "3.2.2",
+		"@inlang/plugin-message-format": "4.6.0",
+		"tsx": "^4.20.7",
+		"typescript": "^5.9.3"
+	}
+}

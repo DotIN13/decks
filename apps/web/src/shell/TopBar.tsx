@@ -6,6 +6,7 @@ import { Show, untrack, type JSX } from "solid-js";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
 import { Switcher } from "../connections/Switcher.tsx";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 
 /**
  * The bar at the top left: whose canvas this is, and which canvas.
@@ -60,7 +61,7 @@ export function TopBar(props: {
 					when={props.desktop}
 					fallback={
 						<>
-							<button type="button" class="v3-icon v3-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
+							<button type="button" class="v3-icon v3-unfold" data-tip={m.shell_show_panel()} data-key="⌘\" aria-label={m.shell_show_panel()} onClick={() => props.onTogglePanel()}>
 								<Icon of={PanelLeftOpen} size={17} />
 							</button>
 							<span class="v3-deck">
@@ -70,7 +71,7 @@ export function TopBar(props: {
 					}
 				>
 					{/* The panel folded on a desktop: one drawer-open button that brings it back on its last tab. */}
-					<button type="button" class="v3-icon v3-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
+					<button type="button" class="v3-icon v3-unfold" data-tip={m.shell_show_panel()} data-key="⌘\" aria-label={m.shell_show_panel()} onClick={() => props.onTogglePanel()}>
 						<Icon of={PanelLeftOpen} size={17} />
 					</button>
 				</Show>
@@ -84,7 +85,7 @@ export function TopBar(props: {
 				onClose={props.onClose}
 				onNew={props.onNew}
 				{...(props.onMoreAgents ? { onMore: props.onMoreAgents } : {})}
-				label="Agents"
+				label={m.shell_agents()}
 				trigger={(api) => (
 					<button
 						type="button"
@@ -93,11 +94,11 @@ export function TopBar(props: {
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-open={api.open ? "true" : undefined}
-						data-tip="Switch agent"
-						aria-label={name() ? `Agents, currently ${name()}` : "Agents"}
+						data-tip={m.shell_switch_agent()}
+						aria-label={name() ? m.shell_agents_current({ name: name()! }) : m.shell_agents()}
 						onClick={api.toggle}
 					>
-						<Show when={active()} fallback={<span class="v3-agent-name">No agent</span>}>
+						<Show when={active()} fallback={<span class="v3-agent-name">{m.shell_no_agent()}</span>}>
 							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} size={22} ring={1.5} />}
 						</Show>
 						<Show when={name()}>{(label) => <span class="v3-agent-name">{label()}</span>}</Show>
@@ -123,8 +124,8 @@ export function TopBar(props: {
 				{untrack(() => props.tabs)}
 				<Show when={props.viewOnly}>
 					{(owner) => (
-						<button type="button" class="v3-viewonly" title={`Shared with you to view by ${owner()}: it follows their copy. Make your own copy to change it.`} onClick={() => props.onCopy?.()}>
-							View only · Make a copy
+						<button type="button" class="v3-viewonly" title={m.shell_view_only_title({ owner: owner() })} onClick={() => props.onCopy?.()}>
+							{m.shell_view_only()}
 						</button>
 					)}
 				</Show>
@@ -150,15 +151,15 @@ function TouchChip(props: { stage: string | undefined; mark: (() => JSX.Element)
 			data-open={(popover ? popover.open : props.stagesOpen) ? "true" : undefined}
 			aria-haspopup={popover ? "menu" : "dialog"}
 			aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
-			data-tip="Canvases"
-			aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
+			data-tip={m.shell_canvases()}
+			aria-label={props.stage ? m.shell_canvases_current({ name: props.stage }) : m.shell_canvases_none()}
 			data-front={props.canvas && !props.canvas.front ? undefined : "true"}
 			onClick={() => (props.canvas && !props.canvas.front ? props.canvas.show() : popover ? popover.toggle() : props.onStages?.())}
 		>
 			<Show when={props.mark} fallback={<Icon of={Layers} size={16} />}>
 				{props.mark!()}
 			</Show>
-			<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
+			<span class="v3-canvas-name">{props.stage ?? m.shell_no_canvas()}</span>
 			<Icon of={ChevronDown} size={13} class="v3-chev" />
 		</button>
 	);

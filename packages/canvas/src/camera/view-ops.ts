@@ -1,4 +1,5 @@
 import type { Page, Camera, StageCall } from "@decks/protocol";
+import { m } from "@decks/i18n";
 import { cssEscape } from "@decks/ui";
 import { boxOf, fit } from "./camera.ts";
 
@@ -168,7 +169,7 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 							path: args.path,
 							x: at.x,
 							y: at.y,
-							label: typeof args.label === "string" ? args.label : "agent",
+							label: typeof args.label === "string" ? args.label : m.canvas_cursor_agent(),
 							color: typeof args.color === "string" ? args.color : "var(--canvas-accent)",
 						}
 					: null,

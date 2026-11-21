@@ -1,0 +1,57 @@
+{
+	"connections_file_cards": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "file · {count} card",
+				"n=other": "file · {count} cards"
+			}
+		}
+	],
+	"connections_not_address": "That is not an address.",
+	"connections_server_answered": "The server answered {status}.",
+	"connections_unreachable": "Could not reach {base}. It must be a Decks server on HTTPS (or localhost) that this browser can reach.",
+	"connections_file_needs_https": "Opening a canvas file needs this page on HTTPS or localhost.",
+	"connections_label": "Connections",
+	"connections_switch_title": "Switch between servers and canvas files",
+	"connections_read_only": "read only",
+	"connections_address": "Server address",
+	"connections_code": "Pairing code",
+	"connections_code_hint": "only over the internet",
+	"connections_code_placeholder": "From decks pair code on that machine",
+	"connections_name": "Name",
+	"connections_optional": "optional",
+	"connections_name_placeholder": "What the server calls itself",
+	"connections_back": "Back",
+	"connections_connecting": "Connecting…",
+	"connections_connect": "Connect",
+	"connections_other_decks": "Other decks",
+	"connections_not_reachable": "not reachable",
+	"connections_pairing_revoked": "pairing revoked",
+	"connections_rename": "Rename",
+	"connections_rename_label": "Rename {name}",
+	"connections_remove_bundle": "Remove this canvas from this browser",
+	"connections_forget_server": "Forget this server",
+	"connections_forget_label": "Forget {name}",
+	"connections_this_server": "This server",
+	"connections_connect_server": "Connect a server…",
+	"connections_open_file": "Open a canvas file…",
+	"connections_download": "Download this canvas",
+	"connections_start_switcher": "Open a file or connect a server",
+	"connections_not_zip": "This file is not a .decks bundle: it is not a zip.",
+	"connections_zip_damaged": "This bundle's table of contents is damaged.",
+	"connections_worker_needs_https": "Opening another server or a canvas file needs this page on HTTPS or localhost; on a plain http:// address the browser has no service workers.",
+	"connections_no_relay": "This server would not relay that one ({status}).",
+	"connections_no_manifest": "This file has no manifest, so it is not a Decks canvas.",
+	"connections_newer_format": "This canvas was saved by a newer Decks (format {format}).",
+	"connections_files_gone": "This canvas's files are gone from this browser. Open the .decks file again.",
+	"connections_read_only_refusal": "This canvas is a file opened in this browser: it cannot be changed from here.",
+	"connections_start_public": "Open a canvas file someone sent you, or connect to a Decks server you can reach.",
+	"connections_start_forgotten": "This address names a connection this browser does not have any more."
+}

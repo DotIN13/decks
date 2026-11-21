@@ -6,6 +6,7 @@ import { blocks, docxBlocks, paragraphSplices, readParagraph, type Block, type P
 import type { Mark } from "./marks.ts";
 import { spliceBetween } from "./marks.ts";
 import { texToHtml } from "./render.ts";
+import { m } from "@decks/i18n";
 
 /**
  * The page as it reads: the document drawn block by block, and a block turned back into its own
@@ -107,7 +108,7 @@ export class Reading {
 			empty.className = "dp-block dp-empty-doc";
 			empty.dataset.start = "0";
 			empty.dataset.end = "0";
-			empty.textContent = this.sync.readOnly ? "This document is empty." : "Empty. Click to write.";
+			empty.textContent = this.sync.readOnly ? m.docs_empty() : m.docs_empty_click();
 			children.push(empty);
 		}
 		// The block being typed into is never taken out of the page, which would drop its focus.
@@ -158,7 +159,7 @@ export class Reading {
 		el.dataset.end = String(block.end);
 		if (block.kind === "preamble") {
 			const lines = source.split("\n").length - 1;
-			el.textContent = `Preamble · ${lines} lines`;
+			el.textContent = m.docs_word_preamble({ count: lines });
 			return el;
 		}
 		const key = `${this.sync.format}:${this.tex ? "tex" : ""}:${source}`;
@@ -226,7 +227,7 @@ export class Reading {
 				className: "docx",
 			});
 		} catch (error) {
-			if (run === this.wordRun) this.root.textContent = `Word could not be drawn: ${(error as Error).message}. Open Source.`;
+			if (run === this.wordRun) this.root.textContent = m.docs_word_failed({ message: (error as Error).message });
 			return;
 		}
 		if (run !== this.wordRun || this.editing) return;

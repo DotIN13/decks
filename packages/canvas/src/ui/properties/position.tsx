@@ -1,4 +1,5 @@
 import { isArrow, isCard, isMarkdown, type PenNode } from "@decks/pen";
+import { m } from "@decks/i18n";
 import FlipHorizontal2 from "lucide-solid/icons/flip-horizontal-2";
 import FlipVertical2 from "lucide-solid/icons/flip-vertical-2";
 import Lock from "lucide-solid/icons/lock";
@@ -45,7 +46,7 @@ export function createPosition(d: PositionNeeds) {
 
 	const placeSection = () => (
 		<Show when={d.single() && !isArrow(d.single()!) && box()}>
-			<Section key="place" title="Position and size">
+			<Section key="place" title={m.canvas_props_place()}>
 				{/*
 				 * A markdown card starts as tall as its words and stays that way until a top or
 				 * bottom handle pins a height on it. This is the way back: the same two words the
@@ -65,16 +66,16 @@ export function createPosition(d: PositionNeeds) {
 					<NumField field="h" label="h" value={box()!.h} min={1} onCommit={(v) => setBox({ h: Math.round(v) })} />
 				</div>
 				<div class="props-row">
-					<NumField label="°" value={numberOf(d.single()!.rotation, 0)} onCommit={(v) => d.set([d.single()!], () => ({ rotation: Math.round(v) % 360 === 0 ? null : Math.round(v) % 360 }))} title="Turn, in degrees" />
-					<NumField label="%" value={Math.round(numberOf(d.single()!.opacity, 1) * 100)} min={0} max={100} onCommit={(v) => d.set([d.single()!], () => ({ opacity: v >= 100 ? null : Math.max(0, v) / 100 }))} title="Opacity" />
+					<NumField label="°" value={numberOf(d.single()!.rotation, 0)} onCommit={(v) => d.set([d.single()!], () => ({ rotation: Math.round(v) % 360 === 0 ? null : Math.round(v) % 360 }))} title={m.canvas_props_rotation()} />
+					<NumField label="%" value={Math.round(numberOf(d.single()!.opacity, 1) * 100)} min={0} max={100} onCommit={(v) => d.set([d.single()!], () => ({ opacity: v >= 100 ? null : Math.max(0, v) / 100 }))} title={m.canvas_props_opacity()} />
 					<div class="props-buttons">
-						<IconToggle on={keepRatio()} title={keepRatio() ? "Keeping the proportions" : "Keep the proportions"} onClick={() => setKeepRatio(!keepRatio())}>
+						<IconToggle on={keepRatio()} title={keepRatio() ? m.canvas_props_keeping_ratio() : m.canvas_props_keep_ratio()} onClick={() => setKeepRatio(!keepRatio())}>
 							<Icon of={keepRatio() ? Lock : LockOpen} size={14} />
 						</IconToggle>
-						<IconToggle on={d.single()!.flipX === true} title="Flip across" onClick={() => d.set([d.single()!], (node) => ({ flipX: node.flipX === true ? null : true }))}>
+						<IconToggle on={d.single()!.flipX === true} title={m.canvas_props_flip_x()} onClick={() => d.set([d.single()!], (node) => ({ flipX: node.flipX === true ? null : true }))}>
 							<Icon of={FlipHorizontal2} size={14} />
 						</IconToggle>
-						<IconToggle on={d.single()!.flipY === true} title="Flip up and down" onClick={() => d.set([d.single()!], (node) => ({ flipY: node.flipY === true ? null : true }))}>
+						<IconToggle on={d.single()!.flipY === true} title={m.canvas_props_flip_y()} onClick={() => d.set([d.single()!], (node) => ({ flipY: node.flipY === true ? null : true }))}>
 							<Icon of={FlipVertical2} size={14} />
 						</IconToggle>
 					</div>

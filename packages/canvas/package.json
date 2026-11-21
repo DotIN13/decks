@@ -26,7 +26,10 @@
 	},
 	"dependencies": {
 		"@decks/api": "*",
+		"@decks/docs": "*",
 		"@decks/frame": "*",
+		"@decks/hub": "*",
+		"@decks/i18n": "*",
 		"@decks/ink": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
@@ -36,9 +39,7 @@
 		"lucide-solid": "^1.37.0",
 		"marked": "^15.0.12",
 		"mathjax-full": "^3.2.2",
-		"solid-js": "^1.9.14",
-		"@decks/hub": "*",
-		"@decks/docs": "*"
+		"solid-js": "^1.9.14"
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.0",

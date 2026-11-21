@@ -1,6 +1,7 @@
 import AppWindow from "lucide-solid/icons/app-window";
 import { AppFrame, type AppFramePass } from "@decks/canvas/page";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { createResource, createSignal, For, Match, Show, Switch } from "solid-js";
 import { appFramePass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
@@ -22,7 +23,9 @@ export const appKind: TabKind = {
 	// By the app's own title once the deck's apps have been read, by its folder's name until then.
 	title: (tab) => (tab.target ? (titleOf(tab.target) ?? tab.target) : undefined),
 	offers: {
-		label: "Apps",
+		get label() {
+			return m.tabs_apps();
+		},
 		always: true,
 		list: async () => (await readApps()).map((app) => ({ target: app.name, title: app.title || app.name, note: app.status })),
 	},
@@ -70,7 +73,7 @@ function AppTab(props: { app: string; shown: boolean; foot: number }) {
 						<div class="tab-missing">
 							<p>{error().message}</p>
 							<button type="button" class="tab-missing-open" onClick={() => window.open(`/app/${encodeURIComponent(props.app)}/`, "_blank", "noopener")}>
-								Open in the browser's tab
+								{m.tabs_open_in_browser()}
 							</button>
 						</div>
 					)}

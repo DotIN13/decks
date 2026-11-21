@@ -2,6 +2,7 @@ import type { FrameChrome } from "@decks/canvas/page";
 import { insets } from "@decks/canvas/camera";
 import { drawing } from "@decks/canvas/tools";
 import { createEffect, Show } from "solid-js";
+import { m } from "@decks/i18n";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
 
 /**
@@ -26,12 +27,12 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 			<Show when={chrome.offer()} keyed>
 				{(offer) => (
 					<div class="v3-bar float pill frame-offer" role="status">
-						<span>An agent wants to {offer.what === "card" ? "show you a card" : offer.what === "canvas" ? "take you to another canvas" : "move the view"}</span>
+						<span>{offer.what === "card" ? m.frame_offer_card() : offer.what === "canvas" ? m.frame_offer_canvas() : m.frame_offer_view()}</span>
 						<button type="button" class="frame-offer-go" onClick={() => offer.go()}>
-							Go
+							{m.frame_offer_go()}
 						</button>
-						<button type="button" class="frame-offer-no" aria-label="Stay here" onClick={() => chrome.dismissOffer()}>
-							Stay
+						<button type="button" class="frame-offer-no" aria-label={m.frame_offer_stay_here()} onClick={() => chrome.dismissOffer()}>
+							{m.frame_offer_stay()}
 						</button>
 					</div>
 				)}

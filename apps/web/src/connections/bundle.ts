@@ -2,6 +2,7 @@ import type { AgentChat, Page, LineClientMessage, ServerMessage } from "@decks/p
 import type { PenDocument } from "@decks/pen";
 import { api, connections, newId, saveConnections, type Connection } from "./connection.ts";
 import { readZip } from "./zip.ts";
+import { m } from "@decks/i18n";
 
 /**
  * A canvas opened from a `.decks` file, and the backend that serves it from this tab.
@@ -71,9 +72,9 @@ export function typeOf(name: string): string {
 export async function openBundle(file: Blob): Promise<string> {
 	const files = readZip(await file.arrayBuffer());
 	const manifestFile = files.find((one) => one.name === "manifest.json");
-	if (!manifestFile) throw new Error("This file has no manifest, so it is not a Decks canvas.");
+	if (!manifestFile) throw new Error(m.connections_no_manifest());
 	const manifest = JSON.parse(new TextDecoder().decode(await manifestFile.bytes())) as BundleManifest;
-	if (manifest.decks !== 1) throw new Error(`This canvas was saved by a newer Decks (format ${manifest.decks}).`);
+	if (manifest.decks !== 1) throw new Error(m.connections_newer_format({ format: String(manifest.decks) }));
 	const id = newId();
 	const cache = await caches.open(cacheName(id));
 	for (const one of files) {
@@ -94,7 +95,7 @@ export async function forget(id: string): Promise<void> {
 async function manifestOf(id: string): Promise<BundleManifest> {
 	const cache = await caches.open(cacheName(id));
 	const response = await cache.match(`/c/${id}/manifest.json`);
-	if (!response) throw new Error("This canvas's files are gone from this browser. Open the .decks file again.");
+	if (!response) throw new Error(m.connections_files_gone());
 	return (await response.json()) as BundleManifest;
 }
 
@@ -176,7 +177,7 @@ export class BundleBackend {
 				this.deliver({ type: "call.answered", id: message.id, ok: true });
 				return;
 			}
-			this.deliver({ type: "call.answered", id: message.id, ok: false, error: "This canvas is a file opened in this browser: it cannot be changed from here." });
+			this.deliver({ type: "call.answered", id: message.id, ok: false, error: m.connections_read_only_refusal() });
 		}
 	}
 

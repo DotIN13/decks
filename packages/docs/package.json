@@ -17,6 +17,7 @@
 		"test": "node --import tsx --test --test-force-exit \"src/**/*.test.ts\""
 	},
 	"dependencies": {
+		"@decks/i18n": "*",
 		"diff": "^8.0.4",
 		"docx-preview": "^0.4.1",
 		"jszip": "^3.10.1"

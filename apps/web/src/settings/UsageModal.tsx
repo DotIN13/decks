@@ -3,8 +3,12 @@ import RefreshCw from "lucide-solid/icons/refresh-cw";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "@decks/ui";
+import { formatNumber, m } from "@decks/i18n";
 import { contextLevel, contextPercent, usageLevel } from "../lib/context-usage.ts";
 import { ago, behaviorLabel, duration, exact, modelLabel, money, planLabel, resetsAt, resetsIn, tokens } from "./usage-format.ts";
+
+/** A share out of a hundred, whole, as the language shown writes a percentage. */
+const pct = (value: number) => formatNumber(Math.round(value) / 100, { style: "percent" });
 
 /** How often the countdowns move. A window resets in hours; this is plenty. */
 const TICK = 30_000;
@@ -106,23 +110,23 @@ export function UsageModal(props: {
 				if (event.target === event.currentTarget) props.onClose();
 			}}
 		>
-			<div class="panel-float usage-modal static flex max-h-[86%] w-[min(520px,calc(100vw-24px))] flex-col overflow-hidden p-0" role="dialog" aria-label="Usage">
+			<div class="panel-float usage-modal static flex max-h-[86%] w-[min(520px,calc(100vw-24px))] flex-col overflow-hidden p-0" role="dialog" aria-label={m.settings_usage_title()}>
 				<header class="set-head">
-					<span class="set-head-title">Usage</span>
+					<span class="set-head-title">{m.settings_usage_title()}</span>
 					<span class="flex-1" />
 					{/* Free to press: the reading is a control request to the runtime, not a turn. */}
 					<button
 						class="icon-button [--control:26px]"
 						classList={{ "usage-spin": props.loading }}
 						type="button"
-						title="Read again"
-						aria-label="Read again"
+						title={m.settings_usage_read_again()}
+						aria-label={m.settings_usage_read_again()}
 						disabled={props.loading}
 						onClick={props.onRefresh}
 					>
 						<Icon of={RefreshCw} size={14} />
 					</button>
-					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:26px]" type="button" title={m.settings_close()} aria-label={m.settings_close()} onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
@@ -135,7 +139,7 @@ export function UsageModal(props: {
 						empty panel — but silence would read as a refresh button that does nothing, so
 						the failure is said out loud above them.
 					*/}
-					<Show when={props.error}>{(message) => <p class="usage-stale">Could not read usage: {message()}</p>}</Show>
+					<Show when={props.error}>{(message) => <p class="usage-stale">{m.settings_usage_failed({ message: message() })}</p>}</Show>
 
 					{/*
 						Figures from the last reading, while this one is in flight.
@@ -143,14 +147,14 @@ export function UsageModal(props: {
 						Said rather than spun, because the spinner is in the header and a bar that is
 						two seconds out of date looks exactly like a bar that is current.
 					*/}
-					<Show when={props.loading && props.report && props.at}>{(at) => <p class="usage-reading">Reading again — figures from {ago(at(), now())}.</p>}</Show>
+					<Show when={props.loading && props.report && props.at}>{(at) => <p class="usage-reading">{m.settings_usage_reading_again({ ago: ago(at(), now()) })}</p>}</Show>
 
 					{/* --- this conversation ------------------------------------------------- */}
 
 					<section class="set-group" data-group="conversation">
 						<header>
-							<span class="set-title">This conversation</span>
-							<span class="set-note">what it has spent, and how full its window is</span>
+							<span class="set-title">{m.settings_usage_conversation()}</span>
+							<span class="set-note">{m.settings_usage_conversation_note()}</span>
 						</header>
 
 						<div class="usage-pad">
@@ -162,7 +166,7 @@ export function UsageModal(props: {
 									 * means the agent has not reported yet. A bar at zero would say the
 									 * context is empty, which is a different and usually false claim.
 									 */
-									<p class="usage-empty">No reading yet. An agent reports its context after its first reply.</p>
+									<p class="usage-empty">{m.settings_usage_no_reading()}</p>
 								}
 							>
 								{/*
@@ -174,14 +178,14 @@ export function UsageModal(props: {
 									unrolled and can be read to a percent, which is what a panel is for.
 								*/}
 								<div class="usage-headline">
-									<span class="big">{Math.round(percent() ?? 0)}%</span>
-									<span class="meta">of the context window</span>
+									<span class="big">{pct(percent() ?? 0)}</span>
+									<span class="meta">{m.settings_usage_of_context()}</span>
 								</div>
 								<div class="track" data-level={contextLevel(props.usage)}>
 									<i style={{ width: `${Math.min(percent() ?? 0, 100)}%` }} />
 								</div>
 								<p class="usage-note">
-									{exact(props.usage?.contextTokens ?? 0)} of {exact(props.usage?.contextWindow ?? 0)} tokens
+									{m.settings_usage_tokens_of({ used: exact(props.usage?.contextTokens ?? 0), window: exact(props.usage?.contextWindow ?? 0) })}
 								</p>
 							</Show>
 
@@ -202,11 +206,11 @@ export function UsageModal(props: {
 							<table class="usage-table">
 								<thead>
 									<tr>
-										<th>Model</th>
-										<th>In</th>
-										<th>Out</th>
-										<th>Cache r/w</th>
-										<th>Cost</th>
+										<th>{m.settings_usage_model()}</th>
+										<th>{m.settings_usage_in()}</th>
+										<th>{m.settings_usage_out()}</th>
+										<th>{m.settings_usage_cache_rw()}</th>
+										<th>{m.settings_usage_cost()}</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -232,7 +236,7 @@ export function UsageModal(props: {
 
 					<section class="set-group" data-group="limits">
 						<header>
-							<span class="set-title">Plan limits</span>
+							<span class="set-title">{m.settings_usage_limits()}</span>
 							{/*
 								Whose limits these are.
 								
@@ -241,7 +245,7 @@ export function UsageModal(props: {
 								reading with no subject until this line says which account it belongs to.
 								It is the one field of the report picone had no need for.
 							*/}
-							<Show when={whose()} fallback={<span class="set-note">what the subscription has left</span>}>
+							<Show when={whose()} fallback={<span class="set-note">{m.settings_usage_limits_note()}</span>}>
 								{(subject) => <span class="set-note">{subject()}</span>}
 							</Show>
 						</header>
@@ -259,10 +263,10 @@ export function UsageModal(props: {
 											 */
 											<p class="usage-empty">
 												{report().kind !== "claude"
-													? `A ${report().kind} agent bills per token and has no plan windows to run out of.`
+													? m.settings_usage_per_token({ kind: report().kind })
 													: report().limits === null
-														? "This agent is not running against a claude.ai plan, so there are no windows to report."
-														: "The plan reports no active windows."}
+														? m.settings_usage_no_plan()
+														: m.settings_usage_no_windows()}
 											</p>
 										}
 									>
@@ -280,14 +284,14 @@ export function UsageModal(props: {
 					<Show when={props.report?.behaviors}>
 						<section class="set-group" data-group="behaviors">
 							<header>
-								<span class="set-title">What's using it</span>
-								<span class="set-note">as the runtime scans this machine</span>
+								<span class="set-title">{m.settings_usage_behaviors()}</span>
+								<span class="set-note">{m.settings_usage_behaviors_note()}</span>
 								<span class="flex-1" />
 								<div class="segmented">
 									<For each={["day", "week"] as const}>
 										{(option) => (
 											<button type="button" data-on={span() === option} onClick={() => setSpan(option)}>
-												{option === "day" ? "24 hours" : "7 days"}
+												{option === "day" ? m.settings_usage_day() : m.settings_usage_week()}
 											</button>
 										)}
 									</For>
@@ -305,7 +309,7 @@ export function UsageModal(props: {
 
 /** Waiting for the round trip, or a runtime that will not make one. */
 function Reading(props: { loading: boolean }) {
-	return <p class="usage-empty">{props.loading ? "Reading…" : "Nothing to report."}</p>;
+	return <p class="usage-empty">{props.loading ? m.settings_usage_reading() : m.settings_usage_nothing()}</p>;
 }
 
 /**
@@ -320,16 +324,16 @@ function Facts(props: { spend: SessionSpend }) {
 	const rows = () => {
 		const spend = props.spend;
 		const out: { label: string; value: string }[] = [
-			{ label: "Cost", value: money(spend.costUsd) },
-			{ label: "In", value: tokens(spend.tokens.input) },
-			{ label: "Out", value: tokens(spend.tokens.output) },
-			{ label: "Cache read", value: tokens(spend.tokens.cacheRead) },
-			{ label: "Cache write", value: tokens(spend.tokens.cacheWrite) },
+			{ label: m.settings_usage_cost(), value: money(spend.costUsd) },
+			{ label: m.settings_usage_in(), value: tokens(spend.tokens.input) },
+			{ label: m.settings_usage_out(), value: tokens(spend.tokens.output) },
+			{ label: m.settings_usage_cache_read(), value: tokens(spend.tokens.cacheRead) },
+			{ label: m.settings_usage_cache_write(), value: tokens(spend.tokens.cacheWrite) },
 		];
-		if (spend.durationMs !== null) out.push({ label: "Elapsed", value: duration(spend.durationMs) });
-		if (spend.apiDurationMs !== null) out.push({ label: "API time", value: duration(spend.apiDurationMs) });
+		if (spend.durationMs !== null) out.push({ label: m.settings_usage_elapsed(), value: duration(spend.durationMs) });
+		if (spend.apiDurationMs !== null) out.push({ label: m.settings_usage_api_time(), value: duration(spend.apiDurationMs) });
 		if (spend.linesAdded !== null || spend.linesRemoved !== null) {
-			out.push({ label: "Lines", value: `+${spend.linesAdded ?? 0} / −${spend.linesRemoved ?? 0}` });
+			out.push({ label: m.settings_usage_lines(), value: `+${formatNumber(spend.linesAdded ?? 0)} / −${formatNumber(spend.linesRemoved ?? 0)}` });
 		}
 		return out;
 	};
@@ -361,16 +365,16 @@ function Limit(props: { limit: PlanLimit; now: number }) {
 	 */
 	const foot = () => {
 		const left = until();
-		if (!props.limit.active) return left ? `not in force · turns over in ${left}` : "not in force";
+		if (!props.limit.active) return left ? m.settings_usage_dormant_turns({ left }) : m.settings_usage_dormant();
 		if (!left) return null;
-		return left === "now" ? "resetting now" : `resets in ${left}`;
+		return left === m.settings_usage_now() ? m.settings_usage_resetting() : m.settings_usage_resets_in({ left });
 	};
 
 	return (
 		<li class="usage-limit" classList={{ dormant: !props.limit.active }}>
 			<div class="usage-limit-head">
 				<span class="usage-limit-label">{props.limit.label}</span>
-				<span class="usage-limit-value">{props.limit.percent === null ? "—" : `${Math.round(props.limit.percent)}%`}</span>
+				<span class="usage-limit-value">{props.limit.percent === null ? "—" : pct(props.limit.percent)}</span>
 			</div>
 			<Meter percent={props.limit.percent} flat={!props.limit.active} />
 			<Show when={foot()}>
@@ -379,7 +383,7 @@ function Limit(props: { limit: PlanLimit; now: number }) {
 					   wait, so it is one hover away. */
 					<span
 						class="usage-limit-reset"
-						title={props.limit.active ? (resetsAt(props.limit.resetsAt, props.now) ?? undefined) : "A window this plan carries and this account is not on right now"}
+						title={props.limit.active ? (resetsAt(props.limit.resetsAt, props.now) ?? undefined) : m.settings_usage_dormant_title()}
 					>
 						{line()}
 					</span>
@@ -423,10 +427,10 @@ function Behaviors(props: { window: UsageWindow }) {
 	return (
 		<div class="usage-pad">
 			<p class="usage-note">
-				{exact(props.window.requests)} requests across {props.window.sessions} {props.window.sessions === 1 ? "session" : "sessions"}.
+				{m.settings_usage_requests_across({ requests: exact(props.window.requests), count: props.window.sessions })}
 			</p>
 
-			<Show when={!empty()} fallback={<p class="usage-empty">Nothing recorded for this window.</p>}>
+			<Show when={!empty()} fallback={<p class="usage-empty">{m.settings_usage_window_empty()}</p>}>
 				<Show when={props.window.behaviors.length}>
 					<ul class="usage-limits">
 						<For each={props.window.behaviors}>
@@ -434,13 +438,13 @@ function Behaviors(props: { window: UsageWindow }) {
 								<li class="usage-limit">
 									<div class="usage-limit-head">
 										<span class="usage-limit-label">{behaviorLabel(behavior.key)}</span>
-										<span class="usage-limit-value">{Math.round(behavior.percent)}%</span>
+										<span class="usage-limit-value">{pct(behavior.percent)}</span>
 									</div>
 									{/* Never coloured: these overlap and do not sum to 100, so an amber bar
 									    here would be reporting a limit that is not one. */}
 									<Meter percent={behavior.percent} flat />
 									<span class="usage-limit-reset">
-										{exact(behavior.count)} {behavior.count === 1 ? "request" : "requests"}
+										{m.settings_usage_requests({ count: behavior.count, shown: exact(behavior.count) })}
 									</span>
 								</li>
 							)}
@@ -448,10 +452,10 @@ function Behaviors(props: { window: UsageWindow }) {
 					</ul>
 				</Show>
 
-				<Shares title="Agents" shares={props.window.agents} />
-				<Shares title="Skills" shares={props.window.skills} />
-				<Shares title="Plugins" shares={props.window.plugins} />
-				<Shares title="MCP servers" shares={props.window.mcpServers} />
+				<Shares title={m.settings_usage_agents()} shares={props.window.agents} />
+				<Shares title={m.settings_usage_skills()} shares={props.window.skills} />
+				<Shares title={m.settings_usage_plugins()} shares={props.window.plugins} />
+				<Shares title={m.settings_usage_mcp()} shares={props.window.mcpServers} />
 			</Show>
 		</div>
 	);
@@ -473,7 +477,7 @@ function Shares(props: { title: string; shares: UsageShare[] }) {
 								<span class="usage-share-name" title={share.name}>
 									{share.name}
 								</span>
-								<span class="usage-share-pct">{Math.round(share.percent)}%</span>
+								<span class="usage-share-pct">{pct(share.percent)}</span>
 							</li>
 						)}
 					</For>

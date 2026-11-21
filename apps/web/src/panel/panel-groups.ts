@@ -1,4 +1,5 @@
 import type { Page, DeckPen } from "@decks/protocol";
+import { m } from "@decks/i18n";
 
 /**
  * What the boards panel lists, and which of its three sections each board belongs to.
@@ -130,10 +131,10 @@ export function panelSections(input: PanelInput): PanelSection[] {
 		});
 
 	const canvas = pick(canvasPaths, (board) => ({ board, onCanvas: true, dim: false }));
-	if (canvas.length > 0) sections.push({ kind: "canvas", label: "On the canvas", rows: canvas });
+	if (canvas.length > 0) sections.push({ kind: "canvas", label: m.panel_section_canvas(), rows: canvas });
 
 	const quiet = pick(quietPaths, (board) => ({ board, onCanvas: false, dim: true }));
-	if (quiet.length > 0) sections.push({ kind: "held", label: "Held, not shown", rows: quiet });
+	if (quiet.length > 0) sections.push({ kind: "held", label: m.panel_section_held(), rows: quiet });
 
 	/*
 	 * The rest of the deck, in the *deck's* order: this section is not about the canvas, and
@@ -147,7 +148,7 @@ export function panelSections(input: PanelInput): PanelSection[] {
 	}
 	rest.sort((a, b) => a.board.path.localeCompare(b.board.path));
 	if (rest.length > 0) {
-		sections.push({ kind: "deck", label: "In the deck", rows: rest });
+		sections.push({ kind: "deck", label: m.panel_section_deck(), rows: rest });
 	}
 
 	return sections;

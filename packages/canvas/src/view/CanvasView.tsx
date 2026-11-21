@@ -1,4 +1,5 @@
 import type { JSX } from "solid-js";
+import { m } from "@decks/i18n";
 import type { Page, Camera } from "@decks/protocol";
 import { Show, createEffect, type Component, createMemo, createSignal, untrack } from "solid-js";
 import { boxOf, fitInto, toWorld, type Viewport } from "../camera/camera.ts";
@@ -508,15 +509,15 @@ export function CanvasView(props: CanvasViewProps) {
 					const tops = () => props.pen?.doc?.children?.length ?? 0;
 					const actions: HoldAction[] = menu.ids.length
 						? [
-								{ label: "Properties", hint: "drawer", run: () => setPropsOpen(true) },
-								{ label: "Duplicate", run: () => selection.penDuplicate() },
-								{ label: "Bring to front", run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
-								...(props.onComment ? [{ label: "Ask the agent", hint: "→", run: () => props.onComment?.({ path: props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? "An item", anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
-								{ label: "Delete", danger: true, run: () => selection.penDeleteSelected() },
+								{ label: m.canvas_props_panel(), hint: m.canvas_hold_drawer(), run: () => setPropsOpen(true) },
+								{ label: m.canvas_pill_duplicate(), run: () => selection.penDuplicate() },
+								{ label: m.canvas_hold_to_front(), run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
+								...(props.onComment ? [{ label: m.canvas_hold_ask(), hint: "→", run: () => props.onComment?.({ path: props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? m.canvas_hold_an_item(), anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
+								{ label: m.canvas_pill_delete(), danger: true, run: () => selection.penDeleteSelected() },
 							]
 						: [
-								{ label: "Add a shape…", run: () => setInsertPanel({ tab: "shapes", at: menu.stage, client: menu.at }) },
-								{ label: "Add an icon…", run: () => setInsertPanel({ tab: "icons", at: menu.stage, client: menu.at }) },
+								{ label: m.canvas_hold_add_shape(), run: () => setInsertPanel({ tab: "shapes", at: menu.stage, client: menu.at }) },
+								{ label: m.canvas_hold_add_icon(), run: () => setInsertPanel({ tab: "icons", at: menu.stage, client: menu.at }) },
 							];
 					return <HoldMenu at={menu.at} preview={preview} actions={actions} onClose={() => setHoldMenu(undefined)} />;
 				}}

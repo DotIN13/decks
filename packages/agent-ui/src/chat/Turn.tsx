@@ -10,6 +10,7 @@ import { Markdown } from "./MarkdownView.tsx";
 import { TimeMachine } from "./TimeMachine.tsx";
 import { ToolGroup } from "./ToolGroup.tsx";
 import type { AgentPart, TurnCard } from "./turn-cards.ts";
+import { m } from "@decks/i18n";
 
 /*
  * A card, and the pieces of one, are `chat/turn-cards.ts`'s now.
@@ -203,13 +204,13 @@ function Mine(props: {
 			<Show when={props.timeMachine === "buttons" && props.card.entryId}>
 				{(entryId) => (
 					<div class="stream-acts">
-						<button type="button" class="stream-act" title="Rewind to here: take back everything after it, and these words go back into the input bar" aria-label="Rewind to here" onClick={() => props.onRewind(entryId())}>
+						<button type="button" class="stream-act" title={m.chat_rewind_title()} aria-label={m.chat_rewind_label()} onClick={() => props.onRewind(entryId())}>
 							<Icon of={RotateCcw} size={13} />
-							<span>Rewind</span>
+							<span>{m.chat_rewind()}</span>
 						</button>
-						<button type="button" class="stream-act" title="Fork from here: a new conversation that remembers everything up to this message" aria-label="Fork from here" onClick={() => props.onFork(entryId())}>
+						<button type="button" class="stream-act" title={m.chat_fork_title()} aria-label={m.chat_fork_label()} onClick={() => props.onFork(entryId())}>
 							<Icon of={GitBranch} size={13} />
-							<span>Fork</span>
+							<span>{m.chat_fork()}</span>
 						</button>
 					</div>
 				)}
@@ -234,7 +235,7 @@ function Said(props: { part: Extract<AgentPart, { kind: "text" }> }) {
 				{(thinking) => (
 					<div class="stream-thinking">
 						<button type="button" aria-expanded={shown()} onClick={() => setShown(!shown())}>
-							{shown() ? "hide thinking" : "thinking…"}
+							{shown() ? m.chat_hide_thinking() : m.chat_thinking()}
 						</button>
 						<Show when={shown()}>
 							<div class="body">{thinking()}</div>

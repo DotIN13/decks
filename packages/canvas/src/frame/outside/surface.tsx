@@ -1,4 +1,5 @@
 import { ALLOW, SANDBOX, spareFrame } from "@decks/frame";
+import { getLocale, m } from "@decks/i18n";
 import type { Accessor, Setter } from "solid-js";
 import { createEffect, createSignal, For, on, onCleanup, untrack, type JSX } from "solid-js";
 import { type PageEnd } from "../protocol.ts";
@@ -12,6 +13,8 @@ const frameAddress = (): string => {
 	for (const name of PASSED_ON) if (page.has(name)) passed.set(name, page.get(name)!);
 	// Which kind this frame is for, so its code is asked for at once (`inside/frame.tsx`).
 	passed.set("kind", "canvas");
+	// The page's language, which a sandboxed frame cannot read for itself (`canvas-frame.html` keeps it).
+	passed.set("lang", getLocale());
 	return `/canvas-frame.html?${passed.toString()}`;
 };
 
@@ -169,7 +172,7 @@ export function createSurface(d: SurfaceNeeds) {
 							else start(one);
 						}}
 						class={front() === one ? "canvas-frame" : one.canvas === undefined && spare() === one ? "canvas-frame-spare" : "canvas-frame-kept"}
-						title="Canvas"
+						title={m.canvas_frame_title()}
 						/* What every frame may do, and why no more (`@decks/frame`, `sandbox.ts`): the apps inside this one can have no more than it has. */
 						sandbox={SANDBOX}
 						allow={ALLOW}

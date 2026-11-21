@@ -5,7 +5,8 @@ import Search from "lucide-solid/icons/search";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { Icon, Popover } from "@decks/ui";
-import { levelsFor, nearestLevel, optionFor } from "./thinking.ts";
+import { levelsFor, nearestLevel, optionFor, thinkingLabel } from "./thinking.ts";
+import { m } from "@decks/i18n";
 
 /**
  * Button three of three, inside the box: which model, and how hard it thinks.
@@ -65,7 +66,7 @@ export function ModelPicker(props: {
 
 	/** The label the chip shows: the model's own name, not `provider/name`, which is twice
 	 *  as long and disambiguates something the list already disambiguates. */
-	const label = () => optionFor(props.models, props.model)?.label ?? props.model?.model ?? "default model";
+	const label = () => optionFor(props.models, props.model)?.label ?? props.model?.model ?? m.composer_model_default();
 
 	const matches = createMemo(() => {
 		const needle = filter().toLowerCase().trim();
@@ -100,7 +101,7 @@ export function ModelPicker(props: {
 			 * and there is nothing for a wider cap to do.
 			 */
 			class="w-[min(344px,calc(100vw-16px))]"
-			label="Model and thinking level"
+			label={m.composer_model_label()}
 			trigger={(api) => {
 				dismiss = () => {
 					if (api.open) api.toggle();
@@ -165,7 +166,7 @@ export function ModelPicker(props: {
 						{/* The level only when there is one to show. "off" is a real answer and
 						    stays; a model with no scale at all has nothing to say here. */}
 						<Show when={levels().length > 0 ? props.model?.thinking : undefined}>
-							{(level) => <span class="chip-sub">{level()}</span>}
+							{(level) => <span class="chip-sub">{thinkingLabel(level())}</span>}
 						</Show>
 						<Icon of={ChevronDown} size={10} class="chevron" />
 					</button>
@@ -201,8 +202,8 @@ export function ModelPicker(props: {
 					 * opens this deliberately can ask for the cursor back the day it exists.
 					 */
 					type="text"
-					placeholder="Find a model"
-					aria-label="Search models"
+					placeholder={m.composer_model_find()}
+					aria-label={m.composer_model_search()}
 					value={filter()}
 					onInput={(event) => setFilter(event.currentTarget.value)}
 				/>
@@ -237,7 +238,7 @@ export function ModelPicker(props: {
 			*/}
 			{/* `px-1.5`: the rows stand in from the card's edge as the search field and the subscription rows do. */}
 			<div class="max-h-[min(33vh,300px)] overflow-y-auto px-1.5">
-				<Show when={matches().length > 0} fallback={<p class="meta m-0 px-2 py-2.5">No model matches that</p>}>
+				<Show when={matches().length > 0} fallback={<p class="meta m-0 px-2 py-2.5">{m.composer_model_none()}</p>}>
 					{/* By maker, each under its own label: the maker is said once, not on every row. */}
 					<For each={makers()}>
 						{(maker) => (
@@ -277,7 +278,7 @@ export function ModelPicker(props: {
 					evenly divided, read left to right.
 				*/}
 				<div class="px-1.5 py-1">
-					<span class="menu-label" style={{ padding: "4px 2px 4px" }}>Thinking</span>
+					<span class="menu-label" style={{ padding: "4px 2px 4px" }}>{m.composer_model_thinking()}</span>
 					<div class="segmented mt-1 w-full" data-scale="true">
 						<For each={levels()}>
 							{(level) => (
@@ -291,7 +292,7 @@ export function ModelPicker(props: {
 									aria-pressed={props.model?.thinking === level}
 									onClick={() => props.onThinking(level)}
 								>
-									{level}
+									{thinkingLabel(level)}
 								</button>
 							)}
 						</For>
@@ -309,7 +310,7 @@ export function ModelPicker(props: {
 			<Show when={(props.accounts?.length ?? 0) > 1 && props.onAccount}>
 				<div class="rule" />
 				<div class="px-1.5 py-1">
-					<span class="menu-label" style={{ padding: "4px 2px 4px" }}>Account</span>
+					<span class="menu-label" style={{ padding: "4px 2px 4px" }}>{m.composer_model_account()}</span>
 					<div class="mt-1">
 						<For each={props.accounts ?? []}>
 							{(account) => (
@@ -326,13 +327,13 @@ export function ModelPicker(props: {
 									 * after its window had lifted — and it was only ever the last
 									 * refusal's word. A limit is said in the conversation that hit one.
 									 */
-									title={account.signedIn ? undefined : "This account has no credentials behind it. Add it again in settings"}
+									title={account.signedIn ? undefined : m.composer_model_no_credentials()}
 									disabled={!account.signedIn}
 									onClick={() => props.onAccount?.(account.id)}
 								>
 									<span class="row-label flex-1 truncate">{account.email ?? account.id}</span>
 									<Show when={!account.signedIn} fallback={<FiveHour reading={account.fiveHour} />}>
-										<span class="meta flex-none text-micro">signed out</span>
+										<span class="meta flex-none text-micro">{m.composer_model_signed_out()}</span>
 									</Show>
 								</button>
 							)}

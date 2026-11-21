@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import type { Page } from "@decks/protocol";
 import { createEffect, createSignal } from "solid-js";
 import { boxOf, canvasBox, fitInto } from "@decks/canvas/camera";
@@ -101,7 +102,7 @@ export function createFraming(stagePages: () => Page[]) {
  */
 export const openLinkedPage = (path: string, from: string): boolean => {
 	if (!state.pages.some((one) => one.path === path)) {
-		notice("warn", `No card at ${path}: the link points at something this deck does not have.`);
+		notice("warn", m.app_no_card_at({ path }));
 		return false;
 	}
 	/*

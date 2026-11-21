@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import X from "lucide-solid/icons/x";
 import { For, Match, Show, Switch } from "solid-js";
 import { Icon } from "@decks/ui";
@@ -38,60 +39,60 @@ interface Group {
 function pointerGroups(): Group[] {
 	return [
 		{
-			title: "Moving around",
+			title: m.canvases_ops_moving_around(),
 			rows: [
-				{ keys: "two-finger scroll", what: "pan the canvas" },
-				{ keys: "pinch · ⌘-wheel", what: "zoom about the pointer" },
-				{ keys: "space-drag", what: "pan from anywhere, including over a card" },
-				{ keys: "+ · -", what: "zoom about the centre" },
-				{ keys: "0", what: "fit everything on the canvas on screen" },
-				{ keys: "1", what: "fit the selected card" },
+				{ keys: m.canvases_ops_two_finger_scroll(), what: m.canvases_ops_pan_the_canvas() },
+				{ keys: m.canvases_ops_pinch_wheel(), what: m.canvases_ops_zoom_about_the_pointer() },
+				{ keys: m.canvases_ops_space_drag(), what: m.canvases_ops_pan_from_anywhere_including_over() },
+				{ keys: "+ · -", what: m.canvases_ops_zoom_about_the_centre() },
+				{ keys: "0", what: m.canvases_ops_fit_everything_on_the_canvas() },
+				{ keys: "1", what: m.canvases_ops_fit_the_selected_card() },
 			],
 		},
 		{
-			title: "Reading a card",
+			title: m.canvases_ops_reading_a_card(),
 			rows: [
-				{ keys: "select words", what: "comment on them: kept in the input bar for your next message, or sent now" },
-				{ keys: "the brush", what: "draw on the card: pen, marker, eraser, lasso" },
-				{ keys: "⌘Z · ⇧⌘Z", what: "undo · redo a stroke, while drawing" },
-				{ keys: "⌫", what: "delete the strokes the lasso holds" },
-				{ keys: "Escape", what: "put the pen down" },
+				{ keys: m.canvases_ops_select_words(), what: m.canvases_ops_comment_on_them_kept_in() },
+				{ keys: m.canvases_ops_the_brush(), what: m.canvases_ops_draw_on_the_card_pen() },
+				{ keys: "⌘Z · ⇧⌘Z", what: m.canvases_ops_undo_redo_a_stroke_while() },
+				{ keys: "⌫", what: m.canvases_ops_delete_the_strokes_the_lasso() },
+				{ keys: "Escape", what: m.canvases_ops_put_the_pen_down() },
 			],
 		},
 		{
-			title: "Drawing",
+			title: m.canvases_ops_drawing(),
 			rows: [
-				{ keys: "V", what: "select, drag and resize" },
-				{ keys: "R · O · F", what: "a rectangle · an ellipse · a frame" },
-				{ keys: "N · C · T · A", what: "a note · a card · words · an arrow" },
-				{ keys: "drop a file on a card", what: "embed it where it landed" },
+				{ keys: "V", what: m.canvases_ops_select_drag_and_resize() },
+				{ keys: "R · O · F", what: m.canvases_ops_a_rectangle_an_ellipse_a() },
+				{ keys: "N · C · T · A", what: m.canvases_ops_a_note_a_card_words() },
+				{ keys: m.canvases_ops_drop_a_file_on_a(), what: m.canvases_ops_embed_it_where_it_landed() },
 			],
 		},
 		{
-			title: "Changing a component",
+			title: m.canvases_ops_changing_a_component(),
 			rows: [
-				{ keys: "click", what: "select it" },
-				{ keys: "double-click", what: "retype its words in place" },
-				{ keys: "drag · drag the corner", what: "move it · resize it" },
-				{ keys: "arrows · shift-arrows", what: "nudge · nudge by ten" },
-				{ keys: "⌘D", what: "duplicate it" },
-				{ keys: "[ · ]", what: "send behind · bring in front" },
-				{ keys: "⌫", what: "delete it" },
-				{ keys: "⌘Z", what: "undo on this card" },
-				{ keys: "Escape", what: "let the selection go" },
+				{ keys: m.canvases_ops_click(), what: m.canvases_ops_select_it() },
+				{ keys: m.canvases_ops_double_click(), what: m.canvases_ops_retype_its_words_in_place() },
+				{ keys: m.canvases_ops_drag_drag_the_corner(), what: m.canvases_ops_move_it_resize_it() },
+				{ keys: "arrows · shift-arrows", what: m.canvases_ops_nudge_nudge_by_ten() },
+				{ keys: "⌘D", what: m.canvases_ops_duplicate_it() },
+				{ keys: "[ · ]", what: m.canvases_ops_send_behind_bring_in_front() },
+				{ keys: "⌫", what: m.canvases_ops_delete_it() },
+				{ keys: "⌘Z", what: m.canvases_ops_undo_on_this_card() },
+				{ keys: "Escape", what: m.canvases_ops_let_the_selection_go() },
 			],
 		},
 		{
-			title: "Cards and the conversation",
+			title: m.canvases_ops_cards_and_the_conversation(),
 			rows: [
-				{ keys: "drag a card's title", what: "move the card" },
-				{ keys: "the card's ×", what: "take it off the canvas, keeping it in context" },
-				{ keys: "the panel buttons", what: "the agents · the cards they are holding" },
-				{ keys: "the grid button", what: "every card in the deck, searchable" },
-				{ keys: "the speech-bubble button", what: "the conversation, opened and closed" },
-				{ keys: "click a turn on the right spine", what: "the conversation at that turn" },
-				{ keys: "/", what: "commands, in the input bar" },
-				{ keys: "@Name", what: "send the line to that agent, without leaving this canvas" },
+				{ keys: m.canvases_ops_drag_a_card_s_title(), what: m.canvases_ops_move_the_card() },
+				{ keys: m.canvases_ops_the_card_s(), what: m.canvases_ops_take_it_off_the_canvas() },
+				{ keys: m.canvases_ops_the_panel_buttons(), what: m.canvases_ops_the_agents_the_cards_they() },
+				{ keys: m.canvases_ops_the_grid_button(), what: m.canvases_ops_every_card_in_the_deck() },
+				{ keys: m.canvases_ops_the_speech_bubble_button(), what: m.canvases_ops_the_conversation_opened_and_closed() },
+				{ keys: m.canvases_ops_click_a_turn_on_the(), what: m.canvases_ops_the_conversation_at_that_turn() },
+				{ keys: "/", what: m.canvases_ops_commands_in_the_input_bar() },
+				{ keys: m.canvases_ops_name(), what: m.canvases_ops_send_the_line_to_that() },
 			],
 		},
 	];
@@ -101,48 +102,48 @@ function pointerGroups(): Group[] {
 function touchGroups(): Group[] {
 	return [
 		{
-			title: "Moving around",
+			title: m.canvases_ops_moving_around(),
 			rows: [
-				{ keys: "drag", what: "pan the canvas" },
-				{ keys: "pinch", what: "zoom about the fingers" },
-				{ keys: "drag inside an embed", what: "scrolls the embed, not the canvas" },
+				{ keys: m.canvases_ops_drag(), what: m.canvases_ops_pan_the_canvas() },
+				{ keys: m.canvases_ops_pinch(), what: m.canvases_ops_zoom_about_the_fingers() },
+				{ keys: m.canvases_ops_drag_inside_an_embed(), what: m.canvases_ops_scrolls_the_embed_not_the() },
 			],
 		},
 		{
-			title: "Reading a card",
+			title: m.canvases_ops_reading_a_card(),
 			rows: [
-				{ keys: "select words", what: "comment on them: kept in the input bar for your next message, or sent now" },
-				{ keys: "the brush", what: "draw on the card: pen, marker, eraser, lasso" },
-				{ keys: "a pencil", what: "draws with its pressure, and from then on a finger moves the canvas" },
-				{ keys: "two fingers", what: "always the canvas, even while drawing" },
+				{ keys: m.canvases_ops_select_words(), what: m.canvases_ops_comment_on_them_kept_in() },
+				{ keys: m.canvases_ops_the_brush(), what: m.canvases_ops_draw_on_the_card_pen() },
+				{ keys: m.canvases_ops_a_pencil(), what: m.canvases_ops_draws_with_its_pressure_and() },
+				{ keys: m.canvases_ops_two_fingers(), what: m.canvases_ops_always_the_canvas_even_while() },
 			],
 		},
 		{
-			title: "Changing a component",
+			title: m.canvases_ops_changing_a_component(),
 			rows: [
-				{ keys: "tap", what: "select it" },
-				{ keys: "tap again", what: "retype its words in place" },
-				{ keys: "drag a selected component", what: "move it" },
-				{ keys: "the properties sheet", what: "kind, tone, order, duplicate, delete" },
+				{ keys: m.canvases_ops_tap(), what: m.canvases_ops_select_it() },
+				{ keys: m.canvases_ops_tap_again(), what: m.canvases_ops_retype_its_words_in_place() },
+				{ keys: m.canvases_ops_drag_a_selected_component(), what: m.canvases_ops_move_it() },
+				{ keys: m.canvases_ops_the_properties_sheet(), what: m.canvases_ops_kind_tone_order_duplicate_delete() },
 			],
 		},
 		{
-			title: "Drawing",
+			title: m.canvases_ops_drawing(),
 			rows: [
-				{ keys: "pick a tool, then tap", what: "place a sticky, card, text or embed" },
-				{ keys: "from this device, in the picker", what: "add a photo or a file to the deck" },
+				{ keys: m.canvases_ops_pick_a_tool_then_tap(), what: m.canvases_ops_place_a_sticky_card_text() },
+				{ keys: m.canvases_ops_from_this_device_in_the(), what: m.canvases_ops_add_a_photo_or_a() },
 			],
 		},
 		{
-			title: "Cards and the conversation",
+			title: m.canvases_ops_cards_and_the_conversation(),
 			rows: [
-				{ keys: "drag a card's title", what: "move the card" },
-				{ keys: "swipe in from the left edge", what: "the cards and agents rail" },
-				{ keys: "swipe in from the right edge", what: "the conversation" },
-				{ keys: "swipe the conversation right", what: "put it away" },
-				{ keys: "the two title-bar buttons", what: "the same two panels, either way" },
-				{ keys: "/", what: "commands, in the input bar" },
-				{ keys: "@Name", what: "send the line to that agent, without leaving this canvas" },
+				{ keys: m.canvases_ops_drag_a_card_s_title(), what: m.canvases_ops_move_the_card() },
+				{ keys: m.canvases_ops_swipe_in_from_the_left(), what: m.canvases_ops_the_cards_and_agents_rail() },
+				{ keys: m.canvases_ops_swipe_in_from_the_right(), what: m.canvases_ops_the_conversation() },
+				{ keys: m.canvases_ops_swipe_the_conversation_right(), what: m.canvases_ops_put_it_away() },
+				{ keys: m.canvases_ops_the_two_title_bar_buttons(), what: m.canvases_ops_the_same_two_panels_either() },
+				{ keys: "/", what: m.canvases_ops_commands_in_the_input_bar() },
+				{ keys: m.canvases_ops_name(), what: m.canvases_ops_send_the_line_to_that() },
 			],
 		},
 	];
@@ -171,14 +172,14 @@ export function CanvasOps(props: { onClose: () => void }) {
 			<div
 				class="panel-float ops-sheet flex max-h-[78%] w-[min(560px,calc(100vw-24px))] static flex-col overflow-hidden bg-bg p-0"
 				role="dialog"
-				aria-label="Shortcuts"
+				aria-label={m.canvases_ops_shortcuts()}
 			>
 				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
-					<span>Shortcuts</span>
+					<span>{m.canvases_ops_shortcuts()}</span>
 					<span class="flex-1" />
 					{/* `.icon-button`: `icon-button` is a class the rewrite replaced and nothing defines,
 					    so this × was a bare button with no target and no hover. */}
-					<button class="icon-button [--control:24px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:24px]" type="button" title={m.canvases_close()} aria-label={m.canvases_close()} onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
@@ -234,7 +235,7 @@ export function CanvasOps(props: { onClose: () => void }) {
 				    below `LIVE_ZOOM` a card is its picture, except the selected one, whose page works. */}
 				<Show when={canHover()}>
 					<footer class="border-t border-line px-3 py-[9px] text-note leading-normal text-faint">
-						Zoomed out far enough, a card is a picture on a map: drag it to move it. The card you select keeps its page, and works at any zoom.
+						{m.canvases_ops_footer()}
 					</footer>
 				</Show>
 			</div>

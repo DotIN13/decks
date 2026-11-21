@@ -12,6 +12,7 @@ import X from "lucide-solid/icons/x";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon, Popover } from "@decks/ui";
+import { m } from "@decks/i18n";
 
 export type PanelApp = { name: string; title: string; status: string; board: string };
 
@@ -26,7 +27,17 @@ function tileColour(name: string): string {
 	return TILES[h % TILES.length] ?? TILES[0]!;
 }
 
-const WORD: Record<string, string> = { running: "Running", asleep: "Asleep", stopped: "Stopped", broken: "Broken", installing: "Installing…", building: "Building…", starting: "Starting…", stopping: "Stopping…" };
+/** An app's state in a word, read when drawn. */
+const WORD: Record<string, () => string> = {
+	running: () => m.panel_app_running(),
+	asleep: () => m.panel_app_asleep(),
+	stopped: () => m.panel_app_stopped(),
+	broken: () => m.panel_app_broken(),
+	installing: () => m.panel_app_installing(),
+	building: () => m.panel_app_building(),
+	starting: () => m.panel_app_starting(),
+	stopping: () => m.panel_app_stopping(),
+};
 
 /**
  * One app in the Apps tab, as the "Apps tab redesigned" mockup has it: a bright tile, its name, and
@@ -62,7 +73,7 @@ export function AppRow(props: {
 			class="v3-app-row"
 			data-status={status()}
 			data-on={props.picked || undefined}
-			title={running() ? `${props.app.title}: double-click to show it on the canvas` : `${props.app.title}: double-click to run it and show it on the canvas`}
+			title={running() ? m.panel_app_dblclick_show({ title: props.app.title }) : m.panel_app_dblclick_run({ title: props.app.title })}
 			onClick={() => props.onPick()}
 			onDblClick={(event) => {
 				if ((event.target as Element).closest(".v3-app-more")) return;
@@ -81,13 +92,13 @@ export function AppRow(props: {
 				<span class="v3-app-name truncate">{props.app.title}</span>
 				<span class="v3-app-state" data-state={running() ? "on" : moving() ? "busy" : status() === "broken" ? "broken" : "off"}>
 					<i aria-hidden="true" />
-					<span class="v3-app-word">{WORD[status()] ?? status()}</span>
+					<span class="v3-app-word">{WORD[status()]?.() ?? status()}</span>
 					<span class="v3-app-path truncate">apps/{props.app.name}</span>
 				</span>
 			</span>
 			<Popover
 				placement="right-start"
-				label={`${props.app.title}'s menu`}
+				label={m.panel_app_menu({ title: props.app.title })}
 				class="w-[210px]"
 				trigger={(api) => {
 					toggle = api.toggle;
@@ -100,7 +111,7 @@ export function AppRow(props: {
 							data-on={api.open || undefined}
 							aria-haspopup="menu"
 							aria-expanded={api.open}
-							aria-label={`More for ${props.app.title}`}
+							aria-label={m.panel_app_more({ title: props.app.title })}
 							onClick={(event) => {
 								event.stopPropagation();
 								props.onPick();
@@ -114,11 +125,11 @@ export function AppRow(props: {
 			>
 				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => act("show"))}>
 					<Icon of={Maximize2} size={15} class="row-icon" />
-					<span class="row-label">Show on canvas</span>
+					<span class="row-label">{m.panel_show_on_canvas()}</span>
 				</button>
 				<button type="button" role="menuitem" data-row data-flat="true" disabled={!running()} onClick={() => menu(() => window.open(`/app/${props.app.name}/`, "_blank", "noopener"))}>
 					<Icon of={ArrowUpRight} size={15} class="row-icon" />
-					<span class="row-label">Open in a new tab</span>
+					<span class="row-label">{m.panel_open_new_tab()}</span>
 				</button>
 				<div class="rule" aria-hidden="true" />
 				<Show
@@ -126,31 +137,31 @@ export function AppRow(props: {
 					fallback={
 						<button type="button" role="menuitem" data-row data-flat="true" disabled={moving()} onClick={() => menu(() => act("start"))}>
 							<Icon of={Play} size={15} class="row-icon" />
-							<span class="row-label">Start</span>
+							<span class="row-label">{m.panel_app_start()}</span>
 						</button>
 					}
 				>
 					<button type="button" role="menuitem" data-row data-flat="true" disabled={moving()} onClick={() => menu(() => act("stop"))}>
 						<Icon of={Square} size={15} class="row-icon" />
-						<span class="row-label">Stop</span>
+						<span class="row-label">{m.panel_app_stop()}</span>
 					</button>
 				</Show>
 				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => act("reload"))}>
 					<Icon of={RefreshCw} size={15} class="row-icon" />
-					<span class="row-label">Reload</span>
+					<span class="row-label">{m.panel_reload()}</span>
 				</button>
 				<button type="button" role="menuitem" data-row data-flat="true" disabled={!running() || moving()} onClick={() => menu(() => act("restart"))}>
 					<Icon of={RotateCcw} size={15} class="row-icon" />
-					<span class="row-label">Restart</span>
+					<span class="row-label">{m.panel_app_restart()}</span>
 				</button>
 				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(props.onLogs)}>
 					<Icon of={Terminal} size={15} class="row-icon" />
-					<span class="row-label">Logs</span>
+					<span class="row-label">{m.panel_app_logs()}</span>
 				</button>
 				<div class="rule" aria-hidden="true" />
 				<button type="button" role="menuitem" data-row data-flat="true" class="menu-danger" onClick={() => menu(() => act("delete"))}>
 					<Icon of={Trash2} size={15} class="row-icon" />
-					<span class="row-label">Delete…</span>
+					<span class="row-label">{m.panel_delete_ellipsis()}</span>
 				</button>
 			</Popover>
 		</div>
@@ -182,16 +193,16 @@ export function AppLogs(props: { title: string; read: () => Promise<string[] | u
 	});
 	return (
 		<Portal>
-			<div class="v3-app-logs" role="dialog" aria-label={`${props.title}: logs`}>
+			<div class="v3-app-logs" role="dialog" aria-label={m.panel_app_logs_of({ title: props.title })}>
 				<div class="v3-app-logs-head">
 					<Icon of={Terminal} size={14} />
 					<span class="truncate">{props.title}</span>
 					<span class="flex-1" />
-					<button type="button" class="v3-app-logs-x" aria-label="Close the logs" onClick={props.onClose}>
+					<button type="button" class="v3-app-logs-x" aria-label={m.panel_app_logs_close()} onClick={props.onClose}>
 						<Icon of={X} size={14} />
 					</button>
 				</div>
-				<pre ref={pre}>{lines() === undefined ? "Reading…" : lines()!.length ? lines()!.join("\n") : "Nothing yet."}</pre>
+				<pre ref={pre}>{lines() === undefined ? m.panel_reading() : lines()!.length ? lines()!.join("\n") : m.panel_nothing_yet()}</pre>
 			</div>
 		</Portal>
 	);

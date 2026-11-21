@@ -1,6 +1,7 @@
 import type { AgentChat, Identity } from "@decks/protocol";
 import { createEffect, For } from "solid-js";
 import { AgentFace } from "../agents/AgentPill.tsx";
+import { m } from "@decks/i18n";
 
 /** Somebody an `@` in the line can name: an agent. */
 export interface Mentionable {
@@ -42,7 +43,7 @@ export function MentionMenu(props: {
 			ref={list}
 			class="row-list mention-menu absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
 			role="listbox"
-			aria-label="Who to name"
+			aria-label={m.composer_mention_label()}
 		>
 			<For each={props.matches}>
 				{(one, index) => (

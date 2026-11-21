@@ -2,6 +2,7 @@ import Images from "lucide-solid/icons/images";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { Icon } from "@decks/ui";
+import { formatNumber, m } from "@decks/i18n";
 
 /** What `GET /api/pictures` answers (`PictureProgress` in the server's `pictures/service.ts`). */
 interface Progress {
@@ -49,7 +50,7 @@ export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 		return p && p.total > 0 ? Math.min(100, (100 * p.ready) / p.total) : 0;
 	};
 
-	const count = (n: number) => n.toLocaleString("en-US");
+	const count = (n: number) => formatNumber(n);
 
 	return (
 		<Show when={!props.quietWhenDone || (progress() !== undefined && !done())}>
@@ -63,13 +64,13 @@ export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 			data-keep-open
 			class="picture-progress"
 			role="status"
-			title={done() ? "Every card has its pictures" : "Pictures of the cards are being made in the background"}
+			title={done() ? m.shell_pictures_done_title() : m.shell_pictures_making_title()}
 		>
 			<span class="row-icon">
 				<Icon of={Images} size={15} />
 			</span>
 			<span class="flex min-w-0 flex-1 flex-col gap-[4px]">
-				<span class="row-label">Card pictures</span>
+				<span class="row-label">{m.shell_pictures()}</span>
 				<Show when={!done()}>
 					<span class="picture-progress-track" aria-hidden="true">
 						<span class="picture-progress-fill" style={{ width: `${share()}%` }} />
@@ -77,14 +78,14 @@ export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 					<span class="meta tabular-nums">
 						{(() => {
 							const p = progress();
-							if (!p) return "Checking…";
-							return `${count(p.ready)} of ${count(p.total)} made${p.failed > 0 ? `, ${count(p.failed)} failed` : ""}`;
+							if (!p) return m.shell_pictures_checking();
+							return p.failed > 0 ? m.shell_pictures_made_failed({ ready: count(p.ready), total: count(p.total), failed: count(p.failed) }) : m.shell_pictures_made({ ready: count(p.ready), total: count(p.total) });
 						})()}
 					</span>
 				</Show>
 			</span>
 			<Show when={done()}>
-				<span class="meta flex-none">All ready</span>
+				<span class="meta flex-none">{m.shell_pictures_ready()}</span>
 			</Show>
 		</div>
 		</Show>

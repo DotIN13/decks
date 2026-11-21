@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import type { InkRequest } from "@decks/canvas/page";
 import { api } from "../connections/connection.ts";
 import { authHeaders } from "../lib/session.ts";
@@ -76,13 +77,13 @@ export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
 	const canvas = stageOf(agentId)?.name;
 	if (!agentId || !canvas) return;
 	// Taken on the server by canvas.screenshot, as decks canvas screenshot takes it, which can take a moment; fetched with this tab's token (a plain link carries none, and was refused), then saved.
-	notice("info", "Taking the picture…");
+	notice("info", m.app_taking_picture());
 	// A card's picture is named after its folder; drawn items after the canvas, as the server names it.
 	const card = ids.length === 1 ? /(?:^|\/)cards\/([^/]+)\//.exec(ids[0] ?? "")?.[1] : undefined;
 	void (async () => {
 		try {
 			const response = await fetch(api(`/stage-shot?${new URLSearchParams({ canvas, agent: agentId, of: ids.join(","), format, scheme: scheme() })}`), { headers: authHeaders() });
-			if (!response.ok) throw new Error((await response.text().catch(() => "")) || `the server answered ${response.status}`);
+			if (!response.ok) throw new Error((await response.text().catch(() => "")) || m.app_server_answered({ status: String(response.status) }));
 			const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1];
 			const local = URL.createObjectURL(await response.blob());
 			const link = document.createElement("a");
@@ -91,7 +92,7 @@ export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
 			link.click();
 			setTimeout(() => URL.revokeObjectURL(local), 60_000);
 		} catch (error) {
-			notice("warn", `The picture could not be taken: ${(error as Error).message}`);
+			notice("warn", m.app_picture_failed({ error: (error as Error).message }));
 		}
 	})();
 };

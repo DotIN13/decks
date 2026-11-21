@@ -1,3 +1,4 @@
+import { formatList, m } from "@decks/i18n";
 import type { Identity } from "@decks/protocol";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import Folder from "lucide-solid/icons/folder";
@@ -120,7 +121,7 @@ export function AgentRow(props: {
 	const stateWords = () => {
 		// An agent that works in its own app: where, when it last called, what waits for it.
 		if (chat().outside) return outsideWords(chat().outside!, true);
-		const base = chat().dormant ? "Dormant" : statusWords(props.row.status, chat().state);
+		const base = chat().dormant ? m.agents_dormant() : statusWords(props.row.status, chat().state);
 		return touch && chat().lastAt !== undefined ? `${base} · ${since(chat().lastAt)}` : base;
 	};
 	/**
@@ -209,7 +210,7 @@ export function AgentRow(props: {
 				data-row
 				data-agent="true"
 				data-current={props.row.current ? "true" : undefined}
-				title={props.row.current ? `${name()} — the conversation on screen` : `Switch to ${name()}`}
+				title={props.row.current ? m.agents_row_current_title({ name: name() }) : m.agents_switch_to({ name: name() })}
 				onClick={props.onFocus}
 				onPointerEnter={(event) => canHover() && props.onHover?.(event.currentTarget.getBoundingClientRect())}
 				onPointerLeave={() => props.onHover?.(undefined)}
@@ -264,13 +265,13 @@ export function AgentRow(props: {
 								<span class="tags agent-tags">
 									<For each={tags().slice(0, TAGS)}>
 										{(tag) => (
-											<span class="tag" data-mine={tag.mine ? "true" : undefined} title={tag.mine ? `Your tag: ${tag.text}` : `${name()} is working on ${tag.text}`}>
+											<span class="tag" data-mine={tag.mine ? "true" : undefined} title={tag.mine ? m.agents_tag_mine({ tag: tag.text }) : m.agents_tag_theirs({ name: name(), tag: tag.text })}>
 												{tag.text}
 											</span>
 										)}
 									</For>
 									<Show when={tags().length > TAGS}>
-										<span class="tag-more" title={tags().slice(TAGS).map((tag) => tag.text).join(", ")}>
+										<span class="tag-more" title={formatList(tags().slice(TAGS).map((tag) => tag.text))}>
 											+{tags().length - TAGS}
 										</span>
 									</Show>
@@ -311,7 +312,7 @@ export function AgentRow(props: {
 						*/}
 						<Popover
 							placement="right-start"
-							label={`${name()}'s menu`}
+							label={m.agents_row_menu({ name: name() })}
 							class="w-[240px]"
 							trigger={(api) => {
 								dismissMenu = () => api.open && api.toggle();
@@ -323,8 +324,8 @@ export function AgentRow(props: {
 										data-on={api.open || editing() || undefined}
 										aria-haspopup="menu"
 										aria-expanded={api.open}
-										title={`${name()}: more`}
-										aria-label={`More for ${name()}`}
+										title={m.agents_row_more_title({ name: name() })}
+										aria-label={m.agents_row_more_label({ name: name() })}
 										onClick={(event) => {
 											event.stopPropagation();
 											api.toggle();
@@ -337,31 +338,31 @@ export function AgentRow(props: {
 						>
 							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => props.onFocus())}>
 								<Icon of={MessageCircle} size={15} class="row-icon" />
-								<span class="row-label">Talk to it here</span>
+								<span class="row-label">{m.agents_menu_talk()}</span>
 							</button>
 							<div class="rule" aria-hidden="true" />
 							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("name"))}>
 								<Icon of={Pencil} size={15} class="row-icon" />
-								<span class="row-label">Rename…</span>
+								<span class="row-label">{m.agents_menu_rename()}</span>
 							</button>
 							<Show when={props.onWorkspace}>
 								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("workspace"))}>
 									<Icon of={Folder} size={15} class="row-icon" />
-									<span class="row-label">Move to…</span>
+									<span class="row-label">{m.agents_menu_move()}</span>
 								</button>
 							</Show>
 							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("tags"))}>
 								<Icon of={Tags} size={15} class="row-icon" />
-								<span class="row-label">Edit tags…</span>
+								<span class="row-label">{m.agents_menu_tags()}</span>
 							</button>
 							<div class="rule" aria-hidden="true" />
-							<button type="button" role="menuitem" data-row data-flat="true" disabled={!busy() || !props.onAbort} title={busy() ? undefined : "Nothing is running"} onClick={() => menu(() => props.onAbort?.())}>
+							<button type="button" role="menuitem" data-row data-flat="true" disabled={!busy() || !props.onAbort} title={busy() ? undefined : m.agents_menu_stop_idle()} onClick={() => menu(() => props.onAbort?.())}>
 								<Icon of={Square} size={15} class="row-icon" />
-								<span class="row-label">Stop its turn</span>
+								<span class="row-label">{m.agents_menu_stop()}</span>
 							</button>
-							<button type="button" role="menuitem" data-row data-flat="true" class="menu-danger" disabled={!close()} title={close() ? undefined : "It is mid-turn: stop it first"} onClick={() => menu(() => props.onClose())}>
+							<button type="button" role="menuitem" data-row data-flat="true" class="menu-danger" disabled={!close()} title={close() ? undefined : m.agents_menu_remove_busy()} onClick={() => menu(() => props.onClose())}>
 								<Icon of={Trash2} size={15} class="row-icon" />
-								<span class="row-label">Remove agent</span>
+								<span class="row-label">{m.agents_menu_remove()}</span>
 							</button>
 						</Popover>
 						<Show when={editing()}>

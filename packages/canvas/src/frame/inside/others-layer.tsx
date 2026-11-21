@@ -1,4 +1,5 @@
 import { For, Show, createMemo, type JSX } from "solid-js";
+import { m } from "@decks/i18n";
 import { AgentCursor } from "../../ui/AgentCursor.tsx";
 import type { FrameContext } from "./boot.ts";
 
@@ -28,7 +29,7 @@ export function createOthersLayer(ctx: FrameContext): { cursors: () => JSX.Eleme
 	};
 	/** Everyone else's pointer on this canvas (`presence.ts`), beside the agent's cursor: one list of cursors, each by its key. */
 	const others = () => [...(ctx.presence?.present() ?? new Map()).entries()];
-	const labelOf = (by: { name?: string; kind: string; harness?: string }) => by.name ?? (by.kind === "agent" ? "An agent" : by.harness ? "Someone elsewhere" : "Another window");
+	const labelOf = (by: { name?: string; kind: string; harness?: string }) => by.name ?? (by.kind === "agent" ? m.canvas_presence_agent() : by.harness ? m.canvas_presence_elsewhere() : m.canvas_presence_window());
 	/** The keys of the cursors to draw, stable while a cursor moves: each `AgentCursor` keeps its element and drifts, rather than being made anew at every point. */
 	const pointerKeys = createMemo(() => others().filter(([, one]) => one.pointer || one.leaving).map(([key]) => key), [] as string[], { equals: (was, next) => was.length === next.length && was.every((key, i) => key === next[i]) });
 	/** One cursor's point now, or null while it leaves (the cursor fades where it was). */
@@ -53,7 +54,7 @@ export function createOthersLayer(ctx: FrameContext): { cursors: () => JSX.Eleme
 			for (const id of one.selection ?? []) {
 				const item = items.find((candidate) => candidate.id === id);
 				if (!item || typeof item.x !== "number" || typeof item.y !== "number") continue;
-				list.push({ key: `${key}/${id}`, x: item.x, y: item.y, w: item.width ?? 0, h: item.height ?? 0, r: item.type === "browser" ? 12 : 4, color: one.by.color, label: one.by.name ?? (one.by.kind === "agent" ? "An agent" : "Another window") });
+				list.push({ key: `${key}/${id}`, x: item.x, y: item.y, w: item.width ?? 0, h: item.height ?? 0, r: item.type === "browser" ? 12 : 4, color: one.by.color, label: one.by.name ?? (one.by.kind === "agent" ? m.canvas_presence_agent() : m.canvas_presence_window()) });
 			}
 		}
 		return list;

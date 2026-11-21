@@ -1,0 +1,33 @@
+{
+	"$schema": "https://inlang.com/schema/project-settings",
+	"baseLocale": "en",
+	"locales": [
+		"en",
+		"zh-CN"
+	],
+	"modules": [
+		"../../node_modules/@inlang/plugin-message-format/dist/index.js"
+	],
+	"plugin.inlang.messageFormat": {
+		"pathPattern": [
+			"./messages/agents/{locale}.json",
+			"./messages/app/{locale}.json",
+			"./messages/canvas/{locale}.json",
+			"./messages/canvases/{locale}.json",
+			"./messages/chat/{locale}.json",
+			"./messages/composer/{locale}.json",
+			"./messages/connections/{locale}.json",
+			"./messages/docs/{locale}.json",
+			"./messages/files/{locale}.json",
+			"./messages/frame/{locale}.json",
+			"./messages/markup/{locale}.json",
+			"./messages/panel/{locale}.json",
+			"./messages/perf/{locale}.json",
+			"./messages/settings/{locale}.json",
+			"./messages/shell/{locale}.json",
+			"./messages/state/{locale}.json",
+			"./messages/tabs/{locale}.json",
+			"./messages/ui/{locale}.json"
+		]
+	}
+}

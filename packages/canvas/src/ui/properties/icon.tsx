@@ -1,4 +1,5 @@
 import type { Accessor } from "solid-js";
+import { m } from "@decks/i18n";
 import { type PenNode } from "@decks/pen";
 import { For, Show } from "solid-js";
 import { setInsertPanel } from "../../edit/pen-tools.ts";
@@ -24,39 +25,39 @@ export function createIconSection(d: IconSectionNeeds) {
 
 	const iconSection = () => (
 		<Show when={d.icons().length > 0}>
-			<Section key="icon" title="Icon">
+			<Section key="icon" title={m.canvas_props_kind_icon()}>
 				<div class="props-row">
-					<span class="props-label">Library</span>
-					<select class="props-select" aria-label="Library" value={String(shared(d.icons(), (node) => String(node.library ?? "lucide")) ?? "")} onChange={(event) => d.set(d.icons(), () => ({ library: event.currentTarget.value }))}>
+					<span class="props-label">{m.canvas_props_icon_library()}</span>
+					<select class="props-select" aria-label={m.canvas_props_icon_library()} value={String(shared(d.icons(), (node) => String(node.library ?? "lucide")) ?? "")} onChange={(event) => d.set(d.icons(), () => ({ library: event.currentTarget.value }))}>
 						<For each={ICON_LIBRARIES}>{(lib) => <option value={lib.id}>{lib.label}</option>}</For>
 					</select>
 				</div>
 				<Show when={d.icons().length === 1}>
 					<div class="props-row">
-						<span class="props-label">Icon</span>
-						<input class="field props-text" aria-label="Icon name" ref={(el) => held(el, () => String(d.icons()[0]?.icon ?? ""))} onChange={(event) => d.set(d.icons(), () => ({ icon: event.currentTarget.value.trim(), name: event.currentTarget.value.trim() }))} />
-						<button type="button" class="btn props-btn" title="Pick another from the icons" onClick={() => setInsertPanel({ tab: "icons", replace: d.icons()[0]!.id })}>
-							Pick…
+						<span class="props-label">{m.canvas_props_kind_icon()}</span>
+						<input class="field props-text" aria-label={m.canvas_props_icon_name()} ref={(el) => held(el, () => String(d.icons()[0]?.icon ?? ""))} onChange={(event) => d.set(d.icons(), () => ({ icon: event.currentTarget.value.trim(), name: event.currentTarget.value.trim() }))} />
+						<button type="button" class="btn props-btn" title={m.canvas_props_icon_pick_title()} onClick={() => setInsertPanel({ tab: "icons", replace: d.icons()[0]!.id })}>
+							{m.canvas_props_icon_pick()}
 						</button>
 					</div>
 				</Show>
 				<div class="props-row">
-					<span class="props-label">Weight</span>
+					<span class="props-label">{m.canvas_props_icon_weight()}</span>
 					<input
 						type="range"
 						class="props-range"
 						min="100"
 						max="700"
 						step="100"
-						aria-label="Weight"
+						aria-label={m.canvas_props_icon_weight()}
 						value={Number(shared(d.icons(), (node) => numberOf(node.weight, 400)) === MIXED ? 400 : shared(d.icons(), (node) => numberOf(node.weight, 400)))}
 						onChange={(event) => d.set(d.icons(), () => ({ weight: Number(event.currentTarget.value) }))}
 					/>
 				</div>
-				<Swatches colors={LINES} value={shared(d.icons(), (node) => colorOf(node.fill))} onPick={(color) => setIconColor(color)} label="Icon colour" />
+				<Swatches colors={LINES} value={shared(d.icons(), (node) => colorOf(node.fill))} onPick={(color) => setIconColor(color)} label={m.canvas_props_icon_colour()} />
 				<div class="props-row">
-					<span class="props-label">Colour</span>
-					<ColorField value={shared(d.icons(), (node) => colorOf(node.fill))} shown={d.shownOf(shared(d.icons(), (node) => colorOf(node.fill)))} onCommit={(color) => setIconColor(color)} onLive={d.live((color) => setIconColor(color, true))} label="Icon colour" />
+					<span class="props-label">{m.canvas_props_colour()}</span>
+					<ColorField value={shared(d.icons(), (node) => colorOf(node.fill))} shown={d.shownOf(shared(d.icons(), (node) => colorOf(node.fill)))} onCommit={(color) => setIconColor(color)} onLive={d.live((color) => setIconColor(color, true))} label={m.canvas_props_icon_colour()} />
 				</div>
 			</Section>
 		</Show>

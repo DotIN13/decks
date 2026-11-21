@@ -2,6 +2,7 @@ import type { ClaudeAccount } from "@decks/protocol";
 import { Show } from "solid-js";
 import { usageLevel } from "../lib/context-usage.ts";
 import { ago, resetsAt } from "./usage-format.ts";
+import { formatNumber, m } from "@decks/i18n";
 
 /**
  * An account's 5-hour window, on its row: "xx% used", and nothing else.
@@ -18,10 +19,10 @@ export default function FiveHour(props: { reading: ClaudeAccount["fiveHour"] }) 
 		<Show when={props.reading}>
 			{(reading) => {
 				const again = () => (reading().resetsAt ? resetsAt(new Date(reading().resetsAt!).toISOString(), Date.now()) : null);
-				const title = () => `5-hour window${again() ? `, starts again at ${again()}` : ""}. Read ${ago(reading().at, Date.now())}.`;
+				const title = () => (again() ? m.settings_five_hour_title_again({ time: again()!, ago: ago(reading().at, Date.now()) }) : m.settings_five_hour_title({ ago: ago(reading().at, Date.now()) }));
 				return (
 					<span class="five-hour" data-level={reading().percent >= 100 ? "high" : usageLevel(reading().percent)} title={title()}>
-						{Math.min(100, reading().percent)}% used
+						{m.settings_five_hour_used({ percent: formatNumber(Math.min(100, reading().percent) / 100, { style: "percent", maximumFractionDigits: 1 }) })}
 					</span>
 				);
 			}}

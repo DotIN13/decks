@@ -1,0 +1,165 @@
+{
+	"agents_status_waiting": "在等你",
+	"agents_status_done": "已完成，未读",
+	"agents_status_idle": "空闲",
+	"agents_status_tool": "正在运行工具…",
+	"agents_status_typing": "正在输入…",
+	"agents_status_thinking": "正在思考…",
+	"agents_outside_waiting": "{count} 条待取",
+	"agents_outside_works": "在 Decks 之外的 {client} 中工作。",
+	"agents_outside_calling": "正在调用。",
+	"agents_outside_last_call": "上次调用在 {ago}前。",
+	"agents_outside_messages_wait": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=other": "{shown} 条消息等它下次调用。"
+			}
+		}
+	],
+	"agents_outside_here": "在线",
+	"agents_outside_away": "离开 · {ago}",
+	"agents_row_new": "新",
+	"agents_row_now": "刚刚",
+	"agents_just_now": "刚刚",
+	"agents_close_title": "关闭 {name}，对话记录仍留在磁盘上。删除的效果相同。",
+	"agents_no_workspace": "无项目",
+	"agents_section_wants": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=other": "{shown} 个在等你"
+			}
+		}
+	],
+	"agents_section_working": "{count} 个在工作",
+	"agents_dormant": "休眠",
+	"agents_row_current_title": "{name}：当前屏幕上的对话",
+	"agents_switch_to": "切换到 {name}",
+	"agents_tag_mine": "你的标签：{tag}",
+	"agents_tag_theirs": "{name} 正在处理 {tag}",
+	"agents_row_menu": "{name} 的菜单",
+	"agents_row_more_title": "{name}：更多",
+	"agents_row_more_label": "{name} 的更多操作",
+	"agents_menu_talk": "在这里对话",
+	"agents_menu_rename": "重命名…",
+	"agents_menu_move": "移到…",
+	"agents_menu_tags": "编辑标签…",
+	"agents_menu_stop_idle": "没有在运行的内容",
+	"agents_menu_stop": "停止本回合",
+	"agents_menu_remove_busy": "回合进行中：请先停止",
+	"agents_menu_remove": "移除智能体",
+	"agents_stack_label": "需要你关注的智能体",
+	"agents_stack_switch": "切换到 {name}：{status}",
+	"agents_agents": "智能体",
+	"agents_hover_click": "点按以切换到 {name}",
+	"agents_quote": "“{text}”",
+	"agents_ws_name_placeholder": "名称",
+	"agents_ws_name_label": "项目名称",
+	"agents_ws_create": "创建",
+	"agents_stack_more": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=other": "另有 {shown} 个智能体需要你"
+			}
+		}
+	],
+	"agents_dialog_allow": "允许",
+	"agents_dialog_deny": "拒绝",
+	"agents_dialog_cancel": "取消",
+	"agents_dialog_done": "完成",
+	"agents_dialog_send": "发送",
+	"agents_dialog_other": "其他…",
+	"agents_dialog_dismiss": "关闭",
+	"agents_dialog_sign_in": "登录",
+	"agents_dialog_something_else": "其他答案…",
+	"agents_dialog_custom": "一个扩展请求了终端界面，本应用没有对应的功能。",
+	"agents_dialog_paste_code": "粘贴浏览器中显示的代码",
+	"agents_edit_label": "编辑 {name}",
+	"agents_edit_close": "关闭",
+	"agents_edit_name": "名称",
+	"agents_edit_name_label": "智能体名称",
+	"agents_edit_name_taken": "已有另一个智能体叫 {name}。",
+	"agents_workspace": "项目",
+	"agents_edit_tags": "标签",
+	"agents_edit_remove_tag": "移除 {tag}",
+	"agents_edit_add_tag": "添加标签",
+	"agents_edit_new_workspace": "新建项目…",
+	"agents_not_installed": "未安装",
+	"agents_add": "添加智能体",
+	"agents_add_title": "{label}：选择运行环境",
+	"agents_find": "查找智能体",
+	"agents_find_none": "没有匹配的智能体",
+	"agents_close": "关闭 {name}",
+	"agents_menu_more_open": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=other": "还有 {shown} 个智能体，请打开智能体面板。"
+			}
+		}
+	],
+	"agents_menu_more": [
+		{
+			"declarations": [
+				"input count",
+				"input shown",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=other": "还有 {shown} 个智能体"
+			}
+		}
+	],
+	"agents_panel": "智能体面板",
+	"agents_new": "新建智能体",
+	"agents_side_panel_title": "侧边栏（⌘\\）",
+	"agents_side_panel_hide": "隐藏侧边栏",
+	"agents_side_panel_show": "显示侧边栏",
+	"agents_switch": "切换智能体",
+	"agents_pill_label": "智能体：当前为 {name}",
+	"agents_none": "无智能体",
+	"agents_stage_title": "画布：{name}",
+	"agents_stages": "画布",
+	"agents_stage_label": "画布，当前为 {name}",
+	"agents_stage_none": "画布，此对话不在任何画布上",
+	"agents_view_only_title": "{owner} 共享给你查看：它跟随对方的副本。要修改，请自己复制一份。",
+	"agents_view_only": "仅查看 · 复制一份",
+	"agents_mode": "模式",
+	"agents_browse_title": "浏览：阅读卡片，移动和改写绘图",
+	"agents_browse_label": "浏览卡片",
+	"agents_draw": "在画布上绘图",
+	"agents_ws_named": "名为"
+}

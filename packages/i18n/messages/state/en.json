@@ -1,0 +1,6 @@
+{
+	"state_an_agent": "An agent",
+	"state_call_failed": "The call failed.",
+	"state_line_dropped": "The line to the harness dropped.",
+	"state_line_dropped_why": "The line to the harness dropped: {reason}."
+}

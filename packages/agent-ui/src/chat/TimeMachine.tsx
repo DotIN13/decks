@@ -5,6 +5,7 @@ import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import { createMemo } from "solid-js";
 import { Icon } from "@decks/ui";
 import { Popover } from "@decks/ui";
+import { m } from "@decks/i18n";
 
 /**
  * The way back to a message, on the message.
@@ -87,7 +88,7 @@ export function TimeMachine(props: {
 			 */
 			placement="top-start"
 			class="w-[min(268px,calc(100vw-32px))]"
-			label="Go back to this message"
+			label={m.chat_tm_go_back()}
 			trigger={(api) => {
 				dismiss = () => {
 					if (api.open) api.toggle();
@@ -98,10 +99,10 @@ export function TimeMachine(props: {
 						type="button"
 						ref={api.ref}
 						data-open={api.open}
-						aria-label="Go back to this message"
+						aria-label={m.chat_tm_go_back()}
 						aria-haspopup="menu"
 						aria-expanded={api.open}
-						title="Preview, rewind, fork or restore from this message"
+						title={m.chat_tm_title()}
 						/*
 						 * A press, and only a press. This used to preview on `mouseenter` and on
 						 * `focus`, and put it back on the way out — which meant the canvas could
@@ -131,8 +132,8 @@ export function TimeMachine(props: {
 				<span class="row-icon">
 					<Icon of={Eye} size={13} />
 				</span>
-				<span class="row-label">{previewing() ? "Stop previewing" : "Preview"}</span>
-				<span class="row-note">Show the canvas as it was at this message. Nothing is written, and Escape puts it back.</span>
+				<span class="row-label">{previewing() ? m.chat_tm_stop_previewing() : m.chat_tm_preview()}</span>
+				<span class="row-note">{m.chat_tm_preview_note()}</span>
 			</button>
 
 			<button
@@ -148,8 +149,8 @@ export function TimeMachine(props: {
 				<span class="row-icon">
 					<Icon of={RotateCcw} size={13} />
 				</span>
-				<span class="row-label">Rewind to here</span>
-				<span class="row-note">Take back everything after it, and these words go back into the input bar.</span>
+				<span class="row-label">{m.chat_rewind_label()}</span>
+				<span class="row-note">{m.chat_tm_rewind_note()}</span>
 			</button>
 
 			<button
@@ -165,8 +166,8 @@ export function TimeMachine(props: {
 				<span class="row-icon">
 					<Icon of={GitBranch} size={13} />
 				</span>
-				<span class="row-label">Fork from here</span>
-				<span class="row-note">Keep this history and start a second agent from this point.</span>
+				<span class="row-label">{m.chat_fork_label()}</span>
+				<span class="row-note">{m.chat_tm_fork_note()}</span>
 			</button>
 
 			{/*
@@ -191,8 +192,8 @@ export function TimeMachine(props: {
 				<span class="row-icon">
 					<Icon of={ArchiveRestore} size={13} />
 				</span>
-				<span class="row-label">Restore</span>
-				<span class="row-note">Write the boards back to how they were here. The conversation stays where it is.</span>
+				<span class="row-label">{m.chat_tm_restore()}</span>
+				<span class="row-note">{m.chat_tm_restore_note()}</span>
 			</button>
 		</Popover>
 	);

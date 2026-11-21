@@ -3,6 +3,7 @@ import X from "lucide-solid/icons/x";
 import { For, Show, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { Icon, Popover } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { CanvasSwitcher } from "../canvases/CanvasSwitcher.tsx";
 import { scheme } from "../lib/theme.ts";
 import { canvasMenu } from "../app/canvas-menu.tsx";
@@ -27,7 +28,7 @@ export const openPlus = (): void => void setTimeout(() => togglePlus?.(), 0);
 export const openTabsList = (): void => void setTimeout(() => toggleList?.(), 0);
 
 /** What a tab is called: its kind's name for it, and a chat on no canvas says so. */
-const titleOf = (tab: Tab): string => kindOf(tab.kind)?.title(tab) ?? tab.target ?? "No canvas";
+const titleOf = (tab: Tab): string => kindOf(tab.kind)?.title(tab) ?? tab.target ?? m.tabs_no_canvas();
 
 /** A tab's ✕: in the row's chip, or at the end of its row in the list. The press is its own, not also a press on what it sits in. */
 function CloseTab(props: { tab: Tab; in: "chip" | "list" }): JSX.Element {
@@ -35,8 +36,8 @@ function CloseTab(props: { tab: Tab; in: "chip" | "list" }): JSX.Element {
 		<button
 			type="button"
 			class={props.in === "chip" ? "tab-chip-close" : "close"}
-			aria-label={`Close ${titleOf(props.tab)}`}
-			data-tip={props.in === "chip" ? "Close the tab" : undefined}
+			aria-label={m.tabs_close_named({ name: titleOf(props.tab) })}
+			data-tip={props.in === "chip" ? m.tabs_close_tab() : undefined}
 			on:click={(event) => {
 				event.stopPropagation();
 				closeTab(props.tab.id);
@@ -66,8 +67,8 @@ function TabChip(props: { tab: Tab }): JSX.Element {
 			aria-haspopup={list ? "menu" : undefined}
 			aria-expanded={list ? list.open : undefined}
 			data-open={list?.open ? "true" : undefined}
-			data-tip={list && inFront() ? "Canvases" : titleOf(tab)}
-			aria-label={`${titleOf(tab)}, a tab`}
+			data-tip={list && inFront() ? m.tabs_canvases() : titleOf(tab)}
+			aria-label={m.tabs_a_tab({ name: titleOf(tab) })}
 			onPointerDown={drag.press}
 			onClick={() => (drag.wasDrag() ? undefined : list && inFront() ? list.toggle() : showTab(tab.id))}
 		>
@@ -94,12 +95,12 @@ function TabFold(): JSX.Element {
 	return (
 		<Popover
 			placement="bottom-start"
-			label="Tabs"
+			label={m.tabs_tabs()}
 			class="w-[300px]"
 			trigger={(popover) => {
 				toggleList = popover.toggle;
 				return (
-					<button type="button" class="tab-chip tab-fold" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip="All tabs" aria-label={`${tabs().length} tabs open`} onClick={popover.toggle}>
+					<button type="button" class="tab-chip tab-fold" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip={m.tabs_all_tabs()} aria-label={m.tabs_open_count({ count: tabs().length })} onClick={popover.toggle}>
 						<span class="tab-fold-count">{tabs().length}</span>
 					</button>
 				);
@@ -154,12 +155,12 @@ export function TabStrip(props: { /** How many tabs the bar has room for beside 
 				onPick={(name) => openTab("canvas", name)}
 				onNew={() => newCanvas()}
 				onAll={() => void setStagesOpen(true)}
-				findLabel="Find a canvas, an app, a card or a document"
+				findLabel={m.tabs_find()}
 				more={(find, pick) => <OpenMore find={find()} pick={pick} />}
 				trigger={(popover) => {
 					togglePlus = popover.toggle;
 					return (
-						<button type="button" class="v3-icon tab-open" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip="Open a tab" aria-label="Open a tab" onClick={popover.toggle}>
+						<button type="button" class="v3-icon tab-open" ref={popover.ref} aria-haspopup="menu" aria-expanded={popover.open} data-open={popover.open ? "true" : undefined} data-tip={m.tabs_open_a_tab()} aria-label={m.tabs_open_a_tab()} onClick={popover.toggle}>
 							<Icon of={Plus} size={16} />
 						</button>
 					);

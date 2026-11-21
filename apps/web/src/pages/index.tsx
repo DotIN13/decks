@@ -7,6 +7,10 @@ import { active, PUBLIC } from "../connections/connection.ts";
 import { Start } from "../connections/Start.tsx";
 import { remount, setMount } from "../connections/switch.ts";
 import "../index.css";
+import { m, markDocumentLanguage } from "@decks/i18n";
+
+// The language the page speaks (Settings, General, else the browser's), on <html lang> for fonts and screen readers.
+markDocumentLanguage();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("No #root to render into");
@@ -19,7 +23,7 @@ if (!root) throw new Error("No #root to render into");
  */
 setMount(root, (failed) => {
 	if (failed) return <Start why={failed} />;
-	if (!active()) return <Start why={PUBLIC ? "Open a canvas file someone sent you, or connect to a Decks server you can reach." : "This address names a connection this browser does not have any more."} />;
+	if (!active()) return <Start why={PUBLIC ? m.connections_start_public() : m.connections_start_forgotten()} />;
 	return <App />;
 });
 void remount();

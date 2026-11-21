@@ -1,6 +1,7 @@
 import FileText from "lucide-solid/icons/file-text";
 import { CardFrame } from "@decks/canvas/page";
 import { Icon } from "@decks/ui";
+import { m } from "@decks/i18n";
 import { For, Show } from "solid-js";
 import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
@@ -34,7 +35,9 @@ export const cardKind: TabKind = {
 	address: "card",
 	title: (tab) => cardAt(tab.target)?.title,
 	offers: {
-		label: "Cards",
+		get label() {
+			return m.tabs_cards();
+		},
 		list: async () => ((await act<Array<{ path: string; title: string }>>("card.list", [])) ?? []).map((card) => ({ target: card.path, title: card.title || card.path, note: canvasOfPath(card.path) })),
 	},
 	has: (target) => cardAt(target) !== undefined,
@@ -48,7 +51,7 @@ function CardTab(props: { tab: Tab; shown: boolean; foot: number }) {
 	return (
 		// Hidden, not taken out of the layout: the frame keeps its size, so the card is as it was when it shows again.
 		<div class="surface" data-surface="card" data-kept={props.shown ? undefined : "true"} style={{ visibility: props.shown ? undefined : "hidden", "pointer-events": props.shown ? undefined : "none" }}>
-			<Show when={canvas && cardAt(path)} fallback={<p class="tab-missing">This card is not in the deck any more.</p>}>
+			<Show when={canvas && cardAt(path)} fallback={<p class="tab-missing">{m.tabs_card_gone()}</p>}>
 				{/* Made again at the header's Reload: a new frame is how a card's page and its scripts start again. */}
 				<Show when={[reloadsOf(props.tab.id)]} keyed>
 					{(_load) => (

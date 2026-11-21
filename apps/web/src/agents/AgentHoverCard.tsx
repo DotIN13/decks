@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import type { AgentChat, Identity } from "@decks/protocol";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
@@ -187,7 +188,7 @@ export function AgentHoverCard(props: {
 				 * a card that covers the boards it is telling you about.
 				 */}
 				<Show when={props.chat.lastLine}>
-					{(line) => <div class="line-clamp-3 text-note leading-[1.45] text-faint">“{line()}”</div>}
+					{(line) => <div class="line-clamp-3 text-note leading-[1.45] text-faint">{m.agents_quote({ text: line() })}</div>}
 				</Show>
 
 				{/* Says what the click does, because the face is a *switch* and not a status
@@ -196,7 +197,7 @@ export function AgentHoverCard(props: {
 				    together, so switching is the only kind of following there is. */}
 				<div class="flex items-center gap-1.5 border-t border-line pt-1.5 text-hint text-muted">
 					<Icon of={ArrowRight} size={11} class="flex-none" />
-					Click to switch to {name()}
+					{m.agents_hover_click({ name: name() })}
 				</div>
 			</div>
 		</Portal>

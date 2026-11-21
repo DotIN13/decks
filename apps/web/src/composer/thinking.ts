@@ -1,4 +1,5 @@
 import { nearestLevel, THINKING_LEVELS, type ModelOption, type ThinkingLevel } from "@decks/protocol";
+import { m } from "@decks/i18n";
 
 /**
  * The thinking scale and the "nearest" rule, shared with the server.
@@ -28,4 +29,17 @@ export function levelsFor(option: ModelOption | undefined): readonly ThinkingLev
 export function optionFor(models: readonly ModelOption[], model: { provider: string; model: string } | undefined): ModelOption | undefined {
 	if (!model) return undefined;
 	return models.find((option) => option.provider === model.provider && option.model === model.model);
+}
+/** A thinking level as the picker writes it, in the language shown; the level's own name stays on the wire. */
+export function thinkingLabel(level: ThinkingLevel): string {
+	const labels: Record<ThinkingLevel, () => string> = {
+		off: () => m.composer_thinking_off(),
+		minimal: () => m.composer_thinking_minimal(),
+		low: () => m.composer_thinking_low(),
+		medium: () => m.composer_thinking_medium(),
+		high: () => m.composer_thinking_high(),
+		xhigh: () => m.composer_thinking_xhigh(),
+		max: () => m.composer_thinking_max(),
+	};
+	return labels[level]?.() ?? level;
 }

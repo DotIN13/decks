@@ -1,4 +1,5 @@
 import { DECKS_COLORS, decksColorOf } from "@decks/pen";
+import { m } from "@decks/i18n";
 
 /**
  * The adaptive colours on offer, by name, a row per role: text, line and surface; the neutral fills;
@@ -26,5 +27,33 @@ export function swatchPaint(color: string): string {
 /** An adaptive colour's tooltip: its name and its two values. */
 export function adaptiveTitle(name: string): string {
 	const decks = DECKS_COLORS[name]!;
-	return `${decks.name} (adaptive): ${decks.light} in light, ${decks.dark} in dark`;
+	return m.canvas_color_adaptive_title({ name: adaptiveName(name), light: decks.light, dark: decks.dark });
+}
+
+/** An adaptive colour's name in the person's language; `@decks/pen`'s English one for a colour not listed here. */
+export function adaptiveName(name: string): string {
+	const names: Record<string, () => string> = {
+		"decks-text": m.canvas_color_text,
+		"decks-text-muted": m.canvas_color_text_muted,
+		"decks-line": m.canvas_color_line,
+		"decks-line-strong": m.canvas_color_line_strong,
+		"decks-line-subtle": m.canvas_color_line_subtle,
+		"decks-surface": m.canvas_color_surface,
+		"decks-fill-slate": m.canvas_color_fill_slate,
+		"decks-fill-sky": m.canvas_color_fill_sky,
+		"decks-fill-gray": m.canvas_color_fill_gray,
+		"decks-fill-red": m.canvas_color_fill_red,
+		"decks-fill-orange": m.canvas_color_fill_orange,
+		"decks-fill-yellow": m.canvas_color_fill_yellow,
+		"decks-fill-green": m.canvas_color_fill_green,
+		"decks-fill-blue": m.canvas_color_fill_blue,
+		"decks-fill-purple": m.canvas_color_fill_purple,
+		"decks-accent-red": m.canvas_color_accent_red,
+		"decks-accent-orange": m.canvas_color_accent_orange,
+		"decks-accent-yellow": m.canvas_color_accent_yellow,
+		"decks-accent-green": m.canvas_color_accent_green,
+		"decks-accent-blue": m.canvas_color_accent_blue,
+		"decks-accent-purple": m.canvas_color_accent_purple,
+	};
+	return names[name]?.() ?? DECKS_COLORS[name]?.name ?? name;
 }

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 /**
  * Reading a `.decks` file: the zip `server/src/share/zip.ts` writes.
  *
@@ -28,13 +29,13 @@ export function readZip(buffer: ArrayBuffer): ZipFile[] {
 			break;
 		}
 	}
-	if (end < 0) throw new NotAZip("This file is not a .decks bundle: it is not a zip.");
+	if (end < 0) throw new NotAZip(m.connections_not_zip());
 	const count = view.getUint16(end + 10, true);
 	let at = view.getUint32(end + 16, true);
 	const decoder = new TextDecoder();
 	const files: ZipFile[] = [];
 	for (let i = 0; i < count; i++) {
-		if (view.getUint32(at, true) !== 0x02014b50) throw new NotAZip("This bundle's table of contents is damaged.");
+		if (view.getUint32(at, true) !== 0x02014b50) throw new NotAZip(m.connections_zip_damaged());
 		const method = view.getUint16(at + 10, true);
 		const size = view.getUint32(at + 20, true);
 		const nameLength = view.getUint16(at + 28, true);

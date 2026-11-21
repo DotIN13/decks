@@ -7,6 +7,7 @@ import Zap from "lucide-solid/icons/zap";
 import type { LucideIcon } from "lucide-solid";
 import { For, Show } from "solid-js";
 import { Icon, Popover } from "@decks/ui";
+import { m } from "@decks/i18n";
 
 /**
  * How much this agent asks before acting, for the rest of the session.
@@ -22,24 +23,36 @@ import { Icon, Popover } from "@decks/ui";
  * `manual / acceptEdits / plan / auto`: they describe what the agent will do rather than
  * naming the mechanism, and the API's names stay on the wire where they belong.
  */
-const MODES: Array<{ mode: AgentMode; label: string; icon: LucideIcon; note: string }> = [
+const MODES: Array<{ mode: AgentMode; readonly label: string; icon: LucideIcon; readonly note: string }> = [
 	{
 		mode: "manual",
-		label: "Ask first",
+		get label() {
+			return m.composer_mode_ask();
+		},
 		icon: Shield,
-		note: "Ask before anything it judges worth asking about.",
+		get note() {
+			return m.composer_mode_ask_note();
+		},
 	},
 	{
 		mode: "acceptEdits",
-		label: "Edit freely",
+		get label() {
+			return m.composer_mode_edit();
+		},
 		icon: SquarePen,
-		note: "Stop asking about board edits. Commands still ask.",
+		get note() {
+			return m.composer_mode_edit_note();
+		},
 	},
 	{
 		mode: "plan",
-		label: "Plan only",
+		get label() {
+			return m.composer_mode_plan();
+		},
 		icon: ClipboardList,
-		note: "Change nothing at all: read, think, and propose a plan to approve.",
+		get note() {
+			return m.composer_mode_plan_note();
+		},
 	},
 	{
 		/*
@@ -49,9 +62,13 @@ const MODES: Array<{ mode: AgentMode; label: string; icon: LucideIcon; note: str
 		 * is tell you which chip you are looking at.
 		 */
 		mode: "auto",
-		label: "Auto",
+		get label() {
+			return m.composer_mode_auto();
+		},
 		icon: Zap,
-		note: "Stop asking altogether and decide for itself.",
+		get note() {
+			return m.composer_mode_auto_note();
+		},
 	},
 ];
 
@@ -93,7 +110,7 @@ export function ModeMenu(props: {
 			<Popover
 				placement="top-start"
 				class="w-[min(220px,calc(100vw-16px))]"
-				label="How much this agent asks before acting"
+				label={m.composer_mode_label()}
 				trigger={(api) => {
 					dismiss = () => {
 						if (api.open) api.toggle();

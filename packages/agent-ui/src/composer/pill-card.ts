@@ -1,5 +1,6 @@
 import { onDismiss } from "@decks/ui";
 import { draftLabel, type DraftMention, type MentionKind } from "./draft.ts";
+import { m } from "@decks/i18n";
 
 /**
  * A pill, as it is drawn wherever one sits — in the field, and in a message you sent — and what it
@@ -103,8 +104,8 @@ const clipName = (name: string) => {
 /** The tooltip's words for a pill: the quote and the note, then its name, cut short, and where it came from. */
 export function pillTip(about: PillAbout): { tip: string; sub: string } {
 	const said = [about.quote ? `“${clip(about.quote)}”` : "", clip(about.note ?? "")].filter(Boolean).join(" · ");
-	if (!said) return { tip: clipName(about.name), sub: `${about.source} · click to read all` };
-	return { tip: said, sub: `${clipName(about.name)} · ${about.source} · click to read all` };
+	if (!said) return { tip: clipName(about.name), sub: m.chat_pill_sub({ source: about.source }) };
+	return { tip: said, sub: m.chat_pill_sub_named({ name: clipName(about.name), source: about.source }) };
 }
 
 let open: { pill: HTMLElement; card: HTMLElement; close: () => void } | undefined;
@@ -153,11 +154,11 @@ function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHost): vo
 	label.textContent = about.name;
 	name.append(label);
 	// One line, cut with an ellipsis (`ink.css`); the whole name is in the title.
-	name.title = `${about.name} — ${about.of === "file" ? "open the file" : "show it on the canvas"}`;
+	name.title = about.of === "file" ? m.chat_pill_open_file({ name: about.name }) : m.chat_pill_show_on_canvas({ name: about.name });
 	if (about.canvas) name.dataset.canvas = "true";
 	if (host.show) name.onclick = () => host.show!(node);
 	else name.disabled = true;
-	const x = button("pill-card-x", svg(BODIES.x, 14, "pill-card-icon"), "Close");
+	const x = button("pill-card-x", svg(BODIES.x, 14, "pill-card-icon"), m.chat_pill_close());
 	head.append(name, x);
 
 	const body = document.createElement("div");
@@ -178,10 +179,13 @@ function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHost): vo
 	const acts = document.createElement("div");
 	acts.className = "pill-card-acts";
 	// The exact words the agent receives for this pill, and back.
-	const exact = button("", "Exact text");
+	const exact = button("", "");
+	exact.textContent = m.chat_pill_exact_text();
 	exact.dataset.act = "exact";
+	let exactShown = false;
 	exact.onclick = () => {
-		const showing = exact.textContent === "Exact text";
+		const showing = !exactShown;
+		exactShown = showing;
 		if (showing) {
 			// The one place the whole of it is: a field of its own that scrolls (`ink.css`).
 			const pre = document.createElement("pre");
@@ -189,12 +193,13 @@ function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHost): vo
 			pre.tabIndex = 0;
 			body.replaceChildren(pre);
 		} else shown();
-		exact.textContent = showing ? "As shown" : "Exact text";
+		exact.textContent = showing ? m.chat_pill_as_shown() : m.chat_pill_exact_text();
 		place(card, pill);
 	};
 	acts.append(exact);
 	if (host.remove) {
-		const remove = button("", "Remove");
+		const remove = button("", "");
+		remove.textContent = m.chat_pill_remove();
 		remove.dataset.act = "remove";
 		remove.onclick = () => {
 			closePillCard();

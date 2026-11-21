@@ -7,6 +7,7 @@
  * What a press on a handle does is the page's, passed in; this only draws.
  */
 import { ARROW_SIDES, sidePoint, type ArrowSide } from "@decks/pen";
+import { m } from "@decks/i18n";
 import GripVertical from "lucide-solid/icons/grip-vertical";
 import { For, Index, Show, type Accessor, type JSX } from "solid-js";
 import { anchorAt, pageHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
@@ -130,7 +131,7 @@ export function OverlayLayer(
 				{(grip) => (
 					<div
 						class="pen-grip"
-						title="Drag to move this block"
+						title={m.canvas_handle_move_block()}
 						// Hidden, not unmounted, while anything is carried or sized: a drag begun on the grip keeps the element it captured the pointer on.
 						data-hidden={o().gripHidden ? "true" : undefined}
 						style={{
@@ -227,7 +228,7 @@ export function OverlayLayer(
 								<div
 									class="pen-anchor"
 									data-side={side}
-									title="Drag to draw an arrow from this side"
+									title={m.canvas_handle_draw_arrow()}
 									style={knob(at().x, at().y, ANCHOR_PX)}
 									onPointerDown={(event) => props.onAnchor(event, box(), side)}
 								/>
@@ -310,7 +311,7 @@ export function OverlayLayer(
 									class="pen-handle"
 									data-end={which}
 									data-joined={joined() ? "true" : undefined}
-									title={joined() ? "Slide along the side, or drag off to join something else; double-click for the middle" : "Drag onto something to join it"}
+									title={joined() ? m.canvas_handle_arrow_joined() : m.canvas_handle_arrow_join()}
 									style={{ ...knob(ends()[which].x, ends()[which].y, px, joined() ? " rotate(45deg)" : ""), "border-radius": joined() ? "2px" : "50%" }}
 									onPointerDown={(event) => props.onArrowEnd(event, which)}
 								/>
@@ -326,7 +327,7 @@ export function OverlayLayer(
 						<div
 							class="pen-handle"
 							data-bend={o().arrow?.route}
-							title="Drag to bend the arrow; double-click for its automatic route"
+							title={m.canvas_handle_arrow_bend()}
 							style={{ ...knob(middle().x, middle().y, px), "border-radius": "50%", "box-shadow": o().arrow?.bent ? "inset 0 0 0 2.5px var(--canvas-accent)" : undefined }}
 							onPointerDown={(event) => props.onArrowBend(event)}
 						/>
@@ -375,7 +376,7 @@ export function OverlayLayer(
 						<div
 							class="pen-handle"
 							data-handle="radius"
-							title="Drag to round the corners"
+							title={m.canvas_handle_corners()}
 							style={knob(box().x + inset(), box().y + inset(), HANDLE_PX)}
 							onPointerDown={(event) => props.onRadius(event)}
 						/>

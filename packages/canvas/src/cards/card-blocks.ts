@@ -1,4 +1,5 @@
 import { cut, splitAround, STYLES, unwrap, type Style } from "./card-styles.ts";
+import { m } from "@decks/i18n";
 import { atom, h, ZW } from "./card-words.ts";
 import { createBlockKind } from "./card-block-kind.ts";
 
@@ -96,7 +97,7 @@ export function createCardBlocks(of: CardBlocksNeeds) {
 		else if (d.cmd === "undo" || d.cmd === "redo") return of.travel(d.cmd === "undo");
 		else if (d.cmd === "link") {
 			const here = (of.sel().anchorNode?.parentElement?.closest("a[data-href]") as HTMLElement | null)?.dataset.href ?? "";
-			const href = window.prompt("Link to (empty takes the link off)", here || "https://");
+			const href = window.prompt(m.canvas_card_link_prompt(), here || "https://");
 			if (href === null) return;
 			restyle(["link"], href.trim() && href.trim() !== "https://" ? href.trim() : null);
 		} else if (d.cmd === "clear") restyle(["bold", "italic", "underline", "strike", "code", "hl", "fg", "size", "font"], null);

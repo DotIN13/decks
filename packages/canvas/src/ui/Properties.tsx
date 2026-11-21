@@ -1,4 +1,5 @@
 import { indexOf, isArrow, isShape } from "@decks/pen";
+import { m } from "@decks/i18n";
 import type { LucideIcon } from "lucide-solid";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import FrameIcon from "lucide-solid/icons/frame";
@@ -50,6 +51,25 @@ import type { PropertiesProps } from "./properties/props.ts";
 
 const KIND_ICON: Record<Kind, LucideIcon> = { shape: Shapes, arrow: ArrowUpRight, text: Type, note: StickyNote, icon: SmilePlus, frame: FrameIcon, rectangle: Square, ellipse: Square, polygon: Shapes, path: Spline, group: Layers, other: Square };
 
+/** An item's type as the panel's title says it, when it has no name. */
+function typeName(type: string): string {
+	const names: Record<string, () => string> = {
+		text: m.canvas_props_kind_text,
+		note: m.canvas_props_kind_note,
+		frame: m.canvas_props_kind_frame,
+		rectangle: m.canvas_props_kind_rectangle,
+		ellipse: m.canvas_props_kind_ellipse,
+		polygon: m.canvas_props_kind_polygon,
+		path: m.canvas_props_kind_path,
+		group: m.canvas_props_kind_group,
+		line: m.canvas_props_kind_line,
+		image: m.canvas_props_kind_image,
+		card: m.canvas_props_kind_card,
+		icon_font: m.canvas_props_kind_icon,
+	};
+	return names[type]?.() ?? type[0]!.toUpperCase() + type.slice(1);
+}
+
 export function Properties(props: PropertiesProps) {
 	const index = createMemo(() => (props.doc ? indexOf(props.doc) : new Map()));
 	const { narrow, anchor } = createPlacement();
@@ -69,18 +89,18 @@ export function Properties(props: PropertiesProps) {
 
 	const title = () => {
 		const node = single();
-		if (!node) return `${selected().length} items`;
+		if (!node) return m.canvas_props_items({ count: selected().length });
 		if (typeof node.name === "string" && node.name) return node.name;
-		if (isShape(node)) return String(node.metadata?.kind ?? "Shape");
-		if (isArrow(node)) return "Arrow";
-		if (kindOf(node) === "icon") return String(node.icon ?? "Icon");
-		return node.type[0]!.toUpperCase() + node.type.slice(1);
+		if (isShape(node)) return node.metadata?.kind ? String(node.metadata.kind) : m.canvas_props_kind_shape();
+		if (isArrow(node)) return m.canvas_props_kind_arrow();
+		if (kindOf(node) === "icon") return node.icon ? String(node.icon) : m.canvas_props_kind_icon();
+		return typeName(node.type);
 	};
 
 	/* It stands aside while a card is typed into, whose toolbar is its panel then (`penTyping`). */
 	return (
 		<Show when={selected().length > 0 && !penTyping() && (!COARSE || propsOpen())}>
-			<aside class="panel-float props-panel" aria-label="Properties" data-props data-sheet={COARSE && narrow() ? "true" : undefined} data-popover={COARSE && !narrow() && anchor() ? "true" : undefined} style={COARSE && !narrow() && anchor() ? { left: `${anchor()!.left}px`, top: `${anchor()!.top}px`, right: "auto" } : undefined}>
+			<aside class="panel-float props-panel" aria-label={m.canvas_props_panel()} data-props data-sheet={COARSE && narrow() ? "true" : undefined} data-popover={COARSE && !narrow() && anchor() ? "true" : undefined} style={COARSE && !narrow() && anchor() ? { left: `${anchor()!.left}px`, top: `${anchor()!.top}px`, right: "auto" } : undefined}>
 				<header class="props-head">
 					<span class="props-kind" aria-hidden="true">
 						<Icon of={single() ? KIND_ICON[kindOf(single()!)] : Layers} size={14} />
@@ -89,7 +109,7 @@ export function Properties(props: PropertiesProps) {
 						{(node) => (
 							<input
 								class="props-title"
-								aria-label="Name"
+								aria-label={m.canvas_props_name()}
 								ref={(el) => held(el, title)}
 								onChange={(event) => {
 									const name = event.currentTarget.value.trim();
@@ -102,7 +122,7 @@ export function Properties(props: PropertiesProps) {
 							/>
 						)}
 					</Show>
-					<button type="button" class="close" aria-label="Close" title={COARSE ? "Close" : "Let go of the selection"} onClick={() => (COARSE ? setPropsOpen(false) : setPenSelection([]))}>
+					<button type="button" class="close" aria-label={m.canvas_props_close()} title={COARSE ? m.canvas_props_close() : m.canvas_props_deselect()} onClick={() => (COARSE ? setPropsOpen(false) : setPenSelection([]))}>
 						<Icon of={X} size={13} />
 					</button>
 				</header>
@@ -118,7 +138,7 @@ export function Properties(props: PropertiesProps) {
 					{placeSection()}
 
 					<Show when={effectTargets().length > 0}>
-						<Section key="effects" title="Shadow and blur">
+						<Section key="effects" title={m.canvas_props_effects()}>
 							<Effects targets={effectTargets()} set={set} show={show} onLive={live} />
 						</Section>
 					</Show>

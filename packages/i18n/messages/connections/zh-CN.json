@@ -1,0 +1,56 @@
+{
+	"connections_file_cards": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=other": "文件 · {count} 张卡片"
+			}
+		}
+	],
+	"connections_not_address": "这不是一个地址。",
+	"connections_server_answered": "服务器返回了 {status}。",
+	"connections_unreachable": "无法连接 {base}。它必须是此浏览器能访问到的、使用 HTTPS（或 localhost）的 Decks 服务器。",
+	"connections_file_needs_https": "打开画布文件需要此页面使用 HTTPS 或 localhost。",
+	"connections_label": "连接",
+	"connections_switch_title": "在服务器和画布文件之间切换",
+	"connections_read_only": "只读",
+	"connections_address": "服务器地址",
+	"connections_code": "配对码",
+	"connections_code_hint": "仅限通过互联网连接",
+	"connections_code_placeholder": "在那台电脑上运行 decks pair code 获取",
+	"connections_name": "名称",
+	"connections_optional": "可选",
+	"connections_name_placeholder": "服务器自己的名称",
+	"connections_back": "返回",
+	"connections_connecting": "正在连接…",
+	"connections_connect": "连接",
+	"connections_other_decks": "其他卡组",
+	"connections_not_reachable": "无法访问",
+	"connections_pairing_revoked": "配对已撤销",
+	"connections_rename": "重命名",
+	"connections_rename_label": "重命名 {name}",
+	"connections_remove_bundle": "从此浏览器中移除此画布",
+	"connections_forget_server": "忘记此服务器",
+	"connections_forget_label": "忘记 {name}",
+	"connections_this_server": "此服务器",
+	"connections_connect_server": "连接服务器…",
+	"connections_open_file": "打开画布文件…",
+	"connections_download": "下载此画布",
+	"connections_start_switcher": "打开文件或连接服务器",
+	"connections_not_zip": "此文件不是 .decks 包：它不是 zip 文件。",
+	"connections_zip_damaged": "此包的目录已损坏。",
+	"connections_worker_needs_https": "打开其他服务器或画布文件需要此页面使用 HTTPS 或 localhost；在普通的 http:// 地址上，浏览器没有 Service Worker。",
+	"connections_no_relay": "此服务器拒绝转发到那个服务器（{status}）。",
+	"connections_no_manifest": "此文件没有清单，因此不是 Decks 画布。",
+	"connections_newer_format": "此画布由更新版本的 Decks 保存（格式 {format}）。",
+	"connections_files_gone": "此画布的文件已不在此浏览器中。请重新打开 .decks 文件。",
+	"connections_read_only_refusal": "此画布是在此浏览器中打开的文件：无法在这里更改。",
+	"connections_start_public": "打开别人发给你的画布文件，或连接到你能访问的 Decks 服务器。",
+	"connections_start_forgotten": "此地址指向的连接已不在此浏览器中。"
+}

@@ -19,7 +19,8 @@ import Search from "lucide-solid/icons/search";
 import Upload from "lucide-solid/icons/upload";
 import X from "lucide-solid/icons/x";
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { Icon } from "@decks/ui";
+import { clockTime, dayKey, formatDate, Icon, yearOf } from "@decks/ui";
+import { formatBytes, m } from "@decks/i18n";
 
 interface BrowseEntry {
 	name: string;
@@ -36,9 +37,9 @@ interface BrowseResult {
 
 /** What the picker is for, said in its title and under it. */
 const PURPOSES = {
-	canvas: { title: "Add a file", sub: "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a board." },
-	attach: { title: "Attach a file", sub: "It goes into your message, for the agent to read." },
-	embed: { title: "Choose a file", sub: "It is shown on the board, where it is." },
+	canvas: () => ({ title: m.files_canvas_title(), sub: m.files_canvas_sub() }),
+	attach: () => ({ title: m.files_attach_title(), sub: m.files_attach_sub() }),
+	embed: () => ({ title: m.files_embed_title(), sub: m.files_embed_sub() }),
 } as const;
 
 /**
@@ -76,7 +77,7 @@ export function FilePicker(props: {
 	purpose?: keyof typeof PURPOSES;
 }) {
 	const documents = () => !!props.onGoogle;
-	const words = () => PURPOSES[props.purpose ?? "embed"];
+	const words = () => PURPOSES[props.purpose ?? "embed"]();
 	const [tab, setTab] = createSignal<"files" | "google">(documents() && localStorage.getItem("decks.picker.tab") === "google" ? "google" : "files");
 	const choose = (next: "files" | "google") => {
 		setTab(next);
@@ -115,7 +116,7 @@ export function FilePicker(props: {
 		async ({ q }) => {
 			const response = await fetch(api(`/google/docs${q ? `?q=${encodeURIComponent(q)}` : ""}`));
 			const body = (await response.json().catch(() => ({}))) as { docs?: GoogleListed[]; error?: string };
-			if (!response.ok) throw new Error(body.error ?? `Google answered ${response.status}.`);
+			if (!response.ok) throw new Error(body.error ?? m.files_google_answered({ status: String(response.status) }));
 			return body.docs ?? [];
 		},
 	);
@@ -135,7 +136,7 @@ export function FilePicker(props: {
 	const signIn = () => window.open(`${api("/google/signin")}?origin=${encodeURIComponent(location.origin)}`, "_blank", "noopener");
 	const finish = async () => {
 		const answer = (await (await fetch(api("/google/code"), { method: "POST", headers: { ...authHeaders(), "content-type": "application/json" }, body: JSON.stringify({ url: returned().trim() }) })).json()) as { ok: boolean; email?: string; message?: string };
-		setSaid(answer.ok ? `Signed in as ${answer.email}.` : (answer.message ?? "That did not work."));
+		setSaid(answer.ok ? m.files_signed_in_sentence({ email: answer.email ?? "" }) : (answer.message ?? m.files_did_not_work()));
 		if (answer.ok) void recheck();
 	};
 
@@ -217,32 +218,32 @@ export function FilePicker(props: {
 						<span class="picker-title">{words().title}</span>
 						<span class="picker-sub">{words().sub}</span>
 					</div>
-					<button class="icon-button [--control:28px]" type="button" title="Close (Esc)" aria-label="Close" onClick={props.onCancel}>
+					<button class="icon-button [--control:28px]" type="button" title={m.files_close_title()} aria-label={m.files_close()} onClick={props.onCancel}>
 						<Icon of={X} size={16} />
 					</button>
 				</header>
 
 				<Show when={documents()}>
-					<div class="picker-tabs" role="tablist" aria-label="Where the file is">
+					<div class="picker-tabs" role="tablist" aria-label={m.files_where()}>
 						<button type="button" role="tab" aria-selected={tab() === "files"} data-on={tab() === "files" ? "true" : undefined} onClick={() => choose("files")}>
 							<Icon of={HardDrive} size={14} />
-							Files
+							{m.files_tab_files()}
 						</button>
 						<button type="button" role="tab" aria-selected={tab() === "google"} data-on={tab() === "google" ? "true" : undefined} onClick={() => choose("google")}>
 							<GoogleDocMark size={14} />
-							Google Docs
+							{m.files_tab_google()}
 						</button>
 					</div>
 				</Show>
 
 				<Show when={tab() === "files"}>
 					<div class="picker-bar">
-						<button class="icon-button [--control:28px]" type="button" title="Up one folder" aria-label="Up one folder" disabled={!at()} onClick={() => go(listing()?.parent ?? "")}>
+						<button class="icon-button [--control:28px]" type="button" title={m.files_up()} aria-label={m.files_up()} disabled={!at()} onClick={() => go(listing()?.parent ?? "")}>
 							<Icon of={ChevronLeft} size={16} />
 						</button>
-						<div class="picker-path" title={listing()?.path || "The deck and the folders it may reach"}>
+						<div class="picker-path" title={listing()?.path || m.files_path_title()}>
 							<button type="button" class="picker-crumb" onClick={() => go("")}>
-								All places
+								{m.files_all_places()}
 							</button>
 							<Show when={at() && listing()?.path}>
 								{(path) => (
@@ -259,8 +260,8 @@ export function FilePicker(props: {
 							<Icon of={Search} size={14} class="text-faint" />
 							<input
 								type="text"
-								placeholder="Filter"
-								aria-label="Filter this folder"
+								placeholder={m.files_filter()}
+								aria-label={m.files_filter_label()}
 								value={filter()}
 								onInput={(event) => setFilter(event.currentTarget.value)}
 								onKeyDown={(event) => {
@@ -273,7 +274,7 @@ export function FilePicker(props: {
 						</label>
 					</div>
 
-					<div class="picker-list" role="listbox" aria-label="Files">
+					<div class="picker-list" role="listbox" aria-label={m.files_list()}>
 						<Show when={listing.error}>
 							<div class="picker-empty">{String(listing.error)}</div>
 						</Show>
@@ -281,7 +282,7 @@ export function FilePicker(props: {
 							each={rows()}
 							fallback={
 								<Show when={!listing.error && !listing.loading}>
-									<div class="picker-empty">{filter() ? `Nothing here matches “${filter()}”.` : "This folder is empty."}</div>
+									<div class="picker-empty">{filter() ? m.files_no_match({ filter: filter() }) : m.files_empty()}</div>
 								</Show>
 							}
 						>
@@ -302,7 +303,7 @@ export function FilePicker(props: {
 					</div>
 
 					<footer class="picker-foot">
-						<span class="picker-hint">{((n) => (n === 0 ? "" : n === 1 ? "1 file here" : `${n} files here`))(rows().filter((row) => row.kind === "file").length)}</span>
+						<span class="picker-hint">{((n) => (n === 0 ? "" : m.files_count({ count: n })))(rows().filter((row) => row.kind === "file").length)}</span>
 						<Show when={props.onAdd}>
 							{/*
 								Hidden input, visible button: a file input styles as whatever the
@@ -322,9 +323,9 @@ export function FilePicker(props: {
 									void add(file);
 								}}
 							/>
-							<button class="btn" type="button" title="Copy a file or photo from this device into the deck" disabled={adding()} onClick={() => input.click()}>
+							<button class="btn" type="button" title={m.files_upload_title()} disabled={adding()} onClick={() => input.click()}>
 								<Icon of={Upload} size={14} />
-								{adding() ? "Adding…" : "Upload from this device"}
+								{adding() ? m.files_adding() : m.files_upload()}
 							</button>
 						</Show>
 					</footer>
@@ -337,8 +338,8 @@ export function FilePicker(props: {
 							<input
 								type="text"
 								autocomplete="off"
-								placeholder="Search your Docs, or paste a link"
-								aria-label="Search your Google Docs, or paste a Doc's link"
+								placeholder={m.files_docs_search()}
+								aria-label={m.files_docs_search_label()}
 								value={query()}
 								ref={(el) => requestAnimationFrame(() => el.focus())}
 								onInput={(event) => ask(event.currentTarget.value)}
@@ -351,13 +352,13 @@ export function FilePicker(props: {
 						</label>
 					</div>
 
-					<div class="picker-list" role="listbox" aria-label="Google Docs">
+					<div class="picker-list" role="listbox" aria-label={m.files_tab_google()}>
 						<Show when={pasted()}>
 							<button type="button" role="option" class="picker-row" onClick={() => props.onGoogle?.(query().trim())}>
 								<span class="picker-tile" data-tone="blue">
 									<GoogleDocMark size={16} />
 								</span>
-								<span class="picker-name">Open the Doc at this link</span>
+								<span class="picker-name">{m.files_open_link()}</span>
 								<span class="picker-kind" />
 								<span class="picker-size">
 									<Icon of={ChevronRight} size={14} />
@@ -368,10 +369,10 @@ export function FilePicker(props: {
 							<Show when={docs.error}>
 								<div class="picker-empty picker-google-stale">
 									<Show when={stale()} fallback={String(docs.error?.message ?? docs.error)}>
-										<span>This sign-in can open a Doc by its link, but not list your Docs.</span>
+										<span>{m.files_stale()}</span>
 										<button class="picker-google-signin" type="button" onClick={signIn}>
 											<GoogleG />
-											Sign in again to see your Docs
+											{m.files_signin_again()}
 										</button>
 										<Show when={google()?.paste}>
 											<form
@@ -385,13 +386,13 @@ export function FilePicker(props: {
 													class="picker-google-input"
 													type="text"
 													autocomplete="off"
-													placeholder="Then paste the address the browser ended on"
-													aria-label="Address after signing in"
+													placeholder={m.files_paste_address()}
+													aria-label={m.files_paste_address_label()}
 													value={returned()}
 													onInput={(event) => setReturned(event.currentTarget.value)}
 												/>
 												<button class="btn" data-primary="true" type="submit" disabled={!returned().trim()}>
-													Done
+													{m.files_done()}
 												</button>
 											</form>
 										</Show>
@@ -405,7 +406,7 @@ export function FilePicker(props: {
 								each={docs.error ? [] : (docs() ?? [])}
 								fallback={
 									<Show when={!docs.error && !docs.loading}>
-										<div class="picker-empty">{asked() ? `No Doc's name has “${asked()}” in it.` : "No Google Docs in this account yet."}</div>
+										<div class="picker-empty">{asked() ? m.files_no_doc_match({ query: asked() }) : m.files_no_docs()}</div>
 									</Show>
 								}
 							>
@@ -415,7 +416,7 @@ export function FilePicker(props: {
 											<GoogleDocMark size={16} />
 										</span>
 										<span class="picker-name">{doc.title}</span>
-										<span class="picker-kind">{doc.owner ? `Shared by ${doc.owner}` : ""}</span>
+										<span class="picker-kind">{doc.owner ? m.files_shared_by({ owner: doc.owner }) : ""}</span>
 										<span class="picker-size">{editedOn(doc.modified)}</span>
 									</button>
 								)}
@@ -426,32 +427,32 @@ export function FilePicker(props: {
 					<footer class="picker-foot">
 						<span class="picker-hint">
 							<span class="picker-dot" aria-hidden="true" />
-							{google()?.mode === "fake" ? "Stand-in Docs on this server" : `Signed in${google()?.email ? ` as ${google()?.email}` : ""}`}
+							{google()?.mode === "fake" ? m.files_fake() : google()?.email ? m.files_signed_in_as({ email: google()!.email! }) : m.files_signed_in()}
 						</span>
-						<span class="picker-hint">Your typing reaches Google within a couple of seconds.</span>
+						<span class="picker-hint">{m.files_typing_reaches()}</span>
 					</footer>
 				</Show>
 
 				<Show when={tab() === "google" && !signedIn()}>
 					<div class="picker-google">
 						<GoogleDocMark size={36} />
-						<Show when={google()} fallback={<p class="picker-google-note">Asking the server about Google…</p>}>
+						<Show when={google()} fallback={<p class="picker-google-note">{m.files_asking()}</p>}>
 							{(state) => (
 								<Show
 									when={state().client}
 									fallback={
 										<>
-											<p class="picker-google-title">Google isn't set up on this server</p>
-											<p class="picker-google-note">Put your Google Cloud project's OAuth client file at google/client.json in the server's data folder, then come back here to sign in.</p>
+											<p class="picker-google-title">{m.files_not_set_up()}</p>
+											<p class="picker-google-note">{m.files_not_set_up_note()}</p>
 										</>
 									}
 								>
 									<>
-										<p class="picker-google-title">Sign in to open a Google Doc</p>
-										<p class="picker-google-note">Decks reads and writes the Doc as you. The sign-in is kept on this server.</p>
+										<p class="picker-google-title">{m.files_signin_title()}</p>
+										<p class="picker-google-note">{m.files_signin_note()}</p>
 										<button class="picker-google-signin" type="button" onClick={signIn}>
 											<GoogleG />
-											Sign in with Google
+											{m.files_signin_google()}
 										</button>
 										<Show when={state().paste}>
 											<form
@@ -465,13 +466,13 @@ export function FilePicker(props: {
 													class="picker-google-input"
 													type="text"
 													autocomplete="off"
-													placeholder="Then paste the address the browser ended on"
-													aria-label="Address after signing in"
+													placeholder={m.files_paste_address()}
+													aria-label={m.files_paste_address_label()}
 													value={returned()}
 													onInput={(event) => setReturned(event.currentTarget.value)}
 												/>
 												<button class="btn" data-primary="true" type="submit" disabled={!returned().trim()}>
-													Done
+													{m.files_done()}
 												</button>
 											</form>
 										</Show>
@@ -509,9 +510,9 @@ function editedOn(iso: string | undefined): string {
 	const when = new Date(iso);
 	if (Number.isNaN(when.getTime())) return "";
 	const now = new Date();
-	if (when.toDateString() === now.toDateString()) return when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-	if (when.getFullYear() === now.getFullYear()) return when.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-	return when.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+	if (dayKey(when) === dayKey(now)) return clockTime(when);
+	if (yearOf(when) === yearOf(now)) return formatDate(when, { month: "short", day: "numeric" });
+	return formatDate(when, { year: "numeric", month: "short", day: "numeric" });
 }
 
 /** A Google Doc, drawn as a blue page: what the tab and the card are about, not Google's own logo. */
@@ -549,9 +550,7 @@ function extensionOf(name: string): string {
 
 function sizeOf(bytes: number | undefined): string {
 	if (bytes === undefined) return "";
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+	return formatBytes(bytes);
 }
 
 /**
@@ -562,25 +561,25 @@ function sizeOf(bytes: number | undefined): string {
  * this be" rather than naming a filetype.
  */
 function kindOf(entry: BrowseEntry): { icon: LucideIcon; label: string; tone: string } {
-	if (entry.kind === "dir") return { icon: Folder, label: "Folder", tone: "folder" };
+	if (entry.kind === "dir") return { icon: Folder, label: m.files_kind_folder(), tone: "folder" };
 	const extension = extensionOf(entry.name);
 	if (["md", "markdown", "mdx"].includes(extension)) return { icon: FileText, label: "Markdown", tone: "blue" };
 	if (["tex", "bib", "sty", "cls", "ltx"].includes(extension)) return { icon: FileCode, label: "LaTeX", tone: "green" };
 	if (extension === "docx") return { icon: FileText, label: "Word", tone: "indigo" };
-	if (["txt", "text", "rst", "org"].includes(extension)) return { icon: FileText, label: "Text", tone: "grey" };
-	if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(extension)) return { icon: FileImage, label: "Image", tone: "amber" };
-	if (["html", "htm", "xhtml"].includes(extension)) return { icon: FileCode, label: "Web page", tone: "grey" };
+	if (["txt", "text", "rst", "org"].includes(extension)) return { icon: FileText, label: m.files_kind_text(), tone: "grey" };
+	if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(extension)) return { icon: FileImage, label: m.files_kind_image(), tone: "amber" };
+	if (["html", "htm", "xhtml"].includes(extension)) return { icon: FileCode, label: m.files_kind_web_page(), tone: "grey" };
 	if (extension === "pdf") return { icon: FileType, label: "PDF", tone: "red" };
-	if (["xlsx", "xls", "ods", "numbers"].includes(extension)) return { icon: FileSpreadsheet, label: "Spreadsheet", tone: "green" };
-	if (["pptx", "ppt", "key", "odp"].includes(extension)) return { icon: Presentation, label: "Presentation", tone: "amber" };
-	if (["zip", "tar", "gz", "tgz", "7z", "rar"].includes(extension)) return { icon: FileArchive, label: "Archive", tone: "grey" };
-	if (["csv", "tsv"].includes(extension)) return { icon: FileSpreadsheet, label: "Table", tone: "green" };
-	if (["mp4", "m4v", "webm", "mov", "ogv", "mkv"].includes(extension)) return { icon: FileVideo, label: "Video", tone: "violet" };
-	if (["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"].includes(extension)) return { icon: FileAudio, label: "Audio", tone: "violet" };
+	if (["xlsx", "xls", "ods", "numbers"].includes(extension)) return { icon: FileSpreadsheet, label: m.files_kind_spreadsheet(), tone: "green" };
+	if (["pptx", "ppt", "key", "odp"].includes(extension)) return { icon: Presentation, label: m.files_kind_presentation(), tone: "amber" };
+	if (["zip", "tar", "gz", "tgz", "7z", "rar"].includes(extension)) return { icon: FileArchive, label: m.files_kind_archive(), tone: "grey" };
+	if (["csv", "tsv"].includes(extension)) return { icon: FileSpreadsheet, label: m.files_kind_table(), tone: "green" };
+	if (["mp4", "m4v", "webm", "mov", "ogv", "mkv"].includes(extension)) return { icon: FileVideo, label: m.files_kind_video(), tone: "violet" };
+	if (["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"].includes(extension)) return { icon: FileAudio, label: m.files_kind_audio(), tone: "violet" };
 	// Text and source both render as escaped preformatted text on a board, so they
 	// share an icon with markup rather than with prose: what you get is the source.
 	if (PREFORMATTED.has(extension)) return { icon: FileCode, label: extension.toUpperCase(), tone: "grey" };
-	return { icon: File, label: extension ? extension.toUpperCase() : "File", tone: "grey" };
+	return { icon: File, label: extension ? extension.toUpperCase() : m.files_kind_file(), tone: "grey" };
 }
 
 /** The extensions `card.js` renders as preformatted text; see its `TEXTUAL` list. */

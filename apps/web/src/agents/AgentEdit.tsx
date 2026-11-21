@@ -1,9 +1,10 @@
+import { m } from "@decks/i18n";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { Icon, Popover } from "@decks/ui";
-import { NO_WORKSPACE } from "./agent-sections.ts";
+import { noWorkspace } from "./agent-sections.ts";
 import { WorkspaceField } from "./NewWorkspace.tsx";
 
 /** The server keeps four of your tags at most (`agents/tags.ts`); past that the field goes away. */
@@ -163,26 +164,26 @@ export function AgentEdit(props: {
 			<div
 				class="panel-float static flex max-h-[86%] w-[min(400px,calc(100vw-24px))] flex-col overflow-hidden p-0"
 				role="dialog"
-				aria-label={`Edit ${props.name}`}
+				aria-label={m.agents_edit_label({ name: props.name })}
 			>
 				<header class="set-head">
 					{props.face}
 					<span class="set-head-title">{props.name}</span>
 					<span class="flex-1" />
-					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:26px]" type="button" title={m.agents_edit_close()} aria-label={m.agents_edit_close()} onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
 
 				<div class="agent-edit">
 					<div class="agent-edit-row">
-						<span class="agent-edit-k">Name</span>
+						<span class="agent-edit-k">{m.agents_edit_name()}</span>
 						<div class="agent-edit-v">
 							<label class="field h-8 flex-none gap-1.5 rounded-md" data-invalid={taken() ? "true" : undefined}>
 								<input
 									ref={nameField}
 									type="text"
-									aria-label="Agent name"
+									aria-label={m.agents_edit_name_label()}
 									aria-invalid={taken()}
 									spellcheck={false}
 									class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
@@ -199,21 +200,21 @@ export function AgentEdit(props: {
 							</label>
 							<Show when={taken()}>
 								<p class="agent-edit-err" role="alert">
-									Another agent is already called {name().trim()}.
+									{m.agents_edit_name_taken({ name: name().trim() })}
 								</p>
 							</Show>
 						</div>
 					</div>
 
 					<div class="agent-edit-row">
-						<span class="agent-edit-k">Workspace</span>
+						<span class="agent-edit-k">{m.agents_workspace()}</span>
 						<div class="agent-edit-v">
 							<WorkspacePick {...(props.workspace ? { value: props.workspace } : {})} workspaces={props.workspaces} onPick={props.onWorkspace} />
 						</div>
 					</div>
 
 					<div class="agent-edit-row agent-edit-tags">
-						<span class="agent-edit-k">Tags</span>
+						<span class="agent-edit-k">{m.agents_edit_tags()}</span>
 						<div class="agent-edit-v">
 							{/* The tags inside their own field, as drawn: chips, then the words you are typing. A click anywhere in it is a click on the typing. */}
 							<div class="field agent-edit-chips" onClick={(event) => event.target === event.currentTarget && tagField?.focus()}>
@@ -224,8 +225,8 @@ export function AgentEdit(props: {
 											<button
 												type="button"
 												class="tag-x"
-												title={`Remove ${tag}`}
-												aria-label={`Remove ${tag}`}
+												title={m.agents_edit_remove_tag({ tag })}
+												aria-label={m.agents_edit_remove_tag({ tag })}
 												onClick={() => setTags(mine().filter((other) => other !== tag))}
 											>
 												<Icon of={X} size={9} />
@@ -239,8 +240,8 @@ export function AgentEdit(props: {
 										spellcheck={false}
 										class="min-w-[80px] flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
 										ref={tagField}
-										placeholder={mine().length ? "" : "Add a tag"}
-										aria-label="Add a tag"
+										placeholder={mine().length ? "" : m.agents_edit_add_tag()}
+										aria-label={m.agents_edit_add_tag()}
 										value={draft()}
 										onInput={(event) => {
 											setDraft(event.currentTarget.value);
@@ -266,7 +267,7 @@ export function AgentEdit(props: {
 				</div>
 				<div class="agent-edit-foot">
 					<button class="btn" type="button" data-primary="true" onClick={props.onClose}>
-						Done
+						{m.agents_dialog_done()}
 					</button>
 				</div>
 			</div>
@@ -293,7 +294,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 		<Popover
 			placement="bottom-start"
 			class="agent-edit-list w-[266px]"
-			label="Workspace"
+			label={m.agents_workspace()}
 			onOpenChange={() => {
 				setMaking(false);
 				setWanted("");
@@ -309,11 +310,11 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 						class="field agent-edit-pick rounded-md"
 						aria-haspopup="listbox"
 						aria-expanded={api.open}
-						aria-label="Workspace"
+						aria-label={m.agents_workspace()}
 						onClick={api.toggle}
 					>
 						<span class="agent-edit-pick-v" data-none={props.value ? undefined : "true"}>
-							{props.value ?? NO_WORKSPACE}
+							{props.value ?? noWorkspace()}
 						</span>
 						<Icon of={ChevronDown} size={13} />
 					</button>
@@ -336,7 +337,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 									if (!current()) props.onPick(workspace || null);
 								}}
 							>
-								<span class="row-label flex-1">{workspace || NO_WORKSPACE}</span>
+								<span class="row-label flex-1">{workspace || noWorkspace()}</span>
 								<Show when={current()}>
 									<Icon of={Check} size={11} class="text-accent" />
 								</Show>
@@ -345,7 +346,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 					}}
 				</For>
 				<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="menu-new" onClick={() => setMaking(true)}>
-					<span class="row-label flex-1">New workspace…</span>
+					<span class="row-label flex-1">{m.agents_edit_new_workspace()}</span>
 				</button>
 			</Show>
 		</Popover>

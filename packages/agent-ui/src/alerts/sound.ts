@@ -26,6 +26,8 @@
  * on disk to save a couple of kilobytes on a file that is fetched once.
  */
 
+import { m } from "@decks/i18n";
+
 /**
  * The five families, which is how the picker groups them.
  *
@@ -91,7 +93,7 @@ export function soundLabel(id: string): { family: string; number: string } {
 
 /** The whole name on one line, for the closed chip: `Staplebops 01`. */
 export function soundName(id: string | undefined): string {
-	if (!id || id === SILENT) return "Silent";
+	if (!id || id === SILENT) return m.chat_sound_silent();
 	const { family, number } = soundLabel(id);
 	return number ? `${family} ${number}` : family;
 }

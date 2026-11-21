@@ -1,5 +1,6 @@
 import type { SlashCommand } from "@decks/protocol";
 import { createEffect, For, Show } from "solid-js";
+import { m } from "@decks/i18n";
 
 /**
  * Fifty at a time.
@@ -51,11 +52,11 @@ function badge(command: SlashCommand, runtime: string): string {
 		case "deck":
 			return "decks";
 		case "skill":
-			return "skill";
+			return m.composer_slash_skill();
 		case "prompt":
-			return "prompt";
+			return m.composer_slash_prompt();
 		case "extension":
-			return "ext";
+			return m.composer_slash_ext();
 		case "runtime":
 			return runtime;
 		default:
@@ -108,7 +109,7 @@ export function SlashMenu(props: {
 			class="row-list absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
 			ref={list}
 			role="listbox"
-			aria-label="Commands"
+			aria-label={m.composer_slash_label()}
 		>
 			<For each={props.commands}>
 				{(command, index) => (

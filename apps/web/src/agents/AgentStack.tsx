@@ -1,3 +1,4 @@
+import { formatNumber, m } from "@decks/i18n";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
@@ -138,7 +139,7 @@ export function AgentStack(props: {
 			 * strip of chrome, and the one thing a screen reader needs before it reads three
 			 * buttons is what they are three of.
 			 */}
-			<span class="agent-stack" role="group" aria-label="Agents wanting your attention" ref={strip}>
+			<span class="agent-stack" role="group" aria-label={m.agents_stack_label()} ref={strip}>
 				<For each={split().shown}>
 					{(chat) => {
 						const status = () => agentStatus(chat.state, props.unread[chat.id] ?? 0);
@@ -149,7 +150,7 @@ export function AgentStack(props: {
 								class="agent-facebtn"
 								/* The words as well as the name: the ring is a colour, and a colour is
 								   not a thing a screen reader can read out. */
-								aria-label={`Switch to ${name()} — ${statusWords(status(), chat.state)}`}
+								aria-label={m.agents_stack_switch({ name: name(), status: statusWords(status(), chat.state) })}
 								title={name()}
 								onPointerEnter={(event) => enter(chat.id, event)}
 								onPointerLeave={() => leave(chat.id)}
@@ -188,7 +189,7 @@ export function AgentStack(props: {
 						{...(props.onMore ? { onMore: props.onMore } : {})}
 						/* Under the button that opens it, not at the toolbar's far end. */
 						placement="bottom-start"
-						label="Agents"
+						label={m.agents_agents()}
 						trigger={(api) => (
 							<button
 								type="button"
@@ -196,8 +197,8 @@ export function AgentStack(props: {
 								ref={api.ref}
 								aria-haspopup="menu"
 								aria-expanded={api.open}
-								title={`${split().more} more ${split().more === 1 ? "agent" : "agents"} wanting you`}
-								aria-label={`${split().more} more ${split().more === 1 ? "agent" : "agents"} wanting you`}
+								title={m.agents_stack_more({ count: split().more, shown: formatNumber(split().more) })}
+								aria-label={m.agents_stack_more({ count: split().more, shown: formatNumber(split().more) })}
 								onClick={api.toggle}
 							>
 								+{split().more}

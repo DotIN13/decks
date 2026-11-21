@@ -1,0 +1,13 @@
+{
+	"total": 24,
+	"files": {
+		"apps/web/src/composer/Hints.tsx": 2,
+		"apps/web/src/connections/Switcher.tsx": 2,
+		"apps/web/src/panel/AppRow.tsx": 1,
+		"apps/web/src/settings/Settings.tsx": 2,
+		"apps/web/src/settings/StudioSignIn.tsx": 1,
+		"packages/canvas/src/cards/card-bar-view.tsx": 2,
+		"packages/canvas/src/ui/properties/layout.tsx": 11,
+		"packages/canvas/src/ui/properties/position.tsx": 3
+	}
+}

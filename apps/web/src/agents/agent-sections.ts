@@ -1,4 +1,5 @@
 import type { AgentChat, Identity } from "@decks/protocol";
+import { formatNumber, m } from "@decks/i18n";
 import { agentStatus, type AgentStatus } from "./agent-order.ts";
 
 /**
@@ -19,7 +20,7 @@ import { agentStatus, type AgentStatus } from "./agent-order.ts";
  */
 
 /** What a list calls the group of agents that have not said which project they are on. */
-export const NO_WORKSPACE = "No workspace";
+export const noWorkspace = (): string => m.agents_no_workspace();
 
 type AgentSectionKind = "workspace" | "unfiled";
 
@@ -173,7 +174,7 @@ function workspaceSections(rows: AgentRow[]): AgentSection[] {
 		.sort((left, right) => left.localeCompare(right))
 		.map((name) => section("workspace", `ws:${name}`, name, groups.get(name) ?? []));
 	const loose = groups.get("");
-	return loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;
+	return loose ? [...named, section("unfiled", "ws:", noWorkspace(), loose)] : named;
 }
 
 function section(kind: AgentSectionKind, id: string, label: string, rows: AgentRow[]): AgentSection {
@@ -192,9 +193,9 @@ function section(kind: AgentSectionKind, id: string, label: string, rows: AgentR
  */
 function sectionNote(rows: AgentRow[]): string | undefined {
 	const wants = rows.filter((row) => row.status === "waiting").length;
-	if (wants > 0) return `${wants} want${wants === 1 ? "s" : ""} you`;
+	if (wants > 0) return m.agents_section_wants({ count: wants, shown: formatNumber(wants) });
 	const working = rows.filter((row) => row.status === "working").length;
-	if (working > 0) return `${working} working`;
+	if (working > 0) return m.agents_section_working({ count: formatNumber(working) });
 	return undefined;
 }
 

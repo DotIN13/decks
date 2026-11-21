@@ -38,11 +38,17 @@
 						setItem: function (key, value) { values.set(key, String(value)); },
 					};
 				}
+				var sandboxed = false;
 				["localStorage", "sessionStorage"].forEach(function (name) {
 					var works = false;
 					try { works = !!window[name]; } catch (e) { works = false; }
 					if (!works) Object.defineProperty(window, name, { value: memory(), configurable: true });
+					if (!works && name === "localStorage") sandboxed = true;
 				});
+				// The page's language (`@decks/i18n`), passed as `?lang=`: kept in the frame's own storage, where its
+				// messages look first. Only in memory: a frame sharing the page's storage reads the page's choice itself.
+				var lang = new URLSearchParams(location.search).get("lang");
+				if (sandboxed && lang) localStorage.setItem("decks.locale", lang);
 			})();
 		</script>
 		<style>

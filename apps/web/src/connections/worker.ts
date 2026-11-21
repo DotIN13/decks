@@ -1,5 +1,6 @@
 import { active, connections, elsewhere, PUBLIC, type Connection } from "./connection.ts";
 import { tokenDigest, authHeaders } from "../lib/session.ts";
+import { m } from "@decks/i18n";
 
 /**
  * The service worker that serves every backend but this one (`public/sw.js`), and what it knows.
@@ -51,7 +52,7 @@ export async function tellWorker(): Promise<void> {
  * worker claims it on activation; this waits for that rather than reloading.
  */
 export async function ensureWorker(): Promise<void> {
-	if (!available()) throw new Error("Opening another server or a canvas file needs this page on HTTPS or localhost; on a plain http:// address the browser has no service workers.");
+	if (!available()) throw new Error(m.connections_worker_needs_https());
 	await navigator.serviceWorker.register("/sw.js", { scope: "/" });
 	await navigator.serviceWorker.ready;
 	if (!navigator.serviceWorker.controller) {
@@ -76,7 +77,7 @@ export async function reach(one: Connection): Promise<void> {
 	else if (one.kind === "bundle" || PUBLIC) await ensureWorker();
 	else {
 		const response = await fetch("/api/relay", { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ id: one.id, base: one.base, token: one.token }) });
-		if (!response.ok) throw new Error(((await response.json().catch(() => ({}))) as { error?: string }).error ?? `This server would not relay that one (${response.status}).`);
+		if (!response.ok) throw new Error(((await response.json().catch(() => ({}))) as { error?: string }).error ?? m.connections_no_relay({ status: String(response.status) }));
 	}
 	ready.add(one.id);
 }

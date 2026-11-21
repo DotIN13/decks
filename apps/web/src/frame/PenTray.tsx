@@ -5,6 +5,7 @@ import ChevronLeft from "lucide-solid/icons/chevron-left";
 import { createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { INK_WIDTHS, inkColor, inkSwatch, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "@decks/canvas/tools";
 import { Icon, onDismiss } from "@decks/ui";
+import { formatNumber, m } from "@decks/i18n";
 
 /**
  * The pen tray: the instruments in a row, the one in hand raised, its colour and its width.
@@ -18,14 +19,21 @@ import { Icon, onDismiss } from "@decks/ui";
  * the drawing while the pen is out, Delete takes what the lasso holds, Escape lets the lasso go and
  * then puts the pen away.
  */
-const INSTRUMENTS: Array<{ tool: InkTool; label: string }> = [
-	{ tool: "pen", label: "Pen: draws, and presses harder with a pencil" },
-	{ tool: "marker", label: "Marker: wide and see-through, for marking words" },
-	{ tool: "eraser", label: "Eraser: removes each stroke it touches" },
-	{ tool: "lasso", label: "Lasso: loop round strokes to select them, then drag or delete" },
+const INSTRUMENTS: Array<{ tool: InkTool; name: () => string; label: () => string }> = [
+	{ tool: "pen", name: () => m.frame_pen(), label: () => m.frame_pen_label() },
+	{ tool: "marker", name: () => m.frame_marker(), label: () => m.frame_marker_label() },
+	{ tool: "eraser", name: () => m.frame_eraser(), label: () => m.frame_eraser_label() },
+	{ tool: "lasso", name: () => m.frame_lasso(), label: () => m.frame_lasso_label() },
 ];
 
-const COLOR_NAMES: Record<InkColor, string> = { ink: "Black or white, with the theme", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };
+/** A colour's name for its tip, and in full for its label. */
+const COLOR_NAMES: Record<InkColor, { name: () => string; label: () => string }> = {
+	ink: { name: () => m.frame_color_ink(), label: () => m.frame_color_ink_label() },
+	red: { name: () => m.frame_color_red(), label: () => m.frame_color_red() },
+	blue: { name: () => m.frame_color_blue(), label: () => m.frame_color_blue() },
+	green: { name: () => m.frame_color_green(), label: () => m.frame_color_green() },
+	yellow: { name: () => m.frame_color_yellow(), label: () => m.frame_color_yellow() },
+};
 
 export function PenTray(props: {
 	onDone: () => void;
@@ -83,8 +91,8 @@ export function PenTray(props: {
 
 	return (
 		<div class="v3-tray-wrap" ref={wrap}>
-			<div class="v3-tray float" role="toolbar" aria-label="Pen tray">
-				<span class="v3-tray-grip" ref={grip} data-tip="Drag to move; throw at an edge to put away" aria-hidden="true">
+			<div class="v3-tray float" role="toolbar" aria-label={m.frame_pen_tray()}>
+				<span class="v3-tray-grip" ref={grip} data-tip={m.frame_tray_grip()} aria-hidden="true">
 					<i />
 					<i />
 					<i />
@@ -92,7 +100,7 @@ export function PenTray(props: {
 					<i />
 					<i />
 				</span>
-				<div class="v3-instruments" role="group" aria-label="Instrument">
+				<div class="v3-instruments" role="group" aria-label={m.frame_instrument()}>
 					<For each={INSTRUMENTS}>
 						{(entry) => (
 							<button
@@ -100,8 +108,8 @@ export function PenTray(props: {
 								class="v3-instrument"
 								data-on={inkTool() === entry.tool ? "true" : undefined}
 								aria-pressed={inkTool() === entry.tool}
-								data-tip={entry.label.split(":")[0]}
-								aria-label={entry.label}
+								data-tip={entry.name()}
+								aria-label={entry.label()}
 								onClick={() => {
 									if (inkTool() === entry.tool) return setWidths((open) => !open);
 									setInkTool(entry.tool);
@@ -115,7 +123,7 @@ export function PenTray(props: {
 				</div>
 				<span class="v3-tray-sep" aria-hidden="true" />
 				<span class="v3-wheel" aria-hidden="true" style={{ "--current": paint() }} />
-				<div class="v3-swatches" role="group" aria-label="Colour" data-off={paints() ? undefined : "true"}>
+				<div class="v3-swatches" role="group" aria-label={m.frame_colour()} data-off={paints() ? undefined : "true"}>
 					<For each={INK_COLORS}>
 						{(color) => (
 							<button
@@ -124,8 +132,8 @@ export function PenTray(props: {
 								data-on={inkColor() === color ? "true" : undefined}
 								aria-pressed={inkColor() === color}
 								disabled={!paints()}
-								data-tip={COLOR_NAMES[color].split(",")[0]}
-								aria-label={COLOR_NAMES[color]}
+								data-tip={COLOR_NAMES[color].name()}
+								aria-label={COLOR_NAMES[color].label()}
 								style={{ "--swatch": inkSwatch(color) }}
 								onClick={() => setInkColor(color)}
 							/>
@@ -136,22 +144,22 @@ export function PenTray(props: {
 					<Show
 						when={inkSelection()}
 						fallback={
-							<button type="button" class="v3-icon" data-on={widths() ? "soft" : undefined} data-tip="Width" aria-label="Width" aria-expanded={widths()} onClick={() => setWidths((open) => !open)}>
+							<button type="button" class="v3-icon" data-on={widths() ? "soft" : undefined} data-tip={m.frame_width()} aria-label={m.frame_width()} aria-expanded={widths()} onClick={() => setWidths((open) => !open)}>
 								<Icon of={MoreHorizontal} size={16} />
 							</button>
 						}
 					>
-						<button type="button" class="v3-icon" data-tip="Delete the strokes" data-key="⌫" aria-label="Delete the selected strokes" onClick={deleteSelection}>
+						<button type="button" class="v3-icon" data-tip={m.frame_delete_strokes()} data-key="⌫" aria-label={m.frame_delete_selected_strokes()} onClick={deleteSelection}>
 							<Icon of={Trash2} size={16} />
 						</button>
 					</Show>
 				</div>
 			</div>
-			<button type="button" class="stowtab" data-stowtab aria-label="Bring the pen tray back" onClick={() => unstow()}>
+			<button type="button" class="stowtab" data-stowtab aria-label={m.frame_bring_tray_back()} onClick={() => unstow()}>
 				<Icon of={ChevronLeft} size={14} />
 			</button>
 			<Show when={widths() && paints()}>
-				<div class="v3-widths float" role="group" aria-label="Width">
+				<div class="v3-widths float" role="group" aria-label={m.frame_width()}>
 					<For each={[0, 1, 2]}>
 						{(index) => (
 							<button
@@ -159,8 +167,8 @@ export function PenTray(props: {
 								class="v3-width"
 								data-on={inkWidth() === index ? "true" : undefined}
 								aria-pressed={inkWidth() === index}
-								data-tip={`${sizes()[index]} px`}
-								aria-label={`${sizes()[index]} pixels wide`}
+								data-tip={m.frame_width_px({ px: formatNumber(sizes()[index]!) })}
+								aria-label={m.frame_width_pixels({ px: formatNumber(sizes()[index]!) })}
 								onClick={() => setInkWidth(index)}
 							>
 								<span style={{ height: `${[2, 5, 9][index]}px`, background: paint() }} />

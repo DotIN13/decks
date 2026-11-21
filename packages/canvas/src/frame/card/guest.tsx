@@ -1,4 +1,5 @@
 import { life, sayShared } from "@decks/frame";
+import { formatNumber, m } from "@decks/i18n";
 import { dismissMenus } from "@decks/ui";
 import { createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
@@ -105,11 +106,11 @@ export async function runCard(root: HTMLElement, start: CardStart, end: CardEnd)
 						type="button"
 						class="card-tab-fit"
 						aria-pressed={fitted()}
-						title={fitted() ? "Show the card at its own size" : "Fit the card to the window"}
+						title={fitted() ? m.canvas_card_tab_actual() : m.canvas_card_tab_fit_title()}
 						style={{ position: "fixed", top: "10px", right: "10px", "z-index": "5", height: "30px", padding: "0 10px", border: "1px solid var(--canvas-line, rgb(0 0 0 / 12%))", "border-radius": "9px", background: "var(--canvas-panel, #fff)", color: "var(--canvas-fg, #1f2328)", font: "500 12px var(--canvas-font-sans, system-ui)", cursor: "pointer", "box-shadow": "0 1px 3px rgb(0 0 0 / 12%)" }}
 						onClick={() => setFitted((was) => !was)}
 					>
-						{fitted() ? `${Math.round(fits() * 100)}%` : "Fit"}
+						{fitted() ? formatNumber(fits(), { style: "percent", maximumFractionDigits: 0 }) : m.canvas_pill_fit()}
 					</button>
 				</Show>
 			</div>

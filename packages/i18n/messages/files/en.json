@@ -1,0 +1,160 @@
+{
+	"files_canvas_title": "Add a file",
+	"files_canvas_sub": "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a board.",
+	"files_attach_title": "Attach a file",
+	"files_attach_sub": "It goes into your message, for the agent to read.",
+	"files_embed_title": "Choose a file",
+	"files_embed_sub": "It is shown on the board, where it is.",
+	"files_google_answered": "Google answered {status}.",
+	"files_signed_in_sentence": "Signed in as {email}.",
+	"files_did_not_work": "That did not work.",
+	"files_close_title": "Close (Esc)",
+	"files_close": "Close",
+	"files_where": "Where the file is",
+	"files_tab_files": "Files",
+	"files_tab_google": "Google Docs",
+	"files_up": "Up one folder",
+	"files_path_title": "The deck and the folders it may reach",
+	"files_all_places": "All places",
+	"files_filter": "Filter",
+	"files_filter_label": "Filter this folder",
+	"files_list": "Files",
+	"files_no_match": "Nothing here matches “{filter}”.",
+	"files_empty": "This folder is empty.",
+	"files_upload_title": "Copy a file or photo from this device into the deck",
+	"files_adding": "Adding…",
+	"files_upload": "Upload from this device",
+	"files_docs_search": "Search your Docs, or paste a link",
+	"files_docs_search_label": "Search your Google Docs, or paste a Doc's link",
+	"files_open_link": "Open the Doc at this link",
+	"files_stale": "This sign-in can open a Doc by its link, but not list your Docs.",
+	"files_signin_again": "Sign in again to see your Docs",
+	"files_paste_address": "Then paste the address the browser ended on",
+	"files_paste_address_label": "Address after signing in",
+	"files_done": "Done",
+	"files_no_doc_match": "No Doc's name has “{query}” in it.",
+	"files_no_docs": "No Google Docs in this account yet.",
+	"files_shared_by": "Shared by {owner}",
+	"files_fake": "Stand-in Docs on this server",
+	"files_signed_in_as": "Signed in as {email}",
+	"files_signed_in": "Signed in",
+	"files_typing_reaches": "Your typing reaches Google within a couple of seconds.",
+	"files_asking": "Asking the server about Google…",
+	"files_not_set_up": "Google isn't set up on this server",
+	"files_not_set_up_note": "Put your Google Cloud project's OAuth client file at google/client.json in the server's data folder, then come back here to sign in.",
+	"files_signin_title": "Sign in to open a Google Doc",
+	"files_signin_note": "Decks reads and writes the Doc as you. The sign-in is kept on this server.",
+	"files_signin_google": "Sign in with Google",
+	"files_kind_folder": "Folder",
+	"files_kind_text": "Text",
+	"files_kind_image": "Image",
+	"files_kind_web_page": "Web page",
+	"files_kind_spreadsheet": "Spreadsheet",
+	"files_kind_presentation": "Presentation",
+	"files_kind_archive": "Archive",
+	"files_kind_table": "Table",
+	"files_kind_video": "Video",
+	"files_kind_audio": "Audio",
+	"files_kind_file": "File",
+	"files_not_uploaded": "not uploaded",
+	"files_upload_ask_title": "Upload {name}?",
+	"files_upload_ask_body": "It is {size}. It is copied into the deck, which takes a while and keeps that much disk.",
+	"files_upload_yes": "Upload",
+	"files_cancel": "Cancel",
+	"files_too_large": "{name} is larger than {size}",
+	"files_is_empty": "{name} is empty",
+	"files_upload_failed": "upload failed ({status})",
+	"files_not_json": "the server's answer was not JSON",
+	"files_connection_dropped": "the connection dropped",
+	"files_cancelled": "cancelled",
+	"files_view_only": "{canvas} is shared with you to view, by {owner}: it follows their copy, and only they can change it. To change it, make your own copy: View only · Make a copy, beside the canvas's name.",
+	"files_view_only_owner": "{canvas} is shared with you to view, by its owner: it follows their copy, and only they can change it. To change it, make your own copy: View only · Make a copy, beside the canvas's name.",
+	"files_adding_one": "Adding {name}…",
+	"files_adding_card_one": "Adding {name} to the card…",
+	"files_progress": "{name} · {percent} of {size}",
+	"files_progress_colon": "{name}: {percent} of {size}",
+	"files_progress_nth": "{index} of {total} · {name} · {percent} of {size}",
+	"files_added": "{name} added",
+	"files_added_reused": "{name} added (already in the deck)",
+	"files_failed": "{name}: {error}",
+	"files_put_canvas_one": "{name} put on the canvas",
+	"files_put_card_one": "{name} put in the card",
+	"files_unreadable": "{name} could not be read ({status}).",
+	"files_read_only_bundle": "This canvas was opened from a file, so it can only be read.",
+	"files_timeline_preview": "That is the canvas as it used to be. Let go of the timeline first.",
+	"files_count": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} file here",
+				"n=other": "{count} files here"
+			}
+		}
+	],
+	"files_adding_many": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "Adding {count} file…",
+				"n=other": "Adding {count} files…"
+			}
+		}
+	],
+	"files_adding_card_many": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "Adding {count} file to the card…",
+				"n=other": "Adding {count} files to the card…"
+			}
+		}
+	],
+	"files_put_canvas_many": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} file put on the canvas",
+				"n=other": "{count} files put on the canvas"
+			}
+		}
+	],
+	"files_put_card_many": [
+		{
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
+			"match": {
+				"n=one": "{count} file put in the card",
+				"n=other": "{count} files put in the card"
+			}
+		}
+	]
+}

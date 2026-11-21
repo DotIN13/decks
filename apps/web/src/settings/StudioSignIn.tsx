@@ -6,7 +6,8 @@ import FileX from "lucide-solid/icons/file-x";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import type { StudioSyncRow } from "@decks/protocol";
-import { Icon } from "@decks/ui";
+import { clockTime, Icon } from "@decks/ui";
+import { formatBytes, formatNumber, m } from "@decks/i18n";
 import { pairing } from "../connections/backend.ts";
 import { notice } from "../state/notices.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
@@ -78,7 +79,7 @@ export function StudioGroup() {
 		</span>
 	);
 	return (
-		<SetGroup label="Decks Studio login" group="studio">
+		<SetGroup label={m.settings_studio_group()} group="studio">
 			<Show
 				when={pairing().studio}
 				fallback={
@@ -87,17 +88,17 @@ export function StudioGroup() {
 						fallback={
 							<SetRow
 								lead={mark}
-								title="Sign in to Decks Studio"
+								title={m.settings_studio_sign_in_title()}
 								sub={
 									<>
-										This deck's canvases sync there, and you reach your agents from anywhere.
+										{m.settings_studio_sign_in_sub()}
 										<Show when={pairing().studioSignIn?.failed}>{(why) => <span class="sw-studio-failed"> {why()}</span>}</Show>
 									</>
 								}
 							>
-								<input class="sw-field sw-studio-at" aria-label="Studio's address" placeholder="https://studio.decks.app" value={studioAt()} onInput={(event) => setAddress(event.currentTarget.value.trim())} spellcheck={false} />
+								<input class="sw-field sw-studio-at" aria-label={m.settings_studio_address()} placeholder="https://studio.decks.app" value={studioAt()} onInput={(event) => setAddress(event.currentTarget.value.trim())} spellcheck={false} />
 								<button class="sw-btn" type="button" data-studio="sign-in" disabled={busy()} onClick={() => void signIn()}>
-									Sign in
+									{m.settings_studio_sign_in()}
 								</button>
 							</SetRow>
 						}
@@ -106,20 +107,20 @@ export function StudioGroup() {
 							<>
 								<SetRow
 									lead={mark}
-									title="Studio is showing a code"
-									sub={sendsBack(open().url) ? `At ${hostOf(open().studio)}, in the tab that opened. Press Sign it in there, or copy the code and paste it below.` : `Open Studio at ${hostOf(open().studio)}, copy the code it shows, and paste it below.`}
+									title={m.settings_studio_showing_code()}
+									sub={sendsBack(open().url) ? m.settings_studio_code_sends_back({ host: hostOf(open().studio) }) : m.settings_studio_code_copy({ host: hostOf(open().studio) })}
 								>
 									<button class="sw-btn" type="button" data-studio="open" onClick={() => window.open(open().url, "_blank")}>
-										Open Studio
+										{m.settings_studio_open()}
 									</button>
 									<button class="sw-btn" type="button" data-studio="cancel" onClick={() => void call("harness.studioCancel").then(warnIfFailed)}>
-										Cancel
+										{m.settings_studio_cancel()}
 									</button>
 								</SetRow>
-								<SetRow lead={<span class="sw-mark" data-empty />} title="Code from Studio">
+								<SetRow lead={<span class="sw-mark" data-empty />} title={m.settings_studio_code()}>
 									<input
 										class="sw-field sw-studio-code"
-										aria-label="The code Studio shows"
+										aria-label={m.settings_studio_code_label()}
 										placeholder="ABCD-EFGH"
 										maxLength={12}
 										autocomplete="off"
@@ -130,7 +131,7 @@ export function StudioGroup() {
 										onKeyDown={(event) => event.key === "Enter" && void paste()}
 									/>
 									<button class="sw-btn" type="button" data-studio="paste" disabled={busy() || !code().trim()} onClick={() => void paste()}>
-										Sign in
+										{m.settings_studio_sign_in()}
 									</button>
 								</SetRow>
 							</>
@@ -142,12 +143,12 @@ export function StudioGroup() {
 					<>
 						<SetRow
 							lead={mark}
-							title={studio().account?.email ? `Signed in to Decks Studio as ${studio().account!.email}` : "Signed in to Decks Studio"}
-							sub={studio().env ? `${hostOf(studio().url)} · its key is set by DECKS_STUDIO_KEY` : `${hostOf(studio().url)} · this deck syncs there`}
+							title={studio().account?.email ? m.settings_studio_signed_in_as({ email: studio().account!.email! }) : m.settings_studio_signed_in()}
+							sub={studio().env ? m.settings_studio_env_key({ host: hostOf(studio().url) }) : m.settings_studio_syncs_there({ host: hostOf(studio().url) })}
 						>
 							<Show when={!studio().env}>
-								<button class="sw-btn" type="button" data-tone="danger" data-studio="sign-out" title="Delete this harness's Studio key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("harness.unpair").then(warnIfFailed)}>
-									Sign out
+								<button class="sw-btn" type="button" data-tone="danger" data-studio="sign-out" title={m.settings_studio_sign_out_title()} onClick={() => void call("harness.unpair").then(warnIfFailed)}>
+									{m.settings_studio_sign_out()}
 								</button>
 							</Show>
 						</SetRow>
@@ -159,14 +160,6 @@ export function StudioGroup() {
 	);
 }
 
-/** "312 KB", "48 MB", "1.24 GB". */
-export function bytesWords(bytes: number): string {
-	if (bytes < 1e6) return `${Math.max(0, Math.round(bytes / 1e3))} KB`;
-	if (bytes < 1e9) return `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`;
-	return `${(bytes / 1e9).toFixed(2)} GB`;
-}
-
-const clock = (at: number) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 /** The icon and colour of each state: still, never animated. */
 const LOOK: Record<StudioSyncRow["state"], { icon: typeof RefreshCw; tone: string }> = {
@@ -201,29 +194,32 @@ export function SyncRow(props: { sync: StudioSyncRow }) {
 	});
 	const share = () => (p().bytes.total > 0 ? Math.min(1, p().bytes.done / p().bytes.total) : p().files.total > 0 ? p().files.done / p().files.total : 0);
 	const moving = () => (p().state === "syncing" || p().state === "held") && p().files.total > 0;
-	const amounts = () => `${bytesWords(p().bytes.done)} of ${bytesWords(p().bytes.total)} · ${p().files.done.toLocaleString()} of ${p().files.total.toLocaleString()} files`;
+	const amounts = () => m.settings_sync_amounts({ done: formatBytes(p().bytes.done), total: formatBytes(p().bytes.total), filesDone: formatNumber(p().files.done), filesTotal: formatNumber(p().files.total) });
 	const left = () => Math.max(0, Math.ceil(((p().heldUntil ?? 0) - now()) / 1000));
 	const title = () => {
 		switch (p().state) {
 			case "connecting":
-				return "Reaching Studio";
+				return m.settings_sync_connecting();
 			case "syncing":
-				return p().files.total ? (share() >= 1 ? "Finishing" : "Syncing to Studio") : "Checking what changed";
+				return p().files.total ? (share() >= 1 ? m.settings_sync_finishing() : m.settings_sync_syncing()) : m.settings_sync_checking();
 			case "held":
-				return "Paused by Studio";
+				return m.settings_sync_held();
 			case "offline":
-				return "Not syncing";
+				return m.settings_sync_offline();
 			case "synced":
-				return "In step with Studio";
+				return m.settings_sync_synced();
 		}
 	};
 	const sub = () => {
 		const x = p();
-		if (x.state === "offline") return `${x.error ?? "Studio could not be reached."} Your work is safe here, and Decks tries again by itself.${x.syncedAt ? ` Last in step at ${clock(x.syncedAt)}.` : ""}`;
-		if (x.state === "synced") return `${x.canvases.total ? `${x.canvases.total} ${x.canvases.total === 1 ? "canvas" : "canvases"} checked. ` : ""}A change here goes up within a second.`;
-		if (x.state === "connecting") return "The first pass starts once Studio answers.";
-		if (!x.files.total) return "Comparing this deck with Studio's copy.";
-		return x.state === "syncing" && speed() > 0 ? `${amounts()} · ${bytesWords(speed())}/s` : amounts();
+		if (x.state === "offline") {
+			const why = x.error ?? m.settings_sync_unreachable();
+			return x.syncedAt ? m.settings_sync_offline_sub_since({ why, time: clockTime(x.syncedAt) }) : m.settings_sync_offline_sub({ why });
+		}
+		if (x.state === "synced") return x.canvases.total ? m.settings_sync_synced_sub_checked({ count: x.canvases.total }) : m.settings_sync_synced_sub();
+		if (x.state === "connecting") return m.settings_sync_connecting_sub();
+		if (!x.files.total) return m.settings_sync_comparing();
+		return x.state === "syncing" && speed() > 0 ? m.settings_sync_with_speed({ amounts: amounts(), speed: formatBytes(speed()) }) : amounts();
 	};
 	const file = () => (p().state === "syncing" && p().now?.path ? `${p().now!.up === false ? "↓" : "↑"} ${p().now!.canvas}/${p().now!.path}` : "");
 	const [listing, setListing] = createSignal(false);
@@ -237,30 +233,30 @@ export function SyncRow(props: { sync: StudioSyncRow }) {
 					<span class="sw-sync-line">
 						<span class="sw-name">{title()}</span>
 						<Show when={p().state === "syncing" && p().files.total}>
-							<span class="sw-sync-figure">{Math.floor(share() * 100)}%</span>
+							<span class="sw-sync-figure">{formatNumber(Math.floor(share() * 100) / 100, { style: "percent" })}</span>
 						</Show>
 						<Show when={p().state === "held" && p().heldUntil}>
 							<span class="sw-sync-figure">
-								{Math.floor(left() / 60)}:{String(left() % 60).padStart(2, "0")} left
+								{m.settings_sync_left({ time: `${Math.floor(left() / 60)}:${String(left() % 60).padStart(2, "0")}` })}
 							</span>
 						</Show>
 						<Show when={p().state === "synced" && p().syncedAt}>
-							<span class="sw-sync-when">Since {clock(p().syncedAt!)}</span>
+							<span class="sw-sync-when">{m.settings_sync_since({ time: clockTime(p().syncedAt!) })}</span>
 						</Show>
 						<Show when={p().state === "offline"}>
 							<button class="sw-btn" type="button" data-studio="retry" onClick={() => void call("harness.studioSync").then(warnIfFailed)}>
-								Try again
+								{m.settings_sync_retry()}
 							</button>
 						</Show>
 					</span>
 					<Show when={moving()}>
-						<span class="sw-sync-bar" role="progressbar" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(share() * 100)}>
+						<span class="sw-sync-bar" role="progressbar" aria-label={m.settings_sync_label()} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(share() * 100)}>
 							<span style={{ width: `${share() * 100}%` }} />
 						</span>
 					</Show>
 					<span class="sw-sub">{sub()}</span>
 					<Show when={p().state === "held"}>
-						<span class="sw-sub">Studio limits how much one machine sends a minute and an hour. The rest go up when the wait ends; nothing is lost.</span>
+						<span class="sw-sub">{m.settings_sync_held_sub()}</span>
 					</Show>
 					<Show when={file()}>
 						<span class="sw-sync-file" title={file()}>
@@ -277,15 +273,15 @@ export function SyncRow(props: { sync: StudioSyncRow }) {
 					<span class="sw-sync-words">
 						<span class="sw-sync-line">
 							<span class="sw-name">
-								{p().skipped} {p().skipped === 1 ? "file" : "files"} left out
+								{m.settings_sync_left_out({ count: p().skipped })}
 							</span>
 							<Show when={p().leftOut?.length}>
 								<button class="sw-btn" type="button" data-studio="left-out" onClick={() => setListing(!listing())}>
-									{listing() ? "Hide" : "Show"}
+									{listing() ? m.settings_sync_hide() : m.settings_sync_show()}
 								</button>
 							</Show>
 						</span>
-						<span class="sw-sub">Over 50 MB, or refused by Studio: they stay on this machine.</span>
+						<span class="sw-sub">{m.settings_sync_left_out_sub()}</span>
 						<Show when={listing()}>
 							<span class="sw-sync-list">
 								<For each={p().leftOut}>{(path) => <span title={path}>{path}</span>}</For>

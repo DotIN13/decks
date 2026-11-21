@@ -1,4 +1,5 @@
 import { life } from "./life.ts";
+import { m } from "@decks/i18n";
 import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
 import { touchedBy } from "./marks.ts";
@@ -73,7 +74,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 				const color = who?.color ?? "#3b5cf6";
 				const touched = touchedBy(edits, (id) => before.get(id), (id) => handle.itemBox(id));
 				ctx.marks.add(agent.id!, color, touched);
-				ctx.presence?.tour(agent.id!, { kind: "agent", id: agent.id!, name: who?.name ?? agent.name ?? "An agent", color }, touched.map((one) => ({ x: one.box.x, y: one.box.y })));
+				ctx.presence?.tour(agent.id!, { kind: "agent", id: agent.id!, name: who?.name ?? agent.name ?? m.canvas_presence_agent(), color }, touched.map((one) => ({ x: one.box.x, y: one.box.y })));
 			}
 			return applied;
 		},

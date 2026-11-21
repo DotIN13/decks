@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { setBackend, setPairing } from "../../connections/backend.ts";
 import { reconcile } from "solid-js/store";
 import { ensureAgent, setState, state } from "../../state/deck.ts";
@@ -29,11 +30,11 @@ export function heardHarness(message: Of<"harness"> | Of<"web"> | Of<"account">,
 			notice(message.level, message.text);
 			// Only `error`. A warning is a thing worth reading when you get to it, and an
 			// app that makes a noise for every one of those is an app people mute.
-			if (message.level === "error") hooks.raise("problem", { title: "Something went wrong", body: message.text, tag: "problem" });
+			if (message.level === "error") hooks.raise("problem", { title: m.app_something_wrong(), body: message.text, tag: "problem" });
 			return;
 		case "harness.error":
 			notice("error", message.text);
-			hooks.raise("problem", { title: "Something went wrong", body: message.text, tag: "problem" });
+			hooks.raise("problem", { title: m.app_something_wrong(), body: message.text, tag: "problem" });
 			return;
 		case "harness.settings":
 			// The zone first, so everything the store change redraws is drawn in it.

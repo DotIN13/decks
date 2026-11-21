@@ -1,4 +1,5 @@
 import type { JSX } from "solid-js";
+import { m } from "@decks/i18n";
 import { serialize, type PenEdit } from "@decks/pen";
 import { untrack } from "solid-js";
 import type { Page } from "@decks/protocol";
@@ -131,7 +132,7 @@ export function installHost(ctx: FrameContext): void {
 								const api = start.backend.api.replace(/\/+$/, "");
 								const response = await fetch(`${api}/apps/${encodeURIComponent(name)}/open`, { method: "POST", headers: { authorization: `Bearer ${ctx.backendToken()}` } });
 								const answer = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
-								if (!response.ok || !answer.url) return { tab: answer.error ?? `The app did not open here (${response.status}).` };
+								if (!response.ok || !answer.url) return { tab: answer.error ?? m.canvas_app_not_opened({ status: String(response.status) }) };
 								const saved = ctx.appStored.get(name) ?? {};
 								const hash = Object.keys(saved).length ? `#decks-storage=${base64url(JSON.stringify(saved))}` : "";
 								return { url: `${new URL(answer.url, api).href}${hash}` };

@@ -1,3 +1,4 @@
+import { m } from "@decks/i18n";
 import { createMemo, Show } from "solid-js";
 import { CanvasManager } from "../canvases/CanvasManager.tsx";
 import { scheme } from "../lib/theme.ts";
@@ -37,7 +38,7 @@ export function Top(props: { parts: Parts }) {
 	/** What a touch bar's chip says: the tab in front, whatever its kind. (A desktop's bar has a row of tabs and no chip of its own.) */
 	const shownTitle = () => (touch() && !onCanvas() ? (kindOf(front().kind)?.title(front()) ?? front().target) : canvasOnScreen()?.title);
 	/** The ⋯ menu: on a touch bar it also opens a tab, which the bar has no + for. */
-	const more = () => [...(touch() ? [{ label: "Open a tab", icon: Plus, onPick: openPlus }] : []), ...moreItems(stagePages)];
+	const more = () => [...(touch() ? [{ label: m.app_open_tab(), icon: Plus, onPick: openPlus }] : []), ...moreItems(stagePages)];
 	/** The agents whose canvas is the one on screen: the faces in the top-right bar. */
 	const hereAgents = createMemo(() => {
 		const stage = canvasOnScreen()?.name;

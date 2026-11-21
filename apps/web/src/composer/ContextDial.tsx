@@ -1,6 +1,7 @@
 import type { AgentUsage } from "@decks/protocol";
 import { Show } from "solid-js";
 import { Popover } from "@decks/ui";
+import { formatNumber, m } from "@decks/i18n";
 import { ContextSummary } from "./ContextSummary.tsx";
 import { ContextRing } from "../shell/ContextRing.tsx";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
@@ -43,7 +44,7 @@ export function ContextDial(props: {
 				<Popover
 					placement="top-end"
 					class="w-[min(280px,calc(100vw-16px))]"
-					label="Context and cost"
+					label={m.composer_context_label()}
 					trigger={(api) => {
 						dismiss = () => {
 							if (api.open) api.toggle();
@@ -56,14 +57,14 @@ export function ContextDial(props: {
 								data-level={contextLevel(props.usage) ?? "normal"}
 								aria-haspopup="menu"
 								aria-expanded={api.open}
-								aria-label={`Context ${Math.round(value())}% full — the numbers behind it`}
+								aria-label={m.composer_context_dial({ percent: formatNumber(Math.round(value()) / 100, { style: "percent" }) })}
 								onClick={api.toggle}
 							>
 								{/* The ring is `shell/ContextRing.tsx`, shared with the `⋯` row on a
 								    touchscreen — it was written out in both and the two drifted apart on
 								    the radius. */}
 								<ContextRing usage={props.usage} size={16} />
-								{Math.round(value())}%
+								{formatNumber(Math.round(value()) / 100, { style: "percent" })}
 							</button>
 						);
 					}}

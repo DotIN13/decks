@@ -1,5 +1,6 @@
 import { batch, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { m } from "@decks/i18n";
 
 /** Whether a pen (an Apple Pencil) has touched this device, kept so it is known before the next stroke. */
 const KEY = "decks.pencil";
@@ -143,7 +144,7 @@ export function ScribbleCatch(props: {
 						seed();
 					}}
 					{...{ [CATCH]: "" }}
-					aria-label="Write here with the pencil; the words go into the field being edited"
+					aria-label={m.ui_scribble_label()}
 					autocapitalize="sentences"
 					spellcheck={false}
 					style={{

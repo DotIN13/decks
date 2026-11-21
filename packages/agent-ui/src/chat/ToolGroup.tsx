@@ -3,6 +3,7 @@ import { createSignal, Index, Show } from "solid-js";
 import { Icon } from "@decks/ui";
 import type { ToolSlot } from "./tool-groups.ts";
 import { ToolChip } from "./ToolChip.tsx";
+import { formatList, m } from "@decks/i18n";
 
 /**
  * A turn's tool calls, inside the turn's own card.
@@ -67,7 +68,7 @@ function Group(props: { slot: Extract<ToolSlot, { kind: "group" }>; alone: boole
 	const [open, setOpen] = createSignal(false);
 	const count = () => props.slot.calls.length;
 	const names = () => (props.slot.more > 0 ? `${props.slot.names.join(" · ")} +${props.slot.more}` : props.slot.names.join(" · "));
-	const word = () => (props.alone ? (count() === 1 ? "tool" : "tools") : "done");
+	const label = () => (props.alone ? m.chat_tool_group_tools({ count: count() }) : m.chat_tool_group_done({ count: count() }));
 
 	return (
 		/* `data-group` names the row for a check without giving it a look of its own —
@@ -78,14 +79,12 @@ function Group(props: { slot: Extract<ToolSlot, { kind: "group" }>; alone: boole
 				type="button"
 				data-open={open()}
 				aria-expanded={open()}
-				aria-label={`${count()} finished tool calls: ${props.slot.names.join(", ")}`}
-				title={open() ? "Hide these calls" : "Show these calls"}
+				aria-label={m.chat_tool_group_label({ count: count(), names: formatList(props.slot.names) })}
+				title={open() ? m.chat_tool_group_hide() : m.chat_tool_group_show()}
 				onClick={() => setOpen(!open())}
 			>
 				<span class="state" aria-hidden="true" />
-				<span class="name">
-					{count()} {word()}
-				</span>
+				<span class="name">{label()}</span>
 				<span class="title">{names()}</span>
 				<Icon of={ChevronRight} class="twisty" size={12} />
 			</button>
