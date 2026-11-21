@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-solid";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import Play from "lucide-solid/icons/play";
 import Check from "lucide-solid/icons/check";
-import { For, Show } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import { AgentFace } from "../agents/AgentPill.tsx";
 import { ContextRing } from "./ContextRing.tsx";
 import { PictureProgress } from "./PictureProgress.tsx";
@@ -32,6 +32,8 @@ export function TopRight(props: {
 	more: MoreItem[];
 	/** Only the `⋯`, for the phone's top bar. */
 	menuOnly?: boolean;
+	/** What the tab in front offers, first in the bar (`tabs/TabActs.tsx`): the header's. */
+	acts?: JSX.Element;
 }) {
 	const menu = () => (
 		<Popover
@@ -103,6 +105,7 @@ export function TopRight(props: {
 	return (
 		<Show when={!props.menuOnly} fallback={menu()}>
 			<div class="v3-bar v3-topright float pill" data-inset="top">
+				{props.acts}
 				<Show when={props.here.length > 0}>
 					<span class="v3-here" role="group" aria-label="Agents on this canvas">
 						<For each={props.here.slice(0, 5)}>

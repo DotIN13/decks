@@ -13,6 +13,8 @@ import { moreItems } from "./more-menu.ts";
 import type { Parts } from "./parts.ts";
 import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, openAgentsPanel, openCanvas, setStagesOpen, showPanel, stagesOpen, viewOnlyStage } from "./person.ts";
 import { openPlus, openTabsList, TabStrip } from "../tabs/TabStrip.tsx";
+import { TabActs } from "../tabs/TabActs.tsx";
+import { showOnCanvas } from "../tabs/show-on-canvas.ts";
 import Plus from "lucide-solid/icons/plus";
 import { Dynamic } from "solid-js/web";
 import { touchTop } from "../tabs/budget.ts";
@@ -22,9 +24,13 @@ import { canvasOnScreen, front, onCanvas } from "../tabs/tabs.ts";
 /**
  * The top of the page: the bar on the left (the panel's button, the agents, the canvas), the corner on
  * the right (who is here, the usage ring, the overflow), and the canvas manager they open.
+ *
+ * Off a phone the two are one header across the canvas's column (`.v3-header`, the ground both sit
+ * on, `styles/v3.css`): as tall as the band the two used to float in, so nothing under it moves. With
+ * a card, a document or an app in front the right end also holds what that tab offers (`TabActs`).
  */
 export function Top(props: { parts: Parts }) {
-	const { layout, present, stagePages } = props.parts;
+	const { layout, present, stagePages, canvasHost } = props.parts;
 	const phone = layout.phone;
 	/** A phone's or a tablet's bar (`tabs/budget.ts`): the chip names the tab in front, the tabs are one count, and the + is in ⋯. */
 	const touch = () => touchTop(phone());
@@ -49,6 +55,9 @@ export function Top(props: { parts: Parts }) {
 				where notices land, and they had been dodging it — and there is one
 				`data-inset="top"` where there were two.
 			*/}
+			<Show when={!phone()}>
+				<div class="v3-header" aria-hidden="true" />
+			</Show>
 			<TopBar
 				/* On a desktop the deck is in the panel's head; folded, the top bar holds only the button that brings the panel back. */
 				panelOpen={panelOpen() && !phone()}
@@ -115,6 +124,7 @@ export function Top(props: { parts: Parts }) {
 				}
 			>
 				<TopRight
+					acts={<TabActs onShow={(tab) => void showOnCanvas(tab, { frameWhenPlaced: canvasHost.frameWhenPlaced })} />}
 					/* On a touch bar the agent you talk to is the face at the left already: alone on the canvas, it is not said twice. */
 					here={touch() && hereAgents().length === 1 && hereAgents()[0]!.id === state.focused ? [] : hereAgents()}
 					identities={state.identities}

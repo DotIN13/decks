@@ -1,6 +1,5 @@
 import { ALLOW, SANDBOX, life, sayShared } from "@decks/frame";
 import { dismissMenus } from "@decks/ui";
-import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { setCanvasScheme } from "../../base/theme.ts";
 import type { AppEnd, AppStart } from "./protocol.ts";
@@ -15,22 +14,19 @@ function carried(stored: Record<string, string>): string {
 }
 
 /**
- * Run one app in the frame, whole: its own page in a frame inside this one, filling the window down to
- * the composer, sandboxed as this frame is and no further. What its page saves in its browser storage
+ * Run one app in the frame, whole: its own page in a frame inside this one, filling the window to its
+ * foot (the page's composer floats over it, and can be put away, as the person asked), sandboxed as
+ * this frame is and no further. What its page saves in its browser storage
  * comes here as a message (`decks-canvas.js`, which the harness puts into every page it serves by this
  * address) and is said up to the page, which keeps it. Answers how to stop it.
  */
 export async function runApp(root: HTMLElement, start: AppStart, end: AppEnd): Promise<() => void> {
-	const [foot, setFoot] = createSignal(start.look.foot);
 	const look = (dark: boolean) => {
 		document.documentElement.dataset.colorScheme = dark ? "dark" : "light";
 		setCanvasScheme(dark ? "dark" : "light");
 	};
 	look(start.look.dark);
-	end.on("look", (data) => {
-		look(data.dark);
-		setFoot(data.foot);
-	});
+	end.on("look", (data) => look(data.dark));
 	sayShared(end as never, { dismiss: dismissMenus, signal: life() });
 
 	let frame: HTMLIFrameElement | undefined;
@@ -44,7 +40,7 @@ export async function runApp(root: HTMLElement, start: AppStart, end: AppEnd): P
 
 	const dispose = render(
 		() => (
-			<div class="app-tab" style={{ position: "absolute", inset: `0 0 ${foot()}px 0`, background: "var(--canvas-bg)" }}>
+			<div class="app-tab" style={{ position: "absolute", inset: "0", background: "var(--canvas-bg)" }}>
 				<iframe
 					ref={(element) => (frame = element)}
 					class="app-tab-frame"

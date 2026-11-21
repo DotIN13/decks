@@ -8,11 +8,11 @@ import { state } from "../../state/deck.ts";
 import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
 import { ITEM_KINDS, ITEMS_BEHIND } from "../budget.ts";
-import { aliveAmong } from "../tabs.ts";
+import { aliveAmong, reloadsOf } from "../tabs.ts";
 import { openAt } from "../open.ts";
 
-/** The canvas a card is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
-function canvasOfPath(path: string): string | undefined {
+/** The canvas a card or a file is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
+export function canvasOfPath(path: string): string | undefined {
 	const own = /^canvases\/([^/]+)\//.exec(path);
 	if (own) return own[1];
 	const shared = /^shared\/canvases\/([^/]+)\/([^/]+)\//.exec(path);
@@ -49,14 +49,20 @@ function CardTab(props: { tab: Tab; shown: boolean; foot: number }) {
 		// Hidden, not taken out of the layout: the frame keeps its size, so the card is as it was when it shows again.
 		<div class="surface" data-surface="card" data-kept={props.shown ? undefined : "true"} style={{ visibility: props.shown ? undefined : "hidden", "pointer-events": props.shown ? undefined : "none" }}>
 			<Show when={canvas && cardAt(path)} fallback={<p class="tab-missing">This card is not in the deck any more.</p>}>
-				<CardFrame
-					card={{ path, title: cardAt(path)?.title ?? path, rev: cardAt(path)?.rev ?? 0, w: cardAt(path)?.w ?? 600, trusted: !path.startsWith("shared/") }}
-					canvas={canvas!}
-					pass={canvasPass}
-					dark={scheme() === "dark"}
-					foot={props.foot}
-					agent={cardAgentCall} openAt={openAt}
-				/>
+				{/* Made again at the header's Reload: a new frame is how a card's page and its scripts start again. */}
+				<Show when={[reloadsOf(props.tab.id)]} keyed>
+					{(_load) => (
+						<CardFrame
+							card={{ path, title: cardAt(path)?.title ?? path, rev: cardAt(path)?.rev ?? 0, w: cardAt(path)?.w ?? 600, trusted: !path.startsWith("shared/") }}
+							canvas={canvas!}
+							pass={canvasPass}
+							dark={scheme() === "dark"}
+							foot={props.foot}
+							agent={cardAgentCall}
+							openAt={openAt}
+						/>
+					)}
+				</Show>
 			</Show>
 		</div>
 	);

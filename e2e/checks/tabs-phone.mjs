@@ -83,7 +83,7 @@ await call("view.open", ["phone-app"]);
 await until(async () => ((await fold.innerText()).trim() === "3" ? true : undefined));
 const appFrame = () => page.frames().find((one) => !one.isDetached() && one.url().includes("/app/t/") && one.url().includes("/phone-app/"));
 const loaded = await until(async () => (await appFrame()?.locator("#count").textContent({ timeout: 1000 }))?.includes("Pressed 0"));
-say("an app's tab loads on the phone, and the title names it", !!loaded && (await fold.innerText()).trim() === "3" && (await title.innerText()).includes("phone-app"), await title.innerText());
+say("an app's tab loads on the phone, and the title names it, by the app's own title", !!loaded && (await fold.innerText()).trim() === "3" && (await until(async () => ((await title.innerText()).includes("Phone app") ? true : undefined))) === true, await title.innerText());
 await appFrame()?.evaluate(() => {
 	document.getElementById("press").click();
 	document.getElementById("press").click();

@@ -38,7 +38,8 @@ await rest(page);
 const pagesBefore = page.context().pages().length;
 await pressCardAction(page, "New tab");
 const chip = page.locator('.tab-chip[data-kind="app"]');
-say("New tab on the app's pill opens it as a tab of this window, in front", (await until(() => chip.count())) === 1 && (await chip.getAttribute("data-front")) === "true" && (await chip.innerText()).includes("tab-counter"), await chip.innerText().catch(() => ""));
+// Named by the app's own title, which comes a moment after the tab when the deck's apps had not been read yet.
+say("New tab on the app's pill opens it as a tab of this window, in front, named by the app's title", (await until(() => chip.count())) === 1 && (await chip.getAttribute("data-front")) === "true" && (await until(async () => ((await chip.innerText()).includes("Tab counter") ? true : undefined))) === true, await chip.innerText().catch(() => ""));
 say("…and not the browser's tab", page.context().pages().length === pagesBefore);
 const frameEl = page.locator('.surface[data-surface="app"] iframe.app-frame');
 say("the app is in a frame of its own, sandboxed as the canvas's is", (await until(() => frameEl.count())) === 1 && !(await frameEl.getAttribute("sandbox")).includes("allow-same-origin") && (await frameEl.getAttribute("sandbox")) === (await page.locator("iframe.canvas-frame").getAttribute("sandbox")));

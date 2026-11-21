@@ -149,6 +149,15 @@ export function showTab(id: string): void {
 /** Bring the canvas of the chat on screen forward, from behind a card, a document or an app. */
 export const showCanvas = (): void => onItsCanvas(who());
 
+/** How many times each tab has been told to load again by hand (the header's Reload), by the tab's id. */
+const [tabReloads, setTabReloads] = createSignal<Readonly<Record<string, number>>>({});
+/** Load what a tab shows again: its frame is made again (`kinds/app.tsx`, `kinds/card.tsx`), this tab alone. */
+export const reloadTab = (id: string): void => void setTabReloads((was) => ({ ...was, [id]: (was[id] ?? 0) + 1 }));
+/** How many times a tab has been told to load again by hand. */
+export const reloadsOf = (id: string): number => tabReloads()[id] ?? 0;
+/** The id a tab on a target has, whether or not one is open. */
+export const tabIdOf = (kind: string, target: string): string => idOf(kind, target);
+
 /**
  * Open a tab on a target and put the camera of the chat on screen on it, or on the one already open
  * on it. A canvas opened this way stays in the row, and so does the one the camera leaves for it.

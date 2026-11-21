@@ -30,7 +30,7 @@ export function App() {
 	const { presenting, layout } = parts;
 	rememberTabs();
 	return (
-		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={layout.phone() ? "true" : undefined} data-touch-top={touchTop(layout.phone()) ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
+		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={layout.phone() ? "true" : undefined} data-header={layout.phone() ? undefined : "true"} data-touch-top={touchTop(layout.phone()) ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
 			<div class="work">
 				<TabView parts={parts} />
 				<Top parts={parts} />

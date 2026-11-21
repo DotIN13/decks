@@ -1715,6 +1715,10 @@
 	:where(.decks-canvas, .decks-layer) .document-surface .dp {
 		height: 100%;
 	}
+	/* A document whole in its tab runs to the window's foot (`frame/document/guest.tsx`): its last lines scroll clear of the composer floating there. */
+	.document-tab .dp-scroll {
+		padding-bottom: var(--canvas-tab-foot, 0px);
+	}
 }
 
 @layer decks.surface {

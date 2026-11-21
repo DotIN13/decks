@@ -428,6 +428,93 @@ body {
 		font-size: 12px;
 	}
 
+	/* ---- the header ------------------------------------------------------------------------
+	 * Off a phone the two top bars are one header across the canvas's column (`app/top.tsx`): a ground
+	 * the full width of the column (`.v3-header`), with the bars flat on it at its two ends. It is as
+	 * tall as the band the bars floated in (12 + 44 px, and 12 + 52 under a finger), and the bars are
+	 * as tall as it is, so the top inset they declare, and everything placed under it, is where it was.
+	 */
+	.app[data-header] {
+		--v3-header-h: 56px;
+	}
+	@media (pointer: coarse) {
+		.app[data-header] {
+			--v3-header-h: 64px;
+		}
+	}
+	.v3-header {
+		position: absolute;
+		z-index: 19;
+		top: 0;
+		right: var(--inset-right, 0px);
+		left: var(--inset-left, 0px);
+		box-sizing: border-box;
+		height: var(--v3-header-h, 56px);
+		border-bottom: 1px solid var(--v3-line);
+		background: var(--v3-panel);
+		transition:
+			left 160ms ease,
+			opacity 200ms var(--v3-ease),
+			translate 260ms var(--v3-ease);
+	}
+	.app[data-header] .v3-topbar.float.pill,
+	.app[data-header] .v3-topright.float.pill {
+		top: 0;
+		height: var(--v3-header-h);
+		border-radius: 0;
+		background: none;
+		box-shadow: none;
+	}
+	.app[data-header] .v3-topbar.float.pill {
+		left: calc(var(--inset-left, 0px) + 6px);
+		max-width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 20px - var(--topright-w, 0px));
+	}
+	.app[data-header] .v3-topright.float.pill {
+		right: calc(var(--inset-right, 0px) + 6px);
+	}
+	.app[data-presenting="true"] .v3-header {
+		opacity: 0;
+		translate: 0 -16px;
+		pointer-events: none;
+	}
+	/* What the tab in front offers, first at the header's right end (`tabs/TabActs.tsx`): two in words, the browser's tab as a mark, then a hairline before who is here. */
+	.tab-acts {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.tab-act {
+		display: flex;
+		height: 32px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 9px;
+		border: 0;
+		border-radius: 8px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+		white-space: nowrap;
+	}
+	.tab-act:hover {
+		background: var(--v3-bg3);
+		color: var(--v3-fg);
+	}
+	.tab-acts > .v3-sep {
+		margin: 0 6px;
+	}
+	/* Tight, the two say themselves by their marks alone. */
+	.app[data-tight-top] .tab-act > span {
+		display: none;
+	}
+	@media (pointer: coarse) {
+		.tab-act {
+			height: 36px;
+		}
+	}
+
 	/* ---- the top-right bar ----------------------------------------------------------------- */
 
 	.v3-topright.float.pill {

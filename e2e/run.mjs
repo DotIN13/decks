@@ -191,6 +191,7 @@ const CHECKS = [
 	{ file: "app-window.mjs", needsAgent: false },
 	{ file: "app-window-touch.mjs", needsAgent: false },
 	{ file: "app-reload.mjs", needsAgent: false },
+	{ file: "header.mjs", needsAgent: false },
 	{ file: "tabs-phone.mjs", needsAgent: false },
 	{ file: "canvas-drawer.mjs", needsAgent: false },
 	{ file: "tabs-cameras.mjs", needsAgent: false },

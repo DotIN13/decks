@@ -55,9 +55,10 @@ export async function runDocument(root: HTMLElement, start: DocumentStart, end: 
 		},
 	});
 
+	// To the window's foot: the page's composer floats over it and can be put away. `--canvas-tab-foot` is how much of the foot it covers now, which the document's last lines scroll clear of (`canvas.css`).
 	const dispose = render(
 		() => (
-			<div class="document-tab" style={{ position: "absolute", inset: `0 0 ${foot()}px 0`, display: "flex", "justify-content": "center", background: "var(--canvas-bg)" }}>
+			<div class="document-tab" style={{ position: "absolute", inset: "0", display: "flex", "justify-content": "center", background: "var(--canvas-bg)", "--canvas-tab-foot": `${foot()}px` }}>
 				<div class="document-tab-page" style={{ position: "relative", width: "100%", "max-width": `${WIDEST}px`, height: "100%" }}>
 					<DocumentSurface file={start.document.path} selected onSelect={() => {}} />
 				</div>

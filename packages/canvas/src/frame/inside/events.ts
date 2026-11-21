@@ -101,11 +101,22 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	 * panel shows for, so every card an agent placed and flew to came with its position, size and
 	 * corners in a panel over the canvas, where a press on a card never opens one.
 	 */
-	const selectCard = (path: string | undefined) => {
+	let selecting: ReturnType<typeof setTimeout> | undefined;
+	const selectCard = (path: string | undefined, until = Date.now() + 2000) => {
+		clearTimeout(selecting);
 		if (!path) return;
-		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path || path.endsWith(one.metadata?.path ?? "\u0000"));
-		if (child?.metadata?.path) handle.select([], child.metadata.path);
+		const children = (handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>;
+		/*
+		 * An app's window or a document has no file path of its own: the page names it `item:<id>`
+		 * (`model/drawing.ts`, `pagePath`), and it is found by that id. Looked for by a card's path it was
+		 * never found, so the Apps tab's Show on canvas flew to a window and left it unselected.
+		 */
+		const found = path.startsWith("item:") ? (children.some((one) => one.id === path.slice(5)) ? path : undefined) : children.find((one) => one.metadata?.path === path || path.endsWith(one.metadata?.path ?? "\u0000"))?.metadata?.path;
+		if (found) return handle.select([], found);
+		// Not on the drawing yet: an item the page has just had placed is selected when its edit arrives, within a moment.
+		if (Date.now() < until) selecting = setTimeout(() => selectCard(path, until), 150);
 	};
+	life().addEventListener("abort", () => clearTimeout(selecting), { once: true });
 	// The card the page had selected on this canvas when the frame was made again (an agent switch and back).
 	selectCard(start.selected);
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
@@ -137,7 +148,12 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	// The page draws the tools: their state is the same here and there (`tools-mirror.ts`), until this canvas ends.
 	if (start.look.pageTools) life().addEventListener("abort", mirrorTools("frame", end, { frame: { zoom: () => ctx.camera().zoom, drawn: () => (ctx.revision(), handle.drawn()) } }), { once: true });
 	end.on("camera", (data) => (data.glide ? handle.glide(data.camera, data.glide) : handle.setCamera(data.camera)));
-	end.on("select", (data) => (data.page ? selectCard(data.page) : handle.select(data.ids)));
+	end.on("select", (data) => {
+		// Whatever the page says next is what holds: a selection still being waited for is let go of.
+		clearTimeout(selecting);
+		if (data.page) selectCard(data.page);
+		else handle.select(data.ids);
+	});
 	end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
 	end.answer("edit", (data) => {
 		probes.pageEdited?.();
