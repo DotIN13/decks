@@ -1,5 +1,5 @@
 import { life } from "./life.ts";
-import { baseTheme, CLIP_TYPE, clipFromHtml, clipHtml, clipItems, clipText, ids as idsOf, isArrow, parseClip, pastedItems, placements, walk, type Clip, type PenNode } from "@decks/pen";
+import { isDeckLink, baseTheme, CLIP_TYPE, clipFromHtml, clipHtml, clipItems, clipText, ids as idsOf, isArrow, parseClip, pastedItems, placements, walk, type Clip, type PenNode } from "@decks/pen";
 import { toWorld } from "../../camera/camera.ts";
 import { wordsSelectedInCards } from "../../items/card.ts";
 import type { CanvasHandle } from "../../view/types.ts";
@@ -72,6 +72,23 @@ function needsFiles(node: PenNode, sameCanvas: boolean): string | undefined {
 	return undefined;
 }
 
+/**
+ * Pasted words that are the address of something in the deck: `#canvas/<name>` as it is written in a
+ * link, or the Decks window's own address with one after `#`, as copied from the browser's address
+ * bar (told from another site's by the origin of the page this frame is in, where the browser says it).
+ */
+function pastedLink(words: string): string | undefined {
+	if (/\s/.test(words)) return undefined;
+	if (isDeckLink(words)) return words;
+	try {
+		const url = new URL(words);
+		const page = location.ancestorOrigins?.[0];
+		return page && url.origin === page && isDeckLink(url.hash) ? url.hash : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: string; text?: string }) => void } {
 	const { handle } = deps;
 	/** Where the pointer is over the canvas, on this frame's screen; undefined once it has left. */
@@ -139,11 +156,22 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 		handle.select(pasted.items.map((one) => one.id));
 	};
 
+	/** A pasted address of something in the deck lands as a link chip, placed by the harness, which knows what it names (`canvas.insert`, `{ type: "link" }`). */
+	const pasteLink = async (to: string) => {
+		const at = worldAt();
+		const answer = await deps.call!("canvas.insert", [{ type: "link", to }, { at: { x1: at.x, y1: at.y } }]);
+		if (!answer.ok) return deps.say(answer.error ?? "The link was not placed.");
+		const id = (answer.value as { id?: unknown } | undefined)?.id;
+		if (typeof id === "string") selectWhenDrawn([id]);
+	};
+
 	const paste = (data: { clip?: Clip | undefined; text?: string | undefined }) => {
 		if (!deps.canWrite()) return deps.say("This canvas can only be read, so nothing is pasted on it.");
 		if (data.clip && data.clip.harness === deps.harness() && (data.clip.id || !deps.call)) return void pasteClip(data.clip);
 		const words = (data.clip ? clipText(data.clip.items) : data.text ?? "").trim();
 		if (!words) return;
+		const link = data.clip || !deps.call ? undefined : pastedLink(words);
+		if (link) return void pasteLink(link);
 		const at = worldAt();
 		const id = `pasted-${Date.now().toString(36)}`;
 		handle.edit([{ op: "insert", node: { type: "note", id, content: words.slice(0, 20_000) }, box: { x1: at.x, y1: at.y } }]);

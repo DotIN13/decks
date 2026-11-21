@@ -57,6 +57,8 @@ export interface FrameHostOptions {
 	openApp?(name: string): void;
 	/** The page has tabs of its own: a card, a document or an app opened whole from its pill (New tab) comes here, by what it is. Without it the pill opens the browser's tab. */
 	openTab?(item: { kind: "card" | "document" | "app"; target: string; browser?: true }): void;
+	/** A link on the canvas to something in the deck, followed: its address in this window, `#canvas/…`, `#card/…`, `#doc/…` or `#app/…`, for the page to read and open as a tab. */
+	openAt?(link: { address: string; browser?: true }): void;
 	/** The page's composer: the frame is told where it is, so a drag let go over it mentions what it carries. */
 	composer?(): HTMLElement | undefined;
 	/** How far up from the bottom the page's dock reaches, in pixels: a phone's tool row goes above it. */

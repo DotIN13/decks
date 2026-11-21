@@ -152,6 +152,8 @@ export function installHost(ctx: FrameContext): void {
 		openLink: (href) => end.emit("open-link", { href }),
 		// The page has tabs of its own (`look.pageTabs`): the pill's New tab says what it opens, and the page opens it.
 		...(start.look.pageTabs ? { openItem: (item: { kind: "card" | "document" | "app"; target: string; browser?: true }) => end.emit("open-tab", item) } : {}),
+		// And a link to something in the deck is the page's to read and open, as a tab.
+		...(start.look.pageTabs ? { openAddress: (address: string, browser: boolean) => end.emit("open-at", { address, ...(browser ? { browser: true as const } : {}) }) } : {}),
 		// The composer is the page's, where the page said it is: a drag let go over it is a mention, sent as a draft.
 		composer: {
 			at: (x, y) => {

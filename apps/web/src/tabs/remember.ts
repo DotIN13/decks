@@ -3,7 +3,7 @@ import { storageKey } from "../connections/connection.ts";
 import { state } from "../state/deck.ts";
 import type { Tab } from "./kind.ts";
 import { kindAt, kindOf } from "./kinds.ts";
-import { stages } from "../state/canvases.ts";
+import { stageOf, stages } from "../state/canvases.ts";
 import { aimCanvas, front, openTab, restoreTabs, rowNow } from "./tabs.ts";
 
 /** The canvas each conversation's camera was last seen on, or was put on by this page: what a canvases frame is news against. */
@@ -124,9 +124,15 @@ export function rememberTabs(): void {
 	createEffect(() => {
 		for (const stage of stages()) {
 			for (const agent of stage.agents) {
+				/*
+				 * Where the page takes the agent to be (`stageOf`), which during a move this page made is
+				 * where it is going: a canvases frame sent before the harness had moved it still lists it on
+				 * the canvas it left, and read as it is, that frame and the next were two moves.
+				 */
+				const now = stageOf(agent.id)?.name ?? stage.name;
 				const was = seen.get(agent.id);
-				seen.set(agent.id, stage.name);
-				if (was !== undefined && was !== stage.name) aimCanvas(agent.id);
+				seen.set(agent.id, now);
+				if (was !== undefined && was !== now) aimCanvas(agent.id);
 			}
 		}
 	});

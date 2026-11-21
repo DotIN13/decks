@@ -22,6 +22,7 @@ export function CardFrame(props: CardFrameProps): JSX.Element {
 			dark={props.dark}
 			foot={props.foot}
 			agent={props.agent}
+			openAt={props.openAt}
 			kind="card"
 			title={props.card.title}
 			pass={() => props.pass(props.canvas)}

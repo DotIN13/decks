@@ -8,6 +8,7 @@ import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
 import { ITEM_KINDS, ITEMS_BEHIND } from "../budget.ts";
 import { aliveAmong } from "../tabs.ts";
+import { openAt } from "../open.ts";
 
 /** What a document is called in the row: its file's name. */
 const nameOf = (path: string | undefined) => path?.split("/").pop() ?? "Document";
@@ -62,6 +63,7 @@ function DocumentTab(props: { tab: Tab; shown: boolean; foot: number }) {
 							dark={scheme() === "dark"}
 							foot={props.foot}
 							agent={cardAgentCall}
+							openAt={openAt}
 						/>
 					)}
 				</Match>

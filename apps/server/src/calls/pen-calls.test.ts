@@ -329,3 +329,41 @@ test("an old Decks colour name an agent still writes is defined, with its new co
 		cleanup();
 	}
 });
+
+test("a link is placed by what it opens, kept as a tagged pill, and read back as a link", async () => {
+	const { must, call, app, agent, cleanup } = await open();
+	try {
+		const notes = (await must("canvas.create", ["Research notes"])).value.name as string;
+		// By a canvas's title, as `view open` takes it: the address is its folder's, the words its title.
+		const chip = (await must("canvas.insert", [{ type: "link", to: "Research notes" }, { at: { x1: 0, y1: 0 } }])).value;
+		assert.deepEqual({ type: chip.type, to: chip.to, title: chip.title }, { type: "link", to: `#canvas/${notes}`, title: "Research notes" });
+		assert.ok(chip.box.x2 - chip.box.x1 > 80 && chip.box.y2 - chip.box.y1 > 20, JSON.stringify(chip.box));
+		// The file keeps a pill pen.dev can open: a frame with a mark, the name and an arrow, tagged with the address.
+		const kept = app.stage.pens!.get(agent.seat.stageName(true)!).doc.children!.find((node) => node.id === chip.id)!;
+		assert.equal(kept.type, "frame");
+		assert.deepEqual(kept.metadata, { type: "decks.link", to: `#canvas/${notes}` });
+		assert.deepEqual(kept.children!.map((child) => [child.type, child.icon ?? child.content]), [["icon", "layers"], ["text", "Research notes"], ["icon", "arrow-up-right"]]);
+		assert.ok(kept.children!.every((child) => typeof child.id === "string" && child.id), "each part has an id");
+		// By a card's path, and by the address itself; a title of the caller's own is kept.
+		const card = (await must("canvas.insert", [{ type: "link", to: "canvases/t/cards/a" }, { beside: chip.id }])).value;
+		assert.deepEqual([card.to, card.title], ["#card/canvases/t/cards/a/index.html", "Revenue is up"]);
+		const named = (await must("canvas.insert", [{ type: "link", to: `#canvas/${notes}`, title: "The interviews" }, { below: chip.id }])).value;
+		assert.deepEqual([named.to, named.title], [`#canvas/${notes}`, "The interviews"]);
+		// Read with the canvas, it is a link among the items; written back as read, it is the same chip.
+		const read = (await must("canvas.read", [])).value.items.find((item: { id: string }) => item.id === chip.id);
+		assert.deepEqual({ type: read.type, to: read.to, title: read.title }, { type: "link", to: `#canvas/${notes}`, title: "Research notes" });
+		const again = (await must("canvas.replace", [chip.id, read])).value;
+		assert.deepEqual({ id: again.id, to: again.to, title: again.title }, { id: chip.id, to: `#canvas/${notes}`, title: "Research notes" });
+		// A name that is nothing in the deck is refused, in words; an address whose target is gone is kept, dimmed.
+		const none = await call("canvas.insert", [{ type: "link", to: "nothing-by-that-name" }]);
+		assert.ok(!none.ok && /Nothing to open is called/.test(none.error ?? ""), none.error);
+		const gone = (await must("canvas.insert", [{ type: "link", to: "#canvas/long-gone" }, { at: { x1: 0, y1: 400 } }])).value;
+		assert.deepEqual([gone.to, gone.title, gone.opacity], ["#canvas/long-gone", "long-gone", 0.45]);
+		// The canvas called something else: the chip that showed its name follows, and the one with words of its own keeps them.
+		await must("canvas.rename", ["Field notes", { canvas: notes }]);
+		const after = (await must("canvas.read", [])).value.items as Array<{ id: string; to?: string; title?: string }>;
+		assert.deepEqual(after.filter((item) => item.id === chip.id || item.id === named.id).map((item) => [item.to, item.title]), [[`#canvas/${notes}`, "Field notes"], [`#canvas/${notes}`, "The interviews"]]);
+	} finally {
+		cleanup();
+	}
+});

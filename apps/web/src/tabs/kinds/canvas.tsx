@@ -18,6 +18,7 @@ export const canvasKind: TabKind = {
 	name: "canvas",
 	address: "canvas",
 	title: (tab) => stages().find((one) => one.name === tab.target)?.title,
+	has: (target) => stages().some((one) => one.name === target),
 	icon: (props) => <Icon of={Layers} size={props.size ?? 16} />,
 	// Kept while a tab of another kind is in front, out of sight: its frame, its canvas and where it was looking are as they were when it comes back. Hidden, not taken out of the layout: a frame with no size moves its view to keep its middle, and draws again when it has one.
 	view: (tab, parts) => (

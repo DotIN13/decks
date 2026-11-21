@@ -45,6 +45,8 @@ export interface ItemLookProps {
 	foot: number;
 	/** A call that is the page's to make, with your login (the agents): as the canvas's frame is answered. */
 	agent?: (call: { verb: string; args: unknown[]; card: string }) => unknown;
+	/** A link in the item to something in the deck, followed: its address in this window, for a page with tabs to open. */
+	openAt?: (link: { address: string; browser?: true }) => void;
 }
 
 /**
@@ -79,7 +81,7 @@ export function ItemFrame<Own = unknown, Says = unknown, Pass extends ItemPass =
 			begin: (held) => {
 				const channel = new MessageChannel();
 				const page = peer(channel.port1) as ItemPageEnd<Own, Says>;
-				hearShared(page as never, { dismiss: dismissMenus, agent: props.agent, refuse: (message) => new CallRefused(message, "refused") });
+				hearShared(page as never, { dismiss: dismissMenus, agent: props.agent, openAt: props.openAt, refuse: (message) => new CallRefused(message, "refused") });
 				props.hear?.(page);
 				setEnd(() => page);
 				// A pass that never runs out (an app's, good while the token behind it works) is not asked for again.

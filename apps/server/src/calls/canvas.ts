@@ -18,6 +18,7 @@ import { freeSpot, type Side } from "./space.ts";
 import { exportPage } from "./export.ts";
 import { resolveInDeck } from "../deck/roots.ts";
 import { heldClip, holdClip, pasteItems } from "./paste.ts";
+import { linkFromItem, linkToItem } from "./link-item.ts";
 
 /**
  * An agent's shape with no colour given gets the colours the canvas tools give theirs, the drawing's
@@ -73,8 +74,10 @@ type CanvasOpIn =
 	| { op: "copy"; id: string; as?: string; at?: Corner; parent?: string | null }
 	| { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 
-/** A pen item as a caller reads it: a card as `{ type: "card", card }`, everything else as pen has it. */
+/** A pen item as a caller reads it: a card as `{ type: "card", card }`, a link chip as `{ type: "link", to, title }`, everything else as pen has it. */
 export function toItem(node: Record<string, unknown>): Record<string, unknown> {
+	const link = linkToItem(node);
+	if (link) return link;
 	const children = Array.isArray(node.children) ? (node.children as Record<string, unknown>[]).map(toItem) : undefined;
 	const path = boardOf(node as unknown as PenNode);
 	if (path) {
@@ -184,6 +187,8 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			if (!file) throw new Error('A document item names its file as the deck does: { type: "document", path: "canvases/<canvas>/files/notes.md" }.');
 			return { ...others, type: "browser", name: named ?? basename(file), width: typeof width === "number" ? width : 1000, height: typeof height === "number" ? height : 1100, metadata: { type: "decks.document", path: file } };
 		}
+		// A link to something in the deck, `{ type: "link", to }`: the chip the file keeps (`link-item.ts`).
+		if (item.type === "link") return linkFromItem(ctx, item as Record<string, unknown>);
 		// A document item given as it reads back (`browser`, tagged `decks.document`): its path as the deck names the file, the same way.
 		if (item.type === "browser" && (item.metadata as { type?: unknown; path?: unknown } | undefined)?.type === "decks.document" && typeof (item.metadata as { path?: unknown }).path === "string") {
 			const meta = item.metadata as { path: string };

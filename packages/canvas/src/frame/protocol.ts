@@ -112,6 +112,8 @@ interface FrameToPage {
 	"open-app": { name: string };
 	/** Open a card, a document or an app whole in a tab of the page's (the pill's New tab), where the page has them (`look.pageTabs`). */
 	"open-tab": { kind: "card" | "document" | "app"; target: string; browser?: true };
+	/** Follow a link to something in the deck, by its address in the page's window (`#canvas/…`, `#card/…`, `#doc/…`, `#app/…`): the page reads the address and opens the tab, where it has tabs (`look.pageTabs`). */
+	"open-at": { address: string; browser?: true };
 	/** A drag is over the page's composer, or no longer: it is marked as where what is dragged would be mentioned. */
 	refer: { over: boolean };
 	/** Open an address in a tab: the page's to open, an http(s) one alone, since the sandbox has no popups. */

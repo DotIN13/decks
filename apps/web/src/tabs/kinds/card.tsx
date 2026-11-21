@@ -9,6 +9,7 @@ import { act } from "../../state/decks.ts";
 import type { Tab, TabKind } from "../kind.ts";
 import { ITEM_KINDS, ITEMS_BEHIND } from "../budget.ts";
 import { aliveAmong } from "../tabs.ts";
+import { openAt } from "../open.ts";
 
 /** The canvas a card is in, by its path: `canvases/<name>/…` is `<name>`'s, `shared/canvases/<owner>/<name>/…` is `shared/<owner>/<name>`'s. */
 function canvasOfPath(path: string): string | undefined {
@@ -36,6 +37,7 @@ export const cardKind: TabKind = {
 		label: "Cards",
 		list: async () => ((await act<Array<{ path: string; title: string }>>("card.list", [])) ?? []).map((card) => ({ target: card.path, title: card.title || card.path, note: canvasOfPath(card.path) })),
 	},
+	has: (target) => cardAt(target) !== undefined,
 	icon: (props) => <Icon of={FileText} size={props.size ?? 16} />,
 	view: (tab, parts) => <For each={aliveAmong(ITEM_KINDS, ITEMS_BEHIND).filter((one) => one.kind === "card")}>{(one) => <CardTab tab={one} shown={tab()?.id === one.id} foot={parts.dock.dockCover()} />}</For>,
 };
@@ -53,7 +55,7 @@ function CardTab(props: { tab: Tab; shown: boolean; foot: number }) {
 					pass={canvasPass}
 					dark={scheme() === "dark"}
 					foot={props.foot}
-					agent={cardAgentCall}
+					agent={cardAgentCall} openAt={openAt}
 				/>
 			</Show>
 		</div>

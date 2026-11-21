@@ -128,14 +128,14 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 	};
 }
 
-type TabKindName = "canvas" | "card" | "document" | "app";
+export type TabKindName = "canvas" | "card" | "document" | "app";
 
 /**
  * What `view.open` is asked to open: the kind named, checked, or the one kind the name fits. A card is
  * its path in the deck (its folder is enough), a canvas its name or title, an app its name, a document
  * its path in the deck or a root it declares.
  */
-function tabFor(ctx: VerbContext, what: string, kind?: TabKindName): { kind: TabKindName; target: string; title: string } {
+export function tabFor(ctx: VerbContext, what: string, kind?: TabKindName): { kind: TabKindName; target: string; title: string } {
 	const { service } = ctx;
 	const asked = String(what ?? "").trim();
 	if (!asked) throw new Error("open names what to open: a canvas, a card's path, a document's path or an app.");

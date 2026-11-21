@@ -13,7 +13,7 @@
  * drag's offset and the resized outline stay until a new drawing is drawn (`drawn`), or until the
  * gesture's entry in `settling` comes due two seconds on (`tick`) with no new drawing since.
  */
-import { isCard, mediaOf, shapeRadius, type MediaItem, type Op, type PenNode } from "@decks/pen";
+import { chipLink, isCard, mediaOf, shapeRadius, type MediaItem, type Op, type PenNode } from "@decks/pen";
 import { snapMove, type Guide } from "../snap.ts";
 import { arrowOp, bendAt, bendStart, droppedEnd, joinAt, resetBendOp, resetEndOp, routeDraft, slideJoin, withEnd, type ArrowHandles, type JoinedEnd, type Which } from "./arrows.ts";
 import { dropSlot, frameUnder, NEAR_PX, nearDrops } from "./drop.ts";
@@ -37,8 +37,8 @@ const HANDLE_TAP_MS = 400;
 /** Where the pointer is and how: in stage coordinates and on the screen, the keys held, its kind, and when. */
 export type PointerInput = { at: Pt; client: Pt; mods: Mods; pointer: PointerKind; time: number };
 
-/** What a click that does not move does, besides selecting: follow a card's link, or play a film or a sound. */
-export type Tap = { do: "open-link"; href: string } | { do: "media"; id: string; media: MediaItem };
+/** What a click that does not move does, besides selecting: follow a link (`browser`: with ⌘ or Ctrl held, which asks for the browser's own tab where the host has tabs of its own), or play a film or a sound. */
+export type Tap = { do: "open-link"; href: string; browser?: true; chip?: true } | { do: "media"; id: string; media: MediaItem };
 
 /** Carrying the selection: items and boards together. `press` until it has moved, `move` after. */
 type Carry = {
@@ -238,7 +238,9 @@ function pressCanvas(state: EditorState, p: PointerInput, scene: SceneQuery, ctx
 		// A film or a sound: a click that does not move plays it, or pauses it.
 		const playable = inner && mediaOf(inner.node) ? inner : mediaOf(hit.node) ? hit : undefined;
 		const media = playable ? mediaOf(playable.node) : undefined;
-		const tap: Tap | undefined = follows ? { do: "open-link", href } : playable && media && !p.mods.shift ? { do: "media", id: playable.id, media } : undefined;
+		// A link chip is all link: its click opens it and leaves it unselected, where a click on a card's link also selects the card.
+		const chip = follows && !group && chipLink(hit.node) === href;
+		const tap: Tap | undefined = follows ? { do: "open-link", href, ...(isFree(p.mods) ? { browser: true as const } : {}), ...(chip ? { chip: true as const } : {}) } : playable && media && !p.mods.shift ? { do: "media", id: playable.id, media } : undefined;
 		const started = carry(next, scene, ctx, p, moving, boards, tap);
 		return done(started.state, [...effects, started.effect]);
 	}
@@ -356,6 +358,8 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 	if (!moved) {
 		next = { ...next, drop: {}, pageDrag: undefined };
 		if (g.tap) effects.push(g.tap);
+		// A chip's click was for its link: the press selected it to carry it, and nothing is left selected.
+		if (g.tap?.do === "open-link" && g.tap.chip) next = withSelection(next, { items: [], boards: [] });
 		return done(next, effects);
 	}
 	/*

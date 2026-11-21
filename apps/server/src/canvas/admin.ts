@@ -4,6 +4,7 @@ import { slug } from "@decks/deck-kit";
 import type { DeckAgent } from "../agents/session.ts";
 import type { Deck } from "../deck/loader.ts";
 import { canvasFolder } from "@decks/hub/layout";
+import { linksFollow } from "./link-chips.ts";
 import type { CanvasPens } from "./pens.ts";
 
 /**
@@ -47,6 +48,8 @@ function moveCanvas(context: Context, from: string, to: string): string {
 	const repoint = (path: string) => (path.startsWith(before) ? after + path.slice(before.length) : path);
 	context.pens.rename(from, to, repoint);
 	context.deck.reload();
+	// The links to it on every canvas, and to what is kept in it, follow it to its new folder.
+	linksFollow(context.pens, { did: "moved", from, to });
 	for (const agent of context.agents) agent.seat.stageRenamed(from, to, repoint);
 	return to;
 }
@@ -60,7 +63,10 @@ function moveCanvas(context: Context, from: string, to: string): string {
  */
 export function titleCanvas(context: Context, name: string, title: string): string {
 	const unchosen = context.pens.naming(name).provisional;
+	const was = context.pens.titleOf(name);
 	const clean = context.pens.setTitle(name, title);
+	// A chip that points at it says its new name.
+	if (clean !== was) linksFollow(context.pens, { did: "titled", canvas: name, was, title: clean });
 	if (!unchosen) return name;
 	if (slug(clean, 40) === name || !slug(clean, 40)) return name;
 	const keepsBoards = existsSync(join(context.deck.path, canvasFolder(name), "cards"));
@@ -75,6 +81,8 @@ export function deleteCanvas(context: Context, name: string): { boards: number }
 	const boards = existsSync(folder) ? readdirSync(folder).length : 0;
 	context.pens.remove(name);
 	context.deck.reload();
+	// A chip that pointed at it, or at something kept in it, stays where it is, dimmed.
+	linksFollow(context.pens, { did: "removed", canvas: name });
 	for (const agent of context.agents) agent.seat.stageDeleted(name);
 	return { boards };
 }

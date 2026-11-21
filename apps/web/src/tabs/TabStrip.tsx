@@ -9,6 +9,7 @@ import { canvasMenu } from "../app/canvas-menu.tsx";
 import { newCanvas, setStagesOpen } from "../app/person.ts";
 import { stages } from "../state/canvases.ts";
 import { kindOf } from "./kinds.ts";
+import { dragToCanvas } from "./drag-link.ts";
 import { OpenMore } from "./OpenMore.tsx";
 import type { Tab } from "./kind.ts";
 import { cameraCanvasTab, canClose, canvasOnScreen, closeTab, front, openTab, showTab, tabs } from "./tabs.ts";
@@ -50,11 +51,13 @@ function CloseTab(props: { tab: Tab; in: "chip" | "list" }): JSX.Element {
  * One tab in the row: its kind's mark, its name and its ✕, washed when it is in front. Every tab is
  * drawn the same, the canvas the chat's camera is on among them, in its place. A press puts the
  * camera of the chat on screen on it; a press on a canvas tab that is already in front opens the
- * canvas list, to take that tab to another canvas.
+ * canvas list, to take that tab to another canvas. Dragged down onto the canvas, a tab leaves a link
+ * to itself there (`drag-link.ts`).
  */
 function TabChip(props: { tab: Tab }): JSX.Element {
 	const tab = props.tab;
 	const inFront = () => front().id === tab.id;
+	const drag = dragToCanvas(tab, () => titleOf(tab));
 	const name = (list?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
 		<button
 			type="button"
@@ -65,7 +68,8 @@ function TabChip(props: { tab: Tab }): JSX.Element {
 			data-open={list?.open ? "true" : undefined}
 			data-tip={list && inFront() ? "Canvases" : titleOf(tab)}
 			aria-label={`${titleOf(tab)}, a tab`}
-			onClick={() => (list && inFront() ? list.toggle() : showTab(tab.id))}
+			onPointerDown={drag.press}
+			onClick={() => (drag.wasDrag() ? undefined : list && inFront() ? list.toggle() : showTab(tab.id))}
 		>
 			<Show when={kindOf(tab.kind)}>{(kind) => <Dynamic component={kind().icon} size={16} />}</Show>
 			<span class="v3-canvas-name">{titleOf(tab)}</span>

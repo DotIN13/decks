@@ -13,12 +13,12 @@ const SHOWN = 6;
  * anything is typed only a kind that says so shows its first few (the apps); typed words find the
  * rest, by title, by path and by where they are.
  */
-export function OpenMore(props: { find: string; pick: (run: () => void) => void }): JSX.Element {
+export function OpenMore(props: { find: string; pick: (run: () => void) => void; /** What a pick does with what was picked: opened as a tab, unless the list is for something else (a link to it, `LinkFinder.tsx`). */ onPick?: (kind: string, target: string) => void }): JSX.Element {
 	const kinds = allKinds().filter((kind) => kind.offers);
-	return <For each={kinds}>{(kind) => <KindOffers kind={kind} find={props.find} pick={props.pick} />}</For>;
+	return <For each={kinds}>{(kind) => <KindOffers kind={kind} find={props.find} pick={props.pick} onPick={props.onPick ?? openTab} />}</For>;
 }
 
-function KindOffers(props: { kind: TabKind; find: string; pick: (run: () => void) => void }) {
+function KindOffers(props: { kind: TabKind; find: string; pick: (run: () => void) => void; onPick: (kind: string, target: string) => void }) {
 	const offers = props.kind.offers!;
 	const [all] = createResource(() => offers.list().catch(() => [] as Offer[]));
 	const listed = () => {
@@ -31,7 +31,7 @@ function KindOffers(props: { kind: TabKind; find: string; pick: (run: () => void
 			<div class="menu-label">{offers.label}</div>
 			<For each={listed()}>
 				{(offer) => (
-					<button type="button" role="menuitem" data-row data-flat="true" class="open-offer" data-kind={props.kind.name} onClick={() => props.pick(() => openTab(props.kind.name, offer.target))}>
+					<button type="button" role="menuitem" data-row data-flat="true" class="open-offer" data-kind={props.kind.name} onClick={() => props.pick(() => props.onPick(props.kind.name, offer.target))}>
 						<span class="row-icon">
 							<Dynamic component={props.kind.icon} size={15} />
 						</span>

@@ -5,6 +5,7 @@ import { createEffect, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createToolsFloat } from "./canvas-tools-float.ts";
 import { PenTray } from "../../frame/PenTray.tsx";
 import { ToolColumn } from "../../frame/ToolColumn.tsx";
+import { LinkFinder, openLinkFinder } from "../LinkFinder.tsx";
 import { ZoomBar } from "../../frame/ZoomBar.tsx";
 import { camera } from "../../state/camera.ts";
 import { mode, setMode, setSelected } from "../../state/selection.ts";
@@ -89,6 +90,8 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 
 	return (
 		<div class="canvas-tools" style={{ display: "contents" }} onMouseDown={keepKeys} on:focusout={giveKeysBack}>
+			{/* The finder the tool column's "Link to…" opens, beside its card tool. */}
+			<LinkFinder />
 			<Show when={drawing() && mode() === "browse"}>
 				<PenTray onFloat={(tray, grip) => floatTools(tray, grip, "pen-tray")} onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => handle()?.edit(ids.map((id) => ({ op: "delete", id })))} />
 			</Show>
@@ -101,10 +104,10 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 			{/* A column at the left; on a phone, a row just above the dock. */}
 			<Show
 				when={layout.phone()}
-				fallback={<ToolColumn onStep={step} onFloat={floatTools} onApps={canvasHost.openAppsPanel} onOpenFile={openFile} onPen={setPen} mode={mode()} onMode={(next) => (next === "edit" && !canWrite() ? undefined : setMode(next))} />}
+				fallback={<ToolColumn onStep={step} onFloat={floatTools} onApps={canvasHost.openAppsPanel} onLink={openLinkFinder} onOpenFile={openFile} onPen={setPen} mode={mode()} onMode={(next) => (next === "edit" && !canWrite() ? undefined : setMode(next))} />}
 			>
 				<div class="frame-tool-row" style={{ bottom: `${dock.dockCover() + 8}px` }}>
-					<ToolColumn row onStep={step} onApps={canvasHost.openAppsPanel} onOpenFile={openFile} onPen={setPen} mode={mode()} onMode={(next) => (next === "edit" && !canWrite() ? undefined : setMode(next))} />
+					<ToolColumn row onStep={step} onApps={canvasHost.openAppsPanel} onLink={openLinkFinder} onOpenFile={openFile} onPen={setPen} mode={mode()} onMode={(next) => (next === "edit" && !canWrite() ? undefined : setMode(next))} />
 				</div>
 			</Show>
 			<Show when={beside()} keyed>

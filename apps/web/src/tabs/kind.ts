@@ -40,6 +40,12 @@ export interface TabKind {
 	 * are few), where the others are found by typing. The canvas has none: the + lists canvases itself.
 	 */
 	offers?: { label: string; always?: boolean; list(): Promise<Offer[]> };
+	/**
+	 * Whether there is such a thing in the deck now, where the page knows without asking: a link to
+	 * one that is gone says so and opens nothing (`open.ts`, `openAt`). A kind that does not say opens
+	 * its tab, which says it there.
+	 */
+	has?(target: string): boolean;
 	/** Its mark in the row. */
 	icon: Component<{ size?: number }>;
 	/**

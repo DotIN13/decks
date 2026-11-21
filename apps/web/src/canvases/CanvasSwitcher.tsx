@@ -26,7 +26,11 @@ export function CanvasSwitcher(props: {
 	onNew: () => void;
 	onAll: () => void;
 	trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
-	placement?: "bottom-start" | "bottom-end";
+	placement?: "bottom-start" | "bottom-end" | "right-start";
+	/** What the list is called, for a screen reader: "Canvases" unless it is for something else. */
+	label?: string;
+	/** Only what can be picked: no New canvas, no All canvases (a list that links to a canvas rather than going to one). */
+	plain?: boolean;
 	/** What else it lists after the canvases, given the words typed and how a pick shuts it: the + of the tabs lists what the other kinds offer (`tabs/OpenMore.tsx`). */
 	more?: (find: () => string, pick: (run: () => void) => void) => JSX.Element;
 	/** What the find field asks for, when it finds more than canvases. */
@@ -47,7 +51,7 @@ export function CanvasSwitcher(props: {
 	return (
 		<Popover
 			placement={props.placement ?? "bottom-start"}
-			label="Canvases"
+			label={props.label ?? "Canvases"}
 			class="w-[320px]"
 			onOpenChange={(open) => {
 				if (!open) setFind("");
@@ -81,15 +85,17 @@ export function CanvasSwitcher(props: {
 				</For>
 			</Show>
 			{props.more?.(find, pick)}
-			<div class="rule" aria-hidden="true" />
-			<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(props.onNew)}>
-				<Icon of={Plus} size={15} class="row-icon" />
-				<span class="row-label flex-1">New canvas</span>
-			</button>
-			<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(props.onAll)}>
-				<Icon of={LayoutGrid} size={15} class="row-icon" />
-				<span class="row-label flex-1">All canvases</span>
-			</button>
+			<Show when={!props.plain}>
+				<div class="rule" aria-hidden="true" />
+				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(props.onNew)}>
+					<Icon of={Plus} size={15} class="row-icon" />
+					<span class="row-label flex-1">New canvas</span>
+				</button>
+				<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(props.onAll)}>
+					<Icon of={LayoutGrid} size={15} class="row-icon" />
+					<span class="row-label flex-1">All canvases</span>
+				</button>
+			</Show>
 		</Popover>
 	);
 }

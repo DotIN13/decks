@@ -329,6 +329,30 @@ body {
 		background: var(--v3-bg3);
 		color: var(--v3-fg);
 	}
+	/* A tab being dragged onto the canvas, where it leaves a link (`tabs/drag-link.ts`): a small copy that follows the pointer, in the accent while over a canvas that takes it. */
+	.tab-ghost {
+		position: fixed;
+		z-index: var(--z-popup);
+		top: 0;
+		left: 0;
+		max-width: 240px;
+		padding: 6px 11px;
+		overflow: hidden;
+		border: 1px solid var(--v3-line);
+		border-radius: 9px;
+		background: var(--v3-panel);
+		box-shadow: 0 6px 18px rgb(0 0 0 / 16%);
+		color: var(--v3-fg2);
+		font-size: 13px;
+		font-weight: 500;
+		pointer-events: none;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.tab-ghost[data-over="true"] {
+		border-color: var(--v3-accent);
+		color: var(--v3-fg);
+	}
 	/* How many tabs are open, in a small square, as a phone's browser shows it: it opens them as a list (`tabs/TabStrip.tsx`, `TabFold`). */
 	.tab-fold {
 		flex: none;

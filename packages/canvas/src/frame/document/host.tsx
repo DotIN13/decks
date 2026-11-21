@@ -10,5 +10,5 @@ export interface DocumentFrameProps extends ItemLookProps {
 
 /** A document whole, in a frame of its own on the page (`kind-host.tsx`), with the document kind inside it (`guest.tsx`). */
 export function DocumentFrame(props: DocumentFrameProps): JSX.Element {
-	return <ItemFrame dark={props.dark} foot={props.foot} agent={props.agent} kind="document" title={props.title} pass={() => props.pass(props.path)} start={() => ({ document: { path: props.path } })} />;
+	return <ItemFrame dark={props.dark} foot={props.foot} agent={props.agent} openAt={props.openAt} kind="document" title={props.title} pass={() => props.pass(props.path)} start={() => ({ document: { path: props.path } })} />;
 }
