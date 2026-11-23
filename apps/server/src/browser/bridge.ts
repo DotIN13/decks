@@ -37,6 +37,8 @@ const SNAPSHOT_LIMIT = 60_000;
 const SCREENSHOT_MS = 15_000;
 /** How long one action waits for the element it names. */
 const ACTION_MS = 10_000;
+/** How long a menu choice may take before it is made by keyboard instead. */
+const SELECT_MS = 4_000;
 
 type Playwright = typeof import("playwright");
 type Browser = import("playwright").Browser;
@@ -45,6 +47,14 @@ type Locator = import("playwright").Locator;
 
 /** How Playwright is reached — injectable so a test can hand in a stub. */
 type Connector = (endpoint: string) => Promise<Browser>;
+
+/** Words on a button whose click reaches outside the page, so it waits for the person's Allow. */
+const CONSEQUENTIAL = /\b(send|e-?mail|invite|invitation|pay|payment|purchase|buy|checkout|place order|donate|delete|remove account|add recommender|request (a )?letter)\b/i;
+
+/** How long closing a tab waits for the extension to say it is gone. */
+const CLOSE_TAB_MS = 5_000;
+/** How long after a click or a key the page is looked at again, to say what the action did. */
+const EFFECT_MS = 400;
 
 export class WebBridge {
 	private readonly wss = new WebSocketServer({ noServer: true });
@@ -82,6 +92,13 @@ export class WebBridge {
 	 * so the title is asked for then and the card follows the tab.
 	 */
 	private readonly titles = new Map<string, string>();
+	/**
+	 * The tab the agent drives, once it has picked or opened one.
+	 *
+	 * Every tab in the Decks group is shared, so the agent may open, switch to and close any of
+	 * them. Until it picks, or after its tab closes, it drives the first.
+	 */
+	private current: Page | undefined;
 
 	constructor(
 		private readonly dataDir: string,
@@ -221,7 +238,7 @@ export class WebBridge {
 		return {
 			paired: existsSync(join(this.dataDir, "web-bridge.json")),
 			connected: this.browser !== undefined && tabs.length > 0,
-			...(tabs[0] ? { tab: tabs[0] } : {}),
+			...(tabs[0] ? { tab: (this.current && !this.current.isClosed() && tabs.find((tab) => tab.url === this.current!.url())) || tabs[0] } : {}),
 			tabs,
 			actions: [...this.actions],
 			...(this.pending ? { pending: { id: this.pending.id, text: this.pending.text } } : {}),
@@ -263,9 +280,110 @@ export class WebBridge {
 					: "No Chrome has been paired. Ask for the pairing code with decks web pairing and put it in the Decks extension.",
 			);
 		}
-		const page = browser.contexts().flatMap((context) => context.pages())[0];
+		const pages = this.allPages();
+		if (this.current && !this.current.isClosed() && pages.includes(this.current)) return this.current;
+		this.current = undefined;
+		const page = pages[0];
 		if (!page) throw new Error("Chrome is connected but no tab is shared. Share one from the Decks extension.");
 		return page;
+	}
+
+	private allPages(): Page[] {
+		return (this.browser?.contexts() ?? []).flatMap((context) => context.pages()).filter((page) => !page.isClosed());
+	}
+
+	/** What the page looks like, cheaply: its address and a fingerprint of its markup, to tell whether an action did anything. */
+	private async mark(page: Page): Promise<{ url: string; print: string }> {
+		const seen = await page
+			.evaluate(() => ({ href: location.href, print: `${document.documentElement.outerHTML.length}:${document.title}:${document.querySelectorAll("*").length}:${document.body?.innerText.length ?? 0}` }))
+			.catch(() => ({ href: page.url(), print: "" }));
+		// The page's own address, not Playwright's: a move within the page reaches it late or not at all through the relay.
+		return { url: seen.href, print: seen.print };
+	}
+
+	/**
+	 * What an action did to the page, said in its answer: the address it went to, when it left
+	 * the page, and `changed: false` when nothing at all moved, so a click that went nowhere is
+	 * not mistaken for one that worked.
+	 */
+	private async effect(page: Page, before: { url: string; print: string }): Promise<{ navigated?: string; changed: boolean }> {
+		await page.waitForTimeout(EFFECT_MS);
+		const driven = await this.page().catch(() => page);
+		const after = await this.mark(driven);
+		if (after.url !== before.url) {
+			this.refs = undefined;
+			this.stale = undefined;
+			return { navigated: after.url, changed: true };
+		}
+		return { changed: after.print !== before.print };
+	}
+
+	/** One tab of the group, by its number from `tabs` (1 is the first) or by words in its address or title. */
+	private async pick(which: number | string): Promise<Page> {
+		await this.page();
+		const pages = this.allPages();
+		if (typeof which === "number" || /^\d+$/.test(String(which).trim())) {
+			const n = Number(which);
+			const page = pages[n - 1];
+			if (!page) throw new Error(`There is no tab ${n}: the group has ${pages.length}. decks web tabs lists them.`);
+			return page;
+		}
+		const words = String(which).trim().toLowerCase();
+		if (!words) throw new Error("Name a tab by its number from decks web tabs, or by words in its address or title.");
+		const titled = await Promise.all(pages.map(async (page) => ({ page, text: `${page.url()} ${await page.title().catch(() => "")}`.toLowerCase() })));
+		const found = titled.filter((t) => t.text.includes(words));
+		if (found.length === 0) throw new Error(`No shared tab has "${which}" in its address or title. decks web tabs lists them.`);
+		if (found.length > 1) throw new Error(`${found.length} shared tabs have "${which}" in their address or title; name one by its number from decks web tabs.`);
+		return found[0]!.page;
+	}
+
+	/** Every tab in the Decks group, numbered from 1, and which one the verbs act on. */
+	async tabs(): Promise<{ index: number; title: string; url: string; current: boolean }[]> {
+		const driven = await this.page();
+		return Promise.all(this.allPages().map(async (page, i) => ({ index: i + 1, title: await page.title().catch(() => ""), url: page.url(), current: page === driven })));
+	}
+
+	/** Open a new tab in the Decks group, at `url` when given, and act on it from now on. */
+	async newTab(url?: string): Promise<{ index: number; url: string; title: string }> {
+		const driven = await this.page();
+		const page = await driven.context().newPage();
+		this.watch(page);
+		this.current = page;
+		this.refs = undefined;
+		this.stale = undefined;
+		try {
+			if (url?.trim()) await page.goto(url.trim(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+		} catch (error) {
+			this.note(`opened a tab but could not load ${url}: ${(error as Error).message}`, false);
+			throw error;
+		}
+		const result = { index: this.allPages().indexOf(page) + 1, url: page.url(), title: await page.title().catch(() => "") };
+		this.note(`opened a new tab${result.title || result.url ? `: ${result.title || result.url}` : ""}`, true);
+		return result;
+	}
+
+	/** Act on another tab of the group from now on, without moving the person's own focus. */
+	async useTab(which: number | string): Promise<{ index: number; url: string; title: string }> {
+		const page = await this.pick(which);
+		this.current = page;
+		this.refs = undefined;
+		this.stale = undefined;
+		const result = { index: this.allPages().indexOf(page) + 1, url: page.url(), title: await page.title().catch(() => "") };
+		this.note(`switched to ${result.title || result.url}`, true);
+		return result;
+	}
+
+	/** Close a tab of the group (the one acted on, when none is named). The last one cannot go: stop sharing instead. */
+	async closeTab(which?: number | string): Promise<{ closed: string; tabs: number }> {
+		const page = which === undefined || which === "" ? await this.page() : await this.pick(which);
+		if (this.allPages().length <= 1) throw new Error("That is the only shared tab; closing it would end the sharing. Use decks web stop instead.");
+		const name = (await page.title().catch(() => "")) || page.url();
+		// Closed once the extension says the tab is gone; a tab that never says so is let go after a few seconds.
+		await Promise.race([page.close(), new Promise((resolve) => setTimeout(resolve, CLOSE_TAB_MS))]);
+		if (this.current === page) this.current = undefined;
+		this.refs = undefined;
+		this.note(`closed ${name}`, true);
+		return { closed: name, tabs: this.allPages().filter((p) => p !== page).length };
 	}
 
 	/** Navigate the shared tab. */
@@ -290,13 +408,16 @@ export class WebBridge {
 	 * The tree is what a screen reader would say — every field with its label and value,
 	 * every button with its name — which is how the agent sees the page. No picture.
 	 */
-	async read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }> {
+	async read(options?: { full?: boolean }): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }> {
 		const page = await this.page();
 		// `mode: "ai"` is the same tree with a `[ref=eN]` on every element, and it descends into
 		// iframes. The references are not decoration: a field with no label, six fields sharing
 		// one, and a control the page hides and paints over are all unreachable by name, and all
 		// three are ordinary on a real form.
-		const snapshot = await page.locator("body").ariaSnapshot({ mode: "ai" });
+		const raw = await page.locator("body").ariaSnapshot({ mode: "ai" });
+		// A birth year or a country is a menu of a hundred options, and those lists were most of a
+		// form's read. Folded to the chosen one and a count; `select` takes any option by name.
+		const snapshot = options?.full ? raw : foldOptions(raw);
 		this.refs = { url: page.url() };
 		const truncated = snapshot.length > SNAPSHOT_LIMIT;
 		return {
@@ -305,6 +426,23 @@ export class WebBridge {
 			snapshot: truncated ? `${snapshot.slice(0, SNAPSHOT_LIMIT)}\n… (cut at ${SNAPSHOT_LIMIT} characters)` : snapshot,
 			...(truncated ? { truncated } : {}),
 		};
+	}
+
+	/**
+	 * Every field on the page, frames included, with its label and what it holds now: the short
+	 * way to check a form after filling it, instead of reading the whole tree again.
+	 */
+	async values(): Promise<{ url: string; fields: { label: string; value: string; kind: string }[] }> {
+		const page = await this.page();
+		const fields: { label: string; value: string; kind: string }[] = [];
+		for (const frame of page.frames()) {
+			// A string, not a function: the server's TypeScript build adds helpers to functions that do not exist in the page.
+			const found = await frame
+				.evaluate<{ label: string; value: string; kind: string }[]>(FIELD_VALUES_SCRIPT)
+				.catch(() => []);
+			fields.push(...found);
+		}
+		return { url: page.url(), fields };
 	}
 
 	/**
@@ -356,6 +494,15 @@ export class WebBridge {
 			// A field the page hides and paints over takes typing the same way it takes a click.
 			const reach = await reachOf(target);
 			await target.fill(text, { timeout: ACTION_MS, ...(reach.kind === "hidden" ? { force: true } : {}) });
+			// `fill` sends `input` only. Pages that count words or validate on `keyup`, `change` or
+			// `blur` (the GSB portal's word counters) never heard it, so those follow, as after typing.
+			await target
+				.evaluate((el) => {
+					for (const type of ["keyup", "change"]) el.dispatchEvent(new Event(type, { bubbles: true }));
+					el.dispatchEvent(new FocusEvent("blur"));
+					el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+				})
+				.catch(() => {});
 			this.note(`filled ${label}`, true);
 			return { field: label };
 		} catch (error) {
@@ -365,13 +512,25 @@ export class WebBridge {
 	}
 
 	/** Pick an option in a `<select>`, by its label or value. */
-	async select(field: WebTarget, option: string): Promise<{ field: string; option: string }> {
+	async select(field: WebTarget, option: string): Promise<{ field: string; option: string; byKeyboard?: boolean }> {
 		const page = await this.page();
 		await this.live(page);
 		const label = labelOf(field);
 		try {
 			const target = await this.locate(page, field, (name) => [page.getByLabel(name), page.getByRole("combobox", { name })]);
-			await target.selectOption({ label: option }, { timeout: ACTION_MS }).catch(() => target.selectOption(option, { timeout: ACTION_MS }));
+			try {
+				await target.selectOption({ label: option }, { timeout: SELECT_MS }).catch(() => target.selectOption(option, { timeout: SELECT_MS }));
+			} catch (first) {
+				// Some forms answer a menu's change with script that never returns (seen on the Stanford
+				// GSB portal's date menus), and the choice stalls. A person would focus the menu and type
+				// the option's name, which the browser handles itself; that is the second way, checked after.
+				await target.focus({ timeout: 3_000 });
+				await page.keyboard.type(option, { delay: 0 });
+				const shown = await target.evaluate((el) => (el as HTMLSelectElement).selectedOptions?.[0]?.textContent?.trim() ?? "").catch(() => "");
+				if (shown.toLowerCase() !== option.trim().toLowerCase()) throw first;
+				this.note(`chose ${option} for ${label}, by typing it into the menu`, true);
+				return { field: label, option, byKeyboard: true };
+			}
 			this.note(`chose ${option} for ${label}`, true);
 			return { field: label, option };
 		} catch (error) {
@@ -381,7 +540,7 @@ export class WebBridge {
 	}
 
 	/** Click a button, link, checkbox or piece of text, by its name or by a reference. */
-	async click(what: WebTarget): Promise<{ clicked: string }> {
+	async click(what: WebTarget, options?: { ask?: boolean }): Promise<{ clicked: string; navigated?: string; changed: boolean; allowed?: boolean }> {
 		const page = await this.page();
 		await this.live(page);
 		const label = labelOf(what);
@@ -398,8 +557,21 @@ export class WebBridge {
 				page.getByText(name, { exact: true }),
 				page.getByText(name),
 			]);
+			// A click that sends something out of the page cannot be taken back: an email to a
+			// recommender, a payment, an invitation. Those wait for the person's Allow, as submit does.
+			const said = await target.evaluate((el) => `${el.getAttribute("aria-label") ?? ""} ${el.textContent ?? ""} ${(el as HTMLInputElement).value ?? ""}`).catch(() => label);
+			if (options?.ask !== false && CONSEQUENTIAL.test(`${label} ${said}`)) {
+				const allowed = await this.askUser(`The agent wants to click "${label}" on ${await page.title()}`);
+				if (!allowed) {
+					this.note(`click "${label}" — not allowed`, false);
+					return { clicked: label, allowed: false, changed: false };
+				}
+			}
+			const before = await this.mark(page);
 			await this.clickOn(target, label);
-			return { clicked: label };
+			const effect = await this.effect(page, before);
+			if (effect.navigated) this.note(`the click went to ${effect.navigated}`, true);
+			return { clicked: label, ...effect };
 		} catch (error) {
 			this.note(`could not click ${label}: ${(error as Error).message}`, false);
 			throw this.staleOr(error, page);
@@ -449,9 +621,26 @@ export class WebBridge {
 		const name = typeof target === "string" ? target : target.name;
 		const nth = typeof target === "object" && "nth" in target ? target.nth : undefined;
 		if (!name?.trim()) throw new Error("A target needs a name, or a { ref } from decks web read.");
-		for (const candidate of candidates(name)) {
-			const count = await candidate.count();
+		for (const found of candidates(name)) {
+			let candidate = found;
+			let count = await candidate.count();
 			if (count === 0) continue;
+			// A label used twice is usually one copy on screen and one hidden (a stale dialog, a
+			// template), or one in the open dialog and one on the page behind it. Narrow to what is
+			// visible, then to the open dialog, before counting: what a person would mean.
+			if (count > 1) {
+				const visible = candidate.filter({ visible: true });
+				const shown = await visible.count();
+				if (shown > 0 && shown < count) [candidate, count] = [visible, shown];
+			}
+			if (count > 1) {
+				const dialog = page.locator('[role="dialog"]:visible, dialog[open]').last();
+				if ((await dialog.count()) > 0) {
+					const inside = candidate.and(dialog.locator("*"));
+					const there = await inside.count();
+					if (there > 0 && there < count) [candidate, count] = [inside, there];
+				}
+			}
 			if (nth !== undefined) {
 				if (!Number.isInteger(nth) || nth < 1 || nth > count)
 					throw new Error(`"${name}" matches ${count} ${count === 1 ? "element" : "elements"} on this page, so nth: ${nth} is out of range — nth: 1 is the first.`);
@@ -469,7 +658,7 @@ export class WebBridge {
 	/** The element a `[ref=…]` from the last read names, or a sentence about why it cannot. */
 	private async byRef(page: Page, ref: string): Promise<Locator> {
 		const id = String(ref ?? "").trim().replace(/^@/, "");
-		if (!/^e\d+$/.test(id)) throw new Error(`"${ref}" is not a reference. A reference looks like e42 and comes from decks web read.`);
+		if (!/^(f\d+)?e\d+$/.test(id)) throw new Error(`"${ref}" is not a reference. A reference looks like e42, or f3e42 inside a frame, and comes from decks web read.`);
 		if (!this.refs) throw new Error("References come from the page itself: read it with decks web read first, then pass one of the [ref=…] ids it shows.");
 		if (this.refs.url !== page.url())
 			throw new Error(
@@ -481,12 +670,45 @@ export class WebBridge {
 	}
 
 	/** Press a key in the page — "Enter", "Tab", "Escape". */
-	async press(key: string): Promise<{ pressed: string }> {
+	/** Put the keyboard's focus on a field or button, as a click would, without clicking it. */
+	async focus(what: WebTarget): Promise<{ focused: string }> {
 		const page = await this.page();
 		await this.live(page);
+		const label = labelOf(what);
+		try {
+			const target = await this.locate(page, what, (name) => [page.getByLabel(name, { exact: true }), page.getByLabel(name), page.getByRole("textbox", { name }), page.getByRole("combobox", { name }), page.getByRole("button", { name })]);
+			await target.focus({ timeout: 10_000 });
+			this.note(`focused ${label}`, true);
+			return { focused: label };
+		} catch (error) {
+			this.note(`could not focus ${label}: ${(error as Error).message}`, false);
+			throw this.staleOr(error, page);
+		}
+	}
+
+	/**
+	 * Type text key by key, as a person would, into the field that has focus — or into `into`
+	 * first, when given. Sites that count words or check as you type see every keystroke.
+	 */
+	async type(text: string, into?: WebTarget): Promise<{ typed: number; into?: string }> {
+		if (into !== undefined) await this.focus(into);
+		const page = await this.page();
+		await this.live(page);
+		await page.keyboard.type(text, { delay: 10 });
+		const where = into === undefined ? undefined : labelOf(into);
+		this.note(`typed ${text.length} characters${where ? ` into ${where}` : ""}`, true);
+		return { typed: text.length, ...(where ? { into: where } : {}) };
+	}
+
+	async press(key: string): Promise<{ pressed: string; navigated?: string; changed: boolean }> {
+		const page = await this.page();
+		await this.live(page);
+		const before = await this.mark(page);
 		await page.keyboard.press(key);
 		this.note(`pressed ${key}`, true);
-		return { pressed: key };
+		const effect = await this.effect(page, before);
+		if (effect.navigated) this.note(`pressing ${key} went to ${effect.navigated}`, true);
+		return { pressed: key, ...effect };
 	}
 
 	/**
@@ -656,3 +878,58 @@ function safeEqual(a: string, b: string): boolean {
 	for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
 	return diff === 0;
 }
+
+/** Long option lists in a snapshot, cut to their first few, the chosen one, and how many there are. */
+export function foldOptions(snapshot: string, keep = 4, over = 12): string {
+	const lines = snapshot.split("\n");
+	const out: string[] = [];
+	for (let i = 0; i < lines.length; ) {
+		const match = /^(\s*)- option\b/.exec(lines[i]!);
+		if (!match) {
+			out.push(lines[i]!);
+			i++;
+			continue;
+		}
+		const indent = match[1]!;
+		let j = i;
+		while (j < lines.length && lines[j]!.startsWith(`${indent}- option`)) j++;
+		const run = lines.slice(i, j);
+		if (run.length <= over) out.push(...run);
+		else {
+			const chosen = run.find((line) => /\[selected\]/.test(line));
+			const first = run.slice(0, keep);
+			out.push(...first);
+			if (chosen && !first.includes(chosen)) out.push(chosen);
+			out.push(`${indent}- … ${run.length} options in all (read with full: true to see every one; select takes any by name)`);
+		}
+		i = j;
+	}
+	return out.join("\n");
+}
+
+/** Run in each frame by `values`: every visible field, its label as a person would read it, and its value. Plain JavaScript. */
+const FIELD_VALUES_SCRIPT = String.raw`(() => {
+	const out = [];
+	const text = (el) => ((el && el.textContent) || "").replace(/\s+/g, " ").trim();
+	for (const el of Array.from(document.querySelectorAll("input, select, textarea"))) {
+		if (["hidden", "submit", "button", "image", "reset", "file"].includes(el.type)) continue;
+		const style = getComputedStyle(el);
+		if (style.display === "none" || style.visibility === "hidden") continue;
+		const byFor = el.id ? document.querySelector('label[for="' + CSS.escape(el.id) + '"]') : null;
+		const byAria = (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean).map((id) => text(document.getElementById(id))).join(" ");
+		let wrapped = "";
+		const holder = el.closest("label");
+		if (holder) { const copy = holder.cloneNode(true); copy.querySelectorAll("select, option, input, textarea").forEach((n) => n.remove()); wrapped = text(copy); }
+		const row = el.closest("tr");
+		const head = row ? text(row.querySelector("th, [role=rowheader]")) : "";
+		const column = row ? Array.from(row.querySelectorAll("input, select, textarea")).indexOf(el) + 1 : 0;
+		const label = el.getAttribute("aria-label") || byAria || text(byFor) || wrapped || el.placeholder || (head ? head + " (column " + column + ")" : "") || el.name || "(no label)";
+		let value;
+		if (el.tagName === "SELECT") value = el.selectedOptions[0] ? el.selectedOptions[0].textContent.trim() : "";
+		else if (el.type === "checkbox" || el.type === "radio") value = el.checked ? "checked" : "not checked";
+		else if (el.type === "password") value = el.value ? "(set)" : "";
+		else value = el.value;
+		out.push({ label: label.slice(0, 120), value: String(value).slice(0, 200), kind: el.tagName === "SELECT" ? "select" : el.tagName === "TEXTAREA" ? "textarea" : el.type || "text" });
+	}
+	return out;
+})()`;

@@ -104,12 +104,19 @@ interface WebHost {
 	status(): WebStatus;
 	stop(): void;
 	open(url: string): Promise<{ url: string; title: string }>;
-	read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
+	focus(what: WebTarget): Promise<{ focused: string }>;
+	type(text: string, into?: WebTarget): Promise<{ typed: number; into?: string }>;
+	tabs(): Promise<{ index: number; title: string; url: string; current: boolean }[]>;
+	newTab(url?: string): Promise<{ index: number; url: string; title: string }>;
+	useTab(which: number | string): Promise<{ index: number; url: string; title: string }>;
+	closeTab(which?: number | string): Promise<{ closed: string; tabs: number }>;
+	values(): Promise<{ url: string; fields: { label: string; value: string; kind: string }[] }>;
+	read(options?: { full?: boolean }): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
 	screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number; png: Buffer }>;
 	fill(field: WebTarget, text: string): Promise<{ field: string }>;
-	select(field: WebTarget, option: string): Promise<{ field: string; option: string }>;
-	click(what: WebTarget): Promise<{ clicked: string }>;
-	press(key: string): Promise<{ pressed: string }>;
+	select(field: WebTarget, option: string): Promise<{ field: string; option: string; byKeyboard?: boolean }>;
+	click(what: WebTarget, options?: { ask?: boolean }): Promise<{ clicked: string; navigated?: string; changed?: boolean; allowed?: boolean }>;
+	press(key: string): Promise<{ pressed: string; navigated?: string; changed?: boolean }>;
 	submit(what?: WebTarget, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
 }
 

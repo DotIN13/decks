@@ -125,13 +125,20 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks web status` · `decks.web.status(): { paired: boolean; connected: boolean; tab?: { title: string; url: string }; pending?: { id: string; text: string }; closed?: string }`. Whether the person is sharing a Chrome tab through the Decks extension, and which.
 - `decks web pairing` · `decks.web.pairing(): { code: string; path: string; note: string }`. A code to pair the Decks extension.
 - `decks web repair` · `decks.web.repair(): { code: string }`. Pair the extension again: a fresh code.
-- `decks web open` · `decks.web.open(url: string): { url: string; title: string }`. Go to an address in the shared tab.
-- `decks web read` · `decks.web.read(): { url: string; title: string; snapshot: string; truncated?: boolean }`. The page as a tree of fields and buttons, each with a [ref=e42]. References die when the tab navigates.
+- `decks web open` · `decks.web.open(url: string): { url: string; title: string }`. Go to an address in the tab the web verbs act on (the first shared tab, until web.tab or web.newTab picks another).
+- `decks web tabs` · `decks.web.tabs(): { index: number; title: string; url: string; current: boolean }[]`. Every tab in the Decks group of the person's Chrome, numbered from 1, and which one the other web verbs act on.
+- `decks web new-tab` · `decks.web.newTab(url?: string): { index: number; url: string; title: string }`. Open a new tab in the Decks group, at an address when given, and act on it from now on. The person's own tab is left as it is.
+- `decks web tab` · `decks.web.tab(which: number | string): { index: number; url: string; title: string }`. Act on another tab of the Decks group from now on: its number from web.tabs, or words in its address or title.
+- `decks web close-tab` · `decks.web.closeTab(which?: number | string): { closed: string; tabs: number }`. Close a tab of the Decks group: the one acted on, or the one named by number or words. The last shared tab cannot be closed; stop sharing instead.
+- `decks web read` · `decks.web.read(options?: { full?: boolean }): { url: string; title: string; snapshot: string; truncated?: boolean }`. The page as a tree of fields and buttons, each with a [ref=e42] (f3e42 inside a frame). Menus of more than 12 options show the first few, the chosen one and a count; `full: true` shows every option. References die when the tab navigates.
+- `decks web values` · `decks.web.values(): { url: string; fields: { label: string; value: string; kind: string }[] }`. Every field on the page, frames included, with its label and what it holds now: a short way to check a form after filling it. Passwords show only as (set).
 - `decks web screenshot` · `decks.web.screenshot(options?: { full?: boolean }): { file: string; width: number; height: number }`. A picture of the tab.
 - `decks web fill` · `decks.web.fill(field: WebTarget, text: string): { field: string }`. Type into a field. Never passwords or codes.
-- `decks web select` · `decks.web.select(field: WebTarget, option: string): { field: string; option: string }`. Choose an option in a select.
-- `decks web click` · `decks.web.click(what: WebTarget): { clicked: string }`. Click a button or link.
-- `decks web press` · `decks.web.press(key: string): { pressed: string }`. Press a key.
+- `decks web select` · `decks.web.select(field: WebTarget, option: string): { field: string; option: string; byKeyboard?: boolean }`. Choose an option in a select. A menu whose choice stalls is chosen again by typing the option into it (`byKeyboard: true`), checked after.
+- `decks web click` · `decks.web.click(what: WebTarget, options?: { ask?: boolean }): { clicked: string; navigated?: string; changed?: boolean; allowed?: boolean }`. Click a button or link. The answer says where the page went (`navigated`), or `changed: false` when the click did nothing. A button that sends, emails, invites, pays or deletes waits for the person's Allow; `allowed: false` is their No.
+- `decks web press` · `decks.web.press(key: string): { pressed: string; navigated?: string; changed?: boolean }`. Press a key. The answer says where the page went (`navigated`), or whether anything changed.
+- `decks web focus` · `decks.web.focus(what: WebTarget): { focused: string }`. Put the keyboard's focus on a field or button, without clicking it.
+- `decks web type` · `decks.web.type(text: string, into?: WebTarget): { typed: number; into?: string }`. Type text key by key, as a person would, into the focused field, or into `into` first. Use it where fill is not seen: word counters, fields that check as you type. Never passwords or codes.
 - `decks web submit` · `decks.web.submit(what?: WebTarget, options?: { ask?: boolean }): { submitted: string; allowed: boolean }`. Submit a form, asking the person first; may come back with allowed: false.
 - `decks web stop` · `decks.web.stop(): void`. Stop sharing.
 

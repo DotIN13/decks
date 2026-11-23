@@ -3639,7 +3639,7 @@
   "group": "web",
   "touches": "outside",
   "effect": "change",
-  "summary": "Go to an address in the shared tab.",
+  "summary": "Go to an address in the tab the web verbs act on (the first shared tab, until web.tab or web.newTab picks another).",
   "signature": "web.open(url: string)",
   "returns": "{ url: string; title: string }",
   "params": [
@@ -3653,6 +3653,102 @@
   ]
  },
  {
+  "name": "web.tabs",
+  "command": [
+   "web",
+   "tabs"
+  ],
+  "group": "web",
+  "touches": "outside",
+  "effect": "read",
+  "summary": "Every tab in the Decks group of the person's Chrome, numbered from 1, and which one the other web verbs act on.",
+  "signature": "web.tabs()",
+  "returns": "{ index: number; title: string; url: string; current: boolean }[]",
+  "params": []
+ },
+ {
+  "name": "web.newTab",
+  "command": [
+   "web",
+   "new-tab"
+  ],
+  "group": "web",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Open a new tab in the Decks group, at an address when given, and act on it from now on. The person's own tab is left as it is.",
+  "signature": "web.newTab(url?: string)",
+  "returns": "{ index: number; url: string; title: string }",
+  "params": [
+   {
+    "name": "url",
+    "optional": true,
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.tab",
+  "command": [
+   "web",
+   "tab"
+  ],
+  "group": "web",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Act on another tab of the Decks group from now on: its number from web.tabs, or words in its address or title.",
+  "signature": "web.tab(which: number | string)",
+  "returns": "{ index: number; url: string; title: string }",
+  "params": [
+   {
+    "name": "which",
+    "type": "number | string",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "string"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.closeTab",
+  "command": [
+   "web",
+   "close-tab"
+  ],
+  "group": "web",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Close a tab of the Decks group: the one acted on, or the one named by number or words. The last shared tab cannot be closed; stop sharing instead.",
+  "signature": "web.closeTab(which?: number | string)",
+  "returns": "{ closed: string; tabs: number }",
+  "params": [
+   {
+    "name": "which",
+    "optional": true,
+    "type": "number | string",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "string"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
   "name": "web.read",
   "command": [
    "web",
@@ -3661,9 +3757,38 @@
   "group": "web",
   "touches": "outside",
   "effect": "read",
-  "summary": "The page as a tree of fields and buttons, each with a [ref=e42]. References die when the tab navigates.",
-  "signature": "web.read()",
+  "summary": "The page as a tree of fields and buttons, each with a [ref=e42] (f3e42 inside a frame). Menus of more than 12 options show the first few, the chosen one and a count; `full: true` shows every option. References die when the tab navigates.",
+  "signature": "web.read(options?: { full?: boolean })",
   "returns": "{ url: string; title: string; snapshot: string; truncated?: boolean }",
+  "params": [
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ full?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "full": {
+       "type": "boolean"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.values",
+  "command": [
+   "web",
+   "values"
+  ],
+  "group": "web",
+  "touches": "outside",
+  "effect": "read",
+  "summary": "Every field on the page, frames included, with its label and what it holds now: a short way to check a form after filling it. Passwords show only as (set).",
+  "signature": "web.values()",
+  "returns": "{ url: string; fields: { label: string; value: string; kind: string }[] }",
   "params": []
  },
  {
@@ -3765,9 +3890,9 @@
   "group": "web",
   "touches": "outside",
   "effect": "change",
-  "summary": "Choose an option in a select.",
+  "summary": "Choose an option in a select. A menu whose choice stalls is chosen again by typing the option into it (`byKeyboard: true`), checked after.",
   "signature": "web.select(field: WebTarget, option: string)",
-  "returns": "{ field: string; option: string }",
+  "returns": "{ field: string; option: string; byKeyboard?: boolean }",
   "params": [
    {
     "name": "field",
@@ -3826,9 +3951,99 @@
   "group": "web",
   "touches": "outside",
   "effect": "change",
-  "summary": "Click a button or link.",
-  "signature": "web.click(what: WebTarget)",
-  "returns": "{ clicked: string }",
+  "summary": "Click a button or link. The answer says where the page went (`navigated`), or `changed: false` when the click did nothing. A button that sends, emails, invites, pays or deletes waits for the person's Allow; `allowed: false` is their No.",
+  "signature": "web.click(what: WebTarget, options?: { ask?: boolean })",
+  "returns": "{ clicked: string; navigated?: string; changed?: boolean; allowed?: boolean }",
+  "params": [
+   {
+    "name": "what",
+    "type": "WebTarget",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "ref": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "ref"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "nth": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      }
+     ],
+     "description": "A field or button: its label, { ref: \"e42\" } from read, or { name, nth }."
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ ask?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "ask": {
+       "type": "boolean"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.press",
+  "command": [
+   "web",
+   "press"
+  ],
+  "group": "web",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Press a key. The answer says where the page went (`navigated`), or whether anything changed.",
+  "signature": "web.press(key: string)",
+  "returns": "{ pressed: string; navigated?: string; changed?: boolean }",
+  "params": [
+   {
+    "name": "key",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.focus",
+  "command": [
+   "web",
+   "focus"
+  ],
+  "group": "web",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Put the keyboard's focus on a field or button, without clicking it.",
+  "signature": "web.focus(what: WebTarget)",
+  "returns": "{ focused: string }",
   "params": [
    {
     "name": "what",
@@ -3872,23 +4087,63 @@
   ]
  },
  {
-  "name": "web.press",
+  "name": "web.type",
   "command": [
    "web",
-   "press"
+   "type"
   ],
   "group": "web",
   "touches": "outside",
   "effect": "change",
-  "summary": "Press a key.",
-  "signature": "web.press(key: string)",
-  "returns": "{ pressed: string }",
+  "summary": "Type text key by key, as a person would, into the focused field, or into `into` first. Use it where fill is not seen: word counters, fields that check as you type. Never passwords or codes.",
+  "signature": "web.type(text: string, into?: WebTarget)",
+  "returns": "{ typed: number; into?: string }",
   "params": [
    {
-    "name": "key",
+    "name": "text",
     "type": "string",
     "schema": {
      "type": "string"
+    }
+   },
+   {
+    "name": "into",
+    "optional": true,
+    "type": "WebTarget",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "ref": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "ref"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "nth": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      }
+     ],
+     "description": "A field or button: its label, { ref: \"e42\" } from read, or { name, nth }."
     }
    }
   ]

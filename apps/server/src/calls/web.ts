@@ -26,7 +26,21 @@ export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
 				if (!url?.trim()) throw new Error("open needs a URL");
 				return needWeb().open(url.trim());
 			},
-			read: async () => needWeb().read(),
+			/** Every tab in the Decks group, numbered from 1, and which one the other verbs act on. */
+			tabs: async () => needWeb().tabs(),
+			/** Open a new tab in the Decks group (at `url`, when given) and act on it from now on. */
+			newTab: async (url?: string) => needWeb().newTab(url),
+			/** Act on another tab of the group from now on: its number from `tabs`, or words in its address or title. */
+			tab: async (which: number | string) => {
+				if (which === undefined || which === null || String(which).trim() === "") throw new Error("tab needs a tab's number from decks web tabs, or words in its address or title");
+				return needWeb().useTab(which);
+			},
+			/** Close a tab of the group: the one acted on, or the one named. The last shared tab cannot be closed. */
+			closeTab: async (which?: number | string) => needWeb().closeTab(which),
+			/** Every field on the page, frames included, with its label and current value. */
+			values: async () => needWeb().values(),
+			/** The page as a tree of fields and buttons; long option lists are folded unless `full: true`. */
+			read: async (options?: { full?: boolean }) => needWeb().read(options),
 			/**
 			 * A picture of the tab, attached to this call's result so you see it at once, and
 			 * saved to `file` for a second look. `full: true` is the whole page.
@@ -38,8 +52,18 @@ export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
 			},
 			fill: async (field: WebTarget, text: string) => needWeb().fill(needTarget(field, "fill needs the field's label, or a { ref } from decks web read"), String(text ?? "")),
 			select: async (field: WebTarget, option: string) => needWeb().select(needTarget(field, "select needs the field's label, or a { ref } from decks web read"), option),
-			click: async (what: WebTarget) => needWeb().click(needTarget(what, "click needs the button's or link's name, or a { ref } from decks web read")),
+			/**
+			 * Click a button or link. One whose words say it sends, emails, invites, pays or deletes
+			 * waits for the user's Allow on the status board, as submit does; `{ ask: false }` only
+			 * when the user has said not to be asked for this site.
+			 */
+			click: async (what: WebTarget, options?: { ask?: boolean }) => needWeb().click(needTarget(what, "click needs the button's or link's name, or a { ref } from decks web read"), options),
 			press: async (key: string) => needWeb().press(key),
+			/** Put the keyboard's focus on a field or button without clicking it. */
+			focus: async (what: WebTarget) => needWeb().focus(needTarget(what, "focus needs the field's label, or a { ref } from decks web read")),
+			/** Type text key by key into the focused field, or into `into` first. */
+			type: async (text: string, into?: WebTarget) =>
+				needWeb().type(String(text ?? ""), into === undefined ? undefined : needTarget(into, "type needs the field's label, or a { ref } from decks web read")),
 			/**
 			 * Press the named button, or Enter, once the user has allowed it on the status
 			 * board. Pass `{ ask: false }` only when the user has said they do not want to be

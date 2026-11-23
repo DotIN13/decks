@@ -480,23 +480,66 @@ export interface Verbs {
 		pairing(): Promise<{ code: string; path: string; note: string }>;
 		/** Pair the extension again: a fresh code. */
 		repair(): Promise<{ code: string }>;
-		/** Go to an address in the shared tab. */
+		/**
+		 * Go to an address in the tab the web verbs act on (the first shared tab, until web.tab or
+		 * web.newTab picks another).
+		 */
 		open(url: string): Promise<{ url: string; title: string }>;
 		/**
-		 * The page as a tree of fields and buttons, each with a [ref=e42]. References die when the tab
-		 * navigates.
+		 * Every tab in the Decks group of the person's Chrome, numbered from 1, and which one the other web
+		 * verbs act on.
 		 */
-		read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
+		tabs(): Promise<{ index: number; title: string; url: string; current: boolean }[]>;
+		/**
+		 * Open a new tab in the Decks group, at an address when given, and act on it from now on. The
+		 * person's own tab is left as it is.
+		 */
+		newTab(url?: string): Promise<{ index: number; url: string; title: string }>;
+		/**
+		 * Act on another tab of the Decks group from now on: its number from web.tabs, or words in its
+		 * address or title.
+		 */
+		tab(which: number | string): Promise<{ index: number; url: string; title: string }>;
+		/**
+		 * Close a tab of the Decks group: the one acted on, or the one named by number or words. The last
+		 * shared tab cannot be closed; stop sharing instead.
+		 */
+		closeTab(which?: number | string): Promise<{ closed: string; tabs: number }>;
+		/**
+		 * The page as a tree of fields and buttons, each with a [ref=e42] (f3e42 inside a frame). Menus of
+		 * more than 12 options show the first few, the chosen one and a count; `full: true` shows every
+		 * option. References die when the tab navigates.
+		 */
+		read(options?: { full?: boolean }): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
+		/**
+		 * Every field on the page, frames included, with its label and what it holds now: a short way to
+		 * check a form after filling it. Passwords show only as (set).
+		 */
+		values(): Promise<{ url: string; fields: { label: string; value: string; kind: string }[] }>;
 		/** A picture of the tab. */
 		screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number }>;
 		/** Type into a field. Never passwords or codes. */
 		fill(field: WebTarget, text: string): Promise<{ field: string }>;
-		/** Choose an option in a select. */
-		select(field: WebTarget, option: string): Promise<{ field: string; option: string }>;
-		/** Click a button or link. */
-		click(what: WebTarget): Promise<{ clicked: string }>;
-		/** Press a key. */
-		press(key: string): Promise<{ pressed: string }>;
+		/**
+		 * Choose an option in a select. A menu whose choice stalls is chosen again by typing the option
+		 * into it (`byKeyboard: true`), checked after.
+		 */
+		select(field: WebTarget, option: string): Promise<{ field: string; option: string; byKeyboard?: boolean }>;
+		/**
+		 * Click a button or link. The answer says where the page went (`navigated`), or `changed: false`
+		 * when the click did nothing. A button that sends, emails, invites, pays or deletes waits for the
+		 * person's Allow; `allowed: false` is their No.
+		 */
+		click(what: WebTarget, options?: { ask?: boolean }): Promise<{ clicked: string; navigated?: string; changed?: boolean; allowed?: boolean }>;
+		/** Press a key. The answer says where the page went (`navigated`), or whether anything changed. */
+		press(key: string): Promise<{ pressed: string; navigated?: string; changed?: boolean }>;
+		/** Put the keyboard's focus on a field or button, without clicking it. */
+		focus(what: WebTarget): Promise<{ focused: string }>;
+		/**
+		 * Type text key by key, as a person would, into the focused field, or into `into` first. Use it
+		 * where fill is not seen: word counters, fields that check as you type. Never passwords or codes.
+		 */
+		type(text: string, into?: WebTarget): Promise<{ typed: number; into?: string }>;
 		/** Submit a form, asking the person first; may come back with allowed: false. */
 		submit(what?: WebTarget, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
 		/** Stop sharing. */

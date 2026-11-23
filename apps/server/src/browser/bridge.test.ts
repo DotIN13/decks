@@ -176,6 +176,9 @@ async function fakeExtension(devtools: Devtools, targetId: string, code: string)
 						const tab = tabs.get(id);
 						if (tab) await devtools.send("Target.closeTarget", { targetId: tab.targetId });
 						tabs.delete(id);
+						// What Chrome tells the extension when a tab it is attached to goes away.
+						send({ method: "chrome.debugger.onDetach", params: [{ tabId: id }, "target_closed"] });
+						send({ method: "chrome.tabs.onRemoved", params: [id, { windowId: 1, isWindowClosing: false }] });
 					}
 					return {};
 				}
@@ -353,6 +356,126 @@ test("a reference from another page is a sentence, not a click on whatever now h
 	await bridge.open(OTHER);
 	await assert.rejects(bridge.click({ ref }), /was read from .* and the tab is now on .*Read the page again/s);
 	await assert.rejects(bridge.click({ ref: "nonsense" }), /is not a reference/);
+});
+
+test("the agent opens, lists, switches and closes tabs of the group, and the verbs follow the tab it picked", async () => {
+	const first = await bridge.tabs();
+	assert.equal(first.length, 1);
+	assert.equal(first[0]!.current, true);
+
+	const opened = await bridge.newTab("data:text/html,<title>Second</title><h1>Two</h1>");
+	assert.equal(opened.index, 2);
+	await until("two tabs", () => bridge.status().tabs.length === 2);
+	assert.equal((await bridge.read()).title, "Second", "the new tab is the one acted on");
+	assert.deepEqual((await bridge.tabs()).map((tab) => tab.current), [false, true]);
+
+	await bridge.useTab(1);
+	assert.notEqual((await bridge.read()).title, "Second", "back on the first tab");
+	await bridge.useTab("second");
+	assert.equal((await bridge.read()).title, "Second", "picked by words in its title");
+	await assert.rejects(bridge.useTab(9), /There is no tab 9/);
+
+	const closed = await bridge.closeTab();
+	assert.equal(closed.closed, "Second");
+	assert.equal(closed.tabs, 1);
+	assert.notEqual((await bridge.read()).title, "Second", "the verbs fall back to the first tab");
+	await assert.rejects(bridge.closeTab(), /only shared tab/);
+});
+
+test("a reference to a field inside a frame (f…e…) is taken, as on portals that put their form in an iframe", async () => {
+	const inner = "<!doctype html><title>Inner</title><table><tr><th>Verbal</th><td><input id=v></td></tr></table>";
+	await bridge.open(`data:text/html,${encodeURIComponent(`<!doctype html><title>Portal</title><iframe srcdoc="${inner.replace(/"/g, "&quot;")}"></iframe>`)}`);
+	await new Promise((resolve) => setTimeout(resolve, 500));
+	const page = await bridge.read();
+	const ref = page.snapshot.match(/textbox \[ref=(f\d+e\d+)\]/)?.[1];
+	assert.ok(ref, `a frame reference in:\n${page.snapshot}`);
+	await bridge.fill({ ref: ref! }, "152");
+	const value = (await devtools.send("Runtime.evaluate", { expression: "document.querySelector('iframe').contentDocument.getElementById('v').value", returnByValue: true }, tabSession())) as { result: { value: string } };
+	assert.equal(value.result.value, "152");
+});
+
+test("type sends real keystrokes into a field it focuses first, so a page that listens to typing hears every key", async () => {
+	await bridge.open(`data:text/html,${encodeURIComponent('<!doctype html><title>Count</title><label>Note <textarea id=n></textarea></label><p id=c>0</p><script>n.addEventListener("keyup",()=>c.textContent=n.value.length)</script>')}`);
+	const typed = await bridge.type("hello world", "Note");
+	assert.equal(typed.typed, 11);
+	const value = (await devtools.send("Runtime.evaluate", { expression: "n.value + '|' + c.textContent", returnByValue: true }, tabSession())) as { result: { value: string } };
+	assert.equal(value.result.value, "hello world|11");
+	await bridge.focus("Note");
+	await bridge.type("!");
+	const after = (await devtools.send("Runtime.evaluate", { expression: "n.value", returnByValue: true }, tabSession())) as { result: { value: string } };
+	assert.equal(after.result.value, "hello world!");
+});
+
+test("fill is heard by a page that listens for keyup and change, not just input", async () => {
+	await bridge.open(`data:text/html,${encodeURIComponent('<!doctype html><title>Words</title><label>Answer <textarea id=a></textarea></label><p id=w>200 words remaining</p><p id=ch>no</p><script>a.addEventListener("keyup",()=>w.textContent=(200-a.value.split(/\\s+/).filter(Boolean).length)+" words remaining");a.addEventListener("change",()=>ch.textContent="yes")</script>')}`);
+	await bridge.fill("Answer", "one two three");
+	const value = (await devtools.send("Runtime.evaluate", { expression: "w.textContent + '|' + ch.textContent", returnByValue: true }, tabSession())) as { result: { value: string } };
+	assert.equal(value.result.value, "197 words remaining|yes");
+});
+
+test("a click or key says where the page went, and a click that changes nothing says so", async () => {
+	// Chrome refuses a link from one data: page to another, so the move is to about:blank.
+	await bridge.open(`data:text/html,${encodeURIComponent(`<!doctype html><title>Start</title><a href="about:blank">Go</a><button>Nothing</button><p id=landed>here</p>`)}`);
+	const idle = await bridge.click("Nothing");
+	assert.equal(idle.changed, false);
+	assert.equal(idle.navigated, undefined);
+	const went = await bridge.click("Go");
+	assert.equal(went.changed, true);
+	assert.equal(went.navigated, "about:blank");
+});
+
+test("a menu of a hundred years reads as its first few, the chosen one and a count, and full shows them all", async () => {
+	const years = Array.from({ length: 80 }, (_, i) => 2026 - i).map((y) => `<option${y === 1998 ? " selected" : ""}>${y}</option>`).join("");
+	await bridge.open(`data:text/html,${encodeURIComponent(`<!doctype html><title>Born</title><label>Year <select>${years}</select></label>`)}`);
+	const folded = await bridge.read();
+	assert.match(folded.snapshot, /option "1998" \[selected\]/);
+	assert.match(folded.snapshot, /80 options in all/);
+	assert.doesNotMatch(folded.snapshot, /option "1960"/);
+	const full = await bridge.read({ full: true });
+	assert.match(full.snapshot, /option "1960"/);
+	await bridge.select("Year", "1960");
+});
+
+test("values lists every field with its label and value, including unlabeled cells in a frame by their row", async () => {
+	const inner = "<!doctype html><table><tr><th>Verbal</th><td><input value=152></td><td><input value=48></td></tr></table>";
+	await bridge.open(`data:text/html,${encodeURIComponent(`<!doctype html><title>Form</title><label>Email <input value="ada@example.org"></label><label>Year <select><option>1997</option><option selected>1998</option></select></label><iframe srcdoc="${inner.replace(/"/g, "&quot;")}"></iframe>`)}`);
+	await new Promise((resolve) => setTimeout(resolve, 500));
+	const { fields } = await bridge.values();
+	const by = Object.fromEntries(fields.map((f) => [f.label, f.value]));
+	assert.equal(by["Email"], "ada@example.org");
+	assert.equal(by["Year"], "1998");
+	assert.equal(by["Verbal (column 1)"], "152");
+	assert.equal(by["Verbal (column 2)"], "48");
+});
+
+test("a label used on the page and in an open dialog means the dialog's, and a hidden copy is passed over", async () => {
+	await bridge.open(
+		`data:text/html,${encodeURIComponent('<!doctype html><title>Dialogs</title><label>City <input id=a></label><div hidden><label>City <input id=h></label></div><div role=dialog aria-label=Address><label>City <input id=d></label></div>')}`,
+	);
+	await bridge.fill("City", "Palo Alto");
+	const value = (await devtools.send("Runtime.evaluate", { expression: "[a.value, h.value, d.value].join('|')", returnByValue: true }, tabSession())) as { result: { value: string } };
+	assert.equal(value.result.value, "||Palo Alto");
+});
+
+test("a click on a button that sends waits for the person's Allow, and a No leaves the page as it was", async () => {
+	await bridge.open(`data:text/html,${encodeURIComponent('<!doctype html><title>Letters</title><button onclick="document.title=\'sent\'">Send request</button>')}`);
+	const asked = bridge.click("Send request");
+	await until("the question on the board", () => bridge.status().pending !== undefined);
+	assert.match(bridge.status().pending!.text, /Send request/);
+	bridge.answer(bridge.status().pending!.id, false);
+	const result = await asked;
+	assert.equal(result.allowed, false);
+	assert.equal((await bridge.read()).title, "Letters");
+});
+
+test("a menu under a transparent covering layer is still chosen (the typed fallback for a stalled menu is not exercised here)", async () => {
+	await bridge.open(
+		`data:text/html,${encodeURIComponent('<!doctype html><title>Stall</title><label>Month <select id=m><option></option><option>August</option><option>September</option></select></label><div style="position:fixed;inset:0;background:transparent"></div>')}`,
+	);
+	const result = await bridge.select("Month", "September");
+	const value = (await devtools.send("Runtime.evaluate", { expression: "m.value", returnByValue: true }, tabSession())) as { result: { value: string } };
+	assert.equal(value.result.value, "September");
+	assert.equal(result.option, "September");
 });
 
 test("stop lets go of the tab; the extension's socket closes and the status says why", async () => {
