@@ -196,6 +196,16 @@ export function loginCookieOf(headers: IncomingHttpHeaders): string | undefined 
 	return undefined;
 }
 
+/**
+ * Whether this harness asks for the password at all: `DECKS_PASSWORD_LOGIN=1`, set by whoever serves
+ * it where anyone can reach it. Off by default, so a Decks on a laptop or a tailnet opens as it always
+ * has, whatever `password.json` holds. On with no password set yet, nothing is handed out until one is
+ * (`decks password set`, on the machine): the lock fails closed.
+ */
+export function passwordLoginOn(env: NodeJS.ProcessEnv = process.env): boolean {
+	return ["1", "true", "yes", "on"].includes(String(env.DECKS_PASSWORD_LOGIN ?? "").trim().toLowerCase());
+}
+
 /** Whether the proxy in front may be believed about who is calling and how: `DECKS_TRUST_PROXY=1`. */
 export function trustProxy(env: NodeJS.ProcessEnv = process.env): boolean {
 	return ["1", "true", "yes", "on"].includes(String(env.DECKS_TRUST_PROXY ?? "").trim().toLowerCase());

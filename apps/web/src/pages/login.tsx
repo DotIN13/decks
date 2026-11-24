@@ -48,7 +48,7 @@ const next = (() => {
 })();
 const approveCode = (query.get("approve") ?? "").trim().toUpperCase() || undefined;
 
-type Phase = "loading" | "login" | "approve" | "approved" | "cancelled" | "unknown";
+type Phase = "loading" | "unset" | "login" | "approve" | "approved" | "cancelled" | "unknown";
 type Device = { label?: string; expires?: number };
 
 async function json<T>(response: Response): Promise<T | undefined> {
@@ -123,9 +123,15 @@ function LoginPage() {
 	onMount(async () => {
 		try {
 			const response = await fetch("/api/login/state", { credentials: "same-origin" });
-			const state = response.ok ? await json<{ password: boolean; loggedIn: boolean }>(response) : undefined;
-			if (state && (state.loggedIn || (!state.password && !approveCode))) {
+			const state = response.ok ? await json<{ enabled: boolean; password: boolean; loggedIn: boolean }>(response) : undefined;
+			// The password login off (DECKS_PASSWORD_LOGIN), or this browser logged in: nothing to ask here.
+			if (state && (state.loggedIn || (!state.enabled && !approveCode))) {
 				await afterLogin();
+				return;
+			}
+			// On, with no password set yet: nothing opens until one is, on the server.
+			if (state?.enabled && !state.password) {
+				setPhase("unset");
 				return;
 			}
 		} catch {
@@ -208,6 +214,9 @@ function LoginPage() {
 					</Match>
 					<Match when={phase() === "cancelled"}>
 						<p>{m.login_cancelled()}</p>
+					</Match>
+					<Match when={phase() === "unset"}>
+						<p>{m.login_no_password()}</p>
 					</Match>
 					<Match when={phase() === "unknown"}>
 						<p>{m.login_code_unknown()}</p>

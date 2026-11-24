@@ -1152,6 +1152,7 @@
 /** @typedef {{}} Login_Code_UnknownInputs */
 /** @typedef {{}} Login_Document_TitleInputs */
 /** @typedef {{ why: NonNullable<unknown> }} Login_FailedInputs */
+/** @typedef {{}} Login_No_PasswordInputs */
 /** @typedef {{}} Login_Open_DecksInputs */
 /** @typedef {{}} Login_Password_LabelInputs */
 /** @typedef {{}} Login_SubInputs */
@@ -6132,6 +6133,10 @@ export const login_document_title = /** @type {(inputs: Login_Document_TitleInpu
 
 export const login_failed = /** @type {(inputs: Login_FailedInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`无法登录：${i?.why}`)
+};
+
+export const login_no_password = /** @type {(inputs: Login_No_PasswordInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`还没有设置密码，所以这个 Decks 暂不对任何人开放。请在服务器上用 decks password set 设置一个。`)
 };
 
 export const login_open_decks = /** @type {(inputs: Login_Open_DecksInputs) => LocalizedString} */ () => {

@@ -19,7 +19,7 @@ import { SetGroup, SetRow } from "./rows.tsx";
  */
 const MIN_LENGTH = 10;
 
-type LoginState = { password: boolean; loggedIn: boolean };
+type LoginState = { enabled: boolean; password: boolean; loggedIn: boolean };
 
 async function errorOf(response: Response): Promise<string | undefined> {
 	try {
@@ -96,7 +96,7 @@ export function PasswordGroup() {
 	});
 
 	return (
-		<Show when={state()}>
+		<Show when={state()?.enabled ? state() : undefined}>
 			{(known) => (
 				<SetGroup label={m.settings_password_group()} group="password">
 					<Show when={known().password} fallback={<SetRow lead={mark(KeyRound)} title={m.settings_password_none()} sub={m.settings_password_none_sub()} />}>

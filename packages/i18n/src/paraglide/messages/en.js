@@ -1152,6 +1152,7 @@
 /** @typedef {{}} Login_Code_UnknownInputs */
 /** @typedef {{}} Login_Document_TitleInputs */
 /** @typedef {{ why: NonNullable<unknown> }} Login_FailedInputs */
+/** @typedef {{}} Login_No_PasswordInputs */
 /** @typedef {{}} Login_Open_DecksInputs */
 /** @typedef {{}} Login_Password_LabelInputs */
 /** @typedef {{}} Login_SubInputs */
@@ -6208,6 +6209,10 @@ export const login_document_title = /** @type {(inputs: Login_Document_TitleInpu
 
 export const login_failed = /** @type {(inputs: Login_FailedInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Could not log in: ${i?.why}`)
+};
+
+export const login_no_password = /** @type {(inputs: Login_No_PasswordInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`No password is set yet, so this Decks opens for no one. Set one on the server with decks password set.`)
 };
 
 export const login_open_decks = /** @type {(inputs: Login_Open_DecksInputs) => LocalizedString} */ () => {

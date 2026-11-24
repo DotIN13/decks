@@ -1154,6 +1154,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Login_Code_UnknownInputs */
 /** @typedef {{}} Login_Document_TitleInputs */
 /** @typedef {{ why: NonNullable<unknown> }} Login_FailedInputs */
+/** @typedef {{}} Login_No_PasswordInputs */
 /** @typedef {{}} Login_Open_DecksInputs */
 /** @typedef {{}} Login_Password_LabelInputs */
 /** @typedef {{}} Login_SubInputs */
@@ -17680,6 +17681,20 @@ export const login_failed = /** @type {((inputs: Login_FailedInputs, options?: {
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.login_failed(inputs)
 	return __en.login_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No password is set yet, so this Decks opens for no one. Set one on the server with decks password set." |
+*
+* @param {Login_No_PasswordInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_no_password = /** @type {((inputs?: Login_No_PasswordInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_No_PasswordInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_no_password(inputs)
+	return __en.login_no_password(inputs)
 });
 /**
 * | output |

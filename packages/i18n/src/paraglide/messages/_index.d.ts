@@ -8091,6 +8091,13 @@ export const login_failed: ((inputs: Login_FailedInputs, options?: { locale?: "e
 /**
 * | output |
 * | --- |
+* | "No password is set yet, so this Decks opens for no one. Set one on the server with decks password set." |
+*
+*/
+export const login_no_password: ((inputs?: Login_No_PasswordInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_No_PasswordInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Open Decks" |
 *
 */
@@ -11853,6 +11860,7 @@ export type Login_CancelledInputs = {};
 export type Login_Code_UnknownInputs = {};
 export type Login_Document_TitleInputs = {};
 export type Login_FailedInputs = { why: NonNullable<unknown> };
+export type Login_No_PasswordInputs = {};
 export type Login_Open_DecksInputs = {};
 export type Login_Password_LabelInputs = {};
 export type Login_SubInputs = {};

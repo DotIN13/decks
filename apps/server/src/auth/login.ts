@@ -26,6 +26,8 @@ import type { TokenStore } from "./tokens.ts";
 export interface LoginHost {
 	readonly tokens: TokenStore;
 	readonly password: PasswordStore;
+	/** Whether the password login is on (`DECKS_PASSWORD_LOGIN`, `password.ts`). */
+	readonly passwordLogin: boolean;
 	readonly throttle: LoginThrottle;
 	readonly deviceLogins: DeviceLogins;
 	readonly deck: { readonly name: string };
@@ -43,9 +45,9 @@ export function loggedIn(app: Pick<LoginHost, "tokens">, req: Pick<Request, "hea
 	return seen.ok && seen.principal.kind === "person";
 }
 
-/** Whether the page and what it serves need a login: a password is set. */
-export function locked(app: Pick<LoginHost, "password">): boolean {
-	return app.password.isSet;
+/** Whether the page and what it serves need a login: the password login is on (`DECKS_PASSWORD_LOGIN`), set or not yet. */
+export function locked(app: Pick<LoginHost, "passwordLogin">): boolean {
+	return app.passwordLogin;
 }
 
 const secure = (req: Request) => overHttps(req.secure, req.headers);
@@ -54,12 +56,13 @@ export function loginRoutes(app: LoginHost): express.Router {
 	const api = express.Router();
 
 	api.get("/login/state", (req, res) => {
-		res.set("cache-control", "no-store").json({ password: app.password.isSet, loggedIn: loggedIn(app, req) });
+		res.set("cache-control", "no-store").json({ enabled: app.passwordLogin, password: app.password.isSet, loggedIn: app.passwordLogin && loggedIn(app, req) });
 	});
 
 	api.post("/login/password", (req, res) => {
 		if (fromAnotherSite(req.headers)) return void res.status(403).json({ error: "Log in from this Decks's own page." });
-		if (!app.password.isSet) return void res.status(404).json({ error: "No password is set on this Decks. Set one on its Mac with decks password set." });
+		if (!app.passwordLogin) return void res.status(404).json({ error: "This Decks does not use a password login. Start it with DECKS_PASSWORD_LOGIN=1 to turn it on." });
+		if (!app.password.isSet) return void res.status(409).json({ error: "No password is set yet. Set one on the server with decks password set." });
 		if (!passwordMaySend(req.socket.remoteAddress, req.secure, req.headers)) return void res.status(403).json({ error: "This Decks is reached over plain HTTP, where a password could be read on the way. Serve it over HTTPS (behind Caddy) to log in from here." });
 		const from = callerOf(req.socket.remoteAddress, req.headers);
 		const wait = app.throttle.wait(from);
@@ -87,7 +90,7 @@ export function loginRoutes(app: LoginHost): express.Router {
 	});
 
 	api.post("/login/everywhere", (req, res) => {
-		if (req.principal?.kind !== "person" && !loggedIn(app, req)) return void res.status(403).json({ error: "Only the person signs everyone out." });
+		if (req.principal?.kind !== "person" && !(app.passwordLogin && loggedIn(app, req))) return void res.status(403).json({ error: "Only the person signs everyone out." });
 		const revoked = app.tokens.revokeWhere((principal, row) => principal.kind === "person" && !KEPT_EVERYWHERE.has(row.label ?? ""));
 		res.setHeader("Set-Cookie", loginCookie(undefined, secure(req)));
 		res.json({ revoked });
@@ -142,7 +145,7 @@ export function loginRoutes(app: LoginHost): express.Router {
 
 	api.post("/login/device/approve", (req, res) => {
 		if (fromAnotherSite(req.headers)) return void res.status(403).json({ error: "Approve from this Decks's own page." });
-		if (!loggedIn(app, req) && !actsAsPerson(req.principal)) return void res.status(401).json({ error: "Log in first, then approve." });
+		if (!(app.passwordLogin && loggedIn(app, req)) && !actsAsPerson(req.principal)) return void res.status(401).json({ error: "Log in first, then approve." });
 		const code = String(((req.body ?? {}) as { code?: unknown }).code ?? "");
 		const done = app.deviceLogins.approve(code, () => app.tokens.issue({ kind: "person" }, { label: app.deviceLogins.find(code)?.label ?? "decks login", terminal: true }).token);
 		if (!done) return void res.status(404).json({ error: "That code is wrong or has run out. Run decks login again." });
@@ -159,7 +162,7 @@ export function loginRoutes(app: LoginHost): express.Router {
 }
 
 /** With a password set, a forwarded port (`/node/…`, `/rnode/…`) answers only a logged-in browser, or a caller with a token. */
-export function lockForwards(app: Pick<LoginHost, "tokens" | "password">) {
+export function lockForwards(app: Pick<LoginHost, "tokens" | "passwordLogin">) {
 	return (req: Request, res: Response, next: NextFunction): void => {
 		if (locked(app) && /^\/r?node\//.test(req.path) && !loggedIn(app, req) && !app.tokens.verify(bearerOf(req.headers)).ok) {
 			res.status(401).type("text").send("This Decks is locked with a password. Log in at /login first.");
@@ -170,7 +173,7 @@ export function lockForwards(app: Pick<LoginHost, "tokens" | "password">) {
 }
 
 /** The login page (`web/src/pages/login.tsx`): open to anyone and holding nothing but the form; a browser already logged in goes on to where it was going. */
-export function loginPage(app: Pick<LoginHost, "tokens" | "password">, webDist: string) {
+export function loginPage(app: Pick<LoginHost, "tokens" | "passwordLogin">, webDist: string) {
 	return (req: Request, res: Response, next: NextFunction): void => {
 		if (locked(app) && loggedIn(app, req) && !req.query.approve) {
 			const to = String(req.query.next ?? "/");

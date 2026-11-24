@@ -6,8 +6,13 @@
 	"login_wrong": "That password is not right.",
 	"login_wait": [
 		{
-			"declarations": ["input count", "local n = count: plural"],
-			"selectors": ["n"],
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
 			"match": {
 				"n=one": "Too many tries. Try again in {count} second.",
 				"n=other": "Too many tries. Try again in {count} seconds."
@@ -26,5 +31,6 @@
 	"login_approved": "Approved. You can go back to the terminal.",
 	"login_cancelled": "Not approved. You can close this tab.",
 	"login_code_unknown": "This code is unknown or has expired. Run decks login in the terminal again.",
-	"login_open_decks": "Open Decks"
+	"login_open_decks": "Open Decks",
+	"login_no_password": "No password is set yet, so this Decks opens for no one. Set one on the server with decks password set."
 }

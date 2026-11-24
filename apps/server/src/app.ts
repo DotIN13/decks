@@ -15,7 +15,7 @@ import { SettingsStore } from "./settings.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
-import { DeviceLogins, LoginThrottle, PasswordStore } from "./auth/password.ts";
+import { DeviceLogins, LoginThrottle, PasswordStore, passwordLoginOn } from "./auth/password.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
@@ -110,6 +110,8 @@ export class App {
 	readonly codes: PairCodes;
 	/** The password that locks this harness when it is served where anyone can reach it (`auth/password.ts`). */
 	readonly password: PasswordStore;
+	/** Whether the password is asked for: `DECKS_PASSWORD_LOGIN=1`, off by default (`auth/password.ts`). */
+	passwordLogin = passwordLoginOn();
 	readonly throttle = new LoginThrottle();
 	readonly deviceLogins = new DeviceLogins();
 	/** Canvas passes, signed and checked on every use (`auth/passes.ts`). */
@@ -185,7 +187,7 @@ export class App {
 		// Kept with the deck it was opened with: a deck opened later keeps the same callers.
 		this.tokens = new TokenStore(join(deck.path, ".decks", "tokens.json"));
 		this.password = PasswordStore.in(config.dataDir);
-		this.codes = new PairCodes(this.tokens, { required: codeRequired(), locked: () => this.password.isSet });
+		this.codes = new PairCodes(this.tokens, { required: codeRequired(), locked: () => this.passwordLogin });
 		this.passes = new Passes(
 			{
 				live: (id) => this.tokens.live(id),

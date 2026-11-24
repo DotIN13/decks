@@ -197,7 +197,7 @@ async function login(words) {
 async function passwordSet() {
 	try {
 		const state = await (await fetch(`${harness()}/api/login/state`)).json();
-		return state.password === true;
+		return state.enabled === true && state.password === true;
 	} catch {
 		return false;
 	}
@@ -274,7 +274,11 @@ async function password(words) {
 	const response = await fetch(`${harness()}/api/password`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${local.token}` }, body: JSON.stringify(body) });
 	const answer = await response.json().catch(() => ({}));
 	if (!response.ok) throw new DecksError(answer.error || `Decks answered ${response.status}`);
-	return answer.password ? `The password is set. A browser now logs in at ${harness()}/login before Decks opens, and terminals elsewhere log in with decks login ${harness()}.` : "The password is taken away: Decks opens without one again.";
+	const on = await fetch(`${harness()}/api/login/state`).then((r) => r.json()).then((state) => state.enabled === true, () => false);
+	if (!answer.password) return on ? "The password is taken away. The password login is still on (DECKS_PASSWORD_LOGIN), so nothing opens until one is set again." : "The password is taken away.";
+	return on
+		? `The password is set. A browser now logs in at ${harness()}/login before Decks opens, and terminals elsewhere log in with decks login ${harness()}.`
+		: "The password is set, but the password login is off: start Decks with DECKS_PASSWORD_LOGIN=1 to ask for it.";
 }
 
 /** `decks logout`: the harness takes the token back, and it is gone from `~/.decks/token`. */

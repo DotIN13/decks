@@ -6,8 +6,13 @@
 	"login_wrong": "密码不正确。",
 	"login_wait": [
 		{
-			"declarations": ["input count", "local n = count: plural"],
-			"selectors": ["n"],
+			"declarations": [
+				"input count",
+				"local n = count: plural"
+			],
+			"selectors": [
+				"n"
+			],
 			"match": {
 				"n=other": "尝试次数过多，请在 {count} 秒后重试。"
 			}
@@ -25,5 +30,6 @@
 	"login_approved": "已批准。现在可以回到终端了。",
 	"login_cancelled": "未批准。可以关闭此标签页。",
 	"login_code_unknown": "此代码无效或已过期。请在终端里重新运行 decks login。",
-	"login_open_decks": "打开 Decks"
+	"login_open_decks": "打开 Decks",
+	"login_no_password": "还没有设置密码，所以这个 Decks 暂不对任何人开放。请在服务器上用 decks password set 设置一个。"
 }

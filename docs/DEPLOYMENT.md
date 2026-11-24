@@ -330,7 +330,8 @@ Two more notes:
 
 A private network is the safer home, and nothing above needs a password. To reach Decks from
 anywhere instead, on a public server with a name and a port, lock it with a password first and
-put Caddy in front for HTTPS. Without a password, anyone who loads the page is given the
+put Caddy in front for HTTPS. The password login is off unless Decks starts with
+`DECKS_PASSWORD_LOGIN=1`: a Decks on a laptop or a tailnet never asks, whatever is set. Without a password, anyone who loads the page is given the
 person's access, and the person's access runs agents, which run shell commands on the machine.
 
 **1. Set the password**, on the server, as the service user, with Decks running:
@@ -340,7 +341,7 @@ decks password set          # typed twice, 10 characters or more; decks password
 ```
 
 It is kept as a scrypt hash in the data folder (`password.json`), outside the deck, so Studio
-never syncs it. From then on:
+never syncs it. With `DECKS_PASSWORD_LOGIN=1` (step 2), from then on:
 
 - the page sends a browser that has not logged in to `/login`; logging in sets an HttpOnly
   cookie that lasts thirty days while it is used, and the page gives that browser its token as
@@ -356,6 +357,8 @@ never syncs it. From then on:
 **2. Run Decks on loopback, telling it its name and to believe Caddy** (in the unit of §7):
 
 ```ini
+# The switch: without it no password is asked, even with one set. On with none set yet, nothing opens.
+Environment=DECKS_PASSWORD_LOGIN=1
 Environment=DECKS_HOST=127.0.0.1
 Environment=DECKS_PORT=4329
 # The name Caddy serves it on, so the Host check lets it through (auth/hosts.ts).

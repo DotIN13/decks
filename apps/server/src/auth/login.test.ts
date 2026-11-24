@@ -70,11 +70,12 @@ test("a terminal waiting for the person is let in once, by its code, and its cod
 	assert.equal(logins.find(late.code, t + 11 * 60_000), undefined);
 });
 
-async function harness(password?: string) {
+async function harness(password?: string, on = password !== undefined) {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-login-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(deck, { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
+	app.passwordLogin = on;
 	if (password) app.password.set(password);
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));
@@ -105,10 +106,32 @@ test("with no password set, a tab is given its token as before, and there is not
 		const page = await open(`${origin}/`);
 		assert.equal(page.status, 200);
 		assert.match(page.text, /decks-session/);
-		assert.deepEqual(await (await fetch(`${origin}/api/login/state`)).json(), { password: false, loggedIn: false });
+		assert.deepEqual(await (await fetch(`${origin}/api/login/state`)).json(), { enabled: false, password: false, loggedIn: false });
 		assert.equal((await fetch(`${origin}/api/login/password`, { method: "POST", headers: json, body: JSON.stringify({ password: "anything at all" }) })).status, 404);
 	} finally {
 		close();
+	}
+});
+
+test("a password on disk asks for nothing while DECKS_PASSWORD_LOGIN is off, and the login on with no password yet hands out nothing", async () => {
+	const off = await harness("correct horse battery", false);
+	try {
+		const page = await open(`${off.origin}/`);
+		assert.equal(page.status, 200, "off: the page opens as it always has");
+		assert.match(page.text, /decks-session/);
+		assert.equal((await fetch(`${off.origin}/node/5173/`)).status !== 401, true, "off: forwarded ports as before");
+		assert.equal(off.app.codes.required, false, "off: pairing as before");
+		assert.equal((await fetch(`${off.origin}/api/login/password`, { method: "POST", headers: json, body: JSON.stringify({ password: "correct horse battery" }) })).status, 404);
+	} finally {
+		off.close();
+	}
+	const bare = await harness(undefined, true);
+	try {
+		assert.equal((await open(`${bare.origin}/`)).status, 302, "on with no password: sent to /login, never given a token");
+		assert.deepEqual(await (await fetch(`${bare.origin}/api/login/state`)).json(), { enabled: true, password: false, loggedIn: false });
+		assert.equal((await fetch(`${bare.origin}/api/login/password`, { method: "POST", headers: json, body: JSON.stringify({ password: "anything at all" }) })).status, 409);
+	} finally {
+		bare.close();
 	}
 });
 
@@ -125,7 +148,7 @@ test("with a password, the page sends a browser to log in, the login's cookie ge
 		assert.equal(right.status, 200);
 		const cookie = right.headers.get("set-cookie")!.split(";")[0]!;
 		assert.match(cookie, /^decks_login=dk_h_/);
-		assert.deepEqual(await (await fetch(`${origin}/api/login/state`, { headers: { cookie } })).json(), { password: true, loggedIn: true });
+		assert.deepEqual(await (await fetch(`${origin}/api/login/state`, { headers: { cookie } })).json(), { enabled: true, password: true, loggedIn: true });
 		const page = await open(`${origin}/`, cookie);
 		assert.equal(page.status, 200);
 		assert.match(page.text, /decks-session/);
@@ -175,7 +198,7 @@ test("a forwarded port needs the login, and a terminal elsewhere is let in from 
 });
 
 test("the password is set on this Mac without the old one, changed elsewhere only with it, and signing out everywhere ends every login", async () => {
-	const { app, origin, close } = await harness();
+	const { app, origin, close } = await harness(undefined, true);
 	try {
 		const machine = app.tokens.issue({ kind: "person" }, { label: "decks login on this machine" });
 		app.cliTokenId = machine.id;
@@ -195,7 +218,7 @@ test("the password is set on this Mac without the old one, changed elsewhere onl
 		const out = (await (await fetch(`${origin}/api/login/everywhere`, { method: "POST", headers: { authorization: `Bearer ${person.token}` } })).json()) as { revoked: number };
 		assert.ok(out.revoked >= 2);
 		assert.equal(app.tokens.verify(person.token).ok, false);
-		assert.deepEqual(await (await fetch(`${origin}/api/login/state`, { headers: { cookie } })).json(), { password: true, loggedIn: false });
+		assert.deepEqual(await (await fetch(`${origin}/api/login/state`, { headers: { cookie } })).json(), { enabled: true, password: true, loggedIn: false });
 		assert.equal(app.tokens.verify(machine.token).ok, true, "this Mac's own token stays");
 	} finally {
 		close();
