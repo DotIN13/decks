@@ -63,6 +63,8 @@ export class Registry {
 			accounts?: ClaudeAccountSwitcher;
 			/** Tell the browser the list moved, after a login or an automatic switch. */
 			accountsChanged?(): void;
+			/** Ask the person to sign in to Claude, for an agent (`claude/login.ts`). */
+			accountNeeded?(agentId: string, why: "no-account" | "asked", accountId?: string): void;
 			/** The canvas tool's HTTP end, for a runtime that is not in this process. */
 			bridge?: CanvasBridge;
 		},
@@ -273,6 +275,7 @@ export class Registry {
 				...options,
 				...(this.host.accounts ? { accounts: this.host.accounts } : {}),
 				...(this.host.accountsChanged ? { accountsChanged: this.host.accountsChanged } : {}),
+				...(this.host.accountNeeded ? { accountNeeded: this.host.accountNeeded } : {}),
 				...(this.host.bridge ? { bridge: this.host.bridge } : {}),
 				// The whole chat row is what carries the menu, so a longer list is one
 				// republish of the list the browser already keys on.

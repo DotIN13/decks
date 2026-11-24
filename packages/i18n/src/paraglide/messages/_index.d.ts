@@ -4789,6 +4789,195 @@ export const chat_yesterday: ((inputs?: Chat_YesterdayInputs, options?: { locale
 /**
 * | output |
 * | --- |
+* | "Anthropic API account (Console, usage billing)" |
+*
+*/
+export const claudelogin_api: ((inputs?: Claudelogin_ApiInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_ApiInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign in with your Anthropic Console account; you pay for what you use." |
+*
+*/
+export const claudelogin_api_sub: ((inputs?: Claudelogin_Api_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Api_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Cancel" |
+*
+*/
+export const claudelogin_cancel: ((inputs?: Claudelogin_CancelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_CancelInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Which account do you sign in with?" |
+*
+*/
+export const claudelogin_choose: ((inputs?: Claudelogin_ChooseInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_ChooseInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Close" |
+*
+*/
+export const claudelogin_close: ((inputs?: Claudelogin_CloseInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_CloseInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Code" |
+*
+*/
+export const claudelogin_code_label: ((inputs?: Claudelogin_Code_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Code_LabelInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Paste the code" |
+*
+*/
+export const claudelogin_code_placeholder: ((inputs?: Claudelogin_Code_PlaceholderInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Code_PlaceholderInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Continue" |
+*
+*/
+export const claudelogin_continue: ((inputs?: Claudelogin_ContinueInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_ContinueInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Copied" |
+*
+*/
+export const claudelogin_copied: ((inputs?: Claudelogin_CopiedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_CopiedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Copy" |
+*
+*/
+export const claudelogin_copy: ((inputs?: Claudelogin_CopyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_CopyInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Done" |
+*
+*/
+export const claudelogin_done: ((inputs?: Claudelogin_DoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_DoneInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Every Claude agent will use it; its models are read again." |
+*
+*/
+export const claudelogin_done_body: ((inputs?: Claudelogin_Done_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Done_BodyInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign-in failed" |
+*
+*/
+export const claudelogin_failed: ((inputs?: Claudelogin_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_FailedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Finish" |
+*
+*/
+export const claudelogin_finish: ((inputs?: Claudelogin_FinishInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_FinishInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Finishing…" |
+*
+*/
+export const claudelogin_finishing: ((inputs?: Claudelogin_FinishingInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_FinishingInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign-in link" |
+*
+*/
+export const claudelogin_link_label: ((inputs?: Claudelogin_Link_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Link_LabelInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Open the sign-in page, sign in, then paste the code it gives you here." |
+*
+*/
+export const claudelogin_link_lead: ((inputs?: Claudelogin_Link_LeadInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Link_LeadInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "This Claude agent has no account to run on yet. Sign in to start it." |
+*
+*/
+export const claudelogin_no_account: ((inputs?: Claudelogin_No_AccountInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_No_AccountInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "{agent} has no account to run on yet. Sign in to start it." |
+*
+*/
+export const claudelogin_no_account_named: ((inputs: Claudelogin_No_Account_NamedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_No_Account_NamedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Open the sign-in page" |
+*
+*/
+export const claudelogin_open: ((inputs?: Claudelogin_OpenInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_OpenInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Signed in" |
+*
+*/
+export const claudelogin_signed_in: ((inputs?: Claudelogin_Signed_InInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Signed_InInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Signed in as {email}" |
+*
+*/
+export const claudelogin_signed_in_as: ((inputs: Claudelogin_Signed_In_AsInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Signed_In_AsInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Starting Claude's sign-in…" |
+*
+*/
+export const claudelogin_starting: ((inputs?: Claudelogin_StartingInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_StartingInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Claude subscription (Pro or Max)" |
+*
+*/
+export const claudelogin_subscription: ((inputs?: Claudelogin_SubscriptionInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_SubscriptionInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign in with your claude.ai account." |
+*
+*/
+export const claudelogin_subscription_sub: ((inputs?: Claudelogin_Subscription_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Subscription_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign in to Claude" |
+*
+*/
+export const claudelogin_title: ((inputs?: Claudelogin_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Try again" |
+*
+*/
+export const claudelogin_try_again: ((inputs?: Claudelogin_Try_AgainInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Claudelogin_Try_AgainInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Attach a file" |
 *
 */
@@ -11390,6 +11579,33 @@ export type Chat_TypingInputs = {};
 export type Chat_Waiting_For_YouInputs = { name: NonNullable<unknown> };
 export type Chat_WorkingInputs = {};
 export type Chat_YesterdayInputs = {};
+export type Claudelogin_ApiInputs = {};
+export type Claudelogin_Api_SubInputs = {};
+export type Claudelogin_CancelInputs = {};
+export type Claudelogin_ChooseInputs = {};
+export type Claudelogin_CloseInputs = {};
+export type Claudelogin_Code_LabelInputs = {};
+export type Claudelogin_Code_PlaceholderInputs = {};
+export type Claudelogin_ContinueInputs = {};
+export type Claudelogin_CopiedInputs = {};
+export type Claudelogin_CopyInputs = {};
+export type Claudelogin_DoneInputs = {};
+export type Claudelogin_Done_BodyInputs = {};
+export type Claudelogin_FailedInputs = {};
+export type Claudelogin_FinishInputs = {};
+export type Claudelogin_FinishingInputs = {};
+export type Claudelogin_Link_LabelInputs = {};
+export type Claudelogin_Link_LeadInputs = {};
+export type Claudelogin_No_AccountInputs = {};
+export type Claudelogin_No_Account_NamedInputs = { agent: NonNullable<unknown> };
+export type Claudelogin_OpenInputs = {};
+export type Claudelogin_Signed_InInputs = {};
+export type Claudelogin_Signed_In_AsInputs = { email: NonNullable<unknown> };
+export type Claudelogin_StartingInputs = {};
+export type Claudelogin_SubscriptionInputs = {};
+export type Claudelogin_Subscription_SubInputs = {};
+export type Claudelogin_TitleInputs = {};
+export type Claudelogin_Try_AgainInputs = {};
 export type Composer_AttachInputs = {};
 export type Composer_Context_DialInputs = { percent: NonNullable<unknown> };
 export type Composer_Context_LabelInputs = {};

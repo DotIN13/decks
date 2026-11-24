@@ -285,11 +285,10 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			void app.accountList.publish(call.tell);
 			if ((options as { limits?: unknown } | undefined)?.limits) void app.accountList.refreshLimits();
 		},
-		"account.add": async () => {
-			const claude = [agents().focused(), ...agents().all()].find((agent) => agent.kind === "claude");
-			if (!claude) throw new Error("Start a Claude agent first. Signing in runs through one.");
-			void claude.prompt("/login");
-		},
+		// Signing in to Claude, run by the harness for the page's modal (`runtimes/claude/login.ts`): the link, then the code.
+		"account.add": async ([options]) => app.claudeLogin.start((options as { method?: unknown } | undefined)?.method === "api" ? "api" : "subscription"),
+		"account.code": async ([code]) => app.claudeLogin.finish(String(code ?? "")),
+		"account.cancel": async () => void app.claudeLogin.cancel(),
 		"account.use": async ([id, agentId]) => {
 			const agent = agents().all().find((one) => one.id === String(agentId));
 			if (!agent) throw new Error("That agent is not here any more.");

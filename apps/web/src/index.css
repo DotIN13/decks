@@ -59,6 +59,8 @@
 @import "./styles/tokens.css";
 /* The v3 harness: its colours on the chrome, the canvas kept as it was, and its surfaces (`styles/v3.css`). */
 @import "./styles/v3.css";
+/* The Claude sign-in over everything (`settings/ClaudeLogin.tsx`), on the confirm dialog's drawing. */
+@import "./styles/claude-login.css";
 
 
 /*

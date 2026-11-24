@@ -682,6 +682,33 @@
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Waiting_For_YouInputs */
 /** @typedef {{}} Chat_WorkingInputs */
 /** @typedef {{}} Chat_YesterdayInputs */
+/** @typedef {{}} Claudelogin_ApiInputs */
+/** @typedef {{}} Claudelogin_Api_SubInputs */
+/** @typedef {{}} Claudelogin_CancelInputs */
+/** @typedef {{}} Claudelogin_ChooseInputs */
+/** @typedef {{}} Claudelogin_CloseInputs */
+/** @typedef {{}} Claudelogin_Code_LabelInputs */
+/** @typedef {{}} Claudelogin_Code_PlaceholderInputs */
+/** @typedef {{}} Claudelogin_ContinueInputs */
+/** @typedef {{}} Claudelogin_CopiedInputs */
+/** @typedef {{}} Claudelogin_CopyInputs */
+/** @typedef {{}} Claudelogin_DoneInputs */
+/** @typedef {{}} Claudelogin_Done_BodyInputs */
+/** @typedef {{}} Claudelogin_FailedInputs */
+/** @typedef {{}} Claudelogin_FinishInputs */
+/** @typedef {{}} Claudelogin_FinishingInputs */
+/** @typedef {{}} Claudelogin_Link_LabelInputs */
+/** @typedef {{}} Claudelogin_Link_LeadInputs */
+/** @typedef {{}} Claudelogin_No_AccountInputs */
+/** @typedef {{ agent: NonNullable<unknown> }} Claudelogin_No_Account_NamedInputs */
+/** @typedef {{}} Claudelogin_OpenInputs */
+/** @typedef {{}} Claudelogin_Signed_InInputs */
+/** @typedef {{ email: NonNullable<unknown> }} Claudelogin_Signed_In_AsInputs */
+/** @typedef {{}} Claudelogin_StartingInputs */
+/** @typedef {{}} Claudelogin_SubscriptionInputs */
+/** @typedef {{}} Claudelogin_Subscription_SubInputs */
+/** @typedef {{}} Claudelogin_TitleInputs */
+/** @typedef {{}} Claudelogin_Try_AgainInputs */
 /** @typedef {{}} Composer_AttachInputs */
 /** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_DialInputs */
 /** @typedef {{}} Composer_Context_LabelInputs */
@@ -4253,6 +4280,114 @@ export const chat_working = /** @type {(inputs: Chat_WorkingInputs) => Localized
 
 export const chat_yesterday = /** @type {(inputs: Chat_YesterdayInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`昨天`)
+};
+
+export const claudelogin_api = /** @type {(inputs: Claudelogin_ApiInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Anthropic API 账户（Console，按用量计费）`)
+};
+
+export const claudelogin_api_sub = /** @type {(inputs: Claudelogin_Api_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`用你的 Anthropic Console 账户登录，按实际用量付费。`)
+};
+
+export const claudelogin_cancel = /** @type {(inputs: Claudelogin_CancelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`取消`)
+};
+
+export const claudelogin_choose = /** @type {(inputs: Claudelogin_ChooseInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`用哪种账户登录？`)
+};
+
+export const claudelogin_close = /** @type {(inputs: Claudelogin_CloseInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`关闭`)
+};
+
+export const claudelogin_code_label = /** @type {(inputs: Claudelogin_Code_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`代码`)
+};
+
+export const claudelogin_code_placeholder = /** @type {(inputs: Claudelogin_Code_PlaceholderInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`粘贴代码`)
+};
+
+export const claudelogin_continue = /** @type {(inputs: Claudelogin_ContinueInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`继续`)
+};
+
+export const claudelogin_copied = /** @type {(inputs: Claudelogin_CopiedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`已拷贝`)
+};
+
+export const claudelogin_copy = /** @type {(inputs: Claudelogin_CopyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`拷贝`)
+};
+
+export const claudelogin_done = /** @type {(inputs: Claudelogin_DoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`好`)
+};
+
+export const claudelogin_done_body = /** @type {(inputs: Claudelogin_Done_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`每个 Claude 智能体都会使用它，并重新读取模型列表。`)
+};
+
+export const claudelogin_failed = /** @type {(inputs: Claudelogin_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`登录失败`)
+};
+
+export const claudelogin_finish = /** @type {(inputs: Claudelogin_FinishInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`完成`)
+};
+
+export const claudelogin_finishing = /** @type {(inputs: Claudelogin_FinishingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`正在完成…`)
+};
+
+export const claudelogin_link_label = /** @type {(inputs: Claudelogin_Link_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`登录链接`)
+};
+
+export const claudelogin_link_lead = /** @type {(inputs: Claudelogin_Link_LeadInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`打开登录页面并登录，然后把页面给出的代码粘贴到这里。`)
+};
+
+export const claudelogin_no_account = /** @type {(inputs: Claudelogin_No_AccountInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`这个 Claude 智能体还没有可以运行的账户。登录后即可启动它。`)
+};
+
+export const claudelogin_no_account_named = /** @type {(inputs: Claudelogin_No_Account_NamedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.agent} 还没有可以运行的账户。登录后即可启动它。`)
+};
+
+export const claudelogin_open = /** @type {(inputs: Claudelogin_OpenInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`打开登录页面`)
+};
+
+export const claudelogin_signed_in = /** @type {(inputs: Claudelogin_Signed_InInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`已登录`)
+};
+
+export const claudelogin_signed_in_as = /** @type {(inputs: Claudelogin_Signed_In_AsInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`已登录为 ${i?.email}`)
+};
+
+export const claudelogin_starting = /** @type {(inputs: Claudelogin_StartingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`正在启动 Claude 的登录…`)
+};
+
+export const claudelogin_subscription = /** @type {(inputs: Claudelogin_SubscriptionInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Claude 订阅（Pro 或 Max）`)
+};
+
+export const claudelogin_subscription_sub = /** @type {(inputs: Claudelogin_Subscription_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`用你的 claude.ai 账户登录。`)
+};
+
+export const claudelogin_title = /** @type {(inputs: Claudelogin_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`登录 Claude`)
+};
+
+export const claudelogin_try_again = /** @type {(inputs: Claudelogin_Try_AgainInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`重试`)
 };
 
 export const composer_attach = /** @type {(inputs: Composer_AttachInputs) => LocalizedString} */ () => {

@@ -682,6 +682,33 @@
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Waiting_For_YouInputs */
 /** @typedef {{}} Chat_WorkingInputs */
 /** @typedef {{}} Chat_YesterdayInputs */
+/** @typedef {{}} Claudelogin_ApiInputs */
+/** @typedef {{}} Claudelogin_Api_SubInputs */
+/** @typedef {{}} Claudelogin_CancelInputs */
+/** @typedef {{}} Claudelogin_ChooseInputs */
+/** @typedef {{}} Claudelogin_CloseInputs */
+/** @typedef {{}} Claudelogin_Code_LabelInputs */
+/** @typedef {{}} Claudelogin_Code_PlaceholderInputs */
+/** @typedef {{}} Claudelogin_ContinueInputs */
+/** @typedef {{}} Claudelogin_CopiedInputs */
+/** @typedef {{}} Claudelogin_CopyInputs */
+/** @typedef {{}} Claudelogin_DoneInputs */
+/** @typedef {{}} Claudelogin_Done_BodyInputs */
+/** @typedef {{}} Claudelogin_FailedInputs */
+/** @typedef {{}} Claudelogin_FinishInputs */
+/** @typedef {{}} Claudelogin_FinishingInputs */
+/** @typedef {{}} Claudelogin_Link_LabelInputs */
+/** @typedef {{}} Claudelogin_Link_LeadInputs */
+/** @typedef {{}} Claudelogin_No_AccountInputs */
+/** @typedef {{ agent: NonNullable<unknown> }} Claudelogin_No_Account_NamedInputs */
+/** @typedef {{}} Claudelogin_OpenInputs */
+/** @typedef {{}} Claudelogin_Signed_InInputs */
+/** @typedef {{ email: NonNullable<unknown> }} Claudelogin_Signed_In_AsInputs */
+/** @typedef {{}} Claudelogin_StartingInputs */
+/** @typedef {{}} Claudelogin_SubscriptionInputs */
+/** @typedef {{}} Claudelogin_Subscription_SubInputs */
+/** @typedef {{}} Claudelogin_TitleInputs */
+/** @typedef {{}} Claudelogin_Try_AgainInputs */
 /** @typedef {{}} Composer_AttachInputs */
 /** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_DialInputs */
 /** @typedef {{}} Composer_Context_LabelInputs */
@@ -4293,6 +4320,114 @@ export const chat_working = /** @type {(inputs: Chat_WorkingInputs) => Localized
 
 export const chat_yesterday = /** @type {(inputs: Chat_YesterdayInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Yesterday`)
+};
+
+export const claudelogin_api = /** @type {(inputs: Claudelogin_ApiInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Anthropic API account (Console, usage billing)`)
+};
+
+export const claudelogin_api_sub = /** @type {(inputs: Claudelogin_Api_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign in with your Anthropic Console account; you pay for what you use.`)
+};
+
+export const claudelogin_cancel = /** @type {(inputs: Claudelogin_CancelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Cancel`)
+};
+
+export const claudelogin_choose = /** @type {(inputs: Claudelogin_ChooseInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Which account do you sign in with?`)
+};
+
+export const claudelogin_close = /** @type {(inputs: Claudelogin_CloseInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Close`)
+};
+
+export const claudelogin_code_label = /** @type {(inputs: Claudelogin_Code_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Code`)
+};
+
+export const claudelogin_code_placeholder = /** @type {(inputs: Claudelogin_Code_PlaceholderInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Paste the code`)
+};
+
+export const claudelogin_continue = /** @type {(inputs: Claudelogin_ContinueInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Continue`)
+};
+
+export const claudelogin_copied = /** @type {(inputs: Claudelogin_CopiedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Copied`)
+};
+
+export const claudelogin_copy = /** @type {(inputs: Claudelogin_CopyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Copy`)
+};
+
+export const claudelogin_done = /** @type {(inputs: Claudelogin_DoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Done`)
+};
+
+export const claudelogin_done_body = /** @type {(inputs: Claudelogin_Done_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Every Claude agent will use it; its models are read again.`)
+};
+
+export const claudelogin_failed = /** @type {(inputs: Claudelogin_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign-in failed`)
+};
+
+export const claudelogin_finish = /** @type {(inputs: Claudelogin_FinishInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Finish`)
+};
+
+export const claudelogin_finishing = /** @type {(inputs: Claudelogin_FinishingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Finishing…`)
+};
+
+export const claudelogin_link_label = /** @type {(inputs: Claudelogin_Link_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign-in link`)
+};
+
+export const claudelogin_link_lead = /** @type {(inputs: Claudelogin_Link_LeadInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Open the sign-in page, sign in, then paste the code it gives you here.`)
+};
+
+export const claudelogin_no_account = /** @type {(inputs: Claudelogin_No_AccountInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This Claude agent has no account to run on yet. Sign in to start it.`)
+};
+
+export const claudelogin_no_account_named = /** @type {(inputs: Claudelogin_No_Account_NamedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.agent} has no account to run on yet. Sign in to start it.`)
+};
+
+export const claudelogin_open = /** @type {(inputs: Claudelogin_OpenInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Open the sign-in page`)
+};
+
+export const claudelogin_signed_in = /** @type {(inputs: Claudelogin_Signed_InInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Signed in`)
+};
+
+export const claudelogin_signed_in_as = /** @type {(inputs: Claudelogin_Signed_In_AsInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Signed in as ${i?.email}`)
+};
+
+export const claudelogin_starting = /** @type {(inputs: Claudelogin_StartingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Starting Claude's sign-in…`)
+};
+
+export const claudelogin_subscription = /** @type {(inputs: Claudelogin_SubscriptionInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Claude subscription (Pro or Max)`)
+};
+
+export const claudelogin_subscription_sub = /** @type {(inputs: Claudelogin_Subscription_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign in with your claude.ai account.`)
+};
+
+export const claudelogin_title = /** @type {(inputs: Claudelogin_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign in to Claude`)
+};
+
+export const claudelogin_try_again = /** @type {(inputs: Claudelogin_Try_AgainInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Try again`)
 };
 
 export const composer_attach = /** @type {(inputs: Composer_AttachInputs) => LocalizedString} */ () => {

@@ -85,6 +85,7 @@ export interface ConversationStart {
 	/** The install's Claude subscriptions (`claude/accounts.ts`). */
 	accounts?: ClaudeAccountSwitcher | undefined;
 	accountsChanged?: (() => void) | undefined;
+	accountNeeded?: ((why: "no-account" | "asked", accountId?: string) => void) | undefined;
 	commandsChanged?: (() => void) | undefined;
 	bridge?: CanvasBridge | undefined;
 	/** A chat read back off disk: a row first and a conversation second. */
@@ -161,6 +162,8 @@ export class Conversation {
 	/** Shared with every other agent: the set of subscriptions this install can use. */
 	private readonly accounts: ClaudeAccountSwitcher | undefined;
 	private readonly accountsChanged: (() => void) | undefined;
+	/** Ask the person to sign in to Claude (`claude/login.ts`). */
+	private readonly accountNeeded: ((why: "no-account" | "asked", accountId?: string) => void) | undefined;
 	/** The runtime's `/` menu moved, so the chat row that carries it has to be resent. */
 	private readonly commandsChanged: (() => void) | undefined;
 	/** Where an out-of-process runtime's canvas tool calls back to. */
@@ -199,6 +202,7 @@ export class Conversation {
 		this.resumeRef = start.resumeRef;
 		this.accounts = start.accounts;
 		this.accountsChanged = start.accountsChanged;
+		this.accountNeeded = start.accountNeeded;
 		this.commandsChanged = start.commandsChanged;
 		this.stageBridge = start.bridge;
 
@@ -495,6 +499,7 @@ export class Conversation {
 				? { account: { id: () => this.account ?? (this.accounts as ClaudeAccountSwitcher).defaultId() } }
 				: {}),
 			...(this.accountsChanged ? { accountsChanged: this.accountsChanged } : {}),
+			...(this.accountNeeded ? { accountNeeded: (why: "no-account" | "asked") => this.accountNeeded!(why, this.account) } : {}),
 			...(this.commandsChanged ? { commandsChanged: this.commandsChanged } : {}),
 			// `/cost` asked for the panel. The shell reads the figures; the backend only says
 			// that somebody wants them.
@@ -532,6 +537,13 @@ export class Conversation {
 				this.translator.notice("error", `This agent could not start: ${this.failure}`);
 			});
 		return this.starting;
+	}
+
+	/** A Claude sign-in landed (`claude/login.ts`): the runtime reads its models anew, and the picker hears them. */
+	async signedIn(): Promise<void> {
+		if (!this.backend?.signedIn) return;
+		await this.backend.signedIn();
+		await this.publishModels();
 	}
 
 	private async publishModels(): Promise<void> {

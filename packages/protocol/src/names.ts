@@ -61,6 +61,8 @@ export const EVENT_NAMES: Record<ServerMessage["type"], true> = {
 	"line.hello": true,
 	"presence.changed": true,
 	"account.list": true,
+	"account.needed": true,
+	"account.login": true,
 	"web.changed": true,
 };
 

@@ -83,7 +83,9 @@ export const PERSON_VERBS: readonly Verb[] = [
 
 	// --- accounts ---------------------------------------------------------------------------
 	{ name: "account.list", group: "misc", ...agentsRead, summary: "The Claude accounts this harness knows, back as account.list; with limits, their spending is read again.", params: [{ name: "options", schema: obj({ limits: opt(bool()) }), optional: true }] },
-	{ name: "account.add", group: "misc", ...agents, summary: "Sign in to another Claude account, through a Claude agent.", params: [] },
+	{ name: "account.add", group: "misc", ...agents, summary: "Start signing in to a Claude account, a subscription or an API account (Console): answers the link to open, whose code account.code finishes.", params: [{ name: "options", schema: obj({ method: opt(lit("subscription", "api")) }), optional: true }], result: obj({ url: str() }) },
+	{ name: "account.code", group: "misc", ...agents, summary: "Finish the Claude sign-in account.add started, with the code the browser showed: who was signed in.", params: [{ name: "code", schema: str() }], result: obj({ email: opt(str()), replaced: opt(bool()) }) },
+	{ name: "account.cancel", group: "misc", ...agents, summary: "Stop a Claude sign-in under way.", params: [] },
 	{ name: "account.use", group: "misc", ...agents, summary: "Have an agent spend from an account.", params: [{ name: "id", schema: str() }, { name: "agent", schema: str() }] },
 	{ name: "account.forget", group: "misc", ...agents, summary: "Forget an account.", params: [{ name: "id", schema: str() }] },
 

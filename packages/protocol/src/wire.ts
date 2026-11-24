@@ -343,6 +343,14 @@ export type ServerMessage =
 	 * the question the panel exists to answer.
 	 */
 	| { type: "account.list"; accounts: ClaudeAccount[]; active: string; spending?: Record<string, string> }
+	/**
+	 * Open the page's Claude sign-in: a Claude agent started with no account to run on (`no-account`,
+	 * with the agent's id when one asked), or the person typed /login (`asked`).
+	 */
+	| { type: "account.needed"; why: "no-account" | "asked"; agent?: string }
+	/** A sign-in under way that the server finished by itself (the browser completed it), or that failed. */
+	| { type: "account.login"; phase: "done"; email?: string }
+	| { type: "account.login"; phase: "failed"; message: string }
 	/** One agent moved to a different subscription — by hand, or because a limit moved it. */
 	| { type: "agent.account"; id: string; account: string }
 	/** The shared browser's state, on connect and whenever it changes (`WebStatus`). */

@@ -50,6 +50,15 @@ const panelOpensWith = (): boolean => {
 	}
 };
 
+/** Why the Claude sign-in opened: an agent with no account to run on (its name), or the person's /login. */
+export interface ClaudeLoginOpen {
+	why?: "no-account" | "asked";
+	agent?: string;
+}
+
+/** A sign-in's end the server sent by itself: who signed in, or Claude's sentence. */
+export type ClaudeLoginHeard = { at: number } & ({ phase: "done"; email?: string } | { phase: "failed"; message: string });
+
 function createUi() {
 	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a board's embed. */
 	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; google?: boolean; purpose?: "canvas" | "attach" | "embed" } | undefined>(undefined);
@@ -63,6 +72,16 @@ function createUi() {
 
 	/** Settings: the Claude subscriptions this install can use (`settings/Settings.tsx`). */
 	const [settings, setSettings] = createSignal(false);
+
+	/**
+	 * The Claude sign-in (`settings/ClaudeLogin.tsx`), open: why it opened (a Claude agent with no
+	 * account, by its name; the person's /login; or nothing, from Settings). One modal over everything.
+	 */
+	const [claudeLogin, setClaudeLogin] = createSignal<ClaudeLoginOpen | undefined>(undefined);
+	const openClaudeLogin = (why: ClaudeLoginOpen = {}) => setClaudeLogin(why);
+	const closeClaudeLogin = () => setClaudeLogin(undefined);
+	/** How a sign-in the server finished by itself ended (`account.login`), stamped so two alike are two. */
+	const [claudeLoginHeard, setClaudeLoginHeard] = createSignal<ClaudeLoginHeard | undefined>(undefined);
 
 	/**
 	 * Words the server has handed to the input bar: the message a rewind took back.
@@ -228,6 +247,11 @@ function createUi() {
 		setPanelOpen,
 		settings,
 		setSettings,
+		claudeLogin,
+		openClaudeLogin,
+		closeClaudeLogin,
+		claudeLoginHeard,
+		setClaudeLoginHeard,
 		draft,
 		setDraft,
 		ops,
@@ -259,6 +283,11 @@ export const {
 	setPanelOpen,
 	settings,
 	setSettings,
+	claudeLogin,
+	openClaudeLogin,
+	closeClaudeLogin,
+	claudeLoginHeard,
+	setClaudeLoginHeard,
 	draft,
 	setDraft,
 	ops,

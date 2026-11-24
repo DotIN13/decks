@@ -15,6 +15,7 @@
 			"./messages/canvas/{locale}.json",
 			"./messages/canvases/{locale}.json",
 			"./messages/chat/{locale}.json",
+			"./messages/claudelogin/{locale}.json",
 			"./messages/composer/{locale}.json",
 			"./messages/connections/{locale}.json",
 			"./messages/docs/{locale}.json",

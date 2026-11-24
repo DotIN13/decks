@@ -106,6 +106,12 @@ export interface AgentBackendContext {
 	/** Tell the browser the account list changed, after a login through `/login`. */
 	accountsChanged?(): void;
 	/**
+	 * Ask the person to sign in to Claude (`claude/login.ts`, the page's modal): `no-account` when the
+	 * agent starts with no account it can run on (the harness checks, and says nothing if there is
+	 * one), `asked` for `/login`.
+	 */
+	accountNeeded?(why: "no-account" | "asked", accountId?: string): void;
+	/**
 	 * Which Claude subscription this agent spends.
 	 *
 	 * What to spawn with, and whose usage report the meter is asking for. A window onto the
@@ -267,6 +273,8 @@ export interface AgentBackend {
 	 * token from a keychain entry chosen when the process starts, so it must start again.
 	 */
 	accountChanged?(): void;
+	/** A Claude sign-in landed (`claude/login.ts`): read the models anew, for the new login. Resolves once they are read. */
+	signedIn?(): Promise<void>;
 
 	dispose(): void;
 }

@@ -16,6 +16,7 @@ import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { DeviceLogins, LoginThrottle, PasswordStore, passwordLoginOn } from "./auth/password.ts";
+import { ClaudeLogin } from "./runtimes/claude/login.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
@@ -178,6 +179,8 @@ export class App {
 	readonly claudeAccounts: ClaudeAccounts;
 	/** The subscriptions as the page is told of them: who each is, its five-hour window, who spends which (`runtimes/claude/account-list.ts`). */
 	readonly accountList: AccountList;
+	/** Signing in to Claude, for the whole harness: what the page's modal drives (`runtimes/claude/login.ts`). */
+	readonly claudeLogin: ClaudeLogin;
 
 	private constructor(
 		readonly config: Config,
@@ -346,6 +349,15 @@ export class App {
 			spending: () => Object.fromEntries(this.agents.all().flatMap((agent) => (agent.conversation.accountId() ? [[agent.id, agent.conversation.accountId()!]] : []))),
 			send: (message) => this.send(message),
 		});
+		this.claudeLogin = new ClaudeLogin(
+			this.claudeAccounts,
+			// A sign-in landed: the list, and every Claude agent's models read anew for it.
+			() => {
+				void this.accountList.publish(undefined, { reread: true });
+				for (const agent of this.agents.all()) if (agent.kind === "claude") void agent.conversation.signedIn();
+			},
+			(event) => this.send({ type: "account.login", ...event }),
+		);
 		/*
 		 * The shared browser, on the install like the accounts are: the pairing code is a
 		 * property of this server, not of a deck. Every change is broadcast, so the settings'
@@ -475,6 +487,12 @@ export class App {
 				boardPathOf: (file) => this.boards.boardPathOf(file),
 				accounts: this.claudeAccounts,
 				accountsChanged: () => void this.accountList.publish(),
+				// Ask the person to sign in (the page's modal), unless this agent's account is there to run on (`claude/login.ts`).
+				accountNeeded: (agentId, why, accountId) => {
+					if (why === "no-account" && this.claudeAccounts.usable(accountId ?? this.claudeAccounts.defaultId())) return;
+					if (why === "no-account") this.agents.get(agentId)?.conversation.translator.notice("warn", "Claude isn't signed in. Sign in from the window that opened, or Settings, Accounts.");
+					this.send({ type: "account.needed", why, agent: agentId });
+				},
 				bridge: this.bridge,
 			},
 		);

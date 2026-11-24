@@ -1,0 +1,182 @@
+/* ---- the Claude sign-in ----------------------------------------------------------------------
+   One modal over everything, Settings included (`settings/ClaudeLogin.tsx`), drawn as the confirm
+   dialog is: its head, body and foot, wider, with the two kinds of account as large choices, the
+   link and the code, and the end as an icon by its words. Its backdrop is last in `Modals`, so it
+   sits over Settings' at the same height. */
+@layer components {
+	.cl-dlg {
+		width: min(460px, calc(100vw - 32px));
+	}
+	.cl-why {
+		margin: 0 18px 12px;
+		padding: 9px 12px;
+		border-radius: 8px;
+		background: var(--v3-accent-soft);
+		color: var(--v3-fg);
+		font-size: 13px;
+		line-height: 1.45;
+	}
+	.cl-body {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		white-space: normal;
+	}
+	.cl-lead {
+		margin: 0;
+	}
+	.cl-options {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.cl-option {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		padding: 12px 14px;
+		border: 1px solid var(--v3-line);
+		border-radius: 10px;
+		background: none;
+		color: var(--v3-fg);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.cl-option:hover:not(:disabled) {
+		background: var(--v3-bg2);
+	}
+	.cl-option[data-on] {
+		border-color: var(--v3-accent);
+		background: var(--v3-accent-soft);
+	}
+	.cl-option:disabled {
+		cursor: default;
+		opacity: 0.7;
+	}
+	.cl-option:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: 1px;
+	}
+	.cl-radio {
+		width: 16px;
+		height: 16px;
+		flex: none;
+		box-sizing: border-box;
+		margin-top: 2px;
+		border: 1.5px solid var(--v3-fg3);
+		border-radius: 50%;
+	}
+	.cl-option[data-on] .cl-radio {
+		border: 5px solid var(--v3-accent);
+	}
+	.cl-option-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.cl-option-title {
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.cl-option-sub {
+		color: var(--v3-fg2);
+		font-size: 12.5px;
+	}
+	.cl-open {
+		align-self: flex-start;
+	}
+	.cl-label {
+		margin-top: 4px;
+		color: var(--v3-fg2);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.cl-link {
+		display: flex;
+		gap: 6px;
+		margin-top: -4px;
+	}
+	.cl-url,
+	.cl-code {
+		min-width: 0;
+		box-sizing: border-box;
+		height: 32px;
+		padding: 0 10px;
+		border: 1px solid var(--v3-line);
+		border-radius: 6px;
+		outline: 0;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		font: inherit;
+	}
+	.cl-url {
+		flex: 1;
+		color: var(--v3-fg2);
+		font-family: var(--font-mono);
+		font-size: 12px;
+		text-overflow: ellipsis;
+	}
+	.cl-code {
+		width: 100%;
+		margin-top: -4px;
+		font-family: var(--font-mono);
+	}
+	.cl-url:focus,
+	.cl-code:focus {
+		border-color: var(--v3-accent);
+		background: var(--v3-panel);
+	}
+	.cl-foot {
+		align-items: center;
+	}
+	.cl-wait {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		color: var(--v3-fg2);
+		font-size: 12.5px;
+	}
+	.cl-spin {
+		display: inline-grid;
+	}
+	.cl-spin svg {
+		animation: cl-spin 900ms linear infinite;
+	}
+	@keyframes cl-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.cl-spin svg {
+			animation: none;
+		}
+	}
+	.cl-end {
+		flex-direction: row;
+		align-items: flex-start;
+		gap: 12px;
+		padding-top: 4px;
+	}
+	.cl-end-icon {
+		display: grid;
+		flex: none;
+		color: var(--v3-accent);
+	}
+	.cl-end-icon[data-failed] {
+		color: var(--v3-danger);
+	}
+	.cl-end-title {
+		margin: 0 0 4px;
+		color: var(--v3-fg);
+		font-size: 14px;
+		font-weight: 600;
+		overflow-wrap: anywhere;
+	}
+	.cl-end-sub {
+		margin: 0;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+}

@@ -156,6 +156,8 @@ export class DeckAgent {
 			/** The install's Claude subscriptions (`claude/accounts.ts`). */
 			accounts?: ClaudeAccountSwitcher;
 			accountsChanged?(): void;
+			/** Ask the person to sign in to Claude for this agent (`claude/login.ts`). */
+			accountNeeded?(agentId: string, why: "no-account" | "asked", accountId?: string): void;
 			commandsChanged?(): void;
 			bridge?: CanvasBridge;
 			/** For an agent that works outside Decks (`kind` "outside"): the key it joins by and the app it runs in. */
@@ -325,6 +327,7 @@ export class DeckAgent {
 				account: options.account,
 				accounts: options.accounts,
 				accountsChanged: options.accountsChanged,
+				accountNeeded: options.accountNeeded ? (why: "no-account" | "asked", accountId?: string) => options.accountNeeded!(this.id, why, accountId) : undefined,
 				commandsChanged: options.commandsChanged,
 				bridge: options.bridge,
 				restored: options.restored,

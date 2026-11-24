@@ -1,11 +1,12 @@
 import { Show } from "solid-js";
 import { CanvasOps } from "../canvases/CanvasOps.tsx";
+import { ClaudeLogin } from "../settings/ClaudeLogin.tsx";
 import { Settings } from "../settings/Settings.tsx";
 import { UsageModal } from "../settings/UsageModal.tsx";
 import { ConfirmDialog } from "../shell/ConfirmDialog.tsx";
 import { setState, state } from "../state/deck.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
-import { ops, picking, readUsage, setOps, setSettings, setUsagePanel, settings, usagePanel, usageReport } from "../state/ui.ts";
+import { claudeLogin, closeClaudeLogin, openClaudeLogin, ops, picking, readUsage, setOps, setSettings, setUsagePanel, settings, usagePanel, usageReport } from "../state/ui.ts";
 import { FilePicker } from "./files/FilePicker.tsx";
 import type { Parts } from "./parts.ts";
 
@@ -35,7 +36,7 @@ export function Pickers(props: { parts: Parts }) {
 	);
 }
 
-/** What opens over everything: the usage panel and Settings. */
+/** What opens over everything: the usage panel, Settings, and the Claude sign-in over both. */
 export function Modals(props: { parts: Parts }) {
 	const { layout, prefs, setPrefs } = props.parts;
 	const phone = layout.phone;
@@ -70,7 +71,7 @@ export function Modals(props: { parts: Parts }) {
 					onPrefs={setPrefs}
 					accounts={state.accounts}
 					active={state.activeAccount}
-					onAdd={() => void call("account.add").then(warnIfFailed)}
+					onAdd={() => openClaudeLogin()}
 					onForget={(id) => void call("account.forget", [id]).then(warnIfFailed)}
 					web={state.web}
 					onWebRepair={() => void call<{ code?: string }>("web.repair").then((answer) => answer.ok && setState("web", (web) => (web ? { ...web, code: answer.value?.code } : web)))}
@@ -79,6 +80,9 @@ export function Modals(props: { parts: Parts }) {
 					onClose={() => setSettings(false)}
 				/>
 			</Show>
+
+			{/* The Claude sign-in, last so it is over Settings, which is where Add account opens it from. */}
+			<Show when={claudeLogin()}>{(open) => <ClaudeLogin open={open()} onClose={closeClaudeLogin} />}</Show>
 		</>
 	);
 }

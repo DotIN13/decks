@@ -684,6 +684,33 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Waiting_For_YouInputs */
 /** @typedef {{}} Chat_WorkingInputs */
 /** @typedef {{}} Chat_YesterdayInputs */
+/** @typedef {{}} Claudelogin_ApiInputs */
+/** @typedef {{}} Claudelogin_Api_SubInputs */
+/** @typedef {{}} Claudelogin_CancelInputs */
+/** @typedef {{}} Claudelogin_ChooseInputs */
+/** @typedef {{}} Claudelogin_CloseInputs */
+/** @typedef {{}} Claudelogin_Code_LabelInputs */
+/** @typedef {{}} Claudelogin_Code_PlaceholderInputs */
+/** @typedef {{}} Claudelogin_ContinueInputs */
+/** @typedef {{}} Claudelogin_CopiedInputs */
+/** @typedef {{}} Claudelogin_CopyInputs */
+/** @typedef {{}} Claudelogin_DoneInputs */
+/** @typedef {{}} Claudelogin_Done_BodyInputs */
+/** @typedef {{}} Claudelogin_FailedInputs */
+/** @typedef {{}} Claudelogin_FinishInputs */
+/** @typedef {{}} Claudelogin_FinishingInputs */
+/** @typedef {{}} Claudelogin_Link_LabelInputs */
+/** @typedef {{}} Claudelogin_Link_LeadInputs */
+/** @typedef {{}} Claudelogin_No_AccountInputs */
+/** @typedef {{ agent: NonNullable<unknown> }} Claudelogin_No_Account_NamedInputs */
+/** @typedef {{}} Claudelogin_OpenInputs */
+/** @typedef {{}} Claudelogin_Signed_InInputs */
+/** @typedef {{ email: NonNullable<unknown> }} Claudelogin_Signed_In_AsInputs */
+/** @typedef {{}} Claudelogin_StartingInputs */
+/** @typedef {{}} Claudelogin_SubscriptionInputs */
+/** @typedef {{}} Claudelogin_Subscription_SubInputs */
+/** @typedef {{}} Claudelogin_TitleInputs */
+/** @typedef {{}} Claudelogin_Try_AgainInputs */
 /** @typedef {{}} Composer_AttachInputs */
 /** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_DialInputs */
 /** @typedef {{}} Composer_Context_LabelInputs */
@@ -11089,6 +11116,384 @@ export const chat_yesterday = /** @type {((inputs?: Chat_YesterdayInputs, option
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.chat_yesterday(inputs)
 	return __en.chat_yesterday(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Anthropic API account (Console, usage billing)" |
+*
+* @param {Claudelogin_ApiInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_api = /** @type {((inputs?: Claudelogin_ApiInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_ApiInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_api(inputs)
+	return __en.claudelogin_api(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign in with your Anthropic Console account; you pay for what you use." |
+*
+* @param {Claudelogin_Api_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_api_sub = /** @type {((inputs?: Claudelogin_Api_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Api_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_api_sub(inputs)
+	return __en.claudelogin_api_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Cancel" |
+*
+* @param {Claudelogin_CancelInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_cancel = /** @type {((inputs?: Claudelogin_CancelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_CancelInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_cancel(inputs)
+	return __en.claudelogin_cancel(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Which account do you sign in with?" |
+*
+* @param {Claudelogin_ChooseInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_choose = /** @type {((inputs?: Claudelogin_ChooseInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_ChooseInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_choose(inputs)
+	return __en.claudelogin_choose(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Close" |
+*
+* @param {Claudelogin_CloseInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_close = /** @type {((inputs?: Claudelogin_CloseInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_CloseInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_close(inputs)
+	return __en.claudelogin_close(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Code" |
+*
+* @param {Claudelogin_Code_LabelInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_code_label = /** @type {((inputs?: Claudelogin_Code_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Code_LabelInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_code_label(inputs)
+	return __en.claudelogin_code_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Paste the code" |
+*
+* @param {Claudelogin_Code_PlaceholderInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_code_placeholder = /** @type {((inputs?: Claudelogin_Code_PlaceholderInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Code_PlaceholderInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_code_placeholder(inputs)
+	return __en.claudelogin_code_placeholder(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Continue" |
+*
+* @param {Claudelogin_ContinueInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_continue = /** @type {((inputs?: Claudelogin_ContinueInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_ContinueInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_continue(inputs)
+	return __en.claudelogin_continue(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Copied" |
+*
+* @param {Claudelogin_CopiedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_copied = /** @type {((inputs?: Claudelogin_CopiedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_CopiedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_copied(inputs)
+	return __en.claudelogin_copied(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Copy" |
+*
+* @param {Claudelogin_CopyInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_copy = /** @type {((inputs?: Claudelogin_CopyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_CopyInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_copy(inputs)
+	return __en.claudelogin_copy(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Done" |
+*
+* @param {Claudelogin_DoneInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_done = /** @type {((inputs?: Claudelogin_DoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_DoneInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_done(inputs)
+	return __en.claudelogin_done(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Every Claude agent will use it; its models are read again." |
+*
+* @param {Claudelogin_Done_BodyInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_done_body = /** @type {((inputs?: Claudelogin_Done_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Done_BodyInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_done_body(inputs)
+	return __en.claudelogin_done_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign-in failed" |
+*
+* @param {Claudelogin_FailedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_failed = /** @type {((inputs?: Claudelogin_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_FailedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_failed(inputs)
+	return __en.claudelogin_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Finish" |
+*
+* @param {Claudelogin_FinishInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_finish = /** @type {((inputs?: Claudelogin_FinishInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_FinishInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_finish(inputs)
+	return __en.claudelogin_finish(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Finishing…" |
+*
+* @param {Claudelogin_FinishingInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_finishing = /** @type {((inputs?: Claudelogin_FinishingInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_FinishingInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_finishing(inputs)
+	return __en.claudelogin_finishing(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign-in link" |
+*
+* @param {Claudelogin_Link_LabelInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_link_label = /** @type {((inputs?: Claudelogin_Link_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Link_LabelInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_link_label(inputs)
+	return __en.claudelogin_link_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Open the sign-in page, sign in, then paste the code it gives you here." |
+*
+* @param {Claudelogin_Link_LeadInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_link_lead = /** @type {((inputs?: Claudelogin_Link_LeadInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Link_LeadInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_link_lead(inputs)
+	return __en.claudelogin_link_lead(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This Claude agent has no account to run on yet. Sign in to start it." |
+*
+* @param {Claudelogin_No_AccountInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_no_account = /** @type {((inputs?: Claudelogin_No_AccountInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_No_AccountInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_no_account(inputs)
+	return __en.claudelogin_no_account(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{agent} has no account to run on yet. Sign in to start it." |
+*
+* @param {Claudelogin_No_Account_NamedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_no_account_named = /** @type {((inputs: Claudelogin_No_Account_NamedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_No_Account_NamedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_no_account_named(inputs)
+	return __en.claudelogin_no_account_named(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Open the sign-in page" |
+*
+* @param {Claudelogin_OpenInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_open = /** @type {((inputs?: Claudelogin_OpenInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_OpenInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_open(inputs)
+	return __en.claudelogin_open(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Signed in" |
+*
+* @param {Claudelogin_Signed_InInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_signed_in = /** @type {((inputs?: Claudelogin_Signed_InInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Signed_InInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_signed_in(inputs)
+	return __en.claudelogin_signed_in(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Signed in as {email}" |
+*
+* @param {Claudelogin_Signed_In_AsInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_signed_in_as = /** @type {((inputs: Claudelogin_Signed_In_AsInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Signed_In_AsInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_signed_in_as(inputs)
+	return __en.claudelogin_signed_in_as(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Starting Claude's sign-in…" |
+*
+* @param {Claudelogin_StartingInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_starting = /** @type {((inputs?: Claudelogin_StartingInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_StartingInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_starting(inputs)
+	return __en.claudelogin_starting(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Claude subscription (Pro or Max)" |
+*
+* @param {Claudelogin_SubscriptionInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_subscription = /** @type {((inputs?: Claudelogin_SubscriptionInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_SubscriptionInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_subscription(inputs)
+	return __en.claudelogin_subscription(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign in with your claude.ai account." |
+*
+* @param {Claudelogin_Subscription_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_subscription_sub = /** @type {((inputs?: Claudelogin_Subscription_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Subscription_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_subscription_sub(inputs)
+	return __en.claudelogin_subscription_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign in to Claude" |
+*
+* @param {Claudelogin_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_title = /** @type {((inputs?: Claudelogin_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_title(inputs)
+	return __en.claudelogin_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Try again" |
+*
+* @param {Claudelogin_Try_AgainInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const claudelogin_try_again = /** @type {((inputs?: Claudelogin_Try_AgainInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Claudelogin_Try_AgainInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.claudelogin_try_again(inputs)
+	return __en.claudelogin_try_again(inputs)
 });
 /**
 * | output |

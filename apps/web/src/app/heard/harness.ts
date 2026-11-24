@@ -3,6 +3,7 @@ import { setBackend, setPairing } from "../../connections/backend.ts";
 import { reconcile } from "solid-js/store";
 import { ensureAgent, setState, state } from "../../state/deck.ts";
 import { notice } from "../../state/notices.ts";
+import { claudeLogin, openClaudeLogin, setClaudeLoginHeard } from "../../state/ui.ts";
 import { setTimeZone } from "@decks/ui";
 import type { FrameHooks, Of } from "../socket-messages.ts";
 
@@ -62,6 +63,19 @@ export function heardHarness(message: Of<"harness"> | Of<"web"> | Of<"account">,
 			}
 			return;
 		}
+		/*
+		 * The Claude sign-in is the page's modal: a Claude agent with no account, or the person's
+		 * /login, opens it (the agent named when it is one we know); a flow the browser finished, or
+		 * that failed, ends its second step. An end heard with the modal closed is nobody's.
+		 */
+		case "account.needed": {
+			const agent = message.agent ? state.identities[message.agent]?.name : undefined;
+			openClaudeLogin({ why: message.why, ...(agent ? { agent } : {}) });
+			return;
+		}
+		case "account.login":
+			if (claudeLogin()) setClaudeLoginHeard({ ...message, at: Date.now() });
+			return;
 		default:
 			return;
 	}
