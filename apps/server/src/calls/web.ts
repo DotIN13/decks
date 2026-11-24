@@ -27,16 +27,16 @@ export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
 				return needWeb().open(url.trim());
 			},
 			/** Every tab in the Decks group, numbered from 1, and which one the other verbs act on. */
-			tabs: async () => needWeb().tabs(),
+			tabs: async () => needWeb().group.list(),
 			/** Open a new tab in the Decks group (at `url`, when given) and act on it from now on. */
-			newTab: async (url?: string) => needWeb().newTab(url),
+			newTab: async (url?: string) => needWeb().group.open(url),
 			/** Act on another tab of the group from now on: its number from `tabs`, or words in its address or title. */
 			tab: async (which: number | string) => {
 				if (which === undefined || which === null || String(which).trim() === "") throw new Error("tab needs a tab's number from decks web tabs, or words in its address or title");
-				return needWeb().useTab(which);
+				return needWeb().group.use(which);
 			},
 			/** Close a tab of the group: the one acted on, or the one named. The last shared tab cannot be closed. */
-			closeTab: async (which?: number | string) => needWeb().closeTab(which),
+			closeTab: async (which?: number | string) => needWeb().group.close(which),
 			/** Every field on the page, frames included, with its label and current value. */
 			values: async () => needWeb().values(),
 			/** The page as a tree of fields and buttons; long option lists are folded unless `full: true`. */

@@ -25,7 +25,9 @@ import type { Duplex } from "node:stream";
 import type { WebAction, WebStatus } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { WebTarget } from "../canvas/service.ts";
+import { locate, markOf } from "./find.ts";
 import { Relay } from "./relay.ts";
+import { TabGroup } from "./tabs.ts";
 
 /** How long a submit waits for the user before giving up. */
 const ANSWER_MS = 120_000;
@@ -51,8 +53,6 @@ type Connector = (endpoint: string) => Promise<Browser>;
 /** Words on a button whose click reaches outside the page, so it waits for the person's Allow. */
 const CONSEQUENTIAL = /\b(send|e-?mail|invite|invitation|pay|payment|purchase|buy|checkout|place order|donate|delete|remove account|add recommender|request (a )?letter)\b/i;
 
-/** How long closing a tab waits for the extension to say it is gone. */
-const CLOSE_TAB_MS = 5_000;
 /** How long after a click or a key the page is looked at again, to say what the action did. */
 const EFFECT_MS = 400;
 
@@ -99,6 +99,22 @@ export class WebBridge {
 	 * them. Until it picks, or after its tab closes, it drives the first.
 	 */
 	private current: Page | undefined;
+	/** The tabs of the Decks group: listed, opened, switched and closed (`tabs.ts`). */
+	readonly group = new TabGroup({
+		page: () => this.page(),
+		pages: () => this.allPages(),
+		watch: (page) => this.watch(page),
+		drive: (page) => {
+			this.current = page;
+			this.refs = undefined;
+			this.stale = undefined;
+		},
+		closed: (page) => {
+			if (this.current === page) this.current = undefined;
+			this.refs = undefined;
+		},
+		note: (text, ok) => this.note(text, ok),
+	});
 
 	constructor(
 		private readonly dataDir: string,
@@ -292,15 +308,6 @@ export class WebBridge {
 		return (this.browser?.contexts() ?? []).flatMap((context) => context.pages()).filter((page) => !page.isClosed());
 	}
 
-	/** What the page looks like, cheaply: its address and a fingerprint of its markup, to tell whether an action did anything. */
-	private async mark(page: Page): Promise<{ url: string; print: string }> {
-		const seen = await page
-			.evaluate(() => ({ href: location.href, print: `${document.documentElement.outerHTML.length}:${document.title}:${document.querySelectorAll("*").length}:${document.body?.innerText.length ?? 0}` }))
-			.catch(() => ({ href: page.url(), print: "" }));
-		// The page's own address, not Playwright's: a move within the page reaches it late or not at all through the relay.
-		return { url: seen.href, print: seen.print };
-	}
-
 	/**
 	 * What an action did to the page, said in its answer: the address it went to, when it left
 	 * the page, and `changed: false` when nothing at all moved, so a click that went nowhere is
@@ -309,81 +316,13 @@ export class WebBridge {
 	private async effect(page: Page, before: { url: string; print: string }): Promise<{ navigated?: string; changed: boolean }> {
 		await page.waitForTimeout(EFFECT_MS);
 		const driven = await this.page().catch(() => page);
-		const after = await this.mark(driven);
+		const after = await markOf(driven);
 		if (after.url !== before.url) {
 			this.refs = undefined;
 			this.stale = undefined;
 			return { navigated: after.url, changed: true };
 		}
 		return { changed: after.print !== before.print };
-	}
-
-	/** One tab of the group, by its number from `tabs` (1 is the first) or by words in its address or title. */
-	private async pick(which: number | string): Promise<Page> {
-		await this.page();
-		const pages = this.allPages();
-		if (typeof which === "number" || /^\d+$/.test(String(which).trim())) {
-			const n = Number(which);
-			const page = pages[n - 1];
-			if (!page) throw new Error(`There is no tab ${n}: the group has ${pages.length}. decks web tabs lists them.`);
-			return page;
-		}
-		const words = String(which).trim().toLowerCase();
-		if (!words) throw new Error("Name a tab by its number from decks web tabs, or by words in its address or title.");
-		const titled = await Promise.all(pages.map(async (page) => ({ page, text: `${page.url()} ${await page.title().catch(() => "")}`.toLowerCase() })));
-		const found = titled.filter((t) => t.text.includes(words));
-		if (found.length === 0) throw new Error(`No shared tab has "${which}" in its address or title. decks web tabs lists them.`);
-		if (found.length > 1) throw new Error(`${found.length} shared tabs have "${which}" in their address or title; name one by its number from decks web tabs.`);
-		return found[0]!.page;
-	}
-
-	/** Every tab in the Decks group, numbered from 1, and which one the verbs act on. */
-	async tabs(): Promise<{ index: number; title: string; url: string; current: boolean }[]> {
-		const driven = await this.page();
-		return Promise.all(this.allPages().map(async (page, i) => ({ index: i + 1, title: await page.title().catch(() => ""), url: page.url(), current: page === driven })));
-	}
-
-	/** Open a new tab in the Decks group, at `url` when given, and act on it from now on. */
-	async newTab(url?: string): Promise<{ index: number; url: string; title: string }> {
-		const driven = await this.page();
-		const page = await driven.context().newPage();
-		this.watch(page);
-		this.current = page;
-		this.refs = undefined;
-		this.stale = undefined;
-		try {
-			if (url?.trim()) await page.goto(url.trim(), { waitUntil: "domcontentloaded", timeout: 30_000 });
-		} catch (error) {
-			this.note(`opened a tab but could not load ${url}: ${(error as Error).message}`, false);
-			throw error;
-		}
-		const result = { index: this.allPages().indexOf(page) + 1, url: page.url(), title: await page.title().catch(() => "") };
-		this.note(`opened a new tab${result.title || result.url ? `: ${result.title || result.url}` : ""}`, true);
-		return result;
-	}
-
-	/** Act on another tab of the group from now on, without moving the person's own focus. */
-	async useTab(which: number | string): Promise<{ index: number; url: string; title: string }> {
-		const page = await this.pick(which);
-		this.current = page;
-		this.refs = undefined;
-		this.stale = undefined;
-		const result = { index: this.allPages().indexOf(page) + 1, url: page.url(), title: await page.title().catch(() => "") };
-		this.note(`switched to ${result.title || result.url}`, true);
-		return result;
-	}
-
-	/** Close a tab of the group (the one acted on, when none is named). The last one cannot go: stop sharing instead. */
-	async closeTab(which?: number | string): Promise<{ closed: string; tabs: number }> {
-		const page = which === undefined || which === "" ? await this.page() : await this.pick(which);
-		if (this.allPages().length <= 1) throw new Error("That is the only shared tab; closing it would end the sharing. Use decks web stop instead.");
-		const name = (await page.title().catch(() => "")) || page.url();
-		// Closed once the extension says the tab is gone; a tab that never says so is let go after a few seconds.
-		await Promise.race([page.close(), new Promise((resolve) => setTimeout(resolve, CLOSE_TAB_MS))]);
-		if (this.current === page) this.current = undefined;
-		this.refs = undefined;
-		this.note(`closed ${name}`, true);
-		return { closed: name, tabs: this.allPages().filter((p) => p !== page).length };
 	}
 
 	/** Navigate the shared tab. */
@@ -484,7 +423,7 @@ export class WebBridge {
 		await this.live(page);
 		const label = labelOf(field);
 		try {
-			const target = await this.locate(page, field, (name) => [
+			const target = await locate(page, this.refs, field, (name) => [
 				page.getByLabel(name, { exact: true }),
 				page.getByLabel(name),
 				page.getByPlaceholder(name),
@@ -517,7 +456,7 @@ export class WebBridge {
 		await this.live(page);
 		const label = labelOf(field);
 		try {
-			const target = await this.locate(page, field, (name) => [page.getByLabel(name), page.getByRole("combobox", { name })]);
+			const target = await locate(page, this.refs, field, (name) => [page.getByLabel(name), page.getByRole("combobox", { name })]);
 			try {
 				await target.selectOption({ label: option }, { timeout: SELECT_MS }).catch(() => target.selectOption(option, { timeout: SELECT_MS }));
 			} catch (first) {
@@ -545,7 +484,7 @@ export class WebBridge {
 		await this.live(page);
 		const label = labelOf(what);
 		try {
-			const target = await this.locate(page, what, (name) => [
+			const target = await locate(page, this.refs, what, (name) => [
 				page.getByRole("button", { name, exact: true }),
 				page.getByRole("button", { name }),
 				page.getByRole("link", { name }),
@@ -567,7 +506,7 @@ export class WebBridge {
 					return { clicked: label, allowed: false, changed: false };
 				}
 			}
-			const before = await this.mark(page);
+			const before = await markOf(page);
 			await this.clickOn(target, label);
 			const effect = await this.effect(page, before);
 			if (effect.navigated) this.note(`the click went to ${effect.navigated}`, true);
@@ -608,67 +547,6 @@ export class WebBridge {
 		this.note(`clicked ${label}`, true);
 	}
 
-	/**
-	 * The one element a target names — or a sentence saying why not.
-	 *
-	 * A reference is exact. A name is not: it goes down the ladder of ways to ask for that
-	 * name, and **stops at the first rung that matches anything**. If that rung matches more
-	 * than one thing, it says so and names both ways out, rather than taking the first and
-	 * writing into whichever row happened to be earliest in the document.
-	 */
-	private async locate(page: Page, target: WebTarget, candidates: (name: string) => Locator[]): Promise<Locator> {
-		if (typeof target === "object" && "ref" in target) return this.byRef(page, target.ref);
-		const name = typeof target === "string" ? target : target.name;
-		const nth = typeof target === "object" && "nth" in target ? target.nth : undefined;
-		if (!name?.trim()) throw new Error("A target needs a name, or a { ref } from decks web read.");
-		for (const found of candidates(name)) {
-			let candidate = found;
-			let count = await candidate.count();
-			if (count === 0) continue;
-			// A label used twice is usually one copy on screen and one hidden (a stale dialog, a
-			// template), or one in the open dialog and one on the page behind it. Narrow to what is
-			// visible, then to the open dialog, before counting: what a person would mean.
-			if (count > 1) {
-				const visible = candidate.filter({ visible: true });
-				const shown = await visible.count();
-				if (shown > 0 && shown < count) [candidate, count] = [visible, shown];
-			}
-			if (count > 1) {
-				const dialog = page.locator('[role="dialog"]:visible, dialog[open]').last();
-				if ((await dialog.count()) > 0) {
-					const inside = candidate.and(dialog.locator("*"));
-					const there = await inside.count();
-					if (there > 0 && there < count) [candidate, count] = [inside, there];
-				}
-			}
-			if (nth !== undefined) {
-				if (!Number.isInteger(nth) || nth < 1 || nth > count)
-					throw new Error(`"${name}" matches ${count} ${count === 1 ? "element" : "elements"} on this page, so nth: ${nth} is out of range — nth: 1 is the first.`);
-				return candidate.nth(nth - 1);
-			}
-			if (count > 1)
-				throw new Error(
-					`"${name}" matches ${count} elements on this page, so I did not guess. Take one by position with { name: "${name}", nth: 1 } — 1 is the first — or read the page (decks.web.read) and pass one of its references, like { ref: "e42" }.`,
-				);
-			return candidate.first();
-		}
-		throw new Error(`Nothing on the page is called "${name}". Read the page (decks.web.read) to see the names it uses.`);
-	}
-
-	/** The element a `[ref=…]` from the last read names, or a sentence about why it cannot. */
-	private async byRef(page: Page, ref: string): Promise<Locator> {
-		const id = String(ref ?? "").trim().replace(/^@/, "");
-		if (!/^(f\d+)?e\d+$/.test(id)) throw new Error(`"${ref}" is not a reference. A reference looks like e42, or f3e42 inside a frame, and comes from decks web read.`);
-		if (!this.refs) throw new Error("References come from the page itself: read it with decks web read first, then pass one of the [ref=…] ids it shows.");
-		if (this.refs.url !== page.url())
-			throw new Error(
-				`That reference was read from ${this.refs.url} and the tab is now on ${page.url()}. Read the page again — every page numbers its references from e1, so an old one can point at the wrong element.`,
-			);
-		const target = page.locator(`aria-ref=${id}`);
-		if ((await target.count()) === 0) throw new Error(`Nothing on this page has the reference ${id}. Read it again — the page may have redrawn.`);
-		return target;
-	}
-
 	/** Press a key in the page — "Enter", "Tab", "Escape". */
 	/** Put the keyboard's focus on a field or button, as a click would, without clicking it. */
 	async focus(what: WebTarget): Promise<{ focused: string }> {
@@ -676,7 +554,7 @@ export class WebBridge {
 		await this.live(page);
 		const label = labelOf(what);
 		try {
-			const target = await this.locate(page, what, (name) => [page.getByLabel(name, { exact: true }), page.getByLabel(name), page.getByRole("textbox", { name }), page.getByRole("combobox", { name }), page.getByRole("button", { name })]);
+			const target = await locate(page, this.refs, what, (name) => [page.getByLabel(name, { exact: true }), page.getByLabel(name), page.getByRole("textbox", { name }), page.getByRole("combobox", { name }), page.getByRole("button", { name })]);
 			await target.focus({ timeout: 10_000 });
 			this.note(`focused ${label}`, true);
 			return { focused: label };
@@ -703,7 +581,7 @@ export class WebBridge {
 	async press(key: string): Promise<{ pressed: string; navigated?: string; changed: boolean }> {
 		const page = await this.page();
 		await this.live(page);
-		const before = await this.mark(page);
+		const before = await markOf(page);
 		await page.keyboard.press(key);
 		this.note(`pressed ${key}`, true);
 		const effect = await this.effect(page, before);

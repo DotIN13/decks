@@ -106,10 +106,13 @@ interface WebHost {
 	open(url: string): Promise<{ url: string; title: string }>;
 	focus(what: WebTarget): Promise<{ focused: string }>;
 	type(text: string, into?: WebTarget): Promise<{ typed: number; into?: string }>;
-	tabs(): Promise<{ index: number; title: string; url: string; current: boolean }[]>;
-	newTab(url?: string): Promise<{ index: number; url: string; title: string }>;
-	useTab(which: number | string): Promise<{ index: number; url: string; title: string }>;
-	closeTab(which?: number | string): Promise<{ closed: string; tabs: number }>;
+	/** The tabs of the Decks group (`browser/tabs.ts`). */
+	readonly group: {
+		list(): Promise<{ index: number; title: string; url: string; current: boolean }[]>;
+		open(url?: string): Promise<{ index: number; url: string; title: string }>;
+		use(which: number | string): Promise<{ index: number; url: string; title: string }>;
+		close(which?: number | string): Promise<{ closed: string; tabs: number }>;
+	};
 	values(): Promise<{ url: string; fields: { label: string; value: string; kind: string }[] }>;
 	read(options?: { full?: boolean }): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
 	screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number; png: Buffer }>;

@@ -359,27 +359,27 @@ test("a reference from another page is a sentence, not a click on whatever now h
 });
 
 test("the agent opens, lists, switches and closes tabs of the group, and the verbs follow the tab it picked", async () => {
-	const first = await bridge.tabs();
+	const first = await bridge.group.list();
 	assert.equal(first.length, 1);
 	assert.equal(first[0]!.current, true);
 
-	const opened = await bridge.newTab("data:text/html,<title>Second</title><h1>Two</h1>");
+	const opened = await bridge.group.open("data:text/html,<title>Second</title><h1>Two</h1>");
 	assert.equal(opened.index, 2);
 	await until("two tabs", () => bridge.status().tabs.length === 2);
 	assert.equal((await bridge.read()).title, "Second", "the new tab is the one acted on");
-	assert.deepEqual((await bridge.tabs()).map((tab) => tab.current), [false, true]);
+	assert.deepEqual((await bridge.group.list()).map((tab) => tab.current), [false, true]);
 
-	await bridge.useTab(1);
+	await bridge.group.use(1);
 	assert.notEqual((await bridge.read()).title, "Second", "back on the first tab");
-	await bridge.useTab("second");
+	await bridge.group.use("second");
 	assert.equal((await bridge.read()).title, "Second", "picked by words in its title");
-	await assert.rejects(bridge.useTab(9), /There is no tab 9/);
+	await assert.rejects(bridge.group.use(9), /There is no tab 9/);
 
-	const closed = await bridge.closeTab();
+	const closed = await bridge.group.close();
 	assert.equal(closed.closed, "Second");
 	assert.equal(closed.tabs, 1);
 	assert.notEqual((await bridge.read()).title, "Second", "the verbs fall back to the first tab");
-	await assert.rejects(bridge.closeTab(), /only shared tab/);
+	await assert.rejects(bridge.group.close(), /only shared tab/);
 });
 
 test("a reference to a field inside a frame (f…e…) is taken, as on portals that put their form in an iframe", async () => {

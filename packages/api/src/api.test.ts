@@ -14,11 +14,12 @@ test("the table has every call of the redesign, each named once", () => {
 		"view.goto", "view.focus", "view.open", "view.camera", "view.move", "view.viewport", "view.cursor", "view.reload",
 		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.item", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.delete", "apps.logs", "apps.check",
 		"web.status", "web.pairing", "web.repair", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
+		"web.tabs", "web.newTab", "web.tab", "web.closeTab", "web.type", "web.focus", "web.values",
 		"ports", "now", "pair.code", "studio.login", "studio.code", "studio.status", "studio.disconnect",
 		// For a caller with no disk, and for an agent that works outside Decks.
 		"file.list", "file.find", "file.read", "file.write", "file.edit", "file.grep", "file.move", "file.delete", "agent.news",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 89);
+	assert.equal(VERBS.length, 96);
 	assert.equal(VERB_BY_NAME.size, VERBS.length, "a name finds only the table's calls");
 });
 
