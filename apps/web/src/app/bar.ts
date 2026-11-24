@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 import { messageParts } from "../composer/pill-about.ts";
-import { getLocale, m } from "@decks/i18n";
+import { m } from "@decks/i18n";
 import type { Draft } from "@decks/agent-ui/composer";
 import { withComments } from "../markup/comments.ts";
 import { takeComments } from "../state/comments.ts";
@@ -63,8 +63,8 @@ export function createBar(names: BarNames) {
 				 * command it adds nothing. The words are sent as they were written.
 				 */
 				const looking = lookingAt();
-				// With it, the language the page speaks (`@decks/i18n`), so the agent writes its cards and replies in it.
-				const at = looking ? { at: { ...looking, lang: getLocale() } } : {};
+				// Not the page's language: an agent answers in the language the person writes in, or the one they ask for.
+				const at = looking ? { at: looking } : {};
 				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
 				if (queue) void call("chat.queue", [dest.id, { action: "add", text: line, ...parts, ...at }]).then(warnIfFailed);
 				else void call("chat.send", [dest.id, { text: line, ...parts, ...at }]).then(warnIfFailed);

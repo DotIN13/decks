@@ -21,7 +21,7 @@ const screen = { touches: "screen", effect: "change", who: "person" } as const;
 const outside = { touches: "outside", effect: "change", who: "person" } as const;
 
 const Parts = arr(any("A part of the message: a card, a comment, a file, as the composer puts them in."));
-/** The tab in front when the person wrote a message: its kind, and what it is of (a canvas's name, a card's or a document's path, an app's name), and the language the page speaks (`lang`, `@decks/i18n`), which the agent is told to write in. */
+/** The tab in front when the person wrote a message: its kind, and what it is of (a canvas's name, a card's or a document's path, an app's name). `lang` is still taken from a page loaded before it was dropped, and ignored: an agent answers in the person's own language, not the page's. */
 const LookingAt = obj({ kind: lit("canvas", "card", "document", "app"), target: str(), lang: opt(str()) });
 const Thinking = str("How hard the agent thinks, as its runtime names the levels.");
 const OnCanvas = obj({ canvas: opt(str()) });
