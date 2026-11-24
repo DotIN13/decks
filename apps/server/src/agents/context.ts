@@ -67,9 +67,7 @@ export function deckContext(deck: Deck, options: { web?: boolean } = {}): string
 		return `You are working in a deck at ${deck.path}. Each canvas keeps its cards in canvases/<name>/cards/<card>/index.html. The decks command in your shell reaches the canvas: decks --help.`;
 	}
 
-	const cards = deck.boards;
-	const cardList = cards.length === 0 ? "_None yet. Write the first one._" : cards.map((one) => `- \`${one.path}\` — ${one.title} (${one.w}×${one.h})`).join("\n");
-
+	// No list of the deck's cards: at 860 cards it was three quarters of this briefing, and grew with every card. `decks card list` and `decks canvas read` answer when asked.
 	const roots = deck.roots.roots;
 	const rootList =
 		roots.length === 0
@@ -87,7 +85,6 @@ export function deckContext(deck: Deck, options: { web?: boolean } = {}): string
 		.replaceAll("{{DECKS_COMMANDS}}", api ? apiFor(api, { web: options.web === true }).trim() : "_The command reference is not in this install: `decks --help` lists the commands._")
 		.replaceAll("{{DECK_NAME}}", deck.name)
 		.replaceAll("{{DECK_PATH}}", deck.path)
-		.replaceAll("{{CARDS}}", cardList)
 		.replaceAll("{{ROOTS}}", rootList)
 		.replaceAll("{{TIME}}", timeLine());
 }
