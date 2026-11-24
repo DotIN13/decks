@@ -34,6 +34,8 @@ export interface EditorViewNeeds {
 	readonly setSelected: Setter<string | undefined>;
 	readonly movePage: (path: string, x: number, y: number) => void;
 	readonly reloads: Accessor<Record<string, number>>;
+	/** Load a card again, in this window: the pill's ⋯, Reload. */
+	readonly reload: (path: string) => void;
 	readonly editable: boolean;
 	engine: CanvasEngine | undefined;
 	readonly doc: Accessor<PenDocument>;
@@ -61,6 +63,7 @@ export function createEditorView(d: EditorViewNeeds) {
 			pen={d.pen()}
 			{...d.editing}
 			{...(d.options.onExport ? { onExport: d.options.onExport } : {})}
+			onReloadCard={d.reload}
 			onPenStep={d.step}
 			drawing={d.inking()}
 			onPencil={() => {

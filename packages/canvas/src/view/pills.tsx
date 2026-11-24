@@ -76,6 +76,8 @@ export function createPills(d: PillsNeeds) {
 						{...(d.props.onDeleteCard && board().item !== "app" ? { onDelete: () => d.props.onDeleteCard?.(path) } : {})}
 						// An app running in its window loads again at a press, this window alone.
 						{...(board().item === "app" && canvasHost().apps?.inCanvas ? { onReload: () => reloadAppWindow(path) } : {})}
+						// ⋯, Reload: a card loads again from its files, an app's window loads its page again; this window alone.
+						{...(board().item === "app" ? (canvasHost().apps?.inCanvas ? { onRefresh: () => reloadAppWindow(path) } : {}) : board().item === "document" ? {} : d.props.onReloadCard ? { onRefresh: () => d.props.onReloadCard?.(path) } : {})}
 						{...(d.props.onComment
 							? {
 									onComment: () =>

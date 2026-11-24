@@ -302,6 +302,8 @@
 /** @typedef {{}} Canvas_Pill_More_CardInputs */
 /** @typedef {{}} Canvas_Pill_New_TabInputs */
 /** @typedef {{}} Canvas_Pill_New_Tab_TitleInputs */
+/** @typedef {{}} Canvas_Pill_RefreshInputs */
+/** @typedef {{}} Canvas_Pill_Refresh_TitleInputs */
 /** @typedef {{}} Canvas_Pill_ReloadInputs */
 /** @typedef {{}} Canvas_Pill_Reload_TitleInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Canvas_Pill_StrokesInputs */
@@ -2760,6 +2762,14 @@ export const canvas_pill_new_tab = /** @type {(inputs: Canvas_Pill_New_TabInputs
 
 export const canvas_pill_new_tab_title = /** @type {(inputs: Canvas_Pill_New_Tab_TitleInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`在新标签页中打开`)
+};
+
+export const canvas_pill_refresh = /** @type {(inputs: Canvas_Pill_RefreshInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`重新加载`)
+};
+
+export const canvas_pill_refresh_title = /** @type {(inputs: Canvas_Pill_Refresh_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`在这个窗口里从文件重新加载`)
 };
 
 export const canvas_pill_reload = /** @type {(inputs: Canvas_Pill_ReloadInputs) => LocalizedString} */ () => {

@@ -285,6 +285,13 @@ export class CardService {
 		if (refused) throw new Error(refused);
 		const file = this.deck.fileOf(path);
 		const before = existsSync(file) ? readFileSync(file, "utf8") : undefined;
+		/*
+		 * Whether the file on disk is the one the browsers last heard of. An edit made just before (a write
+		 * by an agent's own tools, then `decks canvas fit` writing the height a moment later) may not have
+		 * reached the watcher yet: then `before` is that edit, a size-only comparison against it is wrong,
+		 * and the browsers, told "only the size", kept the card as it was before the edit.
+		 */
+		const heard = this.deck.unchanged(path);
 		// A canvas's first card makes its `cards/`.
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
@@ -292,7 +299,7 @@ export class CardService {
 		const board = this.deck.refresh(path);
 		if (!board) throw new Error(`No such board: ${path}`);
 		// Only the size in its tag: the surfaces showing it keep their document (`items/card-surface.tsx`, `sized`).
-		const sized = before !== undefined && onlySizeChanged(before, html);
+		const sized = before !== undefined && heard && onlySizeChanged(before, html);
 		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: this.placed(board), ...(sized ? { sized: true as const } : {}) });
 		return board;
 	}

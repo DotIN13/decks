@@ -92,7 +92,7 @@ const shot = async (name) => process.env.LOOK_SHOTS && (await page.screenshot({ 
 	await settle(page, 400);
 	await shot("app-pill-more");
 	const menu = await canvas.locator(".callout-more [role=menuitem]").evaluateAll((all) => all.map((one) => one.getAttribute("aria-label")));
-	say("⋯ has Copy path alone: no Delete, and no export of a running app", JSON.stringify(menu) === '["Copy path"]', JSON.stringify(menu));
+	say("⋯ has Reload and Copy path: no Delete, and no export of a running app", JSON.stringify(menu) === '["Reload","Copy path"]', JSON.stringify(menu));
 	await page.keyboard.press("Escape");
 	await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
 	await gone(id);

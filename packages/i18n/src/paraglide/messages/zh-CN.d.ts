@@ -300,6 +300,8 @@ export const canvas_pill_more_actions: (inputs: Canvas_Pill_More_ActionsInputs) 
 export const canvas_pill_more_card: (inputs: Canvas_Pill_More_CardInputs) => LocalizedString;
 export const canvas_pill_new_tab: (inputs: Canvas_Pill_New_TabInputs) => LocalizedString;
 export const canvas_pill_new_tab_title: (inputs: Canvas_Pill_New_Tab_TitleInputs) => LocalizedString;
+export const canvas_pill_refresh: (inputs: Canvas_Pill_RefreshInputs) => LocalizedString;
+export const canvas_pill_refresh_title: (inputs: Canvas_Pill_Refresh_TitleInputs) => LocalizedString;
 export const canvas_pill_reload: (inputs: Canvas_Pill_ReloadInputs) => LocalizedString;
 export const canvas_pill_reload_title: (inputs: Canvas_Pill_Reload_TitleInputs) => LocalizedString;
 export const canvas_pill_strokes: (inputs: Canvas_Pill_StrokesInputs) => LocalizedString;
@@ -1853,6 +1855,8 @@ export type Canvas_Pill_More_ActionsInputs = {};
 export type Canvas_Pill_More_CardInputs = {};
 export type Canvas_Pill_New_TabInputs = {};
 export type Canvas_Pill_New_Tab_TitleInputs = {};
+export type Canvas_Pill_RefreshInputs = {};
+export type Canvas_Pill_Refresh_TitleInputs = {};
 export type Canvas_Pill_ReloadInputs = {};
 export type Canvas_Pill_Reload_TitleInputs = {};
 export type Canvas_Pill_StrokesInputs = { count: NonNullable<unknown> };

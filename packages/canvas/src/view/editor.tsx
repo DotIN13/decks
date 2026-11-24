@@ -123,7 +123,7 @@ export function createEditor(options: EditorOptions): Editor {
 	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
 	const { surface, root } = createEditorView({
 		mode, options, ownGlide, opening, pages, pen, editing, step, inking, setModeSignal, camera, setCamera, selected, setSelected,
-		movePage, reloads, editable, doc, edit,
+		movePage, reloads, reload, editable, doc, edit,
 		get asked() { return editorCamera.asked; },
 		get engine() { return engine; },
 		set engine(next) { engine = next; },

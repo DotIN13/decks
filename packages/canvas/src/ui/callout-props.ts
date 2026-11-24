@@ -24,6 +24,8 @@ export interface PageCalloutProps {
 	onDelete?: () => void;
 	/** An app's window: load its page again, this window alone. */
 	onReload?: () => void;
+	/** A card or an app's window: load it again, this window alone, from the ⋯ menu. */
+	onRefresh?: () => void;
 	/**
 	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a board of it, or send it as it
 	 * is, for the agent to read and act on (a command written by hand is carried out). First, in words.

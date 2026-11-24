@@ -168,6 +168,7 @@ const CHECKS = [
 	/* A frame exported as HTML and as Tailwind looks like the canvas's own picture of it, pixel by pixel. */
 	{ file: "export.mjs", needsAgent: false },
 	{ file: "export-pill.mjs", needsAgent: false },
+	{ file: "card-reload.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/* Every edit a person makes, with the server's answer held back: none shows the drawing as it was before it. Eight minutes, so by name. */

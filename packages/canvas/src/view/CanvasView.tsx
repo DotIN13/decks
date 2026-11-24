@@ -149,6 +149,8 @@ export type CanvasViewProps = {
 	onExport?: (ids: string[], format?: "png" | "pdf") => void;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
 	onDeleteCard?: (path: string) => void;
+	/** Load a card again in this window, from its pill's ⋯ menu (`editor.tsx`, `reload`). */
+	onReloadCard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
 	canvasName?: string | undefined;
 	/** The boards that are news, by path, each with the colour its glow is drawn in (`items/news.ts`). */

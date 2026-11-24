@@ -2125,6 +2125,20 @@ export const canvas_pill_new_tab_title: ((inputs?: Canvas_Pill_New_Tab_TitleInpu
 * | "Reload" |
 *
 */
+export const canvas_pill_refresh: ((inputs?: Canvas_Pill_RefreshInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Pill_RefreshInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Load it again from its files, in this window" |
+*
+*/
+export const canvas_pill_refresh_title: ((inputs?: Canvas_Pill_Refresh_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Pill_Refresh_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Reload" |
+*
+*/
 export const canvas_pill_reload: ((inputs?: Canvas_Pill_ReloadInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Pill_ReloadInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
@@ -11199,6 +11213,8 @@ export type Canvas_Pill_More_ActionsInputs = {};
 export type Canvas_Pill_More_CardInputs = {};
 export type Canvas_Pill_New_TabInputs = {};
 export type Canvas_Pill_New_Tab_TitleInputs = {};
+export type Canvas_Pill_RefreshInputs = {};
+export type Canvas_Pill_Refresh_TitleInputs = {};
 export type Canvas_Pill_ReloadInputs = {};
 export type Canvas_Pill_Reload_TitleInputs = {};
 export type Canvas_Pill_StrokesInputs = { count: NonNullable<unknown> };

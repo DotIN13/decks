@@ -304,6 +304,8 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Canvas_Pill_More_CardInputs */
 /** @typedef {{}} Canvas_Pill_New_TabInputs */
 /** @typedef {{}} Canvas_Pill_New_Tab_TitleInputs */
+/** @typedef {{}} Canvas_Pill_RefreshInputs */
+/** @typedef {{}} Canvas_Pill_Refresh_TitleInputs */
 /** @typedef {{}} Canvas_Pill_ReloadInputs */
 /** @typedef {{}} Canvas_Pill_Reload_TitleInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Canvas_Pill_StrokesInputs */
@@ -5789,6 +5791,34 @@ export const canvas_pill_new_tab_title = /** @type {((inputs?: Canvas_Pill_New_T
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.canvas_pill_new_tab_title(inputs)
 	return __en.canvas_pill_new_tab_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Reload" |
+*
+* @param {Canvas_Pill_RefreshInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_pill_refresh = /** @type {((inputs?: Canvas_Pill_RefreshInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Pill_RefreshInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_pill_refresh(inputs)
+	return __en.canvas_pill_refresh(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Load it again from its files, in this window" |
+*
+* @param {Canvas_Pill_Refresh_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_pill_refresh_title = /** @type {((inputs?: Canvas_Pill_Refresh_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Pill_Refresh_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_pill_refresh_title(inputs)
+	return __en.canvas_pill_refresh_title(inputs)
 });
 /**
 * | output |

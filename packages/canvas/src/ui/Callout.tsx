@@ -180,6 +180,12 @@ export function PageCallout(props: PageCalloutProps) {
 						aria-label={props.board ? m.canvas_pill_more_card() : m.canvas_pill_more_actions()}
 						style={menuAt() ? { left: `${menuAt()!.left}px` } : { visibility: "hidden", left: "0" }}
 					>
+						<Show when={props.onRefresh}>
+							<button type="button" role="menuitem" class="callout-more-item" aria-label={m.canvas_pill_refresh()} title={m.canvas_pill_refresh_title()} onClick={pick(props.onRefresh)}>
+								<Icon of={RefreshCw} size={15} />
+								{m.canvas_pill_refresh()}
+							</button>
+						</Show>
 						<Show when={props.onExport}>
 							<button type="button" role="menuitem" class="callout-more-item" aria-label={m.canvas_pill_export_png()} onClick={pick(() => props.onExport?.("png"))}>
 								<Icon of={ImageDown} size={15} />

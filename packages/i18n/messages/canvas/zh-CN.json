@@ -370,5 +370,7 @@
 	"canvas_pill_cards": "{count} 张卡片",
 	"canvas_pill_cards_and_items": "{cards}，{items}",
 	"canvas_card_image": "图片",
-	"canvas_cursor_agent": "智能体"
+	"canvas_cursor_agent": "智能体",
+	"canvas_pill_refresh": "重新加载",
+	"canvas_pill_refresh_title": "在这个窗口里从文件重新加载"
 }

@@ -412,5 +412,7 @@
 	],
 	"canvas_pill_cards_and_items": "{cards}, {items}",
 	"canvas_card_image": "image",
-	"canvas_cursor_agent": "agent"
+	"canvas_cursor_agent": "agent",
+	"canvas_pill_refresh": "Reload",
+	"canvas_pill_refresh_title": "Load it again from its files, in this window"
 }

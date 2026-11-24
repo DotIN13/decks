@@ -84,3 +84,28 @@ test("a measurement of a version that has been rewritten is not reported", async
 		cleanup();
 	}
 });
+
+test("a size written just after an edit the watcher has not heard yet is not taken for a size alone: the browsers load the card again", () => {
+	const { app, deck, cleanup } = open();
+	const said: Array<{ type: string; path?: string; sized?: true }> = [];
+	const send = app.send.bind(app);
+	(app as unknown as { send: (m: unknown) => void }).send = (message) => {
+		said.push(message as never);
+		send(message as never);
+	};
+	try {
+		const file = join(deck, TALL);
+		// An agent's own tools write new words, and before the watcher reads them `decks canvas fit` writes the height.
+		const edited = readFileSync(file, "utf8").replace("<body class=\"board\"></body>", "<body class=\"board\"><p>New words</p></body>");
+		writeFileSync(file, edited);
+		app.boards.writeBoard(TALL, edited.replace('"h":400', '"h":520'));
+		const changed = said.filter((m) => m.type === "card.changed" && m.path === TALL);
+		assert.equal(changed.length, 1);
+		assert.equal(changed[0]!.sized, undefined, "not size-only: the words changed since the browsers last heard");
+		// The height alone, with nothing unheard on disk: size-only, as before.
+		app.boards.writeBoard(TALL, readFileSync(file, "utf8").replace('"h":520', '"h":600'));
+		assert.equal(said.filter((m) => m.type === "card.changed" && m.path === TALL).at(-1)!.sized, true);
+	} finally {
+		cleanup();
+	}
+});
