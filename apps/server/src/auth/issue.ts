@@ -55,14 +55,18 @@ export class PairCodes {
 
 	constructor(
 		private readonly store: Pick<TokenStore, "requireCode">,
-		options: { required?: boolean } = {},
+		options: { required?: boolean; locked?: () => boolean } = {},
 	) {
 		this.forced = options.required ?? false;
+		this.locked = options.locked ?? (() => false);
 	}
+
+	/** Whether a password locks this harness (`password.ts`): then nothing pairs without a code, since a proxy makes every caller look local. */
+	private readonly locked: () => boolean;
 
 	/** Whether every pairing needs a code, wherever it comes from: deployed so, or asked for. */
 	get required(): boolean {
-		return this.forced || this.store.requireCode;
+		return this.forced || this.store.requireCode || this.locked();
 	}
 
 	setRequired(on: boolean): void {

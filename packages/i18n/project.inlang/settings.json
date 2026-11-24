@@ -20,6 +20,7 @@
 			"./messages/docs/{locale}.json",
 			"./messages/files/{locale}.json",
 			"./messages/frame/{locale}.json",
+			"./messages/login/{locale}.json",
 			"./messages/markup/{locale}.json",
 			"./messages/panel/{locale}.json",
 			"./messages/perf/{locale}.json",

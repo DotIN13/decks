@@ -1140,6 +1140,25 @@
 /** @typedef {{ percent: NonNullable<unknown> }} Frame_Zoom_AtInputs */
 /** @typedef {{}} Frame_Zoom_InInputs */
 /** @typedef {{}} Frame_Zoom_OutInputs */
+/** @typedef {{}} Login_ApproveInputs */
+/** @typedef {{ code: NonNullable<unknown> }} Login_Approve_CodeInputs */
+/** @typedef {{}} Login_Approve_FirstInputs */
+/** @typedef {{}} Login_Approve_SubInputs */
+/** @typedef {{ label: NonNullable<unknown> }} Login_Approve_TitleInputs */
+/** @typedef {{}} Login_Approve_Title_PlainInputs */
+/** @typedef {{}} Login_ApprovedInputs */
+/** @typedef {{}} Login_CancelInputs */
+/** @typedef {{}} Login_CancelledInputs */
+/** @typedef {{}} Login_Code_UnknownInputs */
+/** @typedef {{}} Login_Document_TitleInputs */
+/** @typedef {{ why: NonNullable<unknown> }} Login_FailedInputs */
+/** @typedef {{}} Login_Open_DecksInputs */
+/** @typedef {{}} Login_Password_LabelInputs */
+/** @typedef {{}} Login_SubInputs */
+/** @typedef {{}} Login_SubmitInputs */
+/** @typedef {{}} Login_UnreachableInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Login_WaitInputs */
+/** @typedef {{}} Login_WrongInputs */
 /** @typedef {{}} Markup_CloseInputs */
 /** @typedef {{}} Markup_Close_TitleInputs */
 /** @typedef {{}} Markup_CommentInputs */
@@ -1285,6 +1304,31 @@
 /** @typedef {{ name: NonNullable<unknown> }} Settings_Language_BrowserInputs */
 /** @typedef {{}} Settings_Language_RowInputs */
 /** @typedef {{}} Settings_Language_SubInputs */
+/** @typedef {{}} Settings_Password_ChangeInputs */
+/** @typedef {{}} Settings_Password_Change_ButtonInputs */
+/** @typedef {{}} Settings_Password_Change_SubInputs */
+/** @typedef {{}} Settings_Password_ChangedInputs */
+/** @typedef {{}} Settings_Password_CurrentInputs */
+/** @typedef {{}} Settings_Password_EverywhereInputs */
+/** @typedef {{}} Settings_Password_Everywhere_ButtonInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_BodyInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_NoInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_TitleInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_YesInputs */
+/** @typedef {{}} Settings_Password_Everywhere_SubInputs */
+/** @typedef {{}} Settings_Password_GroupInputs */
+/** @typedef {{}} Settings_Password_MismatchInputs */
+/** @typedef {{}} Settings_Password_NewInputs */
+/** @typedef {{}} Settings_Password_NoneInputs */
+/** @typedef {{}} Settings_Password_None_SubInputs */
+/** @typedef {{}} Settings_Password_Not_This_BrowserInputs */
+/** @typedef {{}} Settings_Password_Not_This_Browser_SubInputs */
+/** @typedef {{}} Settings_Password_RepeatInputs */
+/** @typedef {{}} Settings_Password_Sign_OutInputs */
+/** @typedef {{}} Settings_Password_This_BrowserInputs */
+/** @typedef {{}} Settings_Password_This_Browser_SubInputs */
+/** @typedef {{}} Settings_Password_Too_ShortInputs */
+/** @typedef {{}} Settings_Password_UnreachableInputs */
 /** @typedef {{}} Settings_Section_AccountsInputs */
 /** @typedef {{}} Settings_Section_ConnectionsInputs */
 /** @typedef {{}} Settings_Section_GeneralInputs */
@@ -6118,6 +6162,85 @@ export const frame_zoom_out = /** @type {(inputs: Frame_Zoom_OutInputs) => Local
 	return /** @type {LocalizedString} */ (`Zoom out`)
 };
 
+export const login_approve = /** @type {(inputs: Login_ApproveInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Approve`)
+};
+
+export const login_approve_code = /** @type {(inputs: Login_Approve_CodeInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Code ${i?.code}`)
+};
+
+export const login_approve_first = /** @type {(inputs: Login_Approve_FirstInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`A terminal asks to sign in to this Decks. Log in first to approve it.`)
+};
+
+export const login_approve_sub = /** @type {(inputs: Login_Approve_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Approve only if you started this in your terminal just now. It will act as you.`)
+};
+
+export const login_approve_title = /** @type {(inputs: Login_Approve_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Let ${i?.label} into this Decks?`)
+};
+
+export const login_approve_title_plain = /** @type {(inputs: Login_Approve_Title_PlainInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Let a terminal into this Decks?`)
+};
+
+export const login_approved = /** @type {(inputs: Login_ApprovedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Approved. You can go back to the terminal.`)
+};
+
+export const login_cancel = /** @type {(inputs: Login_CancelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Cancel`)
+};
+
+export const login_cancelled = /** @type {(inputs: Login_CancelledInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Not approved. You can close this tab.`)
+};
+
+export const login_code_unknown = /** @type {(inputs: Login_Code_UnknownInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This code is unknown or has expired. Run decks login in the terminal again.`)
+};
+
+export const login_document_title = /** @type {(inputs: Login_Document_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Log in · Decks`)
+};
+
+export const login_failed = /** @type {(inputs: Login_FailedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Could not log in: ${i?.why}`)
+};
+
+export const login_open_decks = /** @type {(inputs: Login_Open_DecksInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Open Decks`)
+};
+
+export const login_password_label = /** @type {(inputs: Login_Password_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Password`)
+};
+
+export const login_sub = /** @type {(inputs: Login_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Log in with this Decks's password.`)
+};
+
+export const login_submit = /** @type {(inputs: Login_SubmitInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Log in`)
+};
+
+export const login_unreachable = /** @type {(inputs: Login_UnreachableInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Could not reach this Decks. Check the connection and try again.`)
+};
+
+export const login_wait = /** @type {(inputs: Login_WaitInputs) => LocalizedString} */ (i) => {
+	const n = __paraglideRegistry.plural("en", i?.count, {}, true);
+	if (n === "one") return /** @type {LocalizedString} */ (`Too many tries. Try again in ${i?.count} second.`);
+	if (n === "other") return /** @type {LocalizedString} */ (`Too many tries. Try again in ${i?.count} seconds.`);
+	return /** @type {LocalizedString} */ ("login_wait");
+};
+
+export const login_wrong = /** @type {(inputs: Login_WrongInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`That password is not right.`)
+};
+
 export const markup_close = /** @type {(inputs: Markup_CloseInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Close`)
 };
@@ -6702,6 +6825,106 @@ export const settings_language_row = /** @type {(inputs: Settings_Language_RowIn
 
 export const settings_language_sub = /** @type {(inputs: Settings_Language_SubInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`The words Decks shows, on this browser. Choosing one reloads the page.`)
+};
+
+export const settings_password_change = /** @type {(inputs: Settings_Password_ChangeInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Change password`)
+};
+
+export const settings_password_change_button = /** @type {(inputs: Settings_Password_Change_ButtonInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Change`)
+};
+
+export const settings_password_change_sub = /** @type {(inputs: Settings_Password_Change_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`At least 10 characters. Browsers already signed in stay signed in.`)
+};
+
+export const settings_password_changed = /** @type {(inputs: Settings_Password_ChangedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Password changed.`)
+};
+
+export const settings_password_current = /** @type {(inputs: Settings_Password_CurrentInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Current password`)
+};
+
+export const settings_password_everywhere = /** @type {(inputs: Settings_Password_EverywhereInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign out everywhere`)
+};
+
+export const settings_password_everywhere_button = /** @type {(inputs: Settings_Password_Everywhere_ButtonInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign out all`)
+};
+
+export const settings_password_everywhere_confirm_body = /** @type {(inputs: Settings_Password_Everywhere_Confirm_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Every browser and terminal that logged in with the password, this one too, has to log in again.`)
+};
+
+export const settings_password_everywhere_confirm_no = /** @type {(inputs: Settings_Password_Everywhere_Confirm_NoInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Cancel`)
+};
+
+export const settings_password_everywhere_confirm_title = /** @type {(inputs: Settings_Password_Everywhere_Confirm_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign out everywhere?`)
+};
+
+export const settings_password_everywhere_confirm_yes = /** @type {(inputs: Settings_Password_Everywhere_Confirm_YesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign out everywhere`)
+};
+
+export const settings_password_everywhere_sub = /** @type {(inputs: Settings_Password_Everywhere_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Every browser and terminal that logged in with the password has to log in again.`)
+};
+
+export const settings_password_group = /** @type {(inputs: Settings_Password_GroupInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Password`)
+};
+
+export const settings_password_mismatch = /** @type {(inputs: Settings_Password_MismatchInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The two new passwords are not the same.`)
+};
+
+export const settings_password_new = /** @type {(inputs: Settings_Password_NewInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`New password`)
+};
+
+export const settings_password_none = /** @type {(inputs: Settings_Password_NoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`No password is set`)
+};
+
+export const settings_password_none_sub = /** @type {(inputs: Settings_Password_None_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Set one on this Mac with decks password set`)
+};
+
+export const settings_password_not_this_browser = /** @type {(inputs: Settings_Password_Not_This_BrowserInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This browser is not signed in with the password`)
+};
+
+export const settings_password_not_this_browser_sub = /** @type {(inputs: Settings_Password_Not_This_Browser_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`It reaches this Decks another way, such as from this Mac itself.`)
+};
+
+export const settings_password_repeat = /** @type {(inputs: Settings_Password_RepeatInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Repeat new password`)
+};
+
+export const settings_password_sign_out = /** @type {(inputs: Settings_Password_Sign_OutInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sign out`)
+};
+
+export const settings_password_this_browser = /** @type {(inputs: Settings_Password_This_BrowserInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Signed in with your password on this browser`)
+};
+
+export const settings_password_this_browser_sub = /** @type {(inputs: Settings_Password_This_Browser_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Signing out here asks for the password again in this browser.`)
+};
+
+export const settings_password_too_short = /** @type {(inputs: Settings_Password_Too_ShortInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The new password needs at least 10 characters.`)
+};
+
+export const settings_password_unreachable = /** @type {(inputs: Settings_Password_UnreachableInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Could not reach this Decks.`)
 };
 
 export const settings_section_accounts = /** @type {(inputs: Settings_Section_AccountsInputs) => LocalizedString} */ () => {

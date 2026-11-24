@@ -75,7 +75,7 @@ export function fromAnotherSite(headers: Record<string, string | string[] | unde
 }
 
 /** The routes a caller with no token yet must reach to get one, or that check a secret of their own. */
-const DOORS = new Set(["/api/hello", "/api/pair", "/api/login", "/api/tokens/session", "/api/gdocs/call", "/api/google/callback", "/api/studio/callback"]);
+const DOORS = new Set(["/api/hello", "/api/pair", "/api/login", "/api/tokens/session", "/api/gdocs/call", "/api/google/callback", "/api/studio/callback", "/api/login/state", "/api/login/password", "/api/logout", "/api/login/device", "/api/login/device/approve", "/api/login/device/poll"]);
 
 export function isDoor(path: string): boolean {
 	return DOORS.has(path) || path.startsWith("/api/web/");

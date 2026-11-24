@@ -1142,6 +1142,25 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ percent: NonNullable<unknown> }} Frame_Zoom_AtInputs */
 /** @typedef {{}} Frame_Zoom_InInputs */
 /** @typedef {{}} Frame_Zoom_OutInputs */
+/** @typedef {{}} Login_ApproveInputs */
+/** @typedef {{ code: NonNullable<unknown> }} Login_Approve_CodeInputs */
+/** @typedef {{}} Login_Approve_FirstInputs */
+/** @typedef {{}} Login_Approve_SubInputs */
+/** @typedef {{ label: NonNullable<unknown> }} Login_Approve_TitleInputs */
+/** @typedef {{}} Login_Approve_Title_PlainInputs */
+/** @typedef {{}} Login_ApprovedInputs */
+/** @typedef {{}} Login_CancelInputs */
+/** @typedef {{}} Login_CancelledInputs */
+/** @typedef {{}} Login_Code_UnknownInputs */
+/** @typedef {{}} Login_Document_TitleInputs */
+/** @typedef {{ why: NonNullable<unknown> }} Login_FailedInputs */
+/** @typedef {{}} Login_Open_DecksInputs */
+/** @typedef {{}} Login_Password_LabelInputs */
+/** @typedef {{}} Login_SubInputs */
+/** @typedef {{}} Login_SubmitInputs */
+/** @typedef {{}} Login_UnreachableInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Login_WaitInputs */
+/** @typedef {{}} Login_WrongInputs */
 /** @typedef {{}} Markup_CloseInputs */
 /** @typedef {{}} Markup_Close_TitleInputs */
 /** @typedef {{}} Markup_CommentInputs */
@@ -1287,6 +1306,31 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ name: NonNullable<unknown> }} Settings_Language_BrowserInputs */
 /** @typedef {{}} Settings_Language_RowInputs */
 /** @typedef {{}} Settings_Language_SubInputs */
+/** @typedef {{}} Settings_Password_ChangeInputs */
+/** @typedef {{}} Settings_Password_Change_ButtonInputs */
+/** @typedef {{}} Settings_Password_Change_SubInputs */
+/** @typedef {{}} Settings_Password_ChangedInputs */
+/** @typedef {{}} Settings_Password_CurrentInputs */
+/** @typedef {{}} Settings_Password_EverywhereInputs */
+/** @typedef {{}} Settings_Password_Everywhere_ButtonInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_BodyInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_NoInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_TitleInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_YesInputs */
+/** @typedef {{}} Settings_Password_Everywhere_SubInputs */
+/** @typedef {{}} Settings_Password_GroupInputs */
+/** @typedef {{}} Settings_Password_MismatchInputs */
+/** @typedef {{}} Settings_Password_NewInputs */
+/** @typedef {{}} Settings_Password_NoneInputs */
+/** @typedef {{}} Settings_Password_None_SubInputs */
+/** @typedef {{}} Settings_Password_Not_This_BrowserInputs */
+/** @typedef {{}} Settings_Password_Not_This_Browser_SubInputs */
+/** @typedef {{}} Settings_Password_RepeatInputs */
+/** @typedef {{}} Settings_Password_Sign_OutInputs */
+/** @typedef {{}} Settings_Password_This_BrowserInputs */
+/** @typedef {{}} Settings_Password_This_Browser_SubInputs */
+/** @typedef {{}} Settings_Password_Too_ShortInputs */
+/** @typedef {{}} Settings_Password_UnreachableInputs */
 /** @typedef {{}} Settings_Section_AccountsInputs */
 /** @typedef {{}} Settings_Section_ConnectionsInputs */
 /** @typedef {{}} Settings_Section_GeneralInputs */
@@ -17472,6 +17516,273 @@ export const frame_zoom_out = /** @type {((inputs?: Frame_Zoom_OutInputs, option
 /**
 * | output |
 * | --- |
+* | "Approve" |
+*
+* @param {Login_ApproveInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_approve = /** @type {((inputs?: Login_ApproveInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_ApproveInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_approve(inputs)
+	return __en.login_approve(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Code {code}" |
+*
+* @param {Login_Approve_CodeInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_approve_code = /** @type {((inputs: Login_Approve_CodeInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Approve_CodeInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_approve_code(inputs)
+	return __en.login_approve_code(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A terminal asks to sign in to this Decks. Log in first to approve it." |
+*
+* @param {Login_Approve_FirstInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_approve_first = /** @type {((inputs?: Login_Approve_FirstInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Approve_FirstInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_approve_first(inputs)
+	return __en.login_approve_first(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Approve only if you started this in your terminal just now. It will act as you." |
+*
+* @param {Login_Approve_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_approve_sub = /** @type {((inputs?: Login_Approve_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Approve_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_approve_sub(inputs)
+	return __en.login_approve_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Let {label} into this Decks?" |
+*
+* @param {Login_Approve_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_approve_title = /** @type {((inputs: Login_Approve_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Approve_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_approve_title(inputs)
+	return __en.login_approve_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Let a terminal into this Decks?" |
+*
+* @param {Login_Approve_Title_PlainInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_approve_title_plain = /** @type {((inputs?: Login_Approve_Title_PlainInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Approve_Title_PlainInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_approve_title_plain(inputs)
+	return __en.login_approve_title_plain(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Approved. You can go back to the terminal." |
+*
+* @param {Login_ApprovedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_approved = /** @type {((inputs?: Login_ApprovedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_ApprovedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_approved(inputs)
+	return __en.login_approved(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Cancel" |
+*
+* @param {Login_CancelInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_cancel = /** @type {((inputs?: Login_CancelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_CancelInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_cancel(inputs)
+	return __en.login_cancel(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Not approved. You can close this tab." |
+*
+* @param {Login_CancelledInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_cancelled = /** @type {((inputs?: Login_CancelledInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_CancelledInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_cancelled(inputs)
+	return __en.login_cancelled(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This code is unknown or has expired. Run decks login in the terminal again." |
+*
+* @param {Login_Code_UnknownInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_code_unknown = /** @type {((inputs?: Login_Code_UnknownInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Code_UnknownInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_code_unknown(inputs)
+	return __en.login_code_unknown(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Log in · Decks" |
+*
+* @param {Login_Document_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_document_title = /** @type {((inputs?: Login_Document_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Document_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_document_title(inputs)
+	return __en.login_document_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Could not log in: {why}" |
+*
+* @param {Login_FailedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_failed = /** @type {((inputs: Login_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_FailedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_failed(inputs)
+	return __en.login_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Open Decks" |
+*
+* @param {Login_Open_DecksInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_open_decks = /** @type {((inputs?: Login_Open_DecksInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Open_DecksInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_open_decks(inputs)
+	return __en.login_open_decks(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Password" |
+*
+* @param {Login_Password_LabelInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_password_label = /** @type {((inputs?: Login_Password_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_Password_LabelInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_password_label(inputs)
+	return __en.login_password_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Log in with this Decks's password." |
+*
+* @param {Login_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_sub = /** @type {((inputs?: Login_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_sub(inputs)
+	return __en.login_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Log in" |
+*
+* @param {Login_SubmitInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_submit = /** @type {((inputs?: Login_SubmitInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_SubmitInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_submit(inputs)
+	return __en.login_submit(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Could not reach this Decks. Check the connection and try again." |
+*
+* @param {Login_UnreachableInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_unreachable = /** @type {((inputs?: Login_UnreachableInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_UnreachableInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_unreachable(inputs)
+	return __en.login_unreachable(inputs)
+});
+/**
+* | n | output |
+* | --- | --- |
+* | "one" | "Too many tries. Try again in {count} second." |
+* | "other" | "Too many tries. Try again in {count} seconds." |
+*
+* @param {Login_WaitInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_wait = /** @type {((inputs: Login_WaitInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_WaitInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_wait(inputs)
+	return __en.login_wait(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "That password is not right." |
+*
+* @param {Login_WrongInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const login_wrong = /** @type {((inputs?: Login_WrongInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Login_WrongInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.login_wrong(inputs)
+	return __en.login_wrong(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Close" |
 *
 * @param {Markup_CloseInputs} inputs
@@ -19500,6 +19811,356 @@ export const settings_language_sub = /** @type {((inputs?: Settings_Language_Sub
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.settings_language_sub(inputs)
 	return __en.settings_language_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Change password" |
+*
+* @param {Settings_Password_ChangeInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_change = /** @type {((inputs?: Settings_Password_ChangeInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_ChangeInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_change(inputs)
+	return __en.settings_password_change(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Change" |
+*
+* @param {Settings_Password_Change_ButtonInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_change_button = /** @type {((inputs?: Settings_Password_Change_ButtonInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Change_ButtonInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_change_button(inputs)
+	return __en.settings_password_change_button(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "At least 10 characters. Browsers already signed in stay signed in." |
+*
+* @param {Settings_Password_Change_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_change_sub = /** @type {((inputs?: Settings_Password_Change_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Change_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_change_sub(inputs)
+	return __en.settings_password_change_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Password changed." |
+*
+* @param {Settings_Password_ChangedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_changed = /** @type {((inputs?: Settings_Password_ChangedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_ChangedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_changed(inputs)
+	return __en.settings_password_changed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Current password" |
+*
+* @param {Settings_Password_CurrentInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_current = /** @type {((inputs?: Settings_Password_CurrentInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_CurrentInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_current(inputs)
+	return __en.settings_password_current(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out everywhere" |
+*
+* @param {Settings_Password_EverywhereInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_everywhere = /** @type {((inputs?: Settings_Password_EverywhereInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_EverywhereInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_everywhere(inputs)
+	return __en.settings_password_everywhere(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out all" |
+*
+* @param {Settings_Password_Everywhere_ButtonInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_everywhere_button = /** @type {((inputs?: Settings_Password_Everywhere_ButtonInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Everywhere_ButtonInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_everywhere_button(inputs)
+	return __en.settings_password_everywhere_button(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Every browser and terminal that logged in with the password, this one too, has to log in again." |
+*
+* @param {Settings_Password_Everywhere_Confirm_BodyInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_everywhere_confirm_body = /** @type {((inputs?: Settings_Password_Everywhere_Confirm_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Everywhere_Confirm_BodyInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_everywhere_confirm_body(inputs)
+	return __en.settings_password_everywhere_confirm_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Cancel" |
+*
+* @param {Settings_Password_Everywhere_Confirm_NoInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_everywhere_confirm_no = /** @type {((inputs?: Settings_Password_Everywhere_Confirm_NoInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Everywhere_Confirm_NoInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_everywhere_confirm_no(inputs)
+	return __en.settings_password_everywhere_confirm_no(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out everywhere?" |
+*
+* @param {Settings_Password_Everywhere_Confirm_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_everywhere_confirm_title = /** @type {((inputs?: Settings_Password_Everywhere_Confirm_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Everywhere_Confirm_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_everywhere_confirm_title(inputs)
+	return __en.settings_password_everywhere_confirm_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out everywhere" |
+*
+* @param {Settings_Password_Everywhere_Confirm_YesInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_everywhere_confirm_yes = /** @type {((inputs?: Settings_Password_Everywhere_Confirm_YesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Everywhere_Confirm_YesInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_everywhere_confirm_yes(inputs)
+	return __en.settings_password_everywhere_confirm_yes(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Every browser and terminal that logged in with the password has to log in again." |
+*
+* @param {Settings_Password_Everywhere_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_everywhere_sub = /** @type {((inputs?: Settings_Password_Everywhere_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Everywhere_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_everywhere_sub(inputs)
+	return __en.settings_password_everywhere_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Password" |
+*
+* @param {Settings_Password_GroupInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_group = /** @type {((inputs?: Settings_Password_GroupInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_GroupInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_group(inputs)
+	return __en.settings_password_group(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The two new passwords are not the same." |
+*
+* @param {Settings_Password_MismatchInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_mismatch = /** @type {((inputs?: Settings_Password_MismatchInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_MismatchInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_mismatch(inputs)
+	return __en.settings_password_mismatch(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New password" |
+*
+* @param {Settings_Password_NewInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_new = /** @type {((inputs?: Settings_Password_NewInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_NewInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_new(inputs)
+	return __en.settings_password_new(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No password is set" |
+*
+* @param {Settings_Password_NoneInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_none = /** @type {((inputs?: Settings_Password_NoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_NoneInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_none(inputs)
+	return __en.settings_password_none(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Set one on this Mac with decks password set" |
+*
+* @param {Settings_Password_None_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_none_sub = /** @type {((inputs?: Settings_Password_None_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_None_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_none_sub(inputs)
+	return __en.settings_password_none_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This browser is not signed in with the password" |
+*
+* @param {Settings_Password_Not_This_BrowserInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_not_this_browser = /** @type {((inputs?: Settings_Password_Not_This_BrowserInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Not_This_BrowserInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_not_this_browser(inputs)
+	return __en.settings_password_not_this_browser(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "It reaches this Decks another way, such as from this Mac itself." |
+*
+* @param {Settings_Password_Not_This_Browser_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_not_this_browser_sub = /** @type {((inputs?: Settings_Password_Not_This_Browser_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Not_This_Browser_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_not_this_browser_sub(inputs)
+	return __en.settings_password_not_this_browser_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Repeat new password" |
+*
+* @param {Settings_Password_RepeatInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_repeat = /** @type {((inputs?: Settings_Password_RepeatInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_RepeatInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_repeat(inputs)
+	return __en.settings_password_repeat(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out" |
+*
+* @param {Settings_Password_Sign_OutInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_sign_out = /** @type {((inputs?: Settings_Password_Sign_OutInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Sign_OutInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_sign_out(inputs)
+	return __en.settings_password_sign_out(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Signed in with your password on this browser" |
+*
+* @param {Settings_Password_This_BrowserInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_this_browser = /** @type {((inputs?: Settings_Password_This_BrowserInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_This_BrowserInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_this_browser(inputs)
+	return __en.settings_password_this_browser(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Signing out here asks for the password again in this browser." |
+*
+* @param {Settings_Password_This_Browser_SubInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_this_browser_sub = /** @type {((inputs?: Settings_Password_This_Browser_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_This_Browser_SubInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_this_browser_sub(inputs)
+	return __en.settings_password_this_browser_sub(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The new password needs at least 10 characters." |
+*
+* @param {Settings_Password_Too_ShortInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_too_short = /** @type {((inputs?: Settings_Password_Too_ShortInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_Too_ShortInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_too_short(inputs)
+	return __en.settings_password_too_short(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Could not reach this Decks." |
+*
+* @param {Settings_Password_UnreachableInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const settings_password_unreachable = /** @type {((inputs?: Settings_Password_UnreachableInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Settings_Password_UnreachableInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.settings_password_unreachable(inputs)
+	return __en.settings_password_unreachable(inputs)
 });
 /**
 * | output |

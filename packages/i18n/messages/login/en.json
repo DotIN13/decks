@@ -1,0 +1,30 @@
+{
+	"login_document_title": "Log in · Decks",
+	"login_sub": "Log in with this Decks's password.",
+	"login_password_label": "Password",
+	"login_submit": "Log in",
+	"login_wrong": "That password is not right.",
+	"login_wait": [
+		{
+			"declarations": ["input count", "local n = count: plural"],
+			"selectors": ["n"],
+			"match": {
+				"n=one": "Too many tries. Try again in {count} second.",
+				"n=other": "Too many tries. Try again in {count} seconds."
+			}
+		}
+	],
+	"login_unreachable": "Could not reach this Decks. Check the connection and try again.",
+	"login_failed": "Could not log in: {why}",
+	"login_approve_first": "A terminal asks to sign in to this Decks. Log in first to approve it.",
+	"login_approve_title": "Let {label} into this Decks?",
+	"login_approve_title_plain": "Let a terminal into this Decks?",
+	"login_approve_sub": "Approve only if you started this in your terminal just now. It will act as you.",
+	"login_approve_code": "Code {code}",
+	"login_approve": "Approve",
+	"login_cancel": "Cancel",
+	"login_approved": "Approved. You can go back to the terminal.",
+	"login_cancelled": "Not approved. You can close this tab.",
+	"login_code_unknown": "This code is unknown or has expired. Run decks login in the terminal again.",
+	"login_open_decks": "Open Decks"
+}

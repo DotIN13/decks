@@ -166,7 +166,9 @@ async function trade(body, bearer) {
  * the terminal's own. Asked for a code only when neither works and there is someone to ask.
  */
 async function login(words) {
-	let code = words.find((word) => /\d/.test(word))?.replace(/\D/g, "") ?? "";
+	let code = words.find((word) => !/^https?:\/\//.test(word) && /\d/.test(word))?.replace(/\D/g, "") ?? "";
+	// A harness locked with a password (`auth/password.ts`), reached from elsewhere: let in from a logged-in browser rather than by a code.
+	if (!code && (words.some((word) => /^https?:\/\//.test(word)) || !cliToken().token) && (await passwordSet())) return deviceLogin();
 	if (!code) {
 		const local = cliToken();
 		if (local.token && !sameHarness(local.url)) {
@@ -189,6 +191,90 @@ async function login(words) {
 	if (!traded.ok) throw new DecksError(traded.answer.error || `Decks answered ${traded.status}`);
 	writeTokens({ ...readTokens(), [harness()]: traded.answer.token });
 	return `Logged in to ${traded.answer.name ?? harness()}. The token is in ${tokenFile()}.`;
+}
+
+/** Whether the harness is locked with a password: then a terminal elsewhere is let in from a browser. */
+async function passwordSet() {
+	try {
+		const state = await (await fetch(`${harness()}/api/login/state`)).json();
+		return state.password === true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * `decks login https://host` on a Decks locked with a password: the harness gives a code and a link,
+ * the person opens the link in a browser where they are logged in and presses Approve, and this asks
+ * every two seconds until it is given the terminal's token. No password is typed here.
+ */
+async function deviceLogin() {
+	const post = (path, body) => fetch(`${harness()}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+	const started = await (await post("/api/login/device", { label: `decks login on ${hostname()}` })).json();
+	if (!started.id) throw new DecksError(started.error || `Decks at ${harness()} did not start a login.`);
+	err(`To let this terminal in, open ${harness()}${started.url}\nin a browser where you are logged in to Decks, check the code is ${started.code}, and press Approve.`);
+	while (Date.now() < started.expires) {
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+		const response = await post("/api/login/device/poll", { id: started.id });
+		const answer = await response.json().catch(() => ({}));
+		if (response.status === 410) break;
+		if (answer.token) {
+			writeTokens({ ...readTokens(), [harness()]: answer.token });
+			return `Logged in to ${answer.name ?? harness()}. The token is in ${tokenFile()}${process.env.DECKS_URL ? `; set DECKS_URL=${harness()} for the commands that follow` : ""}.`;
+		}
+	}
+	throw new DecksError("Nobody approved this login in time. Run decks login again.");
+}
+
+/** A line typed at the terminal without showing it: raw mode before the prompt, so nothing typed early is echoed. */
+function askHidden(prompt) {
+	if (!process.stdin.isTTY) throw new DecksError("decks password set reads the password from a terminal, typed twice.");
+	process.stdin.setRawMode(true);
+	process.stderr.write(prompt);
+	return new Promise((resolve, reject) => {
+		let typed = "";
+		const done = (error) => {
+			process.stdin.off("data", onData);
+			process.stdin.setRawMode(false);
+			process.stdin.pause();
+			process.stderr.write("\n");
+			if (error) reject(error);
+			else resolve(typed);
+		};
+		const onData = (chunk) => {
+			for (const char of chunk.toString("utf8")) {
+				if (char === "\r" || char === "\n") return done();
+				if (char === "\u0003") return done(new DecksError("Cancelled."));
+				if (char === "\u007f" || char === "\b") typed = typed.slice(0, -1);
+				else typed += char;
+			}
+		};
+		process.stdin.on("data", onData);
+		process.stdin.resume();
+	});
+}
+
+/**
+ * `decks password set` and `decks password remove`, on the harness's own machine: the token the harness
+ * keeps for its own user is the proof (`cli-token.ts`), so no old password is asked. With a password
+ * set, a browser logs in before the page gives it access (`auth/password.ts`).
+ */
+async function password(words) {
+	const local = cliToken();
+	if (!local.token || !sameHarness(local.url)) throw new DecksError(`decks password works on the harness's own machine, as the user it runs as: it reads the token the harness keeps in ${local.file}. From elsewhere, change the password in Settings, Accounts.`);
+	const what = words[0] ?? "set";
+	let body;
+	if (what === "remove") body = { password: null };
+	else if (what === "set") {
+		const first = await askHidden("New password (10 characters or more): ");
+		const again = await askHidden("The same again: ");
+		if (first !== again) throw new DecksError("The two did not match. Nothing changed.");
+		body = { password: first };
+	} else throw new DecksError("decks password set, or decks password remove.");
+	const response = await fetch(`${harness()}/api/password`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${local.token}` }, body: JSON.stringify(body) });
+	const answer = await response.json().catch(() => ({}));
+	if (!response.ok) throw new DecksError(answer.error || `Decks answered ${response.status}`);
+	return answer.password ? `The password is set. A browser now logs in at ${harness()}/login before Decks opens, and terminals elsewhere log in with decks login ${harness()}.` : "The password is taken away: Decks opens without one again.";
 }
 
 /** `decks logout`: the harness takes the token back, and it is gone from `~/.decks/token`. */
@@ -240,6 +326,7 @@ export function help(verb) {
 	lines.push("decks mcp is Decks as an MCP server for Claude Code, Codex or Cursor (claude mcp add decks -- decks mcp): it finds or starts Decks, and joins the canvas as an agent named for the client and its folder.");
 	lines.push("decks server [status|start|stop|restart|logs] finds this user's Decks and starts or stops it. A command at a terminal starts it by itself when none is running.");
 	lines.push("decks login [code] signs this terminal in as the person: with no code on the harness's own machine, else with a code from decks pair code; decks logout signs it out.");
+	lines.push("decks login https://host signs in to a Decks locked with a password: approve it in a browser where you are logged in. decks password set (or remove), on the harness's machine, sets the password a browser logs in with.");
 	lines.push("decks help <command> says more about one. DECKS_URL says where Decks is; DECKS_TOKEN, or the token decks login kept, says who is calling.");
 	return lines.join("\n");
 }
@@ -367,6 +454,11 @@ async function main(argv) {
 		await serve();
 		return 0;
 	}
+	// `decks login https://host`: that harness, for this command and for the token it keeps.
+	if (words[0] === "login") {
+		const url = words.slice(1).find((word) => /^https?:\/\//.test(word));
+		if (url) process.env.DECKS_URL = url.replace(/\/+$/, "");
+	}
 	// A terminal the environment told nothing: find this user's Decks, and start it when there is none.
 	if (!process.env.DECKS_URL && process.env.DECKS_AUTOSTART !== "0") {
 		const ready = await ensureServer();
@@ -374,6 +466,10 @@ async function main(argv) {
 	}
 	if (words[0] === "login") {
 		err(await login(words.slice(1)));
+		return 0;
+	}
+	if (words[0] === "password") {
+		err(await password(words.slice(1)));
 		return 0;
 	}
 	if (words[0] === "logout") {

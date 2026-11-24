@@ -14,6 +14,7 @@ import type { App } from "../app.ts";
 import { guard } from "../auth/guard.ts";
 import { extraHosts, hostAllowed, hostRefusal } from "../auth/hosts.ts";
 import { doorRoutes, isTopNavigation, tabToken, withSession } from "../auth/issue.ts";
+import { locked, lockForwards, loggedIn, loginPage, loginRoutes } from "../auth/login.ts";
 import { actsAsPerson } from "../auth/principal.ts";
 import { Relay } from "../share/relay.ts";
 import { asyncRoute } from "./routes/shared.ts";
@@ -43,6 +44,11 @@ function pageShell(app: App, webDist: string) {
 		res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
 		res.setHeader("Vary", "Sec-Fetch-Dest, Sec-Fetch-Mode");
 		const tab = isTopNavigation(req.headers);
+		// With a password set, a tab is given its token only in a browser that logged in (`auth/login.ts`); any other is sent to log in.
+		if (tab && locked(app) && !loggedIn(app, req)) {
+			res.redirect(302, `/login${req.originalUrl && req.originalUrl !== "/" ? `?next=${encodeURIComponent(req.originalUrl)}` : ""}`);
+			return;
+		}
 		if (tab && app.addresses.seen(`${String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim() || req.protocol}://${String(req.headers.host ?? "")}`)) app.addressesChanged?.();
 		res.type("html").send(tab ? withSession(html, tabToken(app.tokens)) : html);
 	};
@@ -84,6 +90,7 @@ export function createHttpApp(app: App): Express {
 	 * Forwarded ports first (`ports.ts`), before any body is read: the request is somebody
 	 * else's server's, and a JSON parser here would eat the body it is waiting for.
 	 */
+	server.use(lockForwards(app));
 	server.use((req, res, next) => {
 		if (!forwardRequest(req, res, app.forwards)) next();
 	});
@@ -120,6 +127,8 @@ export function createHttpApp(app: App): Express {
 	api.use("/v1", verbRoutes(app));
 	// The doors, where tokens are handed out (`auth/issue.ts`).
 	api.use(doorRoutes(app));
+	// Logging in with the password, and letting a terminal in from a browser (`auth/login.ts`).
+	api.use(loginRoutes(app));
 	const relay = new Relay(join(app.deck.path, ".decks", "relay.json"));
 	server.all("/c/:id/*rest", asyncRoute((req, res) => relay.pass(req, res)));
 
@@ -150,6 +159,7 @@ export function createHttpApp(app: App): Express {
 	const shell = pageShell(app, webDist);
 	if (existsSync(webDist)) {
 		server.get(["/", "/index.html"], (req, res, next) => void shell(req, res).catch(next));
+		server.get("/login", loginPage(app, webDist));
 		// Compressed and cached by name first (`static.ts`); anything it passes on is sent plain,
 		// with the same cache rule.
 		/*

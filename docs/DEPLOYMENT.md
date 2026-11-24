@@ -326,6 +326,60 @@ Two more notes:
   every start; saving would freeze that moment's rules into a snapshot restored at boot. It
   also means you generally need no firewall rule of your own — the mesh client adds one.
 
+### On the public internet: a password, and Caddy in front
+
+A private network is the safer home, and nothing above needs a password. To reach Decks from
+anywhere instead, on a public server with a name and a port, lock it with a password first and
+put Caddy in front for HTTPS. Without a password, anyone who loads the page is given the
+person's access, and the person's access runs agents, which run shell commands on the machine.
+
+**1. Set the password**, on the server, as the service user, with Decks running:
+
+```bash
+decks password set          # typed twice, 10 characters or more; decks password remove takes it away
+```
+
+It is kept as a scrypt hash in the data folder (`password.json`), outside the deck, so Studio
+never syncs it. From then on:
+
+- the page sends a browser that has not logged in to `/login`; logging in sets an HttpOnly
+  cookie that lasts thirty days while it is used, and the page gives that browser its token as
+  before (`apps/server/src/auth/password.ts`, `login.ts`);
+- forwarded ports (`/node/…`, `/rnode/…`) need the login too, and nothing pairs without a code;
+- five wrong tries from one address make it wait 30 s, doubling to an hour;
+- Settings, Accounts changes the password (with the current one), signs this browser out, or
+  signs out every browser and terminal at once;
+- a terminal elsewhere logs in with `decks login https://decks.example.com`: it prints a link,
+  you open it in a browser where you are logged in and press Approve. `decks pair code` still
+  works on the machine itself.
+
+**2. Run Decks on loopback, telling it its name and to believe Caddy** (in the unit of §7):
+
+```ini
+Environment=DECKS_HOST=127.0.0.1
+Environment=DECKS_PORT=4329
+# The name Caddy serves it on, so the Host check lets it through (auth/hosts.ts).
+Environment=DECKS_HOSTS=decks.example.com
+# Caddy's X-Forwarded-For and -Proto are believed: wrong tries are counted per visitor, and the cookie is Secure.
+Environment=DECKS_TRUST_PROXY=1
+```
+
+Set `DECKS_TRUST_PROXY` only when Decks listens on loopback behind the proxy: a Decks anyone
+can reach directly would believe a header anyone can write.
+
+**3. Caddy**, which gets the certificate itself and passes WebSockets through unchanged:
+
+```caddyfile
+decks.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:4329
+}
+```
+
+Open ports 80 and 443 for Caddy, and nothing for 4329. A password is refused over plain HTTP
+from anywhere but the machine itself or a private address, so a misconfigured proxy fails
+closed rather than sending it in the clear.
+
 ## 9. The clients
 
 A `.ts.net` name resolves only for devices with MagicDNS enabled. Mobile clients usually

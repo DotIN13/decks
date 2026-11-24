@@ -1140,6 +1140,25 @@
 /** @typedef {{ percent: NonNullable<unknown> }} Frame_Zoom_AtInputs */
 /** @typedef {{}} Frame_Zoom_InInputs */
 /** @typedef {{}} Frame_Zoom_OutInputs */
+/** @typedef {{}} Login_ApproveInputs */
+/** @typedef {{ code: NonNullable<unknown> }} Login_Approve_CodeInputs */
+/** @typedef {{}} Login_Approve_FirstInputs */
+/** @typedef {{}} Login_Approve_SubInputs */
+/** @typedef {{ label: NonNullable<unknown> }} Login_Approve_TitleInputs */
+/** @typedef {{}} Login_Approve_Title_PlainInputs */
+/** @typedef {{}} Login_ApprovedInputs */
+/** @typedef {{}} Login_CancelInputs */
+/** @typedef {{}} Login_CancelledInputs */
+/** @typedef {{}} Login_Code_UnknownInputs */
+/** @typedef {{}} Login_Document_TitleInputs */
+/** @typedef {{ why: NonNullable<unknown> }} Login_FailedInputs */
+/** @typedef {{}} Login_Open_DecksInputs */
+/** @typedef {{}} Login_Password_LabelInputs */
+/** @typedef {{}} Login_SubInputs */
+/** @typedef {{}} Login_SubmitInputs */
+/** @typedef {{}} Login_UnreachableInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Login_WaitInputs */
+/** @typedef {{}} Login_WrongInputs */
 /** @typedef {{}} Markup_CloseInputs */
 /** @typedef {{}} Markup_Close_TitleInputs */
 /** @typedef {{}} Markup_CommentInputs */
@@ -1285,6 +1304,31 @@
 /** @typedef {{ name: NonNullable<unknown> }} Settings_Language_BrowserInputs */
 /** @typedef {{}} Settings_Language_RowInputs */
 /** @typedef {{}} Settings_Language_SubInputs */
+/** @typedef {{}} Settings_Password_ChangeInputs */
+/** @typedef {{}} Settings_Password_Change_ButtonInputs */
+/** @typedef {{}} Settings_Password_Change_SubInputs */
+/** @typedef {{}} Settings_Password_ChangedInputs */
+/** @typedef {{}} Settings_Password_CurrentInputs */
+/** @typedef {{}} Settings_Password_EverywhereInputs */
+/** @typedef {{}} Settings_Password_Everywhere_ButtonInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_BodyInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_NoInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_TitleInputs */
+/** @typedef {{}} Settings_Password_Everywhere_Confirm_YesInputs */
+/** @typedef {{}} Settings_Password_Everywhere_SubInputs */
+/** @typedef {{}} Settings_Password_GroupInputs */
+/** @typedef {{}} Settings_Password_MismatchInputs */
+/** @typedef {{}} Settings_Password_NewInputs */
+/** @typedef {{}} Settings_Password_NoneInputs */
+/** @typedef {{}} Settings_Password_None_SubInputs */
+/** @typedef {{}} Settings_Password_Not_This_BrowserInputs */
+/** @typedef {{}} Settings_Password_Not_This_Browser_SubInputs */
+/** @typedef {{}} Settings_Password_RepeatInputs */
+/** @typedef {{}} Settings_Password_Sign_OutInputs */
+/** @typedef {{}} Settings_Password_This_BrowserInputs */
+/** @typedef {{}} Settings_Password_This_Browser_SubInputs */
+/** @typedef {{}} Settings_Password_Too_ShortInputs */
+/** @typedef {{}} Settings_Password_UnreachableInputs */
 /** @typedef {{}} Settings_Section_AccountsInputs */
 /** @typedef {{}} Settings_Section_ConnectionsInputs */
 /** @typedef {{}} Settings_Section_GeneralInputs */
@@ -6042,6 +6086,82 @@ export const frame_zoom_out = /** @type {(inputs: Frame_Zoom_OutInputs) => Local
 	return /** @type {LocalizedString} */ (`缩小`)
 };
 
+export const login_approve = /** @type {(inputs: Login_ApproveInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`批准`)
+};
+
+export const login_approve_code = /** @type {(inputs: Login_Approve_CodeInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`代码 ${i?.code}`)
+};
+
+export const login_approve_first = /** @type {(inputs: Login_Approve_FirstInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`有终端请求登录此 Decks。请先登录，再批准。`)
+};
+
+export const login_approve_sub = /** @type {(inputs: Login_Approve_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`仅当你刚在终端里发起时才批准。它将以你的身份操作。`)
+};
+
+export const login_approve_title = /** @type {(inputs: Login_Approve_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`允许 ${i?.label} 访问此 Decks？`)
+};
+
+export const login_approve_title_plain = /** @type {(inputs: Login_Approve_Title_PlainInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`允许终端访问此 Decks？`)
+};
+
+export const login_approved = /** @type {(inputs: Login_ApprovedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`已批准。现在可以回到终端了。`)
+};
+
+export const login_cancel = /** @type {(inputs: Login_CancelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`取消`)
+};
+
+export const login_cancelled = /** @type {(inputs: Login_CancelledInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`未批准。可以关闭此标签页。`)
+};
+
+export const login_code_unknown = /** @type {(inputs: Login_Code_UnknownInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`此代码无效或已过期。请在终端里重新运行 decks login。`)
+};
+
+export const login_document_title = /** @type {(inputs: Login_Document_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`登录 · Decks`)
+};
+
+export const login_failed = /** @type {(inputs: Login_FailedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`无法登录：${i?.why}`)
+};
+
+export const login_open_decks = /** @type {(inputs: Login_Open_DecksInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`打开 Decks`)
+};
+
+export const login_password_label = /** @type {(inputs: Login_Password_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`密码`)
+};
+
+export const login_sub = /** @type {(inputs: Login_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`输入此 Decks 的密码登录。`)
+};
+
+export const login_submit = /** @type {(inputs: Login_SubmitInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`登录`)
+};
+
+export const login_unreachable = /** @type {(inputs: Login_UnreachableInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`无法连接此 Decks。请检查网络后重试。`)
+};
+
+export const login_wait = /** @type {(inputs: Login_WaitInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`尝试次数过多，请在 ${i?.count} 秒后重试。`)
+};
+
+export const login_wrong = /** @type {(inputs: Login_WrongInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`密码不正确。`)
+};
+
 export const markup_close = /** @type {(inputs: Markup_CloseInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`关闭`)
 };
@@ -6620,6 +6740,106 @@ export const settings_language_row = /** @type {(inputs: Settings_Language_RowIn
 
 export const settings_language_sub = /** @type {(inputs: Settings_Language_SubInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Decks 在此浏览器上显示的语言。更改后页面会重新加载。`)
+};
+
+export const settings_password_change = /** @type {(inputs: Settings_Password_ChangeInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`更改密码`)
+};
+
+export const settings_password_change_button = /** @type {(inputs: Settings_Password_Change_ButtonInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`更改`)
+};
+
+export const settings_password_change_sub = /** @type {(inputs: Settings_Password_Change_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`至少 10 个字符。已登录的浏览器保持登录。`)
+};
+
+export const settings_password_changed = /** @type {(inputs: Settings_Password_ChangedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`密码已更改。`)
+};
+
+export const settings_password_current = /** @type {(inputs: Settings_Password_CurrentInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`当前密码`)
+};
+
+export const settings_password_everywhere = /** @type {(inputs: Settings_Password_EverywhereInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`在所有设备上退出登录`)
+};
+
+export const settings_password_everywhere_button = /** @type {(inputs: Settings_Password_Everywhere_ButtonInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`全部退出`)
+};
+
+export const settings_password_everywhere_confirm_body = /** @type {(inputs: Settings_Password_Everywhere_Confirm_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`所有用密码登录的浏览器和终端（包括这个）都需要重新登录。`)
+};
+
+export const settings_password_everywhere_confirm_no = /** @type {(inputs: Settings_Password_Everywhere_Confirm_NoInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`取消`)
+};
+
+export const settings_password_everywhere_confirm_title = /** @type {(inputs: Settings_Password_Everywhere_Confirm_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`在所有设备上退出登录？`)
+};
+
+export const settings_password_everywhere_confirm_yes = /** @type {(inputs: Settings_Password_Everywhere_Confirm_YesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`全部退出`)
+};
+
+export const settings_password_everywhere_sub = /** @type {(inputs: Settings_Password_Everywhere_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`所有用密码登录的浏览器和终端都需要重新登录。`)
+};
+
+export const settings_password_group = /** @type {(inputs: Settings_Password_GroupInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`密码`)
+};
+
+export const settings_password_mismatch = /** @type {(inputs: Settings_Password_MismatchInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`两次输入的新密码不一致。`)
+};
+
+export const settings_password_new = /** @type {(inputs: Settings_Password_NewInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`新密码`)
+};
+
+export const settings_password_none = /** @type {(inputs: Settings_Password_NoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`未设置密码`)
+};
+
+export const settings_password_none_sub = /** @type {(inputs: Settings_Password_None_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`在这台 Mac 上用 decks password set 设置`)
+};
+
+export const settings_password_not_this_browser = /** @type {(inputs: Settings_Password_Not_This_BrowserInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`此浏览器未用密码登录`)
+};
+
+export const settings_password_not_this_browser_sub = /** @type {(inputs: Settings_Password_Not_This_Browser_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`它通过其他方式访问此 Decks，例如就在这台 Mac 上。`)
+};
+
+export const settings_password_repeat = /** @type {(inputs: Settings_Password_RepeatInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`再次输入新密码`)
+};
+
+export const settings_password_sign_out = /** @type {(inputs: Settings_Password_Sign_OutInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`退出登录`)
+};
+
+export const settings_password_this_browser = /** @type {(inputs: Settings_Password_This_BrowserInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`此浏览器已用密码登录`)
+};
+
+export const settings_password_this_browser_sub = /** @type {(inputs: Settings_Password_This_Browser_SubInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`在此退出登录后，此浏览器需要重新输入密码。`)
+};
+
+export const settings_password_too_short = /** @type {(inputs: Settings_Password_Too_ShortInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`新密码至少需要 10 个字符。`)
+};
+
+export const settings_password_unreachable = /** @type {(inputs: Settings_Password_UnreachableInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`无法连接此 Decks。`)
 };
 
 export const settings_section_accounts = /** @type {(inputs: Settings_Section_AccountsInputs) => LocalizedString} */ () => {

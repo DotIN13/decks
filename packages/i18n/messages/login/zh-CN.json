@@ -1,0 +1,29 @@
+{
+	"login_document_title": "登录 · Decks",
+	"login_sub": "输入此 Decks 的密码登录。",
+	"login_password_label": "密码",
+	"login_submit": "登录",
+	"login_wrong": "密码不正确。",
+	"login_wait": [
+		{
+			"declarations": ["input count", "local n = count: plural"],
+			"selectors": ["n"],
+			"match": {
+				"n=other": "尝试次数过多，请在 {count} 秒后重试。"
+			}
+		}
+	],
+	"login_unreachable": "无法连接此 Decks。请检查网络后重试。",
+	"login_failed": "无法登录：{why}",
+	"login_approve_first": "有终端请求登录此 Decks。请先登录，再批准。",
+	"login_approve_title": "允许 {label} 访问此 Decks？",
+	"login_approve_title_plain": "允许终端访问此 Decks？",
+	"login_approve_sub": "仅当你刚在终端里发起时才批准。它将以你的身份操作。",
+	"login_approve_code": "代码 {code}",
+	"login_approve": "批准",
+	"login_cancel": "取消",
+	"login_approved": "已批准。现在可以回到终端了。",
+	"login_cancelled": "未批准。可以关闭此标签页。",
+	"login_code_unknown": "此代码无效或已过期。请在终端里重新运行 decks login。",
+	"login_open_decks": "打开 Decks"
+}

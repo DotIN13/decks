@@ -14,6 +14,7 @@ import User from "lucide-solid/icons/user";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js";
 import { StudioGroup } from "./StudioSignIn.tsx";
+import { PasswordGroup } from "./PasswordGroup.tsx";
 import { SetGroup, SetRow, SetSegments, SetSelect } from "./rows.tsx";
 import { browserZone, clockTime, Icon } from "@decks/ui";
 import { browserLocale, chooseLocale, chosenLocale, formatAgo, formatNumber, LANGUAGES, m, type Locale } from "@decks/i18n";
@@ -118,6 +119,7 @@ export function Settings(props: {
 				</Match>
 				<Match when={section() === "accounts"}>
 					<StudioGroup />
+					<PasswordGroup />
 				</Match>
 				<Match when={section() === "claude"}>
 					<ClaudeAccounts accounts={props.accounts} active={props.active} onAdd={props.onAdd} onForget={props.onForget} />

@@ -8007,6 +8007,140 @@ export const frame_zoom_out: ((inputs?: Frame_Zoom_OutInputs, options?: { locale
 /**
 * | output |
 * | --- |
+* | "Approve" |
+*
+*/
+export const login_approve: ((inputs?: Login_ApproveInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_ApproveInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Code {code}" |
+*
+*/
+export const login_approve_code: ((inputs: Login_Approve_CodeInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Approve_CodeInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "A terminal asks to sign in to this Decks. Log in first to approve it." |
+*
+*/
+export const login_approve_first: ((inputs?: Login_Approve_FirstInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Approve_FirstInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Approve only if you started this in your terminal just now. It will act as you." |
+*
+*/
+export const login_approve_sub: ((inputs?: Login_Approve_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Approve_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Let {label} into this Decks?" |
+*
+*/
+export const login_approve_title: ((inputs: Login_Approve_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Approve_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Let a terminal into this Decks?" |
+*
+*/
+export const login_approve_title_plain: ((inputs?: Login_Approve_Title_PlainInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Approve_Title_PlainInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Approved. You can go back to the terminal." |
+*
+*/
+export const login_approved: ((inputs?: Login_ApprovedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_ApprovedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Cancel" |
+*
+*/
+export const login_cancel: ((inputs?: Login_CancelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_CancelInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Not approved. You can close this tab." |
+*
+*/
+export const login_cancelled: ((inputs?: Login_CancelledInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_CancelledInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "This code is unknown or has expired. Run decks login in the terminal again." |
+*
+*/
+export const login_code_unknown: ((inputs?: Login_Code_UnknownInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Code_UnknownInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Log in · Decks" |
+*
+*/
+export const login_document_title: ((inputs?: Login_Document_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Document_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Could not log in: {why}" |
+*
+*/
+export const login_failed: ((inputs: Login_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_FailedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Open Decks" |
+*
+*/
+export const login_open_decks: ((inputs?: Login_Open_DecksInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Open_DecksInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Password" |
+*
+*/
+export const login_password_label: ((inputs?: Login_Password_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_Password_LabelInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Log in with this Decks's password." |
+*
+*/
+export const login_sub: ((inputs?: Login_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Log in" |
+*
+*/
+export const login_submit: ((inputs?: Login_SubmitInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_SubmitInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Could not reach this Decks. Check the connection and try again." |
+*
+*/
+export const login_unreachable: ((inputs?: Login_UnreachableInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_UnreachableInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | n | output |
+* | --- | --- |
+* | "one" | "Too many tries. Try again in {count} second." |
+* | "other" | "Too many tries. Try again in {count} seconds." |
+*
+*/
+export const login_wait: ((inputs: Login_WaitInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_WaitInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "That password is not right." |
+*
+*/
+export const login_wrong: ((inputs?: Login_WrongInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Login_WrongInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Close" |
 *
 */
@@ -9021,6 +9155,181 @@ export const settings_language_row: ((inputs?: Settings_Language_RowInputs, opti
 *
 */
 export const settings_language_sub: ((inputs?: Settings_Language_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Language_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Change password" |
+*
+*/
+export const settings_password_change: ((inputs?: Settings_Password_ChangeInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_ChangeInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Change" |
+*
+*/
+export const settings_password_change_button: ((inputs?: Settings_Password_Change_ButtonInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Change_ButtonInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "At least 10 characters. Browsers already signed in stay signed in." |
+*
+*/
+export const settings_password_change_sub: ((inputs?: Settings_Password_Change_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Change_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Password changed." |
+*
+*/
+export const settings_password_changed: ((inputs?: Settings_Password_ChangedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_ChangedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Current password" |
+*
+*/
+export const settings_password_current: ((inputs?: Settings_Password_CurrentInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_CurrentInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign out everywhere" |
+*
+*/
+export const settings_password_everywhere: ((inputs?: Settings_Password_EverywhereInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_EverywhereInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign out all" |
+*
+*/
+export const settings_password_everywhere_button: ((inputs?: Settings_Password_Everywhere_ButtonInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Everywhere_ButtonInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Every browser and terminal that logged in with the password, this one too, has to log in again." |
+*
+*/
+export const settings_password_everywhere_confirm_body: ((inputs?: Settings_Password_Everywhere_Confirm_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Everywhere_Confirm_BodyInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Cancel" |
+*
+*/
+export const settings_password_everywhere_confirm_no: ((inputs?: Settings_Password_Everywhere_Confirm_NoInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Everywhere_Confirm_NoInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign out everywhere?" |
+*
+*/
+export const settings_password_everywhere_confirm_title: ((inputs?: Settings_Password_Everywhere_Confirm_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Everywhere_Confirm_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign out everywhere" |
+*
+*/
+export const settings_password_everywhere_confirm_yes: ((inputs?: Settings_Password_Everywhere_Confirm_YesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Everywhere_Confirm_YesInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Every browser and terminal that logged in with the password has to log in again." |
+*
+*/
+export const settings_password_everywhere_sub: ((inputs?: Settings_Password_Everywhere_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Everywhere_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Password" |
+*
+*/
+export const settings_password_group: ((inputs?: Settings_Password_GroupInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_GroupInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "The two new passwords are not the same." |
+*
+*/
+export const settings_password_mismatch: ((inputs?: Settings_Password_MismatchInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_MismatchInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "New password" |
+*
+*/
+export const settings_password_new: ((inputs?: Settings_Password_NewInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_NewInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "No password is set" |
+*
+*/
+export const settings_password_none: ((inputs?: Settings_Password_NoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_NoneInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Set one on this Mac with decks password set" |
+*
+*/
+export const settings_password_none_sub: ((inputs?: Settings_Password_None_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_None_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "This browser is not signed in with the password" |
+*
+*/
+export const settings_password_not_this_browser: ((inputs?: Settings_Password_Not_This_BrowserInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Not_This_BrowserInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "It reaches this Decks another way, such as from this Mac itself." |
+*
+*/
+export const settings_password_not_this_browser_sub: ((inputs?: Settings_Password_Not_This_Browser_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Not_This_Browser_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Repeat new password" |
+*
+*/
+export const settings_password_repeat: ((inputs?: Settings_Password_RepeatInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_RepeatInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Sign out" |
+*
+*/
+export const settings_password_sign_out: ((inputs?: Settings_Password_Sign_OutInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Sign_OutInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Signed in with your password on this browser" |
+*
+*/
+export const settings_password_this_browser: ((inputs?: Settings_Password_This_BrowserInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_This_BrowserInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Signing out here asks for the password again in this browser." |
+*
+*/
+export const settings_password_this_browser_sub: ((inputs?: Settings_Password_This_Browser_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_This_Browser_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "The new password needs at least 10 characters." |
+*
+*/
+export const settings_password_too_short: ((inputs?: Settings_Password_Too_ShortInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_Too_ShortInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Could not reach this Decks." |
+*
+*/
+export const settings_password_unreachable: ((inputs?: Settings_Password_UnreachableInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Settings_Password_UnreachableInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
 * | --- |
@@ -11532,6 +11841,25 @@ export type Frame_ZoomInputs = {};
 export type Frame_Zoom_AtInputs = { percent: NonNullable<unknown> };
 export type Frame_Zoom_InInputs = {};
 export type Frame_Zoom_OutInputs = {};
+export type Login_ApproveInputs = {};
+export type Login_Approve_CodeInputs = { code: NonNullable<unknown> };
+export type Login_Approve_FirstInputs = {};
+export type Login_Approve_SubInputs = {};
+export type Login_Approve_TitleInputs = { label: NonNullable<unknown> };
+export type Login_Approve_Title_PlainInputs = {};
+export type Login_ApprovedInputs = {};
+export type Login_CancelInputs = {};
+export type Login_CancelledInputs = {};
+export type Login_Code_UnknownInputs = {};
+export type Login_Document_TitleInputs = {};
+export type Login_FailedInputs = { why: NonNullable<unknown> };
+export type Login_Open_DecksInputs = {};
+export type Login_Password_LabelInputs = {};
+export type Login_SubInputs = {};
+export type Login_SubmitInputs = {};
+export type Login_UnreachableInputs = {};
+export type Login_WaitInputs = { count: NonNullable<unknown> };
+export type Login_WrongInputs = {};
 export type Markup_CloseInputs = {};
 export type Markup_Close_TitleInputs = {};
 export type Markup_CommentInputs = {};
@@ -11677,6 +12005,31 @@ export type Settings_LanguageInputs = {};
 export type Settings_Language_BrowserInputs = { name: NonNullable<unknown> };
 export type Settings_Language_RowInputs = {};
 export type Settings_Language_SubInputs = {};
+export type Settings_Password_ChangeInputs = {};
+export type Settings_Password_Change_ButtonInputs = {};
+export type Settings_Password_Change_SubInputs = {};
+export type Settings_Password_ChangedInputs = {};
+export type Settings_Password_CurrentInputs = {};
+export type Settings_Password_EverywhereInputs = {};
+export type Settings_Password_Everywhere_ButtonInputs = {};
+export type Settings_Password_Everywhere_Confirm_BodyInputs = {};
+export type Settings_Password_Everywhere_Confirm_NoInputs = {};
+export type Settings_Password_Everywhere_Confirm_TitleInputs = {};
+export type Settings_Password_Everywhere_Confirm_YesInputs = {};
+export type Settings_Password_Everywhere_SubInputs = {};
+export type Settings_Password_GroupInputs = {};
+export type Settings_Password_MismatchInputs = {};
+export type Settings_Password_NewInputs = {};
+export type Settings_Password_NoneInputs = {};
+export type Settings_Password_None_SubInputs = {};
+export type Settings_Password_Not_This_BrowserInputs = {};
+export type Settings_Password_Not_This_Browser_SubInputs = {};
+export type Settings_Password_RepeatInputs = {};
+export type Settings_Password_Sign_OutInputs = {};
+export type Settings_Password_This_BrowserInputs = {};
+export type Settings_Password_This_Browser_SubInputs = {};
+export type Settings_Password_Too_ShortInputs = {};
+export type Settings_Password_UnreachableInputs = {};
 export type Settings_Section_AccountsInputs = {};
 export type Settings_Section_ConnectionsInputs = {};
 export type Settings_Section_GeneralInputs = {};

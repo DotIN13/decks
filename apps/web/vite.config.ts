@@ -134,6 +134,7 @@ export default defineConfig({
 	/*
 	 * Three pages: the app, `shot.html`, the page the server's own Chromium loads to take a picture
 	 * of a stage, and `measure.html`, where it measures a card no canvas has (`server/stage/shots.ts`).
+	 * And `login.html`, the password login the server serves at `/login` to anyone (`src/pages/login.tsx`).
 	 * The editor's dev page is not built.
 	 */
 	// The stage's render worker (`stage/render.worker.ts`) imports the engine's module: an ES module worker.
@@ -141,6 +142,6 @@ export default defineConfig({
 	build: {
 		target: "es2022",
 		sourcemap: true,
-		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), shot: fileURLToPath(new URL("./shot.html", import.meta.url)), measure: fileURLToPath(new URL("./measure.html", import.meta.url)), frame: fileURLToPath(new URL("./canvas-frame.html", import.meta.url)) } },
+		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), shot: fileURLToPath(new URL("./shot.html", import.meta.url)), measure: fileURLToPath(new URL("./measure.html", import.meta.url)), frame: fileURLToPath(new URL("./canvas-frame.html", import.meta.url)), login: fileURLToPath(new URL("./login.html", import.meta.url)) } },
 	},
 });
