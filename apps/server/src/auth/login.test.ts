@@ -224,3 +224,36 @@ test("the password is set on this Mac without the old one, changed elsewhere onl
 		close();
 	}
 });
+
+test("a new password signs out every other browser, keeps the one that changed it, and the log says who logged in and who changed it", async () => {
+	const { app, origin, close } = await harness("correct horse battery");
+	const said: string[] = [];
+	const warn = console.warn;
+	console.warn = (...line: unknown[]) => void said.push(line.join(" "));
+	try {
+		const logIn = async () => (await fetch(`${origin}/api/login/password`, { method: "POST", headers: json, body: JSON.stringify({ password: "correct horse battery" }) })).headers.get("set-cookie")!.split(";")[0]!;
+		const mine = await logIn();
+		const theirs = await logIn();
+		const myTab = app.tokens.issue({ kind: "person" }, { label: "Decks tab" });
+		const theirTab = app.tokens.issue({ kind: "person" }, { label: "Decks tab" });
+		const terminal = app.tokens.issue({ kind: "person" }, { label: "decks login on mini", terminal: true });
+		const changed = await fetch(`${origin}/api/password`, { method: "POST", headers: { ...json, authorization: `Bearer ${myTab.token}`, cookie: mine }, body: JSON.stringify({ current: "correct horse battery", password: "a brand new password" }) });
+		assert.deepEqual(await changed.json(), { password: true, signedOut: 2 });
+		const state = async (cookie: string) => ((await (await fetch(`${origin}/api/login/state`, { headers: { cookie } })).json()) as { loggedIn: boolean }).loggedIn;
+		assert.equal(await state(mine), true, "the browser that changed it stays in");
+		assert.equal(await state(theirs), false, "the other browser is out");
+		assert.equal(app.tokens.verify(myTab.token).ok, true);
+		assert.equal(app.tokens.verify(theirTab.token).ok, false, "and its tab");
+		assert.equal(app.tokens.verify(terminal.token).ok, true, "a terminal never knew the password, and stays");
+		const machine = app.tokens.issue({ kind: "person" }, { label: "decks login on this machine" });
+		app.cliTokenId = machine.id;
+		await fetch(`${origin}/api/password`, { method: "POST", headers: { ...json, authorization: `Bearer ${machine.token}` }, body: JSON.stringify({ password: "set again on the machine" }) });
+		assert.equal(await state(mine), false, "set on the machine: every browser is out");
+		assert.ok(said.some((line) => /a browser logged in with the password from \S+/.test(line)), said.join("\n"));
+		assert.ok(said.some((line) => /password was changed from Settings, from \S+; 2 other browser session\(s\) signed out/.test(line)), said.join("\n"));
+		assert.ok(said.some((line) => /password was set on this machine; 2 other browser session\(s\) signed out/.test(line)), said.join("\n"));
+	} finally {
+		console.warn = warn;
+		close();
+	}
+});

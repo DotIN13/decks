@@ -52,6 +52,18 @@ export function locked(app: Pick<LoginHost, "passwordLogin">): boolean {
 
 const secure = (req: Request) => overHttps(req.secure, req.headers);
 
+/**
+ * Every browser signed in, but the ones in `keep`: its login and the tabs it opened. What a new
+ * password does, so a browser that knew the old one is out; terminals and this machine's own token
+ * stay, since they never knew it. Answers how many went.
+ */
+function signOutBrowsers(app: Pick<LoginHost, "tokens">, keep: ReadonlySet<string | undefined>): number {
+	return app.tokens.revokeWhere((principal, row) => principal.kind === "person" && (row.label === LOGIN_LABEL || row.label === "Decks tab") && !keep.has(row.id));
+}
+
+/** What the log says about who did something: the address, as the proxy says when trusted. */
+const who = (req: Request) => callerOf(req.socket.remoteAddress, req.headers);
+
 export function loginRoutes(app: LoginHost): express.Router {
 	const api = express.Router();
 
@@ -76,6 +88,7 @@ export function loginRoutes(app: LoginHost): express.Router {
 		}
 		app.throttle.right(from);
 		const { token } = app.tokens.issue({ kind: "person" }, { label: LOGIN_LABEL, idle: LOGIN_IDLE_MS });
+		console.warn(`[decks] a browser logged in with the password from ${from}`);
 		res.setHeader("Set-Cookie", loginCookie(token, secure(req)));
 		res.set("cache-control", "no-store").json({ ok: true });
 	});
@@ -84,7 +97,7 @@ export function loginRoutes(app: LoginHost): express.Router {
 		if (fromAnotherSite(req.headers)) return void res.status(403).json({ error: "Log out from this Decks's own page." });
 		const cookie = loginCookieOf(req.headers);
 		const id = cookie ? app.tokens.idOf(cookie) : undefined;
-		if (id) app.tokens.revoke(id);
+		if (id && app.tokens.revoke(id)) console.warn(`[decks] a browser logged out from ${who(req)}`);
 		res.setHeader("Set-Cookie", loginCookie(undefined, secure(req)));
 		res.json({ ok: true });
 	});
@@ -92,6 +105,7 @@ export function loginRoutes(app: LoginHost): express.Router {
 	api.post("/login/everywhere", (req, res) => {
 		if (req.principal?.kind !== "person" && !(app.passwordLogin && loggedIn(app, req))) return void res.status(403).json({ error: "Only the person signs everyone out." });
 		const revoked = app.tokens.revokeWhere((principal, row) => principal.kind === "person" && !KEPT_EVERYWHERE.has(row.label ?? ""));
+		console.warn(`[decks] every browser and terminal signed out (${revoked}), asked from ${who(req)}`);
 		res.setHeader("Set-Cookie", loginCookie(undefined, secure(req)));
 		res.json({ revoked });
 	});
@@ -117,12 +131,18 @@ export function loginRoutes(app: LoginHost): express.Router {
 		if (body.password === null) {
 			if (!onThisMac) return void res.status(403).json({ error: "The password is taken away only on this Decks's Mac, with decks password remove." });
 			app.password.set(null);
+			const out = signOutBrowsers(app, new Set());
+			console.warn(`[decks] the password was taken away on this machine; ${out} browser session(s) signed out`);
 			return void res.json({ password: false });
 		}
 		const password = String(body.password ?? "");
 		if (password.length < PASSWORD_MIN) return void res.status(400).json({ error: `A password needs at least ${PASSWORD_MIN} characters.` });
 		app.password.set(password);
-		res.json({ password: true });
+		// A browser that knew the old password is signed out; the one changing it from Settings stays in.
+		const keep = onThisMac ? new Set<string>() : new Set([req.tokenId, app.tokens.idOf(loginCookieOf(req.headers))]);
+		const out = signOutBrowsers(app, keep);
+		console.warn(`[decks] the password was ${onThisMac ? "set on this machine" : `changed from Settings, from ${who(req)}`}; ${out} other browser session(s) signed out`);
+		res.json({ password: true, signedOut: out });
 	});
 
 	// --- a terminal let in from a browser ------------------------------------------------------
@@ -149,6 +169,7 @@ export function loginRoutes(app: LoginHost): express.Router {
 		const code = String(((req.body ?? {}) as { code?: unknown }).code ?? "");
 		const done = app.deviceLogins.approve(code, () => app.tokens.issue({ kind: "person" }, { label: app.deviceLogins.find(code)?.label ?? "decks login", terminal: true }).token);
 		if (!done) return void res.status(404).json({ error: "That code is wrong or has run out. Run decks login again." });
+		console.warn(`[decks] the terminal "${done.label}" was let in by a browser at ${who(req)}`);
 		res.json(done);
 	});
 

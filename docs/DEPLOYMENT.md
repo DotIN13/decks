@@ -350,6 +350,9 @@ never syncs it. With `DECKS_PASSWORD_LOGIN=1` (step 2), from then on:
 - five wrong tries from one address make it wait 30 s, doubling to an hour;
 - Settings, Accounts changes the password (with the current one), signs this browser out, or
   signs out every browser and terminal at once;
+- a new password signs out every other browser (the one that changed it stays; terminals stay);
+- the log (`journalctl -u decks`) says each login, wrong try, logout, password change and
+  terminal let in, with the address it came from;
 - a terminal elsewhere logs in with `decks login https://decks.example.com`: it prints a link,
   you open it in a browser where you are logged in and press Approve. `decks pair code` still
   works on the machine itself.
