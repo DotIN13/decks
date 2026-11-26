@@ -862,6 +862,12 @@ export class Conversation {
 				this.of.save();
 			}
 			await this.start();
+			// As for the model: a start already under way opened on the runtime's own level.
+			const backend = this.runtimeNow();
+			if (backend && backend.model()?.thinking !== level) {
+				backend.setThinking(level);
+				this.lastModel = backend.model() ?? this.lastModel;
+			}
 			this.reportModel();
 			return;
 		}
@@ -889,9 +895,11 @@ export class Conversation {
 		if (!this.backend) {
 			this.currentMode = mode;
 			this.of.save();
-			// `start()` reads the mode off the record and reports back what the runtime made
-			// of it, so there is nothing to re-read here.
+			// `start()` reads the mode off the record and reports back what the runtime made of it;
+			// a start already under way did not have it, so the runtime it opened is told now.
 			await this.start();
+			const backend = this.runtimeNow();
+			if (backend?.setMode && backend.mode?.() !== mode) await backend.setMode(mode);
 			return;
 		}
 		if (!this.backend.setMode) return;

@@ -282,6 +282,41 @@ function agentOn(
 		cleanup();
 	});
 
+	test("a thinking level or a mode chosen while a start is already under way reaches the runtime that start opened", async () => {
+		const { agent, cleanup } = agentOn([], {
+			restored: { id: "restored-7", items: [], context: [], inPlay: [], createdAt: 1 },
+		});
+		let current = { provider: "opencode-go", model: "deepseek-v4.1-flash", thinking: "max" };
+		let mode = "manual";
+		const levels: string[] = [];
+		const modes: string[] = [];
+		const runtime = {
+			sessionRef: () => undefined,
+			model: () => current,
+			setThinking: (level: string) => {
+				levels.push(level);
+				current = { ...current, thinking: level };
+			},
+			mode: () => mode,
+			setMode: async (next: string) => {
+				modes.push(next);
+				mode = next;
+			},
+		};
+		agent.conversation.start = async () => {
+			(agent.conversation as unknown as { backend: unknown }).backend = runtime;
+		};
+
+		await agent.conversation.setThinking("low");
+		(agent.conversation as unknown as { backend: unknown }).backend = undefined;
+		await agent.conversation.setMode("acceptEdits");
+
+		assert.deepEqual(levels, ["low"], "the level is put on the runtime it was not opened with");
+		assert.deepEqual(modes, ["acceptEdits"], "and so is the mode");
+		(agent.conversation as unknown as { backend: unknown }).backend = undefined;
+		cleanup();
+	});
+
 	test("a dormant chat without a recorded model recovers it from its pi session file", () => {
 		const root = mkdtempSync(join(tmpdir(), "decks-session-model-"));
 		const session = join(root, "resume.jsonl");
