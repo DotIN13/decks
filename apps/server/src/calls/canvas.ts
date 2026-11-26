@@ -7,7 +7,7 @@ import { boardOf, CARD_ITEM, type ReadMore } from "../canvas/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { serverText } from "../canvas/text.ts";
-import { blockers, cornerOf, GAP, placeBy, roomFor, slug, stepClear, type StepWay } from "@decks/deck-kit";
+import { cornerOf, GAP, placeBy, roomFor, slug, stepClear, type StepWay } from "@decks/deck-kit";
 import type { ShotFormat, ShotOf } from "../canvas/shots.ts";
 import { fitOn } from "./fit.ts";
 import { documentItemPath } from "../docs/item-path.ts";
@@ -19,6 +19,7 @@ import { exportPage } from "./export.ts";
 import { resolveInDeck } from "../deck/roots.ts";
 import { heldClip, holdClip, pasteItems } from "./paste.ts";
 import { itemFinder, linkFromItem, linkToItem } from "./link-item.ts";
+import { landItem, landNew, type Landing } from "./land.ts";
 import { startAreas } from "../canvas/areas.ts";
 
 /**
@@ -250,40 +251,8 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		/** What an op asked for that pen has no field for, or that Decks keeps and does not draw: said, never refused. */
 		const warned: string[] = [];
 		const typeOf = (id: string) => [...walk(doc.children)].find((one) => one.id === id)?.type;
-		/** What a top-level item placed on the canvas must keep clear of: every top-level item but arrows (mostly empty canvas) and itself. */
-		const inWay = (placed: Map<string, Placed>, except?: string) =>
-			doc.children.filter((one) => one.metadata?.type !== ARROW && one.id !== except).flatMap((one) => {
-				const box = placed.get(one.id)?.box;
-				return box ? [{ id: boardOf(one) ?? one.id, x: box.x, y: box.y, w: box.w, h: box.h }] : [];
-			});
-		/**
-		 * Aim, then step clear (`@decks/deck-kit`, `stepClear`): a top-level item aimed `beside` or
-		 * `below` another, or nowhere (beside the newest), goes on the same way past whatever is in the
-		 * way; one put at a corner the caller named stays there, and what it covers is said. Its size is
-		 * read by placing it at the aim first, so a note or a text is measured as it will be drawn.
-		 */
-		const land = (pen: Op & { box?: { x1: number; y1: number } }, id: string | undefined, label: string, way: StepWay | undefined, placed: Map<string, Placed>, except?: string): Op => {
-			const aim = pen.box;
-			if (!aim) return pen;
-			const after = apply(doc, [pen], { theme, measure }).doc;
-			// An item given no id takes one as it is applied: the top-level item that was not there before.
-			const before = new Set(doc.children.map((one) => one.id));
-			const which = id ?? after.children.find((one) => !before.has(one.id))?.id;
-			const box = which ? surface.layout(after).get(which)?.box : undefined;
-			if (!box) return pen;
-			if (!id && label === "the new item" && which) label = which;
-			const size = { w: box.w, h: box.h };
-			const items = inWay(placed, except);
-			if (!way) {
-				const covers = blockers(items, aim, size, 0);
-				if (covers.length) placedFor.push(`Warning: ${label} sits over ${covers.map((one) => one.id).join(", ")}: a corner given with at is kept as given. Leave at out, or use beside or below, to have it land clear.`);
-				return pen;
-			}
-			const spot = stepClear(items, size, aim, way);
-			if (!spot.past) return pen;
-			placedFor.push(`Warning: ${label} was aimed at x1 ${aim.x1}, y1 ${aim.y1}, which was taken: it went on ${way === "down" ? "down" : "right"} past ${spot.past} item${spot.past === 1 ? "" : "s"}, to x1 ${spot.x1}, y1 ${spot.y1}.`);
-			return { ...pen, box: { ...pen.box, x1: spot.x1, y1: spot.y1 } } as Op;
-		};
+		/** The canvas as the earlier ops left it, for placing an item there (`land.ts`: aim, then step clear). */
+		const on = (): Landing => ({ doc, layout: surface.layout, apply: (more) => apply(doc, more, { theme, measure }).doc, said: placedFor });
 		const warn = (pen: Op) => {
 			const said =
 				pen.op === "insert" || pen.op === "replace"
@@ -322,28 +291,12 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							const there = [...walk(doc.children)].find((one) => boardOf(one) === path || boardOf(one) === ownOn(path));
 							if (there) throw new Error(`${path} is already on this canvas, as ${there.id}: move it with decks canvas move.`);
 						}
-						let box = placeOf(doc, placed, op);
-						// An arrow with both ends is drawn between them: there is no corner to choose.
-						const meta = (node as { metadata?: { type?: unknown; from?: unknown; to?: unknown } }).metadata;
-						const joined = meta?.type === ARROW && meta.from !== undefined && meta.to !== undefined;
-						const top = op.parent === undefined || op.parent === null;
-						const label = path ?? (typeof node.id === "string" ? node.id : "the new item");
-						let way: StepWay | undefined = op.beside ? "right" : op.below ? "down" : undefined;
-						let newest: PenNode | undefined;
-						let unsaid = false;
-						if (!box && !joined && top) {
-							// Nowhere said: beside the newest thing on the canvas, and the caller is told so.
-							newest = [...doc.children].reverse().find((one) => one.metadata?.type !== ARROW && placed.get(one.id));
-							box = newest ? placeBy(placed.get(newest.id)!.box, "beside") : { x1: 0, y1: 0 };
-							way = "right";
-							unsaid = true;
-						}
-						pen = { op: "insert", node: node as Op extends { node: infer N } ? N : never, ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(op.index !== undefined ? { index: op.index } : {}), ...(box ? { box } : {}) } as Op;
-						if (top && !joined) pen = land(pen as Op & { box?: { x1: number; y1: number } }, typeof node.id === "string" ? node.id : undefined, label, way, placed);
-						if (unsaid) {
-							const at = (pen as { box?: { x1: number; y1: number } }).box!;
-							placedFor.push(`Warning: no place was given, so ${label} went ${newest ? `beside ${boardOf(newest) ?? newest.id}` : "at the canvas's corner"}, at x1 ${at.x1}, y1 ${at.y1}: say where with at, beside or below.`);
-						}
+						const box = placeOf(doc, placed, op);
+						pen = landNew(
+							on(),
+							{ op: "insert", node: node as Op extends { node: infer N } ? N : never, ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(op.index !== undefined ? { index: op.index } : {}), ...(box ? { box } : {}) } as Op & { box?: { x1: number; y1: number } },
+							{ label: path ?? (typeof node.id === "string" ? node.id : "the new item"), top: op.parent === undefined || op.parent === null, way: op.beside ? "right" : op.below ? "down" : undefined, placed },
+						);
 						break;
 					}
 					case "update": {
@@ -404,7 +357,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						pen = { op: "move", id, ...(op.parent !== undefined ? { parent: op.parent === null ? null : idIn(doc, op.parent, "parent") } : {}), ...(op.index !== undefined ? { index: op.index } : {}), ...(box ? { box } : {}) };
 						// Moved beside or below another at the top level: aimed there, then on past what is in the way, as an insert is.
 						const moving = doc.children.find((one) => one.id === id);
-						if (box && moving && (op.parent === undefined || op.parent === null) && (op.beside || op.below)) pen = land(pen as Op & { box?: { x1: number; y1: number } }, id, boardOf(moving) ?? id, op.beside ? "right" : "down", placed, id);
+						if (box && moving && (op.parent === undefined || op.parent === null) && (op.beside || op.below)) pen = landItem(on(), pen as Op & { box?: { x1: number; y1: number } }, id, boardOf(moving) ?? id, op.beside ? "right" : "down", placed, id);
 						break;
 					}
 					case "copy": {
