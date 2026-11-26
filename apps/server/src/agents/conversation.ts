@@ -769,6 +769,11 @@ export class Conversation {
 	 * on every commit including one that lands on the value it already had, and a line per
 	 * non-change is a transcript that logs the furniture.
 	 */
+	/** The runtime as it is at this moment, read where a start in between may have made it. */
+	private runtimeNow(): AgentBackend | undefined {
+		return this.backend;
+	}
+
 	async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
 		/*
 		 * A chat nobody has prompted has no runtime to tell, so the choice is written down
@@ -779,10 +784,23 @@ export class Conversation {
 		 * launch flag (antigravity) that is a spawn and an immediate respawn.
 		 */
 		if (!this.backend) {
-			this.lastModel = { provider, model, thinking: thinking ?? this.lastModel?.thinking ?? "medium" };
+			const wanted: AgentModel = { provider, model, thinking: thinking ?? this.lastModel?.thinking ?? "medium" };
+			this.lastModel = wanted;
 			this.of.emit({ type: "agent.model", id: this.of.id, model: this.lastModel });
 			this.of.save();
 			await this.start();
+			/*
+			 * A start already under way (the model list asked for one as the agent was made) was
+			 * opened before this was recorded, on the runtime's default: `start()` hands that one
+			 * back. The runtime is told now, or a model picked at creation is silently not the one used.
+			 */
+			// Read again: the start above is what made it, which the check at the top cannot know.
+			const backend = this.runtimeNow();
+			const opened = backend?.model();
+			if (backend && opened && (opened.provider !== wanted.provider || opened.model !== wanted.model || opened.thinking !== wanted.thinking)) {
+				await backend.setModel(wanted.provider, wanted.model, wanted.thinking);
+				this.lastModel = backend.model() ?? wanted;
+			}
 			this.reportModel();
 			return;
 		}

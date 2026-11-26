@@ -255,6 +255,33 @@ function agentOn(
 		cleanup();
 	});
 
+	test("a model chosen while a start is already under way is put on the runtime that start opened", async () => {
+		const { agent, cleanup } = agentOn([], {
+			restored: { id: "restored-6", items: [], context: [], inPlay: [], createdAt: 1 },
+		});
+		// The start under way was opened before the choice, on the runtime's default (pi's: Kimi K3, thinking max).
+		const told: Array<[string, string, string | undefined]> = [];
+		let current = { provider: "opencode-go", model: "kimi-k3", thinking: "max" };
+		const runtime = {
+			sessionRef: () => undefined,
+			model: () => current,
+			setModel: async (provider: string, model: string, thinking?: string) => {
+				told.push([provider, model, thinking]);
+				current = { provider, model, thinking: thinking ?? current.thinking };
+			},
+		};
+		agent.conversation.start = async () => {
+			(agent.conversation as unknown as { backend: unknown }).backend = runtime;
+		};
+
+		await agent.conversation.setModel("opencode-go", "deepseek-v4.1-flash", "low");
+
+		assert.deepEqual(told, [["opencode-go", "deepseek-v4.1-flash", "low"]], "the runtime is told the model it was not opened on");
+		assert.deepEqual(agent.conversation.model, { provider: "opencode-go", model: "deepseek-v4.1-flash", thinking: "low" });
+		(agent.conversation as unknown as { backend: unknown }).backend = undefined;
+		cleanup();
+	});
+
 	test("a dormant chat without a recorded model recovers it from its pi session file", () => {
 		const root = mkdtempSync(join(tmpdir(), "decks-session-model-"));
 		const session = join(root, "resume.jsonl");
