@@ -395,8 +395,19 @@ test("placed beside, below or nowhere, an item aims there and steps on past what
 		assert.deepEqual(await box("over"), { x1: 50, y1: 50, x2: 150, y2: 150 });
 		assert.ok(over.notes.some((note) => /over sits over a: a corner given with at is kept as given/.test(note)), over.notes.join(" | "));
 		// Moved beside another, as an insert: on past what is in the way.
-		await must("canvas.move", ["free", { beside: "a" }]);
+		const moved = await must("canvas.move", ["free", { beside: "a" }]);
 		assert.equal((await box("free")).x1, 2140);
+		assert.ok(moved.notes.some((note) => /^Warning: free was aimed at x1 560/.test(note)), moved.notes.join(" | "));
+		// Every fallback is a warning: the notes above all start so.
+		for (const answer of [beside, free, over]) assert.ok(answer.notes.some((note) => note.startsWith("Warning: ")), answer.notes.join(" | "));
+		// Room asked for where it is taken says so; room where it is free says nothing.
+		const taken = await must("canvas.space", [{ w: 200, h: 200 }, { near: "a" }]);
+		assert.ok(taken.notes.some((note) => /^Warning: right of a at x1 560, y1 0 is taken/.test(note)), taken.notes.join(" | "));
+		const around = await must("canvas.space", [{ w: 100, h: 100 }, { around: { x: 200, y: 150 } }]);
+		assert.ok(around.notes.some((note) => /^Warning: a box centred on x 200, y 150 would touch/.test(note)), around.notes.join(" | "));
+		const clear = await must("canvas.space", [{ w: 100, h: 100 }, { around: { x: 20000, y: 20000 } }]);
+		assert.deepEqual(clear.value, { x1: 19950, y1: 19950 });
+		assert.ok(!clear.notes.some((note) => note.startsWith("Warning: ")), clear.notes.join(" | "));
 	} finally {
 		cleanup();
 	}

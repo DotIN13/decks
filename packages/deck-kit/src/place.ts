@@ -106,13 +106,24 @@ export function stepClear(items: readonly Rect[], size: { w: number; h: number }
  * nearest the middle of everything.
  */
 export function freeSpot(items: readonly Rect[], size: { w: number; h: number }, options: { near?: Rect; side?: "right" | "below" | "left" | "above"; margin?: number } = {}): { x1: number; y1: number } {
+	const { x1, y1 } = roomFor(items, size, options);
+	return { x1, y1 };
+}
+
+/**
+ * `freeSpot` with the reason: where it aimed, and how many items it stepped past to get clear
+ * (`past`, 0 when the aim was clear). With nothing named there is no aim to miss, so `past` is 0:
+ * the middle of everything is a search, not a fallback.
+ */
+export function roomFor(items: readonly Rect[], size: { w: number; h: number }, options: { near?: Rect; side?: "right" | "below" | "left" | "above"; margin?: number } = {}): { x1: number; y1: number; past: number; aim: { x1: number; y1: number } } {
 	const margin = options.margin ?? GAP;
 	const near = options.near;
 	if (!near) {
-		if (items.length === 0) return { x1: 0, y1: 0 };
+		if (items.length === 0) return { x1: 0, y1: 0, past: 0, aim: { x1: 0, y1: 0 } };
 		const middle = middleOf(items);
-		const { x1, y1 } = stepClear(items, size, { x1: middle.x - size.w / 2, y1: middle.y - size.h / 2 }, "near", margin);
-		return { x1, y1 };
+		const aim = { x1: Math.round(middle.x - size.w / 2), y1: Math.round(middle.y - size.h / 2) };
+		const { x1, y1 } = stepClear(items, size, aim, "near", margin);
+		return { x1, y1, past: 0, aim };
 	}
 	const side = options.side ?? "right";
 	const aim = {
@@ -120,6 +131,6 @@ export function freeSpot(items: readonly Rect[], size: { w: number; h: number },
 		y1: side === "below" ? near.y + near.h + margin : side === "above" ? near.y - margin - size.h : near.y,
 	};
 	const way: StepWay = side === "right" ? "right" : side === "left" ? "left" : side === "below" ? "down" : "up";
-	const { x1, y1 } = stepClear(items, size, aim, way, margin);
-	return { x1, y1 };
+	const spot = stepClear(items, size, aim, way, margin);
+	return { ...spot, aim: { x1: Math.round(aim.x1), y1: Math.round(aim.y1) } };
 }

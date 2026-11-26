@@ -7,7 +7,7 @@ import { boardOf, CARD_ITEM, type ReadMore } from "../canvas/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { serverText } from "../canvas/text.ts";
-import { blockers, cornerOf, GAP, placeBy, slug, stepClear, type StepWay } from "@decks/deck-kit";
+import { blockers, cornerOf, GAP, placeBy, roomFor, slug, stepClear, type StepWay } from "@decks/deck-kit";
 import type { ShotFormat, ShotOf } from "../canvas/shots.ts";
 import { fitOn } from "./fit.ts";
 import { documentItemPath } from "../docs/item-path.ts";
@@ -275,12 +275,12 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			const items = inWay(placed, except);
 			if (!way) {
 				const covers = blockers(items, aim, size, 0);
-				if (covers.length) placedFor.push(`${label} sits over ${covers.map((one) => one.id).join(", ")}: a corner given with at is kept as given. Leave at out, or use beside or below, to have it land clear.`);
+				if (covers.length) placedFor.push(`Warning: ${label} sits over ${covers.map((one) => one.id).join(", ")}: a corner given with at is kept as given. Leave at out, or use beside or below, to have it land clear.`);
 				return pen;
 			}
 			const spot = stepClear(items, size, aim, way);
 			if (!spot.past) return pen;
-			placedFor.push(`${label} was aimed at x1 ${aim.x1}, y1 ${aim.y1}, which was taken: it went on ${way === "down" ? "down" : "right"} past ${spot.past} item${spot.past === 1 ? "" : "s"}, to x1 ${spot.x1}, y1 ${spot.y1}.`);
+			placedFor.push(`Warning: ${label} was aimed at x1 ${aim.x1}, y1 ${aim.y1}, which was taken: it went on ${way === "down" ? "down" : "right"} past ${spot.past} item${spot.past === 1 ? "" : "s"}, to x1 ${spot.x1}, y1 ${spot.y1}.`);
 			return { ...pen, box: { ...pen.box, x1: spot.x1, y1: spot.y1 } } as Op;
 		};
 		const warn = (pen: Op) => {
@@ -341,7 +341,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						if (top && !joined) pen = land(pen as Op & { box?: { x1: number; y1: number } }, typeof node.id === "string" ? node.id : undefined, label, way, placed);
 						if (unsaid) {
 							const at = (pen as { box?: { x1: number; y1: number } }).box!;
-							placedFor.push(`${label} went ${newest ? `beside ${boardOf(newest) ?? newest.id}` : "at the canvas's corner"}, at x1 ${at.x1}, y1 ${at.y1}: say where with at, beside or below.`);
+							placedFor.push(`Warning: no place was given, so ${label} went ${newest ? `beside ${boardOf(newest) ?? newest.id}` : "at the canvas's corner"}, at x1 ${at.x1}, y1 ${at.y1}: say where with at, beside or below.`);
 						}
 						break;
 					}
@@ -544,10 +544,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				if (around !== undefined && around !== null) {
 					if (from) throw new Error("Say one: near (an item) or around (a point).");
 					if (typeof around.x !== "number" || typeof around.y !== "number" || !Number.isFinite(around.x) || !Number.isFinite(around.y)) throw new Error("around is a point on the canvas, as in around: { x: 1200, y: 400 }.");
-					const { x1, y1 } = stepClear(items, { w, h }, { x1: around.x - w / 2, y1: around.y - h / 2 }, "near", margin ?? GAP);
+					const aim = { x1: Math.round(around.x - w / 2), y1: Math.round(around.y - h / 2) };
+					const { x1, y1, past } = stepClear(items, { w, h }, aim, "near", margin ?? GAP);
+					if (past) ctx.notes.push(`Warning: a box centred on x ${around.x}, y ${around.y} would touch ${past} item${past === 1 ? "" : "s"}: the nearest clear corner is x1 ${x1}, y1 ${y1}, not where you aimed.`);
 					return { x1, y1 } as never;
 				}
-				return freeSpot(items, { w, h }, { ...(from ? { near: from } : {}), ...(side ? { side } : {}), margin: margin ?? GAP }) as never;
+				const room = roomFor(items, { w, h }, { ...(from ? { near: from } : {}), ...(side ? { side } : {}), margin: margin ?? GAP });
+				if (room.past) ctx.notes.push(`Warning: ${side ?? "right"} of ${near} at x1 ${room.aim.x1}, y1 ${room.aim.y1} is taken: the room found is past ${room.past} item${room.past === 1 ? "" : "s"}, at x1 ${room.x1}, y1 ${room.y1}.`);
+				return { x1: room.x1, y1: room.y1 } as never;
 			},
 			export: async (of: string | string[], options?: On & { format?: "html" | "tailwind"; to?: string }) => {
 				const { format = "html", to, ...on } = options ?? {};
