@@ -20,7 +20,6 @@ import { resolveInDeck } from "../deck/roots.ts";
 import { heldClip, holdClip, pasteItems } from "./paste.ts";
 import { itemFinder, linkFromItem, linkToItem } from "./link-item.ts";
 import { landItem, landNew, type Landing } from "./land.ts";
-import { startAreas } from "../canvas/areas.ts";
 
 /**
  * An agent's shape with no colour given gets the colours the canvas tools give theirs, the drawing's
@@ -637,9 +636,8 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				if (typeof title !== "string" || !title.trim()) throw new Error('canvas create takes a title, as in decks canvas create "Launch plan".');
 				const pens = needPens();
 				const name = pens.claim(title.trim());
-				startAreas(pens, name);
 				service.stagesChanged();
-				notes.push(`${name} is made, with its To do and Working areas titled and nothing else. Nobody is on it yet: decks view goto ${name} moves you there, and the person's screen with you when your chat is on screen.`);
+				notes.push(`${name} is made and empty. Nobody is on it yet: decks view goto ${name} moves you there, and the person's screen with you when your chat is on screen.`);
 				return canvasRow(name);
 			},
 		},

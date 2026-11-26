@@ -2,7 +2,6 @@ import type { PenDocument } from "@decks/pen";
 import type { DeckState, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
-import { startAreas } from "../canvas/areas.ts";
 import { boardsOn, putOn, takeOff, type OnCanvas } from "../canvas/canvas-ops.ts";
 import type { CanvasService } from "../canvas/service.ts";
 import { canvasNews } from "./canvas-news.ts";
@@ -340,7 +339,6 @@ export class Seat {
 		const pens = this.of.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		const name = pens.claim(title.trim() || UNTITLED, { provisional: options.provisional === true || !title.trim() });
-		startAreas(pens, name);
 		this.openStage(name);
 		return name;
 	}

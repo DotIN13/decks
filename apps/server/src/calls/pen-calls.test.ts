@@ -443,12 +443,11 @@ test("a link can point at any item, by its id or its address, and says how it op
 	}
 });
 
-test("a new canvas starts with its To do and Working areas titled, and nothing else", async () => {
+test("a new canvas is made empty: its areas are the agent's to lay out", async () => {
 	const { must, cleanup } = await open();
 	try {
 		const made = (await must("canvas.create", ["Areas test"])).value;
-		const items = (await must("canvas.read", [{ canvas: made.name }])).value.items as Array<{ id: string; type: string; content?: string }>;
-		assert.deepEqual(items.map((one) => [one.id, one.type, one.content?.slice(0, 7)]), [["to-do", "text", "To do"], ["to-do-hint", "text", "Your to"], ["working", "text", "Working"], ["working-hint", "text", "What ag"]]);
+		assert.deepEqual((await must("canvas.read", [{ canvas: made.name }])).value.items, []);
 	} finally {
 		cleanup();
 	}

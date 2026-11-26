@@ -414,8 +414,13 @@ near. Leave it as they drew it: move or delete a stroke only when asked.
 A canvas has three kinds of area. An area is a place, not an object: a title in plain words and the
 items by it. Nothing is tagged and no frame is needed; a frame or an outline the person draws is an
 area too. The arrangement is the canvas's own (top to bottom, left to right, anything): read where
-the areas are with `decks canvas read` and keep to it. A new canvas starts with the first two
-titled, side by side.
+the areas are with `decks canvas read` and keep to it.
+
+Nothing makes the areas for you: laying them out is your design work. When you start work on a
+canvas that has none, place the titles yourself where they suit what the canvas is for (a title
+`text` for To do and one for Working, with room by each, and a title per topic as topics come),
+clear of what is already there (`decks canvas space`), and say in your answer what you set up. On a
+canvas that already has things on it, ask before rearranging them.
 
 - **To do** is the person's. Each note there is a to-do. At the start of a turn on the canvas, read
   them and say which you can take; start one when the person says so, not by yourself. When it is
