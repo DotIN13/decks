@@ -140,6 +140,8 @@ export type GestureContext = {
 	linkAt: (point: Pt) => string | undefined;
 	/** Whether the composer is under a screen point, for a drag of these to mention them. */
 	overComposer: (client: Pt, ids: readonly string[], boards: readonly string[]) => boolean;
+	/** The board selected by a plain press (the page's own selection, not a pick), if any. */
+	selectedPage?: string | undefined;
 };
 
 /** One step's answer. `preview` absent leaves the engine's preview as it is; `null` takes it away. */
@@ -256,7 +258,13 @@ function pressCanvas(state: EditorState, p: PointerInput, scene: SceneQuery, ctx
 
 /** A press on a board: Shift adds it to the picks or takes it out; otherwise it is carried with the selection it is part of, or alone. */
 function pressPage(state: EditorState, path: string, p: PointerInput, scene: SceneQuery, ctx: GestureContext): Step {
-	const picks = state.selection.boards;
+	/*
+	 * A plain press selects a board on its own, the page's selection rather than a pick: Shift and a
+	 * press on another starts the picks with both, so the two are carried together. Without it the
+	 * first board was left out of the group, and a drag by it moved it alone (or by the other, the other alone).
+	 */
+	const own = ctx.selectedPage;
+	const picks = state.selection.boards.length === 0 && state.selection.items.length === 0 && own && scene.boards().some((board) => board.path === own) ? [own] : state.selection.boards;
 	if (p.mods.shift) return done(withSelection(state, { boards: picks.includes(path) ? picks.filter((one) => one !== path) : [...picks, path] }));
 	const group = picks.includes(path);
 	const next = group ? state : withSelection(state, { items: [], boards: [] });

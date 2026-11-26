@@ -35,6 +35,8 @@ export type EditorHost = {
 	view: () => Rect;
 	nextIds: () => NextId;
 	boards: () => readonly HostPage[];
+	/** The board selected by a plain press, which the page keeps apart from the picks: Shift and a press on another starts the picks with it. */
+	selectedPage?: () => string | undefined;
 	onPenEdit: (ops: Op[]) => void;
 	/** The page's side of the effects, but for the three the controller does itself. */
 	effects: Omit<EffectHost, "settle" | "wake" | "awaitFrame" | "boards"> & { toggleMedia: (id: string, media: MediaItem) => void };
@@ -97,6 +99,7 @@ export function createEditor(host: EditorHost) {
 		pageRev: (path) => untrack(host.boards).find((board) => board.path === path)?.rev ?? 0,
 		linkAt: (point) => host.engine.linkAt(point),
 		overComposer: effects.overComposer,
+		selectedPage: host.selectedPage?.(),
 	});
 
 	/**

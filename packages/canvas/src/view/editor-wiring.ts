@@ -49,6 +49,7 @@ export function wireEditor(d: WireEditorNeeds) {
 		},
 		nextIds: () => d.freshIds(),
 		boards: () => d.props.boards,
+		selectedPage: () => d.props.selected,
 		onPenEdit: (ops) => d.penEdit(ops),
 		effects: {
 			element: () => d.element,

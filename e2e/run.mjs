@@ -171,6 +171,8 @@ const CHECKS = [
 	{ file: "card-reload.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
+	/* Two cards selected and dragged together both move by the hand, and stay where they were dropped. */
+	{ file: "group-drag.mjs", needsAgent: false },
 	/* Every edit a person makes, with the server's answer held back: none shows the drawing as it was before it. Eight minutes, so by name. */
 	{ file: "edits-wait.mjs", needsAgent: false, named: true },
 	/* The arrow keys pressed fast and held on items and boards, with the answers held back: each press drawn at once, the server at the sum. Minutes, so by name. */

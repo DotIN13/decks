@@ -252,6 +252,32 @@ test("a board pressed is the app's selected board, and a drag carries it, moves 
 	assert.equal(shift.state.gesture, undefined);
 });
 
+test("a board selected by a press, then Shift and a press on another: both are picked, and a drag by either carries both", () => {
+	const two = fakeScene([], [
+		{ path: "boards/one.html", x: 0, y: 0, w: 400, h: 300 },
+		{ path: "boards/two.html", x: 900, y: 0, w: 400, h: 300 },
+	]);
+	// The page's own selection is the first board, from the plain press; the picks are still empty.
+	const selected = ctx({ ...WIDE, selectedPage: "boards/one.html" });
+	const picked = step(initialState("edit"), { type: "press-board", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, selected).state;
+	assert.deepEqual(picked.selection.boards, ["boards/one.html", "boards/two.html"]);
+	for (const [path, x] of [["boards/one.html", 100], ["boards/two.html", 1000]] as const) {
+		let state = picked;
+		const go = (input: Input) => {
+			const result = step(state, input, two, ctx({ ...selected, selectedPage: path }));
+			state = result.state;
+			return result;
+		};
+		go({ type: "press-board", path, ...at(x, 100) });
+		go({ type: "move", ...at(x + 37, 141, { meta: true }) });
+		const lift = go({ type: "release", ...at(x + 37, 141, { meta: true }) });
+		assert.deepEqual(lift.effects.find((effect) => effect.do === "move-boards"), { do: "move-boards", moves: [{ path: "boards/one.html", x: 37, y: 41 }, { path: "boards/two.html", x: 937, y: 41 }] }, path);
+	}
+	// A selected board that is not on the canvas any more starts nothing.
+	const gone = step(initialState("edit"), { type: "press-board", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, ctx({ selectedPage: "boards/old.html" })).state;
+	assert.deepEqual(gone.selection.boards, ["boards/two.html"]);
+});
+
 test("a board dragged near another settles 160 from it, the reading gap, and says so", () => {
 	const two = fakeScene([], [
 		{ path: "boards/one.html", x: 0, y: 0, w: 400, h: 300 },
