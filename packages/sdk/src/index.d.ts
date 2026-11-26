@@ -120,26 +120,29 @@ export interface Verbs {
 		/**
 		 * Add an item to the canvas. A card is { type: "card", card: <its folder or index.html> }, or {
 		 * type: "card", html, title?, width?, height? } to write one and place it; an app is { type: "app",
-		 * app: <name> } and a document { type: "document", path }; a link is { type: "link", to }, a small
-		 * chip that opens what it points at as a tab when pressed, where `to` is what view.open takes (a
-		 * canvas's name or title, a card's or a document's path, an app's name) and reads back as its
-		 * address ("#canvas/<name>", "#card/<path>", "#doc/<path>", "#app/<name>"), which a markdown link
-		 * in a note or a text can use too: [the plan](#card/canvases/x/cards/plan/index.html); anything
-		 * else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is
-		 * its top-left corner, kept exactly, and the answer says what it covers; `beside` or `below` (an
-		 * item's id or a card's path) aims 160 px clear of that item, tops or lefts aligned, and when that
-		 * is taken goes on the same way until it is 160 px clear of everything; nothing said aims beside
-		 * the newest item and goes on right the same way; whenever it lands anywhere but where it was
-		 * asked, or over something, the answer has a warning saying where and why; `parent` and `index` put
-		 * it inside a frame. An item with a `name` and no `id` takes its name as its id ("Pricing card" →
-		 * pricing-card, then pricing-card-2), its children too; the answer has every id. Colour it with
-		 * Decks's adaptive colours so it reads in light and dark, named by role: text ("$decks-text",
-		 * "$decks-text-muted"), line ("$decks-line" for arrows, "$decks-line-strong", "$decks-line-subtle"
-		 * for edges), surface ("$decks-surface", paper), fill ("$decks-fill-slate", "$decks-fill-sky",
-		 * "$decks-fill-gray", and soft "$decks-fill-red", -orange, -yellow, -green, -blue, -purple) and
-		 * accent ("$decks-accent-red", -orange, -yellow, -green, -blue, -purple); the insert defines any
-		 * the canvas lacks. A hex stays the same in both; a top-level rectangle, ellipse, icon, empty frame
-		 * or arrow given no colour gets the tools' $decks-* colours.
+		 * app: <name> } and a document { type: "document", path }; a link is { type: "link", to, open? }, a
+		 * small chip that goes to what it points at when pressed, where `to` is what view.open takes (a
+		 * canvas's name or title, a card's or a document's path, an app's name), an item's id on this
+		 * canvas, or an address, and reads back as its address ("#canvas/<name>", "#card/<path>",
+		 * "#doc/<path>", "#app/<name>", "#item/<canvas>/<id>"), which a markdown link in a note or a text
+		 * can use too: [the plan](#card/canvases/x/cards/plan/index.html); `open` is "canvas" (the view
+		 * flies to it) or "tab", left out a card or an item on the canvas and the rest in a tab, and ⌘ or
+		 * Ctrl and a click always a tab; anything else is a pen.dev item (note, text, frame, rectangle,
+		 * ellipse, arrow, ref). Say where: `at` is its top-left corner, kept exactly, and the answer says
+		 * what it covers; `beside` or `below` (an item's id or a card's path) aims 160 px clear of that
+		 * item, tops or lefts aligned, and when that is taken goes on the same way until it is 160 px clear
+		 * of everything; nothing said aims beside the newest item and goes on right the same way; whenever
+		 * it lands anywhere but where it was asked, or over something, the answer has a warning saying
+		 * where and why; `parent` and `index` put it inside a frame. An item with a `name` and no `id`
+		 * takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2), its children too;
+		 * the answer has every id. Colour it with Decks's adaptive colours so it reads in light and dark,
+		 * named by role: text ("$decks-text", "$decks-text-muted"), line ("$decks-line" for arrows,
+		 * "$decks-line-strong", "$decks-line-subtle" for edges), surface ("$decks-surface", paper), fill
+		 * ("$decks-fill-slate", "$decks-fill-sky", "$decks-fill-gray", and soft "$decks-fill-red", -orange,
+		 * -yellow, -green, -blue, -purple) and accent ("$decks-accent-red", -orange, -yellow, -green,
+		 * -blue, -purple); the insert defines any the canvas lacks. A hex stays the same in both; a
+		 * top-level rectangle, ellipse, icon, empty frame or arrow given no colour gets the tools' $decks-*
+		 * colours.
 		 */
 		insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/**
