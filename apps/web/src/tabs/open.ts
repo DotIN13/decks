@@ -42,6 +42,9 @@ export function openAt(link: { address: string; browser?: true }): void {
 	openTab(tab.kind, tab.target);
 }
 
+/** The closest a link's flight comes: life size. */
+const FLY_ZOOM = 1;
+
 /** How long a canvas brought in front takes to land on its own view, before a flight to an item on it. */
 const ARRIVE_MS = 450;
 
@@ -76,7 +79,9 @@ async function flyToItem(canvas: string, id: string, fresh: boolean): Promise<vo
 		const frame = document.querySelector("iframe.canvas-frame, .stage");
 		if (!frame) return;
 		const view = { width: frame.clientWidth, height: frame.clientHeight };
-		moveCamera(fitInto([{ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }], view, canvasBox(view)), { animate });
+		// Held, not filled: a small item is seen at life size at most, with what is round it.
+		const framed = fitInto([{ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }], view, canvasBox(view));
+		moveCamera({ ...framed, zoom: Math.min(framed.zoom, FLY_ZOOM) }, { animate });
 	};
 	if (arriving) {
 		// A canvas just brought in front lands on its own opening view a moment after (`app/landing.ts`): the flight goes after that, and once more in case it was late.
