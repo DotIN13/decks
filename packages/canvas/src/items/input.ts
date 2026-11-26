@@ -31,7 +31,21 @@ interface OwnInput {
 const onControl = (event: Event) => event.composedPath().some((target) => target instanceof Element && target.matches?.(INTERACTIVE));
 
 export function ownInput(target: EventTarget, host: HTMLElement, input: OwnInput): void {
-	target.addEventListener("pointerdown", (event) => {
+	/*
+	 * A press on the item's own box where its content draws nothing (a card below its last words) is
+	 * the host's, and the root never hears it: the card was not selected and Shift could not add it to
+	 * a group. Such presses are taken at the host by the same rule; the ones from inside, marked as the
+	 * root first sees them, are left to the root.
+	 */
+	const inner = new WeakSet<Event>();
+	const outside = target !== host;
+	const own = ["pointerdown", "pointerup", "click", "dblclick", "contextmenu"];
+	if (outside) for (const type of own) target.addEventListener(type, (event) => inner.add(event), { capture: true });
+	const onBox = (type: string, listener: (event: Event) => void) => {
+		target.addEventListener(type, listener);
+		if (outside) host.addEventListener(type, (event) => event.target === host && !inner.has(event) && listener(event));
+	};
+	onBox("pointerdown", (event) => {
 		const press = event as PointerEvent;
 		if (press.pointerType === "touch") {
 			// A finger's press goes on to the stage, which pans or pinches with it, and picks the item as a finger on a picture does; a press on a control keeps it.
@@ -41,10 +55,15 @@ export function ownInput(target: EventTarget, host: HTMLElement, input: OwnInput
 		}
 		if (press.button !== 0 && press.button !== 2) return;
 		if (press.button === 0 && (press.shiftKey || press.metaKey) && !onControl(press) && input.onAddPress?.(press, host)) return;
-		if (!input.selected()) input.onSelect();
+		/*
+		 * Selected again even when it already is: the item can be the page's selection (a link flew to
+		 * it, the agent showed it) while a group picked before is still held, and a plain press means
+		 * this item alone, so the old group must go before Shift adds to a new one.
+		 */
+		if (press.button === 0 || !input.selected()) input.onSelect();
 		press.stopPropagation();
 	});
-	for (const type of ["pointerup", "click", "dblclick", "contextmenu"]) target.addEventListener(type, (event) => (event as PointerEvent).pointerType !== "touch" && event.stopPropagation());
+	for (const type of ["pointerup", "click", "dblclick", "contextmenu"]) onBox(type, (event) => (event as PointerEvent).pointerType !== "touch" && event.stopPropagation());
 	target.addEventListener(
 		"wheel",
 		(event) => {

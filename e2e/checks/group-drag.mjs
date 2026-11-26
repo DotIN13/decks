@@ -8,7 +8,7 @@
  * writes are held back 400 ms, a far network's round trip, so a wrong frame lasts long enough to see.
  */
 import { zoomStep } from "../backends-kit.mjs";
-import { cardEdge, canvasFrame, editMode, onCanvasAt, open, resetStage, rest, say, settle } from "../harness.mjs";
+import { API, CANVAS, asPerson, cardEdge, canvasFrame, editMode, onCanvasAt, open, resetStage, rest, say, settle } from "../harness.mjs";
 
 const lag = { ms: 0 };
 
@@ -163,6 +163,60 @@ async function groupDrag(page, label, by, how = "shift") {
 	await settle(page, 300);
 }
 
+/**
+ * Two live cards, each pressed below its last words, where its page draws nothing and the press is
+ * on the card's own box (`items/input.ts`, `ownInput`): the first is selected, Shift adds the second,
+ * and a drag by the second's bar carries both. Short cards in tall boxes, on bare canvas, seen at life size.
+ */
+async function liveDrag(page) {
+	const person = await asPerson();
+	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person }, body: JSON.stringify({ args }) })).json();
+	const short = (title) => `<title>${title}</title><meta name="card" content='{"w":420}' /><div class="doc" data-id="doc" style="padding:20px"><h1 style="font-size:22px;margin:0">${title}</h1></div>`;
+	const a = (await call("canvas.insert", [{ type: "card", html: short("Short card one"), title: "Short card one", width: 420, height: 420 }, { canvas: CANVAS, at: { x1: 6000, y1: 0 } }])).value;
+	const b = (await call("canvas.insert", [{ type: "card", html: short("Short card two"), title: "Short card two", width: 420, height: 420 }, { canvas: CANVAS, at: { x1: 6580, y1: 0 } }])).value;
+	if (!a?.card || !b?.card) return say("two short cards to press", false, JSON.stringify([a, b]).slice(0, 200));
+	// The side panel folded, so the canvas has the window and a press on a card is a press on the card.
+	await page.locator('.panel-shell [aria-label="Hide the side panel"]').first().click().catch(() => {});
+	await settle(page, 500);
+	const canvas = await canvasFrame(page);
+	const live = () => canvas.evaluate((paths) => paths.every((path) => !!document.querySelector(`.card-node[data-path="${CSS.escape(path)}"] .card-host`)), [a.card, b.card]);
+	for (let tries = 0; tries < 4 && !(await live()); tries++) {
+		await call("view.focus", [[a.card, b.card], { canvas: CANVAS }]);
+		const go = canvas.locator("button", { hasText: /^Go$/ }).first();
+		if (await go.isVisible().catch(() => false)) await go.click();
+		await settle(page, 1200);
+	}
+	say("live: both short cards are awake, their pages drawn", await live());
+	await editMode(page, true);
+	const rect = (path) => canvas.evaluate((p) => window.__decksProbes.cards().find((one) => one.path === p)?.rect?.toJSON?.() ?? null, path);
+	const ra = await rect(a.card);
+	const rb = await rect(b.card);
+	const below = (r) => ({ x: r.x + r.width / 2, y: r.y + r.height * 0.55 });
+	const empty = await canvas.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className?.toString(), below(ra));
+	await page.mouse.click(below(ra).x, below(ra).y);
+	await settle(page, 400);
+	const selected = await canvas.evaluate((p) => document.querySelector(`.card-node[data-path="${CSS.escape(p)}"]`)?.dataset.selected, a.card);
+	say("a press below a live card's words selects it", selected === "true", `pressed on ${empty}, selected ${selected}`);
+	await page.keyboard.down("Shift");
+	await page.mouse.click(below(rb).x, below(rb).y);
+	await page.keyboard.up("Shift");
+	await settle(page, 400);
+	const from = { a: (await rect(a.card)), b: (await rect(b.card)) };
+	const bar = await canvas.locator(`.card-node[data-path="${b.card}"] .plain-card-bar`).boundingBox();
+	const grip = { x: bar.x + bar.width / 2, y: bar.y + bar.height / 2 };
+	await page.mouse.move(grip.x, grip.y);
+	await page.mouse.down();
+	for (let i = 1; i <= 12; i++) {
+		await page.mouse.move(grip.x + i * 10, grip.y + i * 8);
+		await page.waitForTimeout(25);
+	}
+	await page.mouse.up();
+	await settle(page, 1500);
+	const to = { a: await rect(a.card), b: await rect(b.card) };
+	const moved = (one) => Math.abs(to[one].x - from[one].x) > 60 && Math.abs(to[one].y - from[one].y) > 50;
+	say("…Shift and a press below the other's words adds it, and a drag carries both", moved("a") && moved("b"), JSON.stringify({ from, to }));
+}
+
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await page.route(/\/api\/v1\/canvas\./, async (route) => {
@@ -175,5 +229,6 @@ await groupDrag(page, "Chromium, held by the first card", "first");
 await groupDrag(page, "Chromium, held by the second card", "second");
 await groupDrag(page, "Chromium, boxed, held by the first card", "first", "marquee");
 await groupDrag(page, "Chromium, boxed, held by the second card", "second", "marquee");
+await liveDrag(page);
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 await browser.close();
