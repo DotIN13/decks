@@ -1,5 +1,5 @@
 /**
- * Two cards selected together and dragged by one of them both move, by the same amount, and stay
+ * Two cards selected together (a click and a Shift-click, or a box drawn round them) and dragged by one of them both move, by the same amount, and stay
  * where they were dropped: neither is drawn back where it was picked up while the server answers,
  * nor goes back and forth after. The person's report: "when multiple cards are selected, and I try
  * to move the group, it won't move, or it goes back and forth".
@@ -58,8 +58,11 @@ const placed = (canvas, paths) =>
 		}));
 	}, paths);
 
-/** Two cards picked (a press on the first, Shift and a press on the second), then dragged by the one `by` names. */
-async function groupDrag(page, label, by) {
+/**
+ * Two cards picked, then dragged by the one `by` names. Picked as `how` says: "shift", a press on the
+ * first and Shift and a press on the second; or "marquee", a box drawn round both from bare canvas.
+ */
+async function groupDrag(page, label, by, how = "shift") {
 	const canvas = await canvasFrame(page);
 	await editMode(page, true);
 	const cards = await twoPictures(page);
@@ -74,11 +77,23 @@ async function groupDrag(page, label, by) {
 	const paths = [a.path, b.path];
 	await page.keyboard.press("Escape");
 	await editMode(page, true);
-	await page.mouse.click(a.grip.x, a.grip.y);
-	await settle(page, 200);
-	await page.keyboard.down("Shift");
-	await page.mouse.click(b.grip.x, b.grip.y);
-	await page.keyboard.up("Shift");
+	if (how === "marquee") {
+		const rects = cards.filter((card) => paths.includes(card.path)).map((card) => card.rect);
+		const box = { x1: Math.min(...rects.map((r) => r.x)) - 24, y1: Math.min(...rects.map((r) => r.y)) - 24, x2: Math.max(...rects.map((r) => r.x + r.width)) + 24, y2: Math.max(...rects.map((r) => r.y + r.height)) + 24 };
+		// From bare canvas: nothing drawn and no card under the press.
+		const bare = await canvas.evaluate(({ x, y }) => !window.__decksProbes.pictureAt(x, y) && !document.elementFromPoint(x, y)?.closest(".card-node, .pen-hit, iframe, a, button"), { x: box.x1, y: box.y1 });
+		if (!bare || !(await onCanvasAt(page, box.x1, box.y1))) return say(`${label}: bare canvas to start the box from`, false, JSON.stringify(box));
+		await page.mouse.move(box.x1, box.y1);
+		await page.mouse.down();
+		await page.mouse.move(box.x2, box.y2, { steps: 12 });
+		await page.mouse.up();
+	} else {
+		await page.mouse.click(a.grip.x, a.grip.y);
+		await settle(page, 200);
+		await page.keyboard.down("Shift");
+		await page.mouse.click(b.grip.x, b.grip.y);
+		await page.keyboard.up("Shift");
+	}
 	await settle(page, 300);
 	const picks = await canvas.evaluate(() => [...document.querySelectorAll(".card-node")].filter((n) => n.dataset.selected === "true").map((n) => n.dataset.path));
 	const from = await placed(canvas, paths);
@@ -158,5 +173,7 @@ await page.route(/\/api\/v1\/canvas\./, async (route) => {
 await rest(page, { start: 0 });
 await groupDrag(page, "Chromium, held by the first card", "first");
 await groupDrag(page, "Chromium, held by the second card", "second");
+await groupDrag(page, "Chromium, boxed, held by the first card", "first", "marquee");
+await groupDrag(page, "Chromium, boxed, held by the second card", "second", "marquee");
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 await browser.close();
