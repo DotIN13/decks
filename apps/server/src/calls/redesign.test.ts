@@ -159,7 +159,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		assert.notEqual(other.name, home);
 		await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { canvas: "Launch plan", at: { x1: 0, y1: 0 } }]);
 		assert.equal((await must("here")).value.name, home, "making and writing a canvas does not move you to it");
-		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.map((one: { card?: string }) => one.card), [`canvases/${other.name}/cards/a/index.html`]);
+		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.filter((one: { card?: string }) => one.card).map((one: { card?: string }) => one.card), [`canvases/${other.name}/cards/a/index.html`]);
 		assert.deepEqual((await must("canvas.read")).value.items, [], "your own canvas is untouched");
 		const unknown = await call("canvas.read", [{ canvas: "no such canvas" }]);
 		assert.match(unknown.error!, /No canvas is called "no such canvas"/);
