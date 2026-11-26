@@ -412,3 +412,33 @@ test("placed beside, below or nowhere, an item aims there and steps on past what
 		cleanup();
 	}
 });
+
+test("a link can point at any item, by its id or its address, and says how it opens", async () => {
+	const { must, call, agent, cleanup } = await open();
+	try {
+		const canvas = agent.seat.stageName(true) ?? "";
+		await must("canvas.insert", [{ type: "note", name: "Risks", content: "Three risks" }, { at: { x1: 0, y1: 0 } }]);
+		// By its id on this canvas: an item's address, opened on the canvas unless it says otherwise.
+		const chip = (await must("canvas.insert", [{ type: "link", to: "risks" }, { at: { x1: 0, y1: 600 } }])).value;
+		assert.deepEqual({ to: chip.to, open: chip.open, title: chip.title }, { to: `#item/${encodeURIComponent(canvas)}/risks`, open: "canvas", title: "Risks" });
+		// Said: a tab. Kept in the file's address and read back.
+		const tab = (await must("canvas.insert", [{ type: "link", to: "risks", open: "tab" }, { at: { x1: 400, y1: 600 } }])).value;
+		assert.equal(tab.open, "tab");
+		const kept = JSON.parse(JSON.stringify((await must("canvas.read", [{ of: tab.id }])).value.items[0]));
+		assert.equal(kept.open, "tab");
+		// A card opens on the canvas by default, a canvas in a tab.
+		const card = (await must("canvas.insert", [{ type: "link", to: "canvases/t/cards/a" }, { at: { x1: 800, y1: 600 } }])).value;
+		assert.equal(card.open, "canvas");
+		const other = (await must("canvas.insert", [{ type: "link", to: `#canvas/${canvas}` }, { at: { x1: 1200, y1: 600 } }])).value;
+		assert.equal(other.open, "tab");
+		// An item on a canvas that does not have it: kept, dimmed. A wrong opening is refused, in words.
+		const gone = (await must("canvas.insert", [{ type: "link", to: "#item/nowhere/x" }, { at: { x1: 0, y1: 900 } }])).value;
+		assert.equal(gone.opacity, 0.45);
+		const bad = await call("canvas.insert", [{ type: "link", to: "risks", open: "window" }]);
+		assert.ok(!bad.ok && /open is how the link opens/.test(bad.error ?? ""), bad.error);
+		const none = await call("canvas.insert", [{ type: "link", to: "no-such-thing" }]);
+		assert.ok(!none.ok && /Nor is it an item's id on this canvas/.test(none.error ?? ""), none.error);
+	} finally {
+		cleanup();
+	}
+});

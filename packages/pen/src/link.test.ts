@@ -31,3 +31,24 @@ test("a link chip is a pill of plain pen items tagged with its address, and says
 	assert.equal(chipLink({ metadata: { type: "decks.shape", kind: "rounded" } }), undefined);
 	assert.equal(chipLink({ metadata: { type: "decks.link", to: "https://example.com" } }), undefined);
 });
+
+test("an item's address names its canvas and id, slashes and all, and says how it opens", async () => {
+	const { deckLinkOf, itemLinkOf, itemLinkTo, linkOpenFor, linkOpenOf, withLinkOpen } = await import("./link.ts");
+	const address = itemLinkTo("shared/ana/plan", "card-1/label");
+	assert.equal(address, "#item/shared%2Fana%2Fplan/card-1%2Flabel");
+	assert.deepEqual(itemLinkOf(address), { canvas: "shared/ana/plan", id: "card-1/label" });
+	assert.deepEqual(deckLinkOf(address), { kind: "item", target: "shared/ana/plan/card-1/label" });
+	// Unsaid: an item or a card on the canvas, the rest in a tab.
+	assert.equal(linkOpenFor(address), "canvas");
+	assert.equal(linkOpenFor("#card/canvases/x/cards/a/index.html"), "canvas");
+	assert.equal(linkOpenFor("#canvas/x"), "tab");
+	assert.equal(linkOpenFor("#app/notes"), "tab");
+	// Said, it wins, and the address still names the same thing.
+	const tab = withLinkOpen(address, "tab");
+	assert.equal(tab, `${address}?open=tab`);
+	assert.equal(linkOpenOf(tab), "tab");
+	assert.equal(linkOpenFor(tab), "tab");
+	assert.deepEqual(itemLinkOf(tab), { canvas: "shared/ana/plan", id: "card-1/label" });
+	assert.deepEqual(deckLinkOf("#canvas/x?open=canvas"), { kind: "canvas", target: "x" });
+	assert.equal(withLinkOpen(tab, undefined), address);
+});

@@ -1,4 +1,4 @@
-import { chipLink, chipTitle, deckLinkOf, deckLinkTo, LINK_CHIP, walk, type Op, type PenNode } from "@decks/pen";
+import { chipLink, chipTitle, deckLinkOf, deckLinkTo, itemLinkOf, itemLinkTo, LINK_CHIP, linkOpenOf, walk, withLinkOpen, type Op, type PenNode } from "@decks/pen";
 import { canvasFolder } from "@decks/hub/layout";
 import type { CanvasPens } from "./pens.ts";
 
@@ -22,6 +22,7 @@ function within(address: string, canvas: string): "canvas" | "inside" | undefine
 	const link = deckLinkOf(address);
 	if (!link) return undefined;
 	if (link.kind === "canvas") return link.target === canvas ? "canvas" : undefined;
+	if (link.kind === "item") return itemLinkOf(address)?.canvas === canvas ? "inside" : undefined;
 	return link.kind !== "app" && link.target.startsWith(`${canvasFolder(canvas)}/`) ? "inside" : undefined;
 }
 
@@ -30,7 +31,9 @@ function moved(address: string, from: string, to: string): string {
 	const link = deckLinkOf(address);
 	const part = within(address, from);
 	if (!link || !part) return address;
-	return part === "canvas" ? deckLinkTo("canvas", to) : deckLinkTo(link.kind, `${canvasFolder(to)}/${link.target.slice(canvasFolder(from).length + 1)}`);
+	const open = linkOpenOf(address);
+	if (link.kind === "item") return itemLinkTo(to, itemLinkOf(address)!.id, open);
+	return withLinkOpen(part === "canvas" ? deckLinkTo("canvas", to) : deckLinkTo(link.kind, `${canvasFolder(to)}/${link.target.slice(canvasFolder(from).length + 1)}`), open);
 }
 
 /** The edits one drawing needs for a change: none for most. */

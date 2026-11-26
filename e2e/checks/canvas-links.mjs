@@ -39,13 +39,14 @@ const plan = card("plan");
 const words = (id, content) => ({ type: "text", id, content, fontSize: 30, textGrowth: "fixed-width", width: 460, metadata: { type: "decks.markdown" } });
 const placed = await call("canvas.batch", [
 	[
-		{ op: "insert", item: words("to-card", `[The plan, whole](#card/${plan})`), at: { x1: 0, y1: -400 } },
+		{ op: "insert", item: words("to-card", `[The plan, whole](#card/${plan}?open=tab)`), at: { x1: 0, y1: -400 } },
+		{ op: "insert", item: words("to-card-fly", `[The plan, where it is](#card/${plan})`), at: { x1: 0, y1: -480 } },
 		{ op: "insert", item: words("to-canvas", `[Over to tab two](#canvas/${second})`), at: { x1: 0, y1: -320 } },
 		{ op: "insert", item: words("to-gone", "[A canvas long gone](#canvas/nowhere-at-all)"), at: { x1: 0, y1: -240 } },
 	],
 	{ canvas: CANVAS },
 ]);
-say("three lines of words, each a link to something in the deck", placed.ok === true, JSON.stringify(placed).slice(0, 240));
+say("four lines of words, each a link to something in the deck", placed.ok === true, JSON.stringify(placed).slice(0, 240));
 
 // Wide, so the row shows every tab this opens.
 const { browser, page, errors } = await open({ width: 1800, height: 900, scheme: "light" });
@@ -73,7 +74,7 @@ const show = async (ids) => {
 	}
 	await settle(page, 600);
 };
-await show(["to-card", "to-canvas", "to-gone"]);
+await show(["to-card-fly", "to-card", "to-canvas", "to-gone"]);
 if (process.env.LOOK_SHOTS) await page.screenshot({ path: `${process.env.LOOK_SHOTS}/links-words.png` });
 /** A point on a drawn item, on screen: the canvas's frame fills the window, so its points are the page's. */
 const middle = async (id) => {
@@ -98,17 +99,26 @@ const toCanvas = async () => {
 };
 const firstTitle = await cameraName();
 
-say("a press on a link to a card opens the card as a tab, in front", (await press("to-card")) && JSON.stringify(await until(async () => ((await row()).includes("card*") ? row() : undefined))) === '["canvas","card*"]' && (await page.evaluate(() => location.hash)) === `#card/${plan}`, JSON.stringify(await row()));
+say("a press on a link to a card that says open=tab opens the card as a tab, in front", (await press("to-card")) && JSON.stringify(await until(async () => ((await row()).includes("card*") ? row() : undefined))) === '["canvas","card*"]' && (await page.evaluate(() => location.hash)) === `#card/${plan}`, JSON.stringify(await row()));
 await toCanvas();
 say("pressed again it comes forward, and no second tab is made", (await press("to-card")) && JSON.stringify(await until(async () => ((await row()).includes("card*") ? row() : undefined))) === '["canvas","card*"]', JSON.stringify(await row()));
 await toCanvas();
 
-// --- with ⌘, the browser's tab ---------------------------------------------------------------------------------------
-const popup = page.context().waitForEvent("page", { timeout: 5000 }).catch(() => undefined);
-await press("to-card", ["Meta"]);
-const opened = await popup;
-say("with ⌘ held the link opens the browser's tab, at this window's address with the card's after #", !!opened && opened.url().endsWith(`#card/${plan}`) && JSON.stringify(await row()) === '["canvas*","card"]', `${opened?.url()} ${JSON.stringify(await row())}`);
-await opened?.close().catch(() => {});
+// --- a link to a card that says nothing: the view flies to the card on its canvas; with ⌘, a tab ---------------------
+const camera = () => canvasFrame(page).then((frame) => frame.evaluate(() => ({ ...globalThis.__decksProbes.rust.camera })));
+const planBox = (await call("canvas.read", [{ canvas: CANVAS, of: plan, depth: 0 }])).value?.items?.[0]?.box;
+const cameraBefore = await camera();
+await press("to-card-fly");
+const flown = await until(async () => {
+	const now = await camera();
+	return planBox && now.x > planBox.x1 && now.x < planBox.x2 && now.y > planBox.y1 && now.y < planBox.y2 ? now : undefined;
+}, 5000);
+say("a press on a link to a card, opening unsaid, flies the view to the card on its canvas and opens no tab", !!flown && JSON.stringify(await row()) === '["canvas*","card"]', `${JSON.stringify({ cameraBefore, now: await camera(), planBox })} ${JSON.stringify(await row())}`);
+await show(["to-card-fly", "to-card", "to-canvas", "to-gone"]);
+await press("to-card-fly", ["Meta"]);
+say("with ⌘ held the same link opens a tab of this window, whatever it says", JSON.stringify(await until(async () => ((await row()).includes("card*") ? row() : undefined))) === '["canvas","card*"]', JSON.stringify(await row()));
+await toCanvas();
+await show(["to-card-fly", "to-card", "to-canvas", "to-gone"]);
 
 // --- a link to nothing -----------------------------------------------------------------------------------------------
 await press("to-gone");

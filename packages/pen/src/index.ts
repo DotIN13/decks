@@ -13,5 +13,5 @@ export * from "./values.ts";
 export { ARROW, ARROW_SIDES, bendsArrow, bentArrows, arrowBend, arrowEnd, arrowEndAt, arrowMiddle, arrowEndItem, arrowEndSide, arrowLabel, arrowPoints, arrowRoute, arrowShape, arrowStyle, isArrow, isPointEnd, moveArrowEnds, reroute, routeArrow, sidedRoute, sidePoint, type ArrowHeads, type ArrowRouter, type ArrowRoute, type ArrowSide, type ArrowStyle } from "./arrows.ts";
 export { darkAxis, DECKS_COLORS, DECKS_LEGACY, decksColorOf, expandVariables, shortVariables, withDecksColors } from "./colors.ts";
 export { fitShapes, isShape, makeLabel, makeShape, maxRadius, roundedGeometry, SHAPE, SHAPE_GROUPS, SHAPES, shapeKind, shapeLabel, shapeOutline, shapeRadius, type ShapeGroup, type ShapeKind } from "./shapes.ts";
-export { chipLink, chipTitle, deckLinkOf, deckLinkTo, isDeckLink, LINK_CHIP, linkChip, type LinkKind } from "./link.ts";
+export { chipLink, chipTitle, deckLinkOf, deckLinkTo, isDeckLink, itemLinkOf, itemLinkTo, LINK_CHIP, linkChip, linkOpenFor, linkOpenOf, withLinkOpen, type LinkKind, type LinkOpen } from "./link.ts";
 export { CLIP_TYPE, clipFromHtml, clipHtml, clipItems, clipText, parseClip, pastedItems, type Clip } from "./clip.ts";

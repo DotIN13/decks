@@ -193,6 +193,8 @@ const CHECKS = [
 	{ file: "tab-about.mjs", needsAgent: false },
 	{ file: "tab-row.mjs", needsAgent: false },
 	{ file: "canvas-links.mjs", needsAgent: false },
+	/* A link to any item: on the canvas the view flies to it, on its own canvas when that is another. */
+	{ file: "link-items.mjs", needsAgent: false },
 	{ file: "app-window.mjs", needsAgent: false },
 	{ file: "app-window-touch.mjs", needsAgent: false },
 	{ file: "app-reload.mjs", needsAgent: false },

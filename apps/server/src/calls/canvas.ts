@@ -18,7 +18,7 @@ import { freeSpot, type Side } from "./space.ts";
 import { exportPage } from "./export.ts";
 import { resolveInDeck } from "../deck/roots.ts";
 import { heldClip, holdClip, pasteItems } from "./paste.ts";
-import { linkFromItem, linkToItem } from "./link-item.ts";
+import { itemFinder, linkFromItem, linkToItem } from "./link-item.ts";
 
 /**
  * An agent's shape with no colour given gets the colours the canvas tools give theirs, the drawing's
@@ -188,7 +188,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			return { ...others, type: "browser", name: named ?? basename(file), width: typeof width === "number" ? width : 1000, height: typeof height === "number" ? height : 1100, metadata: { type: "decks.document", path: file } };
 		}
 		// A link to something in the deck, `{ type: "link", to }`: the chip the file keeps (`link-item.ts`).
-		if (item.type === "link") return linkFromItem(ctx, item as Record<string, unknown>);
+		if (item.type === "link") return linkFromItem(ctx, item as Record<string, unknown>, itemFinder(ctx, () => onCanvas));
 		// A document item given as it reads back (`browser`, tagged `decks.document`): its path as the deck names the file, the same way.
 		if (item.type === "browser" && (item.metadata as { type?: unknown; path?: unknown } | undefined)?.type === "decks.document" && typeof (item.metadata as { path?: unknown }).path === "string") {
 			const meta = item.metadata as { path: string };
