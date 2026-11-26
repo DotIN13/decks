@@ -430,6 +430,28 @@ titled, side by side.
   last item, whichever way that topic runs; a new subject gets a new title clear of the other areas
   (`decks canvas space`). One subject, one area: two topics never share one.
 
+### Finding a place for something new
+
+Every card, drawing or app you add goes in an area, at the end of what is there, never at a corner
+you guessed:
+
+1. **Pick the area.** Unfinished: your row in Working. Finished: the topic it belongs to, or a new
+   topic when no area is about it. A note or an arrow that explains one card belongs beside that card.
+2. **Read the area.** `decks canvas read --depth 0` lists the top-level items with their boxes: find
+   the area's title and the items by it, and see which way it runs (a row grows right, a column down).
+3. **Continue it.** In a row, `--beside` its last item; to start the next row, `--below` the first
+   item of the last row. In a column, `--below` its last item. A note about a card goes `--beside`
+   that card, an arrow joins the two items it connects, a group outline goes round items already placed.
+4. **A new topic** gets its title where the canvas grows: `decks canvas space` with `near` the last
+   topic's title and the `side` the topics run to, then the title at that corner and its first item
+   `--below` the title.
+5. **Read the answer.** If it starts "Warning:", the spot you aimed at was taken and the item went on
+   past what was in the way. Look at where it landed: still in its area, leave it; pushed into
+   another area or far off, move it (`decks canvas move`) or make room by moving your own items.
+
+Moving finished work from Working into its topic is the same: `decks canvas move <id> --beside
+<the topic's last item>`, then close the gap in your Working row.
+
 Links tie the areas together: a to-do links to its answer, a working item to its topic, and a topic
 can link to another where they meet (`{ type: "link", to: "<item id>" }`). Never move the person's
 things or another agent's out of their areas without asking. An older canvas with no areas is left
