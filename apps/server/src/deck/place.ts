@@ -7,8 +7,8 @@
  * put a new board below every board the stage had ever had a place for: a column a million
  * pixels tall.
  *
- * The rule here is: **a board joins the stage beside the stage's newest board, in the nearest
- * open slot**, clear of every board and every drawn item already there. The first board on an
+ * The rule here is: **a board joins the stage beside the stage's newest board, stepping on to the
+ * right past every board and drawn item in the way** (`@decks/deck-kit`, aim then step clear). The first board on an
  * empty stage goes at the origin.
  *
  * **It reads what is on the stage, and nothing about who is watching.** The anchor used to be the
@@ -22,6 +22,8 @@
  * the list of what is on the stage and the drawing around it.
  */
 
+import { GAP, placeBy, stepClear } from "@decks/deck-kit";
+
 export interface Box {
 	x: number;
 	y: number;
@@ -30,7 +32,7 @@ export interface Box {
 }
 
 /** Space left between boards. The same number `deck/loader.ts` lays its fallback rows on. */
-export const GUTTER = 160;
+export const GUTTER = GAP;
 
 const touching = (a: Box, b: Box, gap: number): boolean =>
 	a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
@@ -46,58 +48,18 @@ export function bounds(boxes: readonly Box[]): Box | undefined {
 }
 
 /**
- * The nearest free spot to an anchor, for a board of this size.
- *
- * The candidates are the anchor itself and the edges of the boards already on the canvas — to
- * the right of each, below each, to the left of each — so a board that cannot land where it was
- * aimed lands *tidily* beside something rather than nudged a few pixels clear of it.
- *
- * The nearest of those to the anchor wins, which works out as **the short way round whatever is
- * in the way**: past the side of a board that is taller than it is wide, underneath one that is
- * wider than it is tall. That is what keeps a canvas compact instead of growing in one direction.
- * Equal distances go to the right, and when every candidate is taken the board goes to the right
- * of everything.
- */
-export function freeSpot(anchor: { x: number; y: number }, size: { w: number; h: number }, occupied: readonly Box[]): { x: number; y: number } {
-	const middle = (spot: { x: number; y: number }) => ({ x: spot.x + size.w / 2, y: spot.y + size.h / 2 });
-	const aimed = { x: Math.round(anchor.x - size.w / 2), y: Math.round(anchor.y - size.h / 2) };
-	const candidates = [
-		aimed,
-		...occupied.flatMap((box) => [
-			{ x: box.x + box.w + GUTTER, y: box.y },
-			{ x: box.x, y: box.y + box.h + GUTTER },
-			{ x: box.x - size.w - GUTTER, y: box.y },
-		]),
-	];
-	const free = candidates.filter((spot) => !occupied.some((box) => touching({ ...spot, ...size }, box, GUTTER / 2)));
-	let best: { x: number; y: number } | undefined;
-	let closest = Infinity;
-	for (const spot of free) {
-		const from = middle(spot);
-		const distance = Math.hypot(from.x - anchor.x, from.y - anchor.y);
-		if (distance < closest) {
-			closest = distance;
-			best = spot;
-		}
-	}
-	if (best) return { x: Math.round(best.x), y: Math.round(best.y) };
-	const cluster = bounds(occupied);
-	return cluster ? { x: Math.round(cluster.x + cluster.w + GUTTER), y: Math.round(cluster.y) } : aimed;
-}
-
-/**
- * Where a board joins a stage: just right of the stage's newest board, top edges level, or the
- * nearest open slot to that when it is taken. With nothing on the stage, the origin.
+ * Where a board joins a stage: aimed just right of the stage's newest board, top edges level, then
+ * on to the right past whatever is in the way (`@decks/deck-kit`, `stepClear`), so a row of
+ * newcomers stays a row. With nothing on the stage, the origin.
  *
  * `newest` is the board last put on the stage, not the right-hand end of all of them: "beside
  * the board you were just shown" is the near that matters, and a row that has wrapped back or a
  * board dragged away should not drag every newcomer to the far edge.
  */
 export function joinSpot(size: { w: number; h: number }, newest: Box | undefined, occupied: readonly Box[]): { x: number; y: number } {
-	const aim = newest
-		? { x: newest.x + newest.w + GUTTER + size.w / 2, y: newest.y + size.h / 2 }
-		: { x: size.w / 2, y: size.h / 2 };
-	return freeSpot(aim, size, occupied);
+	const aim = newest ? placeBy(newest, "beside") : { x1: 0, y1: 0 };
+	const spot = stepClear(occupied, size, aim, "right", GUTTER);
+	return { x: spot.x1, y: spot.y1 };
 }
 
 /**

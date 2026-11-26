@@ -28,3 +28,17 @@ test("with nothing named, the free spot nearest the middle of everything, clear 
 	for (const item of items) assert.ok(!(grown.x < item.x + item.w && item.x < grown.x + grown.w && grown.y < item.y + item.h && item.y < grown.y + grown.h), JSON.stringify(spot));
 	assert.ok(Math.abs(spot.x1 + 200 - 700) <= 300, JSON.stringify(spot));
 });
+
+test("aim, then step clear: a clear aim is kept; a taken one goes on its way, or to the nearest clear corner", async () => {
+	const { stepClear } = await import("@decks/deck-kit");
+	const a = box(0, 0, 400, 300);
+	assert.deepEqual(stepClear([a], { w: 200, h: 200 }, { x1: 560, y1: 0 }, "right"), { x1: 560, y1: 0, past: 0 });
+	const row = [a, box(600, 0, 300, 300), box(1000, 50, 300, 300)];
+	// Right: past both, tops kept where the aim had them.
+	assert.deepEqual(stepClear(row, { w: 200, h: 200 }, { x1: 560, y1: 0 }, "right"), { x1: 1460, y1: 0, past: 2 });
+	// Down: past what is under, lefts kept.
+	assert.deepEqual(stepClear([a, box(0, 500, 300, 300)], { w: 200, h: 200 }, { x1: 0, y1: 460 }, "down"), { x1: 0, y1: 960, past: 1 });
+	// Near: the clear corner nearest the aim, clear by the margin.
+	const near = stepClear([box(0, 0, 1000, 1000)], { w: 100, h: 100 }, { x1: 450, y1: 50 }, "near", 40);
+	assert.deepEqual(near, { x1: 450, y1: -140, past: 1 });
+});

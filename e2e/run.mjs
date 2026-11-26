@@ -173,6 +173,8 @@ const CHECKS = [
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/* Two cards selected and dragged together both move by the hand, and stay where they were dropped. */
 	{ file: "group-drag.mjs", needsAgent: false },
+	/* A file dropped where something is drawn lands beside it, the nearest clear spot, not over it. */
+	{ file: "drop-clear.mjs", needsAgent: false },
 	/* Every edit a person makes, with the server's answer held back: none shows the drawing as it was before it. Eight minutes, so by name. */
 	{ file: "edits-wait.mjs", needsAgent: false, named: true },
 	/* The arrow keys pressed fast and held on items and boards, with the answers held back: each press drawn at once, the server at the sum. Minutes, so by name. */

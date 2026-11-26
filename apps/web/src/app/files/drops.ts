@@ -15,7 +15,7 @@ import { can } from "../../connections/backend.ts";
 import { formatBytes, formatNumber, m } from "@decks/i18n";
 import { switchTo } from "../../connections/connection.ts";
 import { ensureWorker } from "../../connections/worker.ts";
-import { editDrawing, stageOnScreen } from "../../state/decks.ts";
+import { act, editDrawing, stageOnScreen } from "../../state/decks.ts";
 import { viewOnly } from "../../state/canvases.ts";
 import { authedSrc } from "../../lib/authed.tsx";
 
@@ -102,7 +102,7 @@ const percent = (fraction: number) => formatNumber(fraction, { style: "percent" 
  * are stored once, and nothing is ever overwritten (`files/upload.ts`).
  *
  * **Nothing goes into a board.** A drop lands on the canvas where it was let go, over a board or
- * not; a paste lands on the canvas in the middle of the view; the input bar mentions the path
+ * not; a paste lands on the canvas in the middle of the view, or the clear spot nearest it; the input bar mentions the path
  * where the caret is.
  */
 export function createFileDrops() {
@@ -206,6 +206,33 @@ export function createFileDrops() {
 		report.done([paths.length ? (paths.length === 1 ? m.files_put_canvas_one({ name: files[0]?.name ?? "" }) : m.files_put_canvas_many({ count: paths.length })) : "", ...failures].filter(Boolean).join("; ") || undefined, failures.length ? "warn" : "info");
 	};
 
+	/**
+	 * What a drop puts down, moved as one block to the clear spot nearest where it was aimed
+	 * (`canvas.space` with `around`, the shared rule in `@decks/deck-kit`): it lands beside what is
+	 * there, never over it. Kept close (`DROP_MARGIN`), since the person chose the place. A box
+	 * without a height is taken as `fallback` tall; on any refusal the ops go as they were.
+	 */
+	const DROP_MARGIN = 40;
+	const clearOf = async <T,>(ops: T[], fallback = 240): Promise<T[]> => {
+		type Corner = { x1: number; y1: number; x2?: number; y2?: number };
+		const boxes = ops.map((op) => (op as { box?: Corner }).box).filter((box): box is Corner => !!box);
+		if (boxes.length === 0) return ops;
+		const x1 = Math.min(...boxes.map((box) => box.x1));
+		const y1 = Math.min(...boxes.map((box) => box.y1));
+		const x2 = Math.max(...boxes.map((box) => box.x2 ?? box.x1 + fallback));
+		const y2 = Math.max(...boxes.map((box) => box.y2 ?? box.y1 + fallback));
+		const canvas = stageOnScreen();
+		const at = await act<{ x1: number; y1: number }>("canvas.space", [{ w: x2 - x1, h: y2 - y1 }, { around: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 }, margin: DROP_MARGIN, ...(canvas ? { canvas } : {}) }]).catch(() => undefined);
+		const dx = at ? at.x1 - x1 : 0;
+		const dy = at ? at.y1 - y1 : 0;
+		if (!dx && !dy) return ops;
+		return ops.map((op) => {
+			const box = (op as { box?: Corner }).box;
+			if (!box) return op;
+			return { ...op, box: { ...box, x1: box.x1 + dx, y1: box.y1 + dy, ...(box.x2 !== undefined ? { x2: box.x2 + dx } : {}), ...(box.y2 !== undefined ? { y2: box.y2 + dy } : {}) } };
+		});
+	};
+
 	/** An SVG is a picture shown live on the canvas (`liveFileItem`). */
 	const LIVE = /\.svg$/i;
 
@@ -221,14 +248,14 @@ export function createFileDrops() {
 		if (agentId && live.length) {
 			const files = [];
 			for (const path of live) files.push({ path, preview: await previewOf(path) });
-			void editDrawing(agentId, liveFileOps(files, middle, fresh, fromStage));
+			await editDrawing(agentId, await clearOf(liveFileOps(files, middle, fresh, fromStage), 400));
 		}
 		const paths = all.filter((one) => !LIVE.test(one));
 		if (!agentId || paths.length === 0) return;
 		const files = [];
 		// Its path from the stage's own folder, as a file's chip in a card has it, so a double-click opens it (`openFileOf`).
 		for (const path of paths) files.push({ path: fromStage(path), preview: await previewOf(path) });
-		void editDrawing(agentId, fileCardOps(files, middle, fresh, fromStage));
+		await editDrawing(agentId, await clearOf(fileCardOps(files, middle, fresh, fromStage)));
 	};
 
 	/**
@@ -294,7 +321,7 @@ export function createFileDrops() {
 		}
 		if (items.length > 0) {
 			const stamp = Date.now().toString(36);
-			void editDrawing(agentId, rowOps(items, middle, (i) => `drop-${stamp}-${i}`));
+			await editDrawing(agentId, await clearOf(rowOps(items, middle, (i) => `drop-${stamp}-${i}`)));
 		}
 		const added = items.length === 0 ? "" : items.length === 1 ? m.files_put_canvas_one({ name: files[0]?.name ?? "" }) : m.files_put_canvas_many({ count: items.length });
 		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");

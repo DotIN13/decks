@@ -112,9 +112,10 @@ export interface Verbs {
 		 * where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside).
 		 * With `near` (an id or a card's path) it starts on that item's `side` (right; or below, left,
 		 * above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the
-		 * way. Nothing is placed: give the corner to insert or move as `at`.
+		 * way. With `around` (a canvas point) it is the clear corner nearest a box centred there. Nothing
+		 * is placed: give the corner to insert or move as `at`.
 		 */
-		space(size: { w: number; h: number }, options?: { canvas?: string; frame?: string; near?: string; side?: "right" | "below" | "left" | "above"; margin?: number }): Promise<{ x1: number; y1: number }>;
+		space(size: { w: number; h: number }, options?: { canvas?: string; frame?: string; near?: string; around?: { x: number; y: number }; side?: "right" | "below" | "left" | "above"; margin?: number }): Promise<{ x1: number; y1: number }>;
 		/**
 		 * Add an item to the canvas. A card is { type: "card", card: <its folder or index.html> }, or {
 		 * type: "card", html, title?, width?, height? } to write one and place it; an app is { type: "app",
@@ -124,17 +125,19 @@ export interface Verbs {
 		 * address ("#canvas/<name>", "#card/<path>", "#doc/<path>", "#app/<name>"), which a markdown link
 		 * in a note or a text can use too: [the plan](#card/canvases/x/cards/plan/index.html); anything
 		 * else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is
-		 * its top-left corner; `beside` or `below` (an item's id or a card's path) puts it 160 px clear of
-		 * that item, tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a
-		 * `name` and no `id` takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2),
-		 * its children too; the answer has every id. Colour it with Decks's adaptive colours so it reads in
-		 * light and dark, named by role: text ("$decks-text", "$decks-text-muted"), line ("$decks-line" for
-		 * arrows, "$decks-line-strong", "$decks-line-subtle" for edges), surface ("$decks-surface", paper),
-		 * fill ("$decks-fill-slate", "$decks-fill-sky", "$decks-fill-gray", and soft "$decks-fill-red",
-		 * -orange, -yellow, -green, -blue, -purple) and accent ("$decks-accent-red", -orange, -yellow,
-		 * -green, -blue, -purple); the insert defines any the canvas lacks. A hex stays the same in both; a
-		 * top-level rectangle, ellipse, icon, empty frame or arrow given no colour gets the tools' $decks-*
-		 * colours.
+		 * its top-left corner, kept exactly, and the answer says what it covers; `beside` or `below` (an
+		 * item's id or a card's path) aims 160 px clear of that item, tops or lefts aligned, and when that
+		 * is taken goes on the same way until it is 160 px clear of everything; nothing said aims beside
+		 * the newest item and goes on right the same way; `parent` and `index` put it inside a frame. An
+		 * item with a `name` and no `id` takes its name as its id ("Pricing card" → pricing-card, then
+		 * pricing-card-2), its children too; the answer has every id. Colour it with Decks's adaptive
+		 * colours so it reads in light and dark, named by role: text ("$decks-text", "$decks-text-muted"),
+		 * line ("$decks-line" for arrows, "$decks-line-strong", "$decks-line-subtle" for edges), surface
+		 * ("$decks-surface", paper), fill ("$decks-fill-slate", "$decks-fill-sky", "$decks-fill-gray", and
+		 * soft "$decks-fill-red", -orange, -yellow, -green, -blue, -purple) and accent
+		 * ("$decks-accent-red", -orange, -yellow, -green, -blue, -purple); the insert defines any the
+		 * canvas lacks. A hex stays the same in both; a top-level rectangle, ellipse, icon, empty frame or
+		 * arrow given no colour gets the tools' $decks-* colours.
 		 */
 		insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/**
@@ -147,8 +150,9 @@ export interface Verbs {
 		/** Take an item off the canvas. A card's folder stays in the deck. */
 		delete(id: string, options?: { canvas?: string; frame?: string }): Promise<{ deleted: string }>;
 		/**
-		 * Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame
-		 * (`parent`, `index`; null for the canvas itself).
+		 * Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`, going on past
+		 * whatever is in the way, as insert does), or into a frame (`parent`, `index`; null for the canvas
+		 * itself).
 		 */
 		move(id: string, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/** Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`. */

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { freeSpot, GUTTER, joinPlaces, joinSpot, keepsPlace } from "./place.ts";
+import { GUTTER, joinPlaces, joinSpot, keepsPlace } from "./place.ts";
 
 const overlap = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
 	a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -21,7 +21,7 @@ test("near means the newest board, not the far edge of all of them", () => {
 	assert.deepEqual(spot, { x: 1000 + GUTTER, y: 0 });
 });
 
-test("a taken slot sends the board to the nearest open one, clear of what is there", () => {
+test("a taken slot sends the board on to the next open one, clear of what is there", () => {
 	const newest = { x: 0, y: 0, w: 1000, h: 800 };
 	const note = { x: 1100, y: 0, w: 400, h: 300 };
 	const spot = joinSpot({ w: 1000, h: 800 }, newest, [newest, note]);
@@ -55,22 +55,11 @@ test("a place is kept when it is beside the stage's boards, and dropped when it 
 	assert.equal(keepsPlace({ x: 0, y: 900_000, ...size }, []), true, "the first board back on an empty stage");
 });
 
-test("with every candidate taken, a board goes to the right of everything rather than on top", () => {
-	const wall = Array.from({ length: 4 }, (_, index) => ({ x: index * 1160, y: 0, w: 1000, h: 800 }));
-	const spot = freeSpot({ x: 0, y: 0 }, { w: 1000, h: 800 }, wall);
-	for (const box of wall) assert.equal(overlap({ ...spot, w: 1000, h: 800 }, box), false);
-});
-
-test("the nearest free spot wins, which is the short way round the board in the way", () => {
-	const tall = { x: -500, y: -600, w: 1000, h: 1200 };
-	const beside = freeSpot({ x: 0, y: 0 }, { w: 1000, h: 1200 }, [tall]);
-	assert.ok(beside.x >= tall.x + tall.w, "a tall board is passed at the side: 1000 across beats 1200 down");
-	assert.equal(beside.y, tall.y, "and kept in line with it");
-
-	const wide = { x: -900, y: -300, w: 1800, h: 600 };
-	const under = freeSpot({ x: 0, y: 0 }, { w: 1800, h: 600 }, [wide]);
-	assert.ok(under.y >= wide.y + wide.h, "a wide one is passed underneath, for the same reason");
-	assert.equal(under.x, wide.x, "and kept in line with it");
+test("a slot taken sends the board on to the right, past everything in the way, tops still level", () => {
+	const newest = { x: 0, y: 0, w: 1000, h: 800 };
+	const wall = Array.from({ length: 3 }, (_, index) => ({ x: 1160 + index * 1160, y: 100, w: 1000, h: 800 }));
+	const spot = joinSpot({ w: 1000, h: 800 }, newest, [newest, ...wall]);
+	assert.deepEqual(spot, { x: 1160 * 4, y: 0 });
 });
 
 test("a place the caller names is kept exactly, however far or crowded, and the rest keep clear of it", () => {

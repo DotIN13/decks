@@ -116,9 +116,12 @@ const file = await decks.canvas.file();               // "canvases/<name>/canvas
   what the file holds, plus **`box: { x1, y1, x2, y2 }`**: where it is on the canvas; a card reads
   as `{ type: "card", card, title, width, height, box }`. An instance (`type: "ref"`) also lists
   `inside`, the items in its copy with their id paths and boxes.
-- **`beside` and `below`** take an item's id or a card's path and put the item 160 px clear of
+- **`beside` and `below`** take an item's id or a card's path and aim the item 160 px clear of
   that item's box: `beside` to its right with the tops aligned, `below` under it with the lefts
-  aligned. They work for any item, a note under a card or a card beside a note.
+  aligned. When that spot is taken it goes on the same way, right or down, until it is 160 px
+  clear of everything, and a note says so. They work for any item, a note under a card or a card
+  beside a note. With no place given it aims beside the newest item and goes on right the same
+  way. **`at`** is kept exactly, even over something; a note names what it covers.
 - Each call answers with the item as it now is, box included; `batch` with one per op. A note says
   what happened that you did not ask for (a size the layout overrode, a place chosen because you
   gave none). If any op of a batch fails, none is saved, and the error names the op and why.

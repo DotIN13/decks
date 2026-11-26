@@ -367,3 +367,37 @@ test("a link is placed by what it opens, kept as a tagged pill, and read back as
 		cleanup();
 	}
 });
+
+test("placed beside, below or nowhere, an item aims there and steps on past what is in the way; a corner given is kept and what it covers said", async () => {
+	const { must, cleanup } = await open();
+	try {
+		const box = async (id: string) => (await must("canvas.read", [{ of: id }])).value.items[0].box;
+		const rect = (name: string, width: number, height: number) => ({ type: "rectangle", name, width, height });
+		await must("canvas.insert", [rect("A", 400, 300), { at: { x1: 0, y1: 0 } }]);
+		// Something already where "beside A" aims (x 560), and something where "below A" aims (y 460).
+		await must("canvas.insert", [rect("Right", 300, 300), { at: { x1: 600, y1: 50 } }]);
+		await must("canvas.insert", [rect("Under", 300, 300), { at: { x1: 20, y1: 500 } }]);
+		const beside = await must("canvas.insert", [rect("Beside", 200, 200), { beside: "a" }]);
+		assert.deepEqual(await box("beside"), { x1: 1060, y1: 0, x2: 1260, y2: 200 }, "on right, past Right, tops still level with A");
+		assert.ok(beside.notes.some((note) => /aimed at x1 560, y1 0, which was taken: it went on right past 1 item, to x1 1060/.test(note)), beside.notes.join(" | "));
+		await must("canvas.insert", [rect("Below", 200, 200), { below: "a" }]);
+		assert.deepEqual(await box("below"), { x1: 0, y1: 960, x2: 200, y2: 1160 }, "on down, past Under, lefts still level with A");
+		// Nowhere said: beside the newest (Below), and on past nothing, so right where it aimed.
+		const free = await must("canvas.insert", [rect("Free", 100, 100)]);
+		assert.deepEqual(await box("free"), { x1: 360, y1: 960, x2: 460, y2: 1060 });
+		assert.ok(free.notes.some((note) => /went beside below, at x1 360, y1 960/.test(note)), free.notes.join(" | "));
+		// A batch: each new item keeps clear of the ones before it.
+		await must("canvas.batch", [[{ op: "insert", item: rect("One", 200, 200), beside: "a" }, { op: "insert", item: rect("Two", 200, 200), beside: "a" }]]);
+		assert.equal((await box("one")).x1, 1420);
+		assert.equal((await box("two")).x1, 1780);
+		// A corner given is the caller's decision: kept, and what it covers is said.
+		const over = await must("canvas.insert", [rect("Over", 100, 100), { at: { x1: 50, y1: 50 } }]);
+		assert.deepEqual(await box("over"), { x1: 50, y1: 50, x2: 150, y2: 150 });
+		assert.ok(over.notes.some((note) => /over sits over a: a corner given with at is kept as given/.test(note)), over.notes.join(" | "));
+		// Moved beside another, as an insert: on past what is in the way.
+		await must("canvas.move", ["free", { beside: "a" }]);
+		assert.equal((await box("free")).x1, 2140);
+	} finally {
+		cleanup();
+	}
+});

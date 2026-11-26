@@ -9,7 +9,7 @@
  *
  * - `text-files.ts`: a path a caller may name, and a text file read in part, edited and searched.
  * - `cards.ts`: a card's name from its title, the file a new card starts as, and what its head says.
- * - `place.ts`: where an item goes when it is put beside or below another.
+ * - `place.ts`: where an item goes on a canvas: aim, then step clear (`stepClear`).
  */
 export * from "./text-files.ts";
 export * from "./cards.ts";

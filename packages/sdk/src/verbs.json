@@ -68,8 +68,8 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "read",
-  "summary": "Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside). With `near` (an id or a card's path) it starts on that item's `side` (right; or below, left, above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the way. Nothing is placed: give the corner to insert or move as `at`.",
-  "signature": "canvas.space(size: { w: number; h: number }, options?: { canvas?: string; frame?: string; near?: string; side?: \"right\" | \"below\" | \"left\" | \"above\"; margin?: number })",
+  "summary": "Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside). With `near` (an id or a card's path) it starts on that item's `side` (right; or below, left, above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the way. With `around` (a canvas point) it is the clear corner nearest a box centred there. Nothing is placed: give the corner to insert or move as `at`.",
+  "signature": "canvas.space(size: { w: number; h: number }, options?: { canvas?: string; frame?: string; near?: string; around?: { x: number; y: number }; side?: \"right\" | \"below\" | \"left\" | \"above\"; margin?: number })",
   "returns": "{ x1: number; y1: number }",
   "params": [
    {
@@ -95,7 +95,7 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string; frame?: string; near?: string; side?: \"right\" | \"below\" | \"left\" | \"above\"; margin?: number }",
+    "type": "{ canvas?: string; frame?: string; near?: string; around?: { x: number; y: number }; side?: \"right\" | \"below\" | \"left\" | \"above\"; margin?: number }",
     "schema": {
      "type": "object",
      "properties": {
@@ -107,6 +107,22 @@
       },
       "near": {
        "type": "string"
+      },
+      "around": {
+       "type": "object",
+       "properties": {
+        "x": {
+         "type": "number"
+        },
+        "y": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "x",
+        "y"
+       ],
+       "additionalProperties": false
       },
       "side": {
        "enum": [
@@ -134,7 +150,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "change",
-  "summary": "Add an item to the canvas. A card is { type: \"card\", card: <its folder or index.html> }, or { type: \"card\", html, title?, width?, height? } to write one and place it; an app is { type: \"app\", app: <name> } and a document { type: \"document\", path }; a link is { type: \"link\", to }, a small chip that opens what it points at as a tab when pressed, where `to` is what view.open takes (a canvas's name or title, a card's or a document's path, an app's name) and reads back as its address (\"#canvas/<name>\", \"#card/<path>\", \"#doc/<path>\", \"#app/<name>\"), which a markdown link in a note or a text can use too: [the plan](#card/canvases/x/cards/plan/index.html); anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or `below` (an item's id or a card's path) puts it 160 px clear of that item, tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a `name` and no `id` takes its name as its id (\"Pricing card\" → pricing-card, then pricing-card-2), its children too; the answer has every id. Colour it with Decks's adaptive colours so it reads in light and dark, named by role: text (\"$decks-text\", \"$decks-text-muted\"), line (\"$decks-line\" for arrows, \"$decks-line-strong\", \"$decks-line-subtle\" for edges), surface (\"$decks-surface\", paper), fill (\"$decks-fill-slate\", \"$decks-fill-sky\", \"$decks-fill-gray\", and soft \"$decks-fill-red\", -orange, -yellow, -green, -blue, -purple) and accent (\"$decks-accent-red\", -orange, -yellow, -green, -blue, -purple); the insert defines any the canvas lacks. A hex stays the same in both; a top-level rectangle, ellipse, icon, empty frame or arrow given no colour gets the tools' $decks-* colours.",
+  "summary": "Add an item to the canvas. A card is { type: \"card\", card: <its folder or index.html> }, or { type: \"card\", html, title?, width?, height? } to write one and place it; an app is { type: \"app\", app: <name> } and a document { type: \"document\", path }; a link is { type: \"link\", to }, a small chip that opens what it points at as a tab when pressed, where `to` is what view.open takes (a canvas's name or title, a card's or a document's path, an app's name) and reads back as its address (\"#canvas/<name>\", \"#card/<path>\", \"#doc/<path>\", \"#app/<name>\"), which a markdown link in a note or a text can use too: [the plan](#card/canvases/x/cards/plan/index.html); anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner, kept exactly, and the answer says what it covers; `beside` or `below` (an item's id or a card's path) aims 160 px clear of that item, tops or lefts aligned, and when that is taken goes on the same way until it is 160 px clear of everything; nothing said aims beside the newest item and goes on right the same way; `parent` and `index` put it inside a frame. An item with a `name` and no `id` takes its name as its id (\"Pricing card\" → pricing-card, then pricing-card-2), its children too; the answer has every id. Colour it with Decks's adaptive colours so it reads in light and dark, named by role: text (\"$decks-text\", \"$decks-text-muted\"), line (\"$decks-line\" for arrows, \"$decks-line-strong\", \"$decks-line-subtle\" for edges), surface (\"$decks-surface\", paper), fill (\"$decks-fill-slate\", \"$decks-fill-sky\", \"$decks-fill-gray\", and soft \"$decks-fill-red\", -orange, -yellow, -green, -blue, -purple) and accent (\"$decks-accent-red\", -orange, -yellow, -green, -blue, -purple); the insert defines any the canvas lacks. A hex stays the same in both; a top-level rectangle, ellipse, icon, empty frame or arrow given no colour gets the tools' $decks-* colours.",
   "signature": "canvas.insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
   "returns": "Item",
   "params": [
@@ -526,7 +542,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "change",
-  "summary": "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame (`parent`, `index`; null for the canvas itself).",
+  "summary": "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`, going on past whatever is in the way, as insert does), or into a frame (`parent`, `index`; null for the canvas itself).",
   "signature": "canvas.move(id: string, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
   "returns": "Item",
   "params": [

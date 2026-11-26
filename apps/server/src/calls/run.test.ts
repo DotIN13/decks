@@ -75,7 +75,7 @@ test("GET /api/v1 lists every verb with its signature", async () => {
 			group: "canvas",
 			touches: "deck",
 			effect: "change",
-			summary: "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame (`parent`, `index`; null for the canvas itself).",
+			summary: "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`, going on past whatever is in the way, as insert does), or into a frame (`parent`, `index`; null for the canvas itself).",
 			signature: "canvas.move(id: string, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
 		});
 		assert.equal(listed.verbs.find((verb) => verb.name === "move"), undefined, "an old name is not listed");
