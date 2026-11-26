@@ -411,7 +411,7 @@ export const VERBS: readonly Verb[] = [
 		group: "agent",
 		...agentsChange,
 		summary:
-			"Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the project) or tags (up to four, for what you are doing now). `canvas` puts your chat's camera on a canvas, as view.goto does. Set the first four early in every session.",
+			"Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the project) or tags (up to four, for what you are doing now, left set when you finish so the person sees what you last worked on). `canvas` puts your chat's camera on a canvas, as view.goto does. Set the first four early in every session.",
 		params: [p("patch", AgentPatch)],
 		result: Agent,
 	},

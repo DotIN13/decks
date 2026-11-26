@@ -270,13 +270,13 @@ test("work the person sends or queues is theirs: not signed by the agent in focu
 	}
 });
 
-test("clearing your tags at the end of a turn is answered without a request to set them", async () => {
+test("clearing your tags is answered with a request to set them again: they show what you last worked on", async () => {
 	const { must, cleanup } = await open();
 	try {
 		await must("agent.update", [{ name: "Linnet", avatar: { emoji: "🐦" }, workspace: "decks", tags: ["drawing"] }]);
 		const cleared = await must("agent.update", [{ tags: [] }]);
 		assert.deepEqual(cleared.value.tags, []);
-		assert.ok(!cleared.notes.some((note) => /tags are empty/.test(note)), cleared.notes.join(" | "));
+		assert.ok(cleared.notes.some((note) => /tags are empty.*leave them set when you finish/.test(note)), cleared.notes.join(" | "));
 	} finally {
 		cleanup();
 	}

@@ -341,8 +341,9 @@ export interface Verbs {
 		me(): Promise<Agent>;
 		/**
 		 * Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the
-		 * project) or tags (up to four, for what you are doing now). `canvas` puts your chat's camera on a
-		 * canvas, as view.goto does. Set the first four early in every session.
+		 * project) or tags (up to four, for what you are doing now, left set when you finish so the person
+		 * sees what you last worked on). `canvas` puts your chat's camera on a canvas, as view.goto does.
+		 * Set the first four early in every session.
 		 */
 		update(patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }): Promise<Agent>;
 		/** Say these cards carry your work, without showing them: you become their writer. */

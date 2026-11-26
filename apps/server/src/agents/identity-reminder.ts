@@ -41,16 +41,15 @@ const ASK: Record<Gap, string> = {
 /**
  * The request, or nothing when the agent has said everything.
  *
- * `afterCall` is the reminder after a stage call, which leaves empty tags alone: an agent is told
- * to set them to `[]` when it finishes, and that last call was answered with a request to set them.
- * The head of the next message still asks (`agents/session.ts`), which is when a turn starts.
+ * Tags are kept when an agent finishes: they are how the person sees what each agent last worked
+ * on, so empty tags are asked for at the head of a message (`agents/session.ts`) and after a stage
+ * call alike (`afterCall`), and the request says to leave them set.
  */
-export function identityReminder(identity: Pick<Identity, "name" | "avatar" | "tags" | "workspace">, options: { afterCall?: boolean } = {}): string | undefined {
+export function identityReminder(identity: Pick<Identity, "name" | "avatar" | "tags" | "workspace">, _options: { afterCall?: boolean } = {}): string | undefined {
 	const gaps = identityGaps(identity);
 	if (gaps.length === 0) return undefined;
 	if (gaps.length === 1 && gaps[0] === "tags") {
-		if (options.afterCall) return undefined;
-		return `[Decks] Your tags are empty. Set them to what this turn is about with decks agent update --tags '["…"]', and to '[]' when you finish.`;
+		return `[Decks] Your tags are empty. Set them to what you are working on with decks agent update --tags '["…"]', change them when the work changes, and leave them set when you finish: they show the person what you last worked on.`;
 	}
 	return `[Decks] You have not said who you are: set it now with decks agent update ${gaps.map((gap) => ASK[gap]).join("; ")}. It is how the person and other agents find you.`;
 }

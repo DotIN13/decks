@@ -24,7 +24,7 @@ test("only the tags missing is its own, shorter reminder", () => {
 	assert.match(identityReminder({ ...whole, tags: [] }) ?? "", /Your tags are empty/);
 });
 
-test("after a stage call, empty tags are left alone: clearing them is how a turn ends", () => {
-	assert.equal(identityReminder({ ...whole, tags: [] }, { afterCall: true }), undefined);
+test("empty tags are asked for after a stage call too, and the request says to leave them set", () => {
+	assert.match(identityReminder({ ...whole, tags: [] }, { afterCall: true }) ?? "", /leave them set when you finish/);
 	assert.match(identityReminder({ ...whole, name: "Agent 2", tags: [] }, { afterCall: true }) ?? "", /--name/, "a missing name is still asked for");
 });
