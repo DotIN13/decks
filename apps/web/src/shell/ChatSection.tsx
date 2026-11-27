@@ -8,6 +8,7 @@ import { onCleanup, onMount, Show, type JSX } from "solid-js";
 import { AgentFace } from "../agents/AgentPill.tsx";
 import { Icon } from "@decks/ui";
 import { m } from "@decks/i18n";
+import { holdHandle } from "../lib/hold-handle.ts";
 
 /** What an agent is doing, said after its name: "running tools…", "waiting for you", or nothing. */
 export function stateWords(state: AgentState, name: string): string | undefined {
@@ -91,51 +92,21 @@ export function ChatSection(props: {
 		const saved = Number(localStorage.getItem(CHAT_HEIGHT_KEY) ?? "");
 		if (saved > 0) applyHeight(saved);
 	});
-	/*
-	 * The drag ends however the button comes up: on the handle, anywhere in the window, outside it,
-	 * over a board's frame (which swallows the pointer), on a lost capture, or when the window loses
-	 * focus. A move with no button held ends it too, so a release nobody reported cannot leave the
-	 * handle stuck to the pointer.
-	 */
+	/* The drag ends however the button comes up (`lib/hold-handle.ts`); the height is saved then. */
 	const startResize = (event: PointerEvent) => {
 		if (event.button !== 0 || props.folded || !section) return;
-		const handle = event.currentTarget as HTMLElement;
 		const bottom = section.getBoundingClientRect().bottom;
-		try {
-			handle.setPointerCapture(event.pointerId);
-		} catch {
-			// A capture refused still leaves the window listeners below.
-		}
 		event.preventDefault();
 		const p = panel();
 		if (p) p.dataset.chatResizing = "true";
-		let done = false;
-		const move = (m: PointerEvent) => {
-			// A mouse moved with no button held has been let go of somewhere; a finger or a pen ends on its own pointerup.
-			if (m.pointerType === "mouse" && m.buttons === 0) return end();
-			applyHeight(bottom - m.clientY);
-		};
-		const end = () => {
-			if (done) return;
-			done = true;
-			window.removeEventListener("pointermove", move, true);
-			window.removeEventListener("pointerup", end, true);
-			window.removeEventListener("pointercancel", end, true);
-			window.removeEventListener("blur", end);
-			handle.removeEventListener("lostpointercapture", end);
-			try {
-				handle.releasePointerCapture(event.pointerId);
-			} catch {
-				// Already gone.
-			}
-			if (p) delete p.dataset.chatResizing;
-			saveHeight(section?.getBoundingClientRect().height);
-		};
-		window.addEventListener("pointermove", move, true);
-		window.addEventListener("pointerup", end, true);
-		window.addEventListener("pointercancel", end, true);
-		window.addEventListener("blur", end);
-		handle.addEventListener("lostpointercapture", end);
+		holdHandle(
+			event,
+			(moved) => applyHeight(bottom - moved.clientY),
+			() => {
+				if (p) delete p.dataset.chatResizing;
+				saveHeight(section?.getBoundingClientRect().height);
+			},
+		);
 	};
 	const keyResize = (event: KeyboardEvent) => {
 		const now = section?.getBoundingClientRect().height ?? 0;

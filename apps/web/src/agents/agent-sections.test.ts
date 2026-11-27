@@ -67,7 +67,7 @@ test("every agent appears exactly once", () => {
 /*
  * The keys the panel's store joins on, asserted here because nothing else would notice them.
  *
- * `LeftPanel` keeps this list in a store and hands old and new to `reconcile`, which matches by
+ * `createAgentLists` (`panel/agent-list.tsx`) keeps this list in a store and hands old and new to `reconcile`, which matches by
  * one key at every level. A section or a row without that key is matched by *position* instead,
  * which does not fail loudly: the list still says the right thing, it just re-draws itself, and
  * an open popup silently attaches to whoever took the row's place. That is what the panel did

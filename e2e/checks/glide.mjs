@@ -20,7 +20,7 @@
  */
 import { canvasFrame, open, resetStage, say, settle, zoom } from "../harness.mjs";
 
-// The panel's Canvas tab lists the boards on the canvas (`panel/LeftPanel.tsx`, `itemRow`); a board's row flies to it.
+// The panel's Canvas tab lists the boards on the canvas (`panel/ObjectsTab.tsx`, `itemRow`); a board's row flies to it.
 const { browser, page, errors } = await open({ width: 1500, height: 1000, panelTab: "canvas" });
 await resetStage(page);
 await settle(page, 600);

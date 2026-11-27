@@ -41,7 +41,7 @@ say("the top-left bar has the agent and the canvas as its one tab, and the panel
 
 /*
  * The left panel's Canvas tab (once Boards) lists what is on the canvas as rows of an icon and a
- * name (`panel/LeftPanel.tsx`, `itemRow`): no picture of the board, and no board mounted as a
+ * name (`panel/ObjectsTab.tsx`, `itemRow`): no picture of the board, and no board mounted as a
  * document, so a long list costs a line of text a row. The server still takes pictures
  * (`pictures/service.ts`) for the stage's sheet, asked for by revision so each can be cached for a year.
  */

@@ -8,14 +8,14 @@ import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import Brush from "lucide-solid/icons/brush";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
-import X from "lucide-solid/icons/x";
-import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { AgentMark } from "@decks/ui/agent-marks";
 import type { CanvasMode } from "../state/selection.ts";
 import { DecksMark, Icon, type Placement, Popover } from "@decks/ui";
 import { runtimes } from "../state/deck.ts";
-import { canHover } from "../lib/media.ts";
-import { agentList, agentStatus, closeWords, dropdownFaces, rowWords, workspaceRuns } from "./agent-order.ts";
+import { agentList, agentStatus, dropdownFaces, workspaceRuns } from "./agent-order.ts";
+import { AgentMenuRow } from "./AgentMenuRow.tsx";
+import { createMenuCard } from "./menu-card.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AuthedImg } from "../lib/authed.tsx";
 
@@ -220,80 +220,8 @@ export function AgentMenu(props: {
 	/** Make an agent: a last row, "New agent", that opens the runtimes as a submenu beside it. */
 	onNew?: (kind: AgentKind) => void;
 }) {
-
-	/*
-	 * Which row the card is describing, and where that row is.
-	 *
-	 * `held` keeps the last row after the pointer leaves so the card fades out with words
-	 * still in it: a card
-	 * emptied the instant it starts fading is a card that fades out blank.
-	 */
-	type Anchor = Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height">;
-	const [over, setOver] = createSignal<{ id: string; at: Anchor } | undefined>();
-	const [held, setHeld] = createSignal<{ id: string; at: Anchor } | undefined>();
-	let exit: ReturnType<typeof setTimeout> | undefined;
-	onCleanup(() => clearTimeout(exit));
-
-	/**
-	 * At once, and it lingers 80ms on the way out.
-	 *
-	 * There was a 350ms wait before the card, to stop a pointer run down five rows from
-	 * flashing five cards. The fear was reasonable and the cure was worse: the same card
-	 * summoned from the corner arrives instantly, so one hover felt broken and the other
-	 * did not, and 350ms of nothing is long enough to conclude there is nothing to see.
-	 *
-	 * What actually stops the flashing is the grace on the way *out*: leaving a row does not
-	 * take the card down for 80ms, so entering the next one inside that window moves it
-	 * rather than replacing it. A card that slides down the list is not a card that blinks
-	 * five times — and it is the behaviour of the surface next to it.
-	 */
-	/**
-	 * The box the card hangs off: level with the row, clear of the *menu*.
-	 *
-	 * A row is inset from the popover's edge by its padding, so a card placed beside the row
-	 * overlapped the menu's own border by three pixels — visible as a card that looks stuck
-	 * to the list rather than beside it. Taking the row's vertical extent and the popover's
-	 * right edge is the anchor that means what the design says: beside the menu, aligned to
-	 * the row.
-	 */
-	const anchorFor = (row: HTMLElement): Anchor => {
-		const at = row.getBoundingClientRect();
-		const card = row.closest(".popover")?.getBoundingClientRect();
-		return {
-			top: at.top,
-			bottom: at.bottom,
-			height: at.height,
-			left: card?.left ?? at.left,
-			right: card?.right ?? at.right,
-			width: (card?.right ?? at.right) - (card?.left ?? at.left),
-		};
-	};
-
-	/*
-	 * Not on a touch screen, and not as a rule about small windows: the card is a *hover*
-	 * card, and a finger cannot hover.
-	 *
-	 * `pointerenter` fires on a tap, so a list of agents on a phone answered the first tap
-	 * with a card and needed a second one to switch — the card arriving instead of the
-	 * thing you asked for. It reads as the tap being eaten, which is what it is. Everything
-	 * the card says is on the row underneath it anyway; on a phone the row is the answer.
-	 */
-	const point = (id: string, at: Anchor) => {
-		if (!canHover()) return;
-		clearTimeout(exit);
-		setOver({ id, at });
-		setHeld({ id, at });
-	};
-
-	const unpoint = (id: string) => {
-		clearTimeout(exit);
-		exit = setTimeout(() => setOver((was) => (was?.id === id ? undefined : was)), 80);
-	};
-
-	const describing = () => {
-		const id = (over() ?? held())?.id;
-		return id ? props.chats.find((chat) => chat.id === id) : undefined;
-	};
+	/* The one hover card the rows share, beside the menu (`menu-card.ts`). */
+	const card = createMenuCard(() => props.chats);
 
 	/*
 	 * `Popover` closes on Escape and on a press outside, but a row picked *inside* it has to
@@ -367,113 +295,18 @@ export function AgentMenu(props: {
 						*/}
 						<Show when={run.label}>{(label) => <div class="group">{label()}</div>}</Show>
 						<For each={run.chats}>
-				{(chat) => {
-					const status = () => agentStatus(chat.state, props.unread[chat.id] ?? 0);
-					const name = () => props.identities[chat.id]?.name ?? chat.name;
-					/** The tooltip if this chat can be closed, and `undefined` if it cannot. */
-					const close = () => closeWords(chat.state, name());
-					return (
-						/*
-						 * The row and its × in one box, which is `.row-act` in `chrome.css` — a
-						 * `<button>` cannot contain a `<button>`, and the wash has to belong to the
-						 * box or it stops 22px short of the row's own right edge.
-						 */
-						<div class="row-act">
-							<button
-								type="button"
-								role="menuitem"
-								data-row
-								data-flat="true"
-								data-agent="true"
-								data-status={status()}
-								/* Washed rather than ticked: the row is describing the window you are
-								   already in, and a tick would imply the list is a setting. */
-								data-current={props.focused === chat.id ? "true" : undefined}
-								class="min-w-0 flex-1"
-								onClick={() => pick(() => props.onFocus(chat.id))}
-								/*
-								 * The card is summoned by pointing and by focus, which is the keyboard's
-								 * equivalent — the arrows rove this list, so without the focus half the
-								 * detail would be mouse-only, and the roving exists precisely so the list
-								 * can be used without one.
-								 */
-								onPointerEnter={(event) => point(chat.id, anchorFor(event.currentTarget))}
-								onPointerLeave={() => unpoint(chat.id)}
-								onFocus={(event) => point(chat.id, anchorFor(event.currentTarget))}
-								onBlur={() => unpoint(chat.id)}
-								/*
-								 * Delete is the × for the keyboard, and it is on the row because the row
-								 * is what the arrows rove onto. `Popover`'s own handler reads Escape and
-								 * the arrows off the document and ignores these two, so nothing has to
-								 * be coordinated — but the event still stops here, or a Backspace meant
-								 * for a chat would also be the browser's go-back.
-								 */
-								onKeyDown={(event) => {
-									if (event.key !== "Delete" && event.key !== "Backspace") return;
-									event.preventDefault();
-									event.stopPropagation();
-									if (close()) props.onClose(chat.id);
-								}}
-							>
-								<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={20} ring={1.5} />
-								{/*
-									`block`, because `.row-label` is a flex row and `text-overflow` does not apply to
-									one — a long name would have overflowed the row rather than ellipsing.
-
-									`nm` keeps the name at 600 where the rest of this menu's labels are 400: a
-									row you pick an *agent* from is not a row you pick a command from. See
-									`chrome.css`, where both halves of that are stated together.
-								*/}
-								<span class="row-label row-name block truncate">{name()}</span>
-								{/*
-									Which runtime, in the word the server uses. The chip the panel row and the
-									hover card also wear, so the three surfaces name a runtime identically —
-									`.kind` in `styles/chrome.css` argues for the word over a badge on the face.
-								*/}
-								<span class="kind" data-dormant={chat.dormant ? "true" : undefined}>{chat.outside?.client ?? chat.kind}</span>
-								{/*
-									`data-yield` says these words give ground for the × rather than a square
-									standing empty beside them until it arrives: the last column of a row is one
-									short status, and 22px reserved there is a ragged gutter down the whole list.
-									So the slot opens on approach and the words slide left by it — see `.row-act`
-									in `chrome.css`, which is also where the touch case lives, since there is
-									nothing to approach with on a phone and the slot simply stays open.
-								*/}
-								<span class="meta flex-none text-micro tabular-nums" data-yield>{rowWords(status(), chat.state, chat.lastAt)}</span>
-							</button>
-
-							{/*
-								Not a `[data-row]`, and that is the whole reason the arrows still work: the
-								rove list is built from that attribute, so an × carrying it would make every
-								journey through the list twice as long. It is also why picking it does not
-								close the menu — `Popover` closes on a row click and this is not one — which
-								is right on its own terms, since closing three chats is one visit to the list.
-
-								**Absent, rather than disabled, on a chat that cannot be closed.** The
-								registry refuses anything mid-turn, and the row already says why: it keeps its
-								words instead of swapping them for a greyed-out button whose tooltip repeats
-								"still working". A control that cannot be pressed is worth drawing when its
-								absence would be a mystery, and "typing…" is not a mystery.
-							*/}
-							<Show when={close()}>
-								{(words) => (
-									<button
-										class="close"
-										type="button"
-										title={words()}
-										aria-label={m.agents_close({ name: name() })}
-										onClick={(event) => {
-											event.stopPropagation();
-											props.onClose(chat.id);
-										}}
-									>
-										<Icon of={X} size={13} />
-									</button>
-								)}
-							</Show>
-						</div>
-					);
-				}}
+							{(chat) => (
+								<AgentMenuRow
+									chat={chat}
+									identity={props.identities[chat.id]}
+									unread={props.unread[chat.id] ?? 0}
+									current={props.focused === chat.id}
+									onPick={() => pick(() => props.onFocus(chat.id))}
+									onClose={() => props.onClose(chat.id)}
+									onPoint={(row) => card.point(chat.id, row)}
+									onUnpoint={() => card.unpoint(chat.id)}
+								/>
+							)}
 						</For>
 					</>
 				)}
@@ -553,24 +386,15 @@ export function AgentMenu(props: {
 				)}
 			</Show>
 
-					{/*
+			{/*
 				One card for the whole menu, mounted with it and only unhidden on hover.
 				
 				`beside`, not under: a card centred beneath a row would cover the rows below it,
 				which are the ones being compared. It is the same component the corner faces
 				summon — the detail lives in one place and is reachable from either list.
 			*/}
-			<Show when={describing()}>
-				{(chat) => (
-					<AgentHoverCard
-						chat={chat()}
-						identity={props.identities[chat().id]}
-						unread={props.unread[chat().id] ?? 0}
-						anchor={(over() ?? held())!.at}
-						shown={over() !== undefined}
-						beside
-					/>
-				)}
+			<Show when={card.describing()}>
+				{(chat) => <AgentHoverCard chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} anchor={card.anchor()} shown={card.shown()} beside />}
 			</Show>
 		</Popover>
 	);
