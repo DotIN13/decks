@@ -28,7 +28,7 @@
 		"apps/web/src/agents/AgentPill.tsx: AgentPill": 231,
 		"apps/web/src/agents/AgentRow.tsx: AgentRow": 350,
 		"apps/web/src/agents/Dialog.tsx: Dialog": 269,
-		"apps/web/src/app/files/FilePicker.tsx: FilePicker": 429,
+		"apps/web/src/app/files/FilePicker.tsx: FilePicker": 391,
 		"apps/web/src/app/files/drops.ts: createFileDrops": 390,
 		"apps/web/src/canvases/CanvasManager.tsx: CanvasManager": 270,
 		"apps/web/src/canvases/CanvasManager.tsx: StageCard": 158,

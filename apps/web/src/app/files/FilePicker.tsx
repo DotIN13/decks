@@ -375,26 +375,7 @@ export function FilePicker(props: {
 											{m.files_signin_again()}
 										</button>
 										<Show when={google()?.paste}>
-											<form
-												class="picker-google-form"
-												onSubmit={(event) => {
-													event.preventDefault();
-													if (returned().trim()) void finish().then(() => relist());
-												}}
-											>
-												<input
-													class="picker-google-input"
-													type="text"
-													autocomplete="off"
-													placeholder={m.files_paste_address()}
-													aria-label={m.files_paste_address_label()}
-													value={returned()}
-													onInput={(event) => setReturned(event.currentTarget.value)}
-												/>
-												<button class="btn" data-primary="true" type="submit" disabled={!returned().trim()}>
-													{m.files_done()}
-												</button>
-											</form>
+											<PasteAddress value={returned()} onInput={setReturned} onDone={() => void finish().then(() => relist())} />
 										</Show>
 										<Show when={said()}>
 											<span>{said()}</span>
@@ -455,26 +436,7 @@ export function FilePicker(props: {
 											{m.files_signin_google()}
 										</button>
 										<Show when={state().paste}>
-											<form
-												class="picker-google-form"
-												onSubmit={(event) => {
-													event.preventDefault();
-													if (returned().trim()) void finish();
-												}}
-											>
-												<input
-													class="picker-google-input"
-													type="text"
-													autocomplete="off"
-													placeholder={m.files_paste_address()}
-													aria-label={m.files_paste_address_label()}
-													value={returned()}
-													onInput={(event) => setReturned(event.currentTarget.value)}
-												/>
-												<button class="btn" data-primary="true" type="submit" disabled={!returned().trim()}>
-													{m.files_done()}
-												</button>
-											</form>
+											<PasteAddress value={returned()} onInput={setReturned} onDone={() => void finish()} />
 										</Show>
 										<Show when={said()}>
 											<p class="picker-google-note">{said()}</p>
@@ -513,6 +475,38 @@ function editedOn(iso: string | undefined): string {
 	if (dayKey(when) === dayKey(now)) return clockTime(when);
 	if (yearOf(when) === yearOf(now)) return formatDate(when, { month: "short", day: "numeric" });
 	return formatDate(when, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/**
+ * The address Google sent the browser to, pasted back to finish signing in.
+ *
+ * A Desktop client is sent to a loopback address that does not load, so the person copies it from
+ * the address bar and pastes it here. Asked for in two places, on first sign-in and when a sign-in
+ * is too old to list Docs, so written once.
+ */
+function PasteAddress(props: { value: string; onInput: (value: string) => void; onDone: () => void }) {
+	return (
+		<form
+			class="picker-google-form"
+			onSubmit={(event) => {
+				event.preventDefault();
+				if (props.value.trim()) props.onDone();
+			}}
+		>
+			<input
+				class="picker-google-input"
+				type="text"
+				autocomplete="off"
+				placeholder={m.files_paste_address()}
+				aria-label={m.files_paste_address_label()}
+				value={props.value}
+				onInput={(event) => props.onInput(event.currentTarget.value)}
+			/>
+			<button class="btn" data-primary="true" type="submit" disabled={!props.value.trim()}>
+				{m.files_done()}
+			</button>
+		</form>
+	);
 }
 
 /** A Google Doc, drawn as a blue page: what the tab and the card are about, not Google's own logo. */
