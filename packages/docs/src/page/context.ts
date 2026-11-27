@@ -87,13 +87,13 @@ export interface PageHooks {
 	closeVersion(): void;
 	/** `pdf.ts`: typeset again once typing has paused, when the PDF is open. */
 	compileSoon(): void;
-	/** `page.ts`: send a Doc's styles to Google once the typing before them has gone. */
+	/** `google.ts`: send a Doc's styles to Google once the typing before them has gone. */
 	sendStyle(requests: DocsRequest[]): void;
-	/** `page.ts`: the Google Docs button and its popover. */
+	/** `google.ts`: the Google Docs button and its popover. */
 	drawGoogle(): void;
-	/** `page.ts`: signing in to Google. */
+	/** `google.ts`: signing in to Google. */
 	signInParts(): HTMLElement[];
-	/** `page.ts`: how the Doc's link stands, as the server last said. */
+	/** `google.ts`: how the Doc's link stands, as the server last said. */
 	remoteStatus(): DocRemoteStatus | undefined;
 }
 
