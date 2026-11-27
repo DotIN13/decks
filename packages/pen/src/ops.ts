@@ -1,6 +1,6 @@
 import { check, clone, idFor, ids, indexOf, PenError } from "./doc.ts";
 import { layout, type MeasureText, type Placed } from "./layout.ts";
-import { expand } from "./refs.ts";
+import { expand, standsAlone } from "./refs.ts";
 import { fitShapes, shapesToFit } from "./shapes.ts";
 import type { Box, PenDocument, PenNode, PenVariable } from "./types.ts";
 import { fillsOf, parseColor, type ThemeState } from "./values.ts";
@@ -394,7 +394,9 @@ function placeBox(doc: PenDocument, id: string, box: Partial<Box>, options: Appl
 	const node = found.node;
 	const hasX = typeof box.x1 === "number";
 	const hasY = typeof box.y1 === "number";
-	const placed: Map<string, Placed> = layout(doc, expand(doc), options);
+	// A top-level item is where it is whatever its neighbours are: only it is laid out (on a canvas of 7,000, that was a whole layout per insert).
+	const scope = found.parent || !standsAlone(node) ? doc : { ...doc, children: [node] };
+	const placed: Map<string, Placed> = layout(scope, expand(scope), options);
 	const parent = found.parent ? placed.get(found.parent.id) : undefined;
 	const origin = parent ? { x: parent.box.x, y: parent.box.y } : { x: 0, y: 0 };
 	/*

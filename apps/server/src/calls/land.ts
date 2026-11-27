@@ -1,5 +1,5 @@
 import { blockers, placeBy, stepClear, type StepWay } from "@decks/deck-kit";
-import { ARROW, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, standsAlone, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { cardOf } from "../canvas/pens.ts";
 
 /**
@@ -38,7 +38,9 @@ export function landItem(on: Landing, pen: Op & { box?: { x1: number; y1: number
 	// An item given no id takes one as it is applied: the top-level item that was not there before.
 	const before = new Set(on.doc.children.map((one) => one.id));
 	const which = id ?? after.children.find((one) => !before.has(one.id))?.id;
-	const box = which ? on.layout(after).get(which)?.box : undefined;
+	// Its size alone: a top-level item is as big as it is wherever its neighbours are, so only it is laid out.
+	const alone = after.children.filter((one) => one.id === which && standsAlone(one));
+	const box = which ? on.layout(alone.length ? { ...after, children: alone } : after).get(which)?.box : undefined;
 	if (!box) return pen;
 	const name = !id && label === "the new item" && which ? which : label;
 	const size = { w: box.w, h: box.h };

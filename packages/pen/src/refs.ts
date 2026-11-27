@@ -144,3 +144,12 @@ function prefix(root: PenNode, id: string): PenNode {
 	}
 	return root;
 }
+
+/**
+ * Whether a top-level item lays out the same on its own as among the rest: true unless it or
+ * something in it is an instance, which may name another item of the same drawing.
+ */
+export function standsAlone(node: PenNode): boolean {
+	if (node.type === "ref") return false;
+	return !Array.isArray(node.children) || node.children.every((child) => standsAlone(child));
+}

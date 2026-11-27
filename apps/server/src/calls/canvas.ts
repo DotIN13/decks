@@ -1,7 +1,7 @@
 import { copySharedCanvas } from "../canvas/copy-shared.ts";
 import { canvasOfPath } from "./move-home.ts";
 import { basename, dirname } from "node:path";
-import { apply, ARROW, baseTheme, clone, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { apply, ARROW, baseTheme, clone, expandVariables, ids, placements, shortVariables, standsAlone, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../canvas/canvas-files.ts";
 import { cardOf, CARD_ITEM, type ReadMore } from "../canvas/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
@@ -92,13 +92,28 @@ export function toItem(node: Record<string, unknown>): Record<string, unknown> {
  * Where an item would land, worked out on a copy that is not kept (`land.ts`). An item put at the top of
  * the drawing changes only the top list, so a copy of that list is enough; anything else copies it all.
  */
+/** What an op asks for that pen has no field for, or that Decks keeps and does not draw: said, never refused. */
+function opWarnings(doc: PenDocument, pen: Op): string[] {
+	if (pen.op === "insert" || pen.op === "replace") return warnings(pen.node);
+	if (pen.op !== "update") return [];
+	const type = pen.id.includes("/") ? undefined : [...walk(doc.children)].find((one) => one.id === pen.id)?.type;
+	return updateWarnings(type, pen.set ?? {});
+}
+
 /**
- * A value made the first time it is asked for, then kept: in a batch, the canvas laid out as the earlier
- * ops left it, only for an op that places something; an update or a delete does not lay 7,000 items out.
+ * The canvas laid out as a batch's ops leave it, kept from one op to the next where that is cheap: made
+ * only for an op that places something (an update or a delete does not lay 7,000 items out), and after
+ * an item put at the top level, which moves nothing else, kept with that item laid out alone and added.
+ * Anything else (an arrow, which follows what it joins; an item put in a frame, which lays it out; any
+ * other op) lets it go, to be laid out again when next asked for.
  */
-function once<T>(make: () => T): () => T {
-	let made: { value: T } | undefined;
-	return () => (made ??= { value: make() }).value;
+function laidAfter(laid: Map<string, Placed> | undefined, doc: PenDocument, pen: Op, made: string | undefined, layout: (doc: PenDocument) => Map<string, Placed>): Map<string, Placed> | undefined {
+	if (!laid || pen.op !== "insert" || (pen.parent !== undefined && pen.parent !== null) || !made) return undefined;
+	const node = doc.children.find((one) => one.id === made);
+	if (!node || node.metadata?.type === ARROW || !standsAlone(node)) return undefined;
+	let order = laid.size;
+	for (const [id, one] of layout({ ...doc, children: [node] })) laid.set(id, { ...one, order: order++ });
+	return laid;
 }
 
 function preview(doc: PenDocument, more: Op[], theme: ReturnType<typeof baseTheme>, measure: Parameters<typeof apply>[2]["measure"]): PenDocument {
@@ -268,24 +283,18 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 		const placedFor: string[] = [];
 		/** What an op asked for that pen has no field for, or that Decks keeps and does not draw: said, never refused. */
 		const warned: string[] = [];
-		const typeOf = (id: string) => [...walk(doc.children)].find((one) => one.id === id)?.type;
 		/** The canvas as the earlier ops left it, for placing an item there (`land.ts`: aim, then step clear). */
 		const on = (): Landing => ({ doc, layout: surface.layout, apply: (more) => preview(doc, more, theme, measure), said: placedFor });
 		const warn = (pen: Op) => {
-			const said =
-				pen.op === "insert" || pen.op === "replace"
-					? warnings(pen.node)
-					: pen.op === "update"
-						? updateWarnings(pen.id.includes("/") ? undefined : typeOf(pen.id), pen.set ?? {})
-						: [];
 			const where = ops.length > 1 ? `Op ${penOps.length + 1} (${pen.op}): ` : "";
-			for (const one of said) warned.push(`${where}${one}`);
+			for (const one of opWarnings(doc, pen)) warned.push(`${where}${one}`);
 		};
 		if (!Array.isArray(ops) || ops.length === 0) throw new Error('A batch is a list of ops: [{ op: "insert", item: { type: "note", content: "…" } }].');
+		let laid: Map<string, Placed> | undefined;
 		ops.forEach((op, index) => {
 			const where = ops.length > 1 ? `Op ${index + 1} (${op?.op ?? "?"}): ` : "";
 			try {
-				const placed = once(() => surface.layout(doc));
+				const placed = () => (laid ??= surface.layout(doc));
 				let pen: Op;
 				// pen.dev's own form (what the canvas editor sends): taken as it is, with a card's path for an id.
 				const raw = op as unknown as Record<string, unknown>;
@@ -297,6 +306,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 					pen = given as unknown as Op;
 					warn(pen);
 					doc = apply(doc, [pen], { theme, measure, scratch: true }).doc;
+					laid = undefined;
 					penOps.push(pen);
 					return;
 				}
@@ -398,7 +408,9 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 						throw new Error(`there is no op "${(op as { op?: unknown })?.op}": insert, update, replace, delete, move, copy or variables.`);
 				}
 				warn(pen);
-				doc = apply(doc, [pen], { theme, measure, scratch: true }).doc;
+				const done = apply(doc, [pen], { theme, measure, scratch: true });
+				doc = done.doc;
+				laid = laidAfter(laid, doc, pen, done.results[0]?.id, surface.layout);
 				penOps.push(pen);
 			} catch (error) {
 				throw new Error(`${where}${error instanceof Error ? error.message : String(error)}${ops.length > 1 ? " Nothing was changed." : ""}`);

@@ -89,3 +89,23 @@ test("shared apply: an item no op touched is the same object", () => {
 	assert.equal((b!.children as PenNode[])[1], (prev.children[1]!.children as PenNode[])[1], "the changed item's sibling is shared");
 	assert.equal(((prev.children[1]!.children as PenNode[])[0] as PenNode).x, 0, "the old item keeps its x");
 });
+
+test("a box puts a top-level item where it says, laid out on its own or among the rest", async () => {
+	const { layout, expand } = await import("./index.ts");
+	const items: PenNode[] = [
+		{ id: "r", type: "rectangle", x: 5, y: 5, width: 20, height: 10 },
+		{ id: "t", type: "text", x: 0, y: 40, content: "words here" },
+		{ id: "n", type: "note", x: 100, y: 0, content: "a note" },
+		{ id: "g", type: "group", children: [{ id: "g1", type: "rectangle", x: 30, y: 30, width: 10, height: 10 }, { id: "g2", type: "ellipse", x: 50, y: 60, width: 10, height: 10 }] },
+		{ id: "f", type: "frame", layout: "vertical", x: 300, y: 0, width: 120, children: [{ id: "f1", type: "rectangle", width: 50, height: 20 }] },
+		makeShape(shapeKind("Rounded")!, { frame: "s", outline: "s-o" }, { w: 60, h: 40 }) as PenNode,
+		{ id: "c", type: "component", children: [{ id: "c1", type: "rectangle", width: 10, height: 10 }] } as PenNode,
+		{ id: "i", type: "ref", ref: "c", x: 500, y: 500 } as PenNode,
+	];
+	for (const id of ["r", "t", "n", "g", "f", "s", "i"]) {
+		const doc: PenDocument = { version: "2.11", children: structuredClone(items) };
+		const next = apply(doc, [{ op: "update", id, set: {}, box: { x1: 777, y1: 333 } }], { theme: {} }).doc;
+		const box = layout(next, expand(next), { theme: {} }).get(id)!.box;
+		assert.deepEqual([Math.round(box.x), Math.round(box.y)], [777, 333], id);
+	}
+});
