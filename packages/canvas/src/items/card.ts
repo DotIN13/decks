@@ -64,7 +64,11 @@ export interface CardContext {
 	 * are the card's own element, `createElement` and the rest are the page's.
 	 */
 	document: Document;
-	/** Aborted when the card sleeps or is removed: pass it to listeners and `fetch`, and they stop by themselves. */
+	/**
+	 * Aborted when the card is taken down (far from the view, reloaded, or removed): pass it to listeners
+	 * and `fetch`, and they stop by themselves. A card merely asleep is kept, ready to wake, and its
+	 * signal stays: `awake` says that.
+	 */
 	signal: AbortSignal;
 	/** The card's own address, for files beside it. */
 	url: string;
@@ -85,8 +89,20 @@ export interface CardContext {
 	 * stops it when it turns false; `on("active")` hears the change.
 	 */
 	active: boolean;
-	/** Hear a change of the theme, the size, or whether the card is active. */
-	on(what: "theme" | "size" | "active", listener: () => void): void;
+	/**
+	 * Whether the card is awake: false while it is asleep but kept, ready to wake (panned away a little).
+	 * Its CSS animations pause by themselves then; stop anything else you run (`on("awake")`), or use
+	 * `frame`, which does.
+	 */
+	awake: boolean;
+	/**
+	 * Run `draw` once per animation frame while the card is awake, paused while it sleeps; returns a
+	 * function that stops it. Taken down with the card. The way to animate without costing a canvas of
+	 * cards: a loop of your own keeps running while the card sleeps.
+	 */
+	frame(draw: (time: number) => void): () => void;
+	/** Hear a change of the theme, the size, whether the card is active, or whether it is awake. */
+	on(what: "theme" | "size" | "active" | "awake", listener: () => void): void;
 	/** The SDK, as this card (`CardDecks`): `await card.decks.canvas.insert(item, { beside: card.path })`. */
 	decks: CardDecks;
 	/** The card's deck path, as the canvas names it. */
@@ -116,6 +132,8 @@ export interface MountedCard {
 	setSize(size: { w: number; h: number }): void;
 	/** The person selected the card, opened it whole, or left it (`CardContext.active`). */
 	setActive(active: boolean): void;
+	/** The card went to sleep, kept, or woke (`CardContext.awake`). */
+	setAwake(awake: boolean): void;
 	/** Hear the card's content height, in its own pixels, as it lays out and whenever it changes. */
 	onHeight(listener: (h: number) => void): void;
 	/** How the card reads now: words, smallest type, spill and cut boxes (`card-reading.ts`), for `fit`. */
@@ -291,7 +309,9 @@ function cardSheet(lib: string): Promise<string | undefined> {
 				 * the canvas frame, on the server's page that measures and pictures it, and on a phone.
 				 */
 				// No ground of its own: the paper is the host's, so a card's `:host { background }` is its whole ground.
-				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root; background: none }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg); " + HOST_RESET + " }";
+				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root; background: none }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg); " + HOST_RESET + " }"
+				// Asleep, kept to wake: nothing it animates in CSS runs (`setAwake`).
+				+ "\n:host([data-asleep]) *, :host([data-asleep]) *::before, :host([data-asleep]) *::after { animation-play-state: paused !important }";
 			return css;
 		} catch {
 			// Asked for again by the next card: a pass run out or a restart is not the end of the card's look.
@@ -642,6 +662,43 @@ function readFragment(source: CardSource): { fragment: DocumentFragment; scripts
  * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
  * they arrive.
  */
+/**
+ * A card's `card.frame` loops: each draws once per animation frame while the card is awake, pauses while
+ * it sleeps (`wake(false)`), and all stop when it is taken down (`stop`).
+ */
+function frameLoops(awake: () => boolean) {
+	const loops = new Set<{ draw: (time: number) => void; id: number }>();
+	const run = (loop: { draw: (time: number) => void; id: number }) => {
+		const tick = (time: number) => {
+			if (!loops.has(loop) || !awake()) return;
+			loop.draw(time);
+			loop.id = requestAnimationFrame(tick);
+		};
+		loop.id = requestAnimationFrame(tick);
+	};
+	return {
+		add: (draw: (time: number) => void) => {
+			const loop = { draw, id: 0 };
+			loops.add(loop);
+			if (awake()) run(loop);
+			return () => {
+				loops.delete(loop);
+				cancelAnimationFrame(loop.id);
+			};
+		},
+		wake: (on: boolean) => {
+			for (const loop of loops) {
+				cancelAnimationFrame(loop.id);
+				if (on) run(loop);
+			}
+		},
+		stop: () => {
+			for (const loop of loops) cancelAnimationFrame(loop.id);
+			loops.clear();
+		},
+	};
+}
+
 export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
 	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
@@ -668,7 +725,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	root.append(body);
 
 	const controller = new AbortController();
-	const listeners = { theme: new Set<() => void>(), size: new Set<() => void>(), active: new Set<() => void>() };
+	const listeners = { theme: new Set<() => void>(), size: new Set<() => void>(), active: new Set<() => void>(), awake: new Set<() => void>() };
+	const loops = frameLoops(() => context.awake);
 	const store = {
 		getItem: (key: string) => localStorage.getItem(`decks.card:${source.path}:${key}`),
 		setItem: (key: string, value: string) => localStorage.setItem(`decks.card:${source.path}:${key}`, value),
@@ -684,6 +742,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		theme: source.theme,
 		size: { ...source.size },
 		active: source.active === true,
+		awake: true,
+		frame: loops.add,
 		elements: registry ?? customElements,
 		store,
 		on: (what, listener) => void listeners[what].add(listener),
@@ -751,7 +811,17 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 			context.active = active;
 			for (const listener of listeners.active) listener();
 		},
+		setAwake(awake) {
+			if (context.awake === awake) return;
+			context.awake = awake;
+			// Asleep: its CSS animations pause (the card sheet's `:host([data-asleep])`), its frame loops stop.
+			if (awake) delete host.dataset.asleep;
+			else host.dataset.asleep = "";
+			loops.wake(awake);
+			for (const listener of listeners.awake) listener();
+		},
 		dispose() {
+			loops.stop();
 			sizes.disconnect();
 			heightListeners.clear();
 			controller.abort();

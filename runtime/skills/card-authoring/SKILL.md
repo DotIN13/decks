@@ -105,7 +105,7 @@ Everything that used to be a board is a card. A board file left in a deck from b
 **Scripts: modules handed the card**
 
 - A `<script type="module">` in a card exports one function, and it is called with the card each
-  time the card wakes (it sleeps when panned far away):
+  time the card is mounted (it is taken down when panned far away):
 
   ```html
   <script type="module">
@@ -116,7 +116,7 @@ Everything that used to be a board is a card. A board file left in a deck from b
   		draw(card.root.getElementById("chart"), data);
   		card.root.querySelector("#reset").addEventListener("click", () => draw(…), { signal: card.signal });
   		const timer = setInterval(tick, 1000);
-  		return () => clearInterval(timer); // when it sleeps
+  		return () => clearInterval(timer); // when it is taken down
   	}
   </script>
   ```
@@ -124,12 +124,12 @@ Everything that used to be a board is a card. A board file left in a deck from b
 - **`card.root` is what `document` is to a page**: `querySelector`, `querySelectorAll`,
   `getElementById`. `document` and `window` are the app's own page, shared by every card: never
   query, listen on or write to them. A key listener goes on an element of the card.
-- `card.signal` is aborted when the card sleeps: pass it to every `addEventListener` and `fetch`.
+- `card.signal` is aborted when the card is taken down: pass it to every `addEventListener` and `fetch`.
   Return a function to stop anything else you started (a timer, an animation frame).
 - `card.file(name)` is a file's address in the card's folder; `card.url` is the card's own.
   `card.theme` is "light" or "dark", and `card.on("theme", draw)` hears it change, as
-  `card.on("size", …)` hears its box change and `card.on("active", …)` whether the person is using
-  the card (`card.active`, "Be light" below). `card.store` keeps a little data of the card's own
+  `card.on("size", …)` hears its box change, `card.on("active", …)` whether the person is using
+  the card (`card.active`) and `card.on("awake", …)` whether it is asleep (`card.awake`, "Be light" below). `card.store` keeps a little data of the card's own
   (`getItem`, `setItem`). `card.elements` defines custom elements for this card alone.
 - The top of a module runs once for every placement of the card; what belongs to one card's view
   lives inside the function.
@@ -146,9 +146,15 @@ does at rest only what its resting look needs, and saves the heavy work for when
   poster picture, or a drawing of the scene) and a short hint ("Select to play"); build the heavy
   thing on the first activation, run it while active, pause it when not.
 - **Heavy data** (a large JSON, a model, many pictures) is fetched on first activation, not on wake.
-- No `requestAnimationFrame` loop, timer or CSS animation running while the card is inactive or
-  asleep: pause CSS animations with a class (`.paused * { animation-play-state: paused }`), stop
-  loops on `active` false, and let `card.signal` stop the rest when the card sleeps.
+- **`card.awake`** is false while the card is asleep but kept, ready to wake (panned a little away);
+  `card.on("awake", …)` hears it. Its CSS animations pause by themselves then. Animate with
+  **`card.frame(draw)`**, a loop that runs only while the card is awake and stops with it; a
+  `requestAnimationFrame` loop or a timer of your own keeps running while it sleeps, so stop it on
+  `awake` false. `card.signal` is aborted only when the card is taken down for good (far away,
+  reloaded, removed).
+- No loop, timer or CSS animation runs while the card is inactive unless its resting look needs it:
+  pause CSS animations with a class (`.paused * { animation-play-state: paused }`) and stop
+  `frame` loops when `active` turns false.
 - Video plays only when asked (`preload="metadata"`, no `autoplay`, or `autoplay muted` set on
   activation). A light, periodic read, like a progress card polling its JSON, may run at rest.
 
@@ -163,7 +169,7 @@ export default function (card) {
 	const stop = () => scene?.pause();
 	if (card.active) start();
 	card.on("active", () => (card.active ? start() : stop()));
-	return () => scene?.dispose(); // when the card sleeps
+	return () => scene?.dispose(); // when the card is taken down
 }
 ```
 

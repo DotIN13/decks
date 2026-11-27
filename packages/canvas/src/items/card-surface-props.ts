@@ -9,6 +9,8 @@ export interface CardSurfaceProps {
 	reload?: number | undefined;
 	size: () => { w: number; h: number };
 	selected: boolean;
+	/** False while the card is asleep but kept, ready to wake (`CardContext.awake`); awake unless said. */
+	awake?: boolean;
 	onSelect: () => void;
 	/**
 	 * A mouse or pen press with Shift (or ⌘) inside the card, offered to the editor as a press on the

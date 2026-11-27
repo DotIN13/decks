@@ -159,6 +159,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 						reload={props.reload}
 						size={size}
 						selected={props.selected}
+						awake={!props.asleep}
 						onSelect={() => props.view.select()}
 						onAddPress={(event, on) => props.view.press(event, on)}
 						onOpenPage={(path) => props.onOpenPage?.(path, props.board.path)}

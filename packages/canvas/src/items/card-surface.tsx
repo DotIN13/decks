@@ -131,6 +131,11 @@ export function CardSurface(props: CardSurfaceProps) {
 		const active = props.selected;
 		mounted?.setActive(active);
 	});
+	// Asleep but kept, ready to wake: its animations pause (`CardContext.awake`).
+	createEffect(() => {
+		const awake = props.awake !== false;
+		mounted?.setAwake(awake);
+	});
 	onCleanup(() => {
 		loader.stop();
 		forget();
