@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
 import type { NextFunction, Request, Response } from "express";
 import { SHARED_SANDBOX } from "@decks/hub/layout";
 import type { App } from "../../app.ts";
@@ -60,19 +59,6 @@ export function sendFile(res: Response, target: string): Promise<void> {
 	return new Promise((ok, fail) => {
 		res.sendFile(target, { acceptRanges: true, dotfiles: "allow" }, (error) => (error ? fail(error) : ok()));
 	});
-}
-
-
-/** The commit this harness runs, short, read once; "" when it is not a git checkout. */
-let version: string | undefined;
-export function harnessVersion(): string {
-	if (version !== undefined) return version;
-	try {
-		version = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: process.env.DECKS_APP_DIR ?? process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-	} catch {
-		version = "";
-	}
-	return version;
 }
 
 /**

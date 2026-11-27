@@ -1,12 +1,12 @@
 {
 	"counts": {
 		"files over 1,000 lines": 7,
-		"functions over 150 lines": 42,
+		"functions over 150 lines": 41,
 		"classes over 30 methods": 10,
-		"server folder pairs that import each other": 11,
+		"server folder pairs that import each other": 10,
 		"imports across packages by relative path": 0,
 		"\"one release\" notes": 0,
-		"server imports that point up a layer": 13,
+		"server imports that point up a layer": 11,
 		"canvas package folder pairs that import each other": 3,
 		"canvas package imports that point up a layer": 0
 	},
@@ -23,7 +23,6 @@
 		"apps/server/src/calls/apps.ts: appsVerbs": 196,
 		"apps/server/src/calls/apps.ts: (a function)": 183,
 		"apps/server/src/calls/canvas.ts: canvasVerbs": 555,
-		"apps/server/src/calls/person-table.ts: personTable": 431,
 		"apps/server/src/connections/routes/files.ts: register": 178,
 		"apps/server/src/connections/routes/pictures.ts: register": 315,
 		"apps/server/src/connections/routes/v1.ts: verbRoutes": 159,
@@ -73,8 +72,6 @@
 	},
 	"upward": [
 		"apps/server/src/auth/issue.ts -> apps/server/src/app.ts",
-		"apps/server/src/calls/person-table.ts -> apps/server/src/app.ts",
-		"apps/server/src/calls/person-table.ts -> apps/server/src/connections/routes/shared.ts",
 		"apps/server/src/canvas/admin.ts -> apps/server/src/agents/session.ts",
 		"apps/server/src/canvas/service.ts -> apps/server/src/apps/check.ts",
 		"apps/server/src/canvas/service.ts -> apps/server/src/apps/service.ts",

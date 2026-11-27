@@ -9,7 +9,7 @@ import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../connections/http.ts";
 import { revokeStudioTokens, saveStudioLink, STUDIO_TOKEN_MS, studioToken } from "../studio/index.ts";
-import { unpairStudioHere } from "../calls/person-table.ts";
+import { unpairStudioHere } from "../calls/person-studio.ts";
 
 const KEY = "dsk_abcdefghijklmnopqrstuvwxyz012345";
 const STUDIO = { origin: "https://studio.test", "sec-fetch-site": "cross-site", "content-type": "application/json" };

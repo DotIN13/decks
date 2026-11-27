@@ -4,7 +4,7 @@ import { withBox, type VerbContext } from "./context.ts";
 
 /**
  * What the person's hands do on the canvas, sent over the socket: a card moved, sized or taken off
- * (`card.move`, `card.resize`, `card.hide` in `calls/person-table.ts`), and the drawing edited, a canvas
+ * (`card.move`, `card.resize`, `card.hide` in `calls/person-canvas.ts`), and the drawing edited, a canvas
  * picked or made (`canvas.edit`, there too). Not verbs: nothing in the table names them and `/api/v1` cannot
  * reach them; an agent does these with `canvas.move`, `canvas.update`, `canvas.batch` and the rest.
  */

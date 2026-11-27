@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { renameCanvas } from "../calls/person-table.ts";
+import { renameCanvas } from "../calls/person-canvas.ts";
 
 /*
  * Canvases are the deck's: a new one is not named after the agent on it, and the first name chosen

@@ -228,7 +228,7 @@ export class Seat {
 	/**
 	 * Size one board on this agent's stage, in its file. Nothing else sizes a board: a browser's
 	 * measurement does not, and neither does a new revision of its file. `decks.canvas.fit` and `decks.canvas.update`
-	 * call this; a person's drag sizes the board on the stage on screen, by name (`calls/person-table.ts`).
+	 * call this; a person's drag sizes the board on the stage on screen, by name (`calls/person-canvas.ts`).
 	 */
 	setSize(path: string, size: { w?: number; h?: number }): void {
 		const name = this.canvasName();

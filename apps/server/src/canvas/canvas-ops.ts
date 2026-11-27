@@ -2,7 +2,7 @@
  * Boards on a stage, read from and written to its file (`canvas/pens.ts`), by anyone who names it.
  *
  * The stage file is the one record of which boards are on a stage, where, and how big. An agent
- * works on its own stage (`agents/session.ts`), a person on the stage on screen (`calls/person-table.ts`);
+ * works on its own stage (`agents/session.ts`), a person on the stage on screen (`calls/person-canvas.ts`);
  * both come here with the stage's name, and neither keeps a copy of what the file says.
  */
 import type { Deck } from "../deck/loader.ts";

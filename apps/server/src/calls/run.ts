@@ -6,7 +6,8 @@ import { penEditBy } from "../canvas/pens.ts";
 import { callerOf } from "./caller.ts";
 import { refusedForCanvas } from "./canvas-frame.ts";
 import type { CallsHost } from "./host.ts";
-import { personTable, type PersonCall, type PersonHost } from "./person-table.ts";
+import type { PersonCall } from "./person-call.ts";
+import { personTable, type PersonHost } from "./person-table.ts";
 import { renamedVerb } from "./renamed.ts";
 import type { CallResult } from "./tool.ts";
 

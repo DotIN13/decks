@@ -1,5 +1,5 @@
 import type { ServerMessage } from "@decks/protocol";
-import type { View } from "../calls/person-table.ts";
+import type { View } from "../calls/person-call.ts";
 import type { RouteDeps } from "./routes/shared.ts";
 
 /**

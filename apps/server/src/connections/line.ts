@@ -3,7 +3,7 @@ import type { Duplex } from "node:stream";
 import type { LineClientMessage, Presence, PresenceBy, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { App } from "../app.ts";
-import type { View } from "../calls/person-table.ts";
+import type { View } from "../calls/person-call.ts";
 import { verifyOn } from "../auth/guard.ts";
 import { isCanvasPass, isDocumentPass } from "../auth/passes.ts";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
