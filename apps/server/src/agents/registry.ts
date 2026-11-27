@@ -32,6 +32,16 @@ const COLORS = ["#3b5cf6", "#2eaf5a", "#e7af36", "#623be2", "#d92e3c", "#0f9ba8"
  * at once produce a canvas nobody can follow and a bill nobody expected.
  */
 
+/**
+ * The mode a chat opens in: the one asked for or kept (a restored chat's, a fork's), else auto for a
+ * new agent whose runtime has it, so new agents work without stopping to ask. Nothing for a runtime
+ * with no modes (pi), which already works that way.
+ */
+export function startingMode(kind: AgentKind, options: { mode?: AgentMode; restored?: unknown }): AgentMode | undefined {
+	if (options.mode !== undefined || options.restored) return options.mode;
+	return runtimeOf(kind).capabilities.modes.includes("auto") ? "auto" : undefined;
+}
+
 export class Registry {
 	private readonly agents: DeckAgent[] = [];
 	private focusedId: string | undefined;
@@ -248,6 +258,13 @@ export class Registry {
 			};
 		} = {},
 	): DeckAgent {
+		/*
+		 * A new agent starts in auto, where its runtime has it: it works without stopping to ask,
+		 * as the person wants new agents to. A chat read back off disk keeps the mode it had, a
+		 * fork its parent's, and a mode asked for (`agent.create --mode`) is the one used.
+		 */
+		const mode = startingMode(options.kind ?? this.host.defaultKind, options);
+		if (mode) options = { ...options, mode };
 		const agent = new DeckAgent(
 			this.deck,
 			this.emit,

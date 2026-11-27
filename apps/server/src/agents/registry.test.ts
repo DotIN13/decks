@@ -901,3 +901,11 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 	assert.deepEqual(wrote, [["canvases/t/cards/plan/index.html", agent.id], ["canvases/t/cards/plan/index.html", agent.id]]);
 	cleanup();
 });
+
+test("a new agent starts in auto wherever its runtime has it; a kept or asked-for mode wins", async () => {
+	const { startingMode } = await import("./registry.ts");
+	for (const kind of ["claude", "opencode", "opencode2", "antigravity"] as const) assert.equal(startingMode(kind, {}), "auto", kind);
+	assert.equal(startingMode("pi", {}), undefined, "pi has no modes: it already goes ahead");
+	assert.equal(startingMode("claude", { mode: "plan" }), "plan", "asked for");
+	assert.equal(startingMode("claude", { restored: {} }), undefined, "a chat read back keeps what it had");
+});

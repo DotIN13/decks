@@ -33,12 +33,12 @@ import { decksEnv } from "../decks-env.ts";
  * canvas. This process is one Decks spawned, trusted to the same degree pi and an
  * opencode agent in `auto` already are, so the CLI's own headless switch
  * (`--dangerously-skip-permissions`) is armed. The *modes* are a separate thing and still
- * mean something: `accept-edits` writes where it is told, `plan` plans, and both carry
+ * mean something: `accept-edits` writes where it is told, `auto` goes ahead, `plan` plans, and each carries
  * the CLI's own behaviour on top of the permission decision.
  */
 
-/** The CLI has two execution modes; the shell's four map down. `manual` would be a lie: headless agy cannot ask. */
-export const ANTIGRAVITY_CAPABILITIES: AgentCapabilities = { modes: ["acceptEdits", "plan"] };
+/** The CLI's execution modes: accept-edits, auto and plan (`agy --mode`). `manual` would be a lie: headless agy cannot ask. */
+export const ANTIGRAVITY_CAPABILITIES: AgentCapabilities = { modes: ["acceptEdits", "auto", "plan"] };
 
 export const ANTIGRAVITY_COMMANDS: SlashCommand[] = [
 	{ name: "cost", hint: "Open the usage panel: spend, tokens, context", source: "deck" },
@@ -118,7 +118,7 @@ export class AntigravityBackend implements AgentBackend {
 			// scoped permission files would mean rewriting the user's settings.json.
 			"--dangerously-skip-permissions",
 			...(this.currentModel ? ["--model", this.currentModel.model] : []),
-			...(this.currentMode === "acceptEdits" ? ["--mode", "accept-edits"] : this.currentMode === "plan" ? ["--mode", "plan"] : []),
+			...(this.currentMode === "acceptEdits" ? ["--mode", "accept-edits"] : this.currentMode === "plan" ? ["--mode", "plan"] : this.currentMode === "auto" ? ["--mode", "auto"] : []),
 			...(conversation ? ["--conversation", conversation] : []),
 		];
 		const child = spawn(executable, args, {
