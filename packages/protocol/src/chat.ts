@@ -320,6 +320,13 @@ export interface ModelOption {
 	label: string;
 	/** Whether the model has thinking levels worth offering. */
 	reasoning: boolean;
+	/**
+	 * The levels it takes, in scale order, when the runtime says (pi's per-model map, opencode's
+	 * variants): DeepSeek v4.1 Flash on pi takes low, high and max, and a level it lacks is
+	 * moved to the nearest it has (`nearestLevel`). Absent: every level, or none when
+	 * `reasoning` is false.
+	 */
+	levels?: readonly ThinkingLevel[];
 }
 
 export interface AgentModel {

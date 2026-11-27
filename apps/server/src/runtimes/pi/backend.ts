@@ -11,7 +11,7 @@ import {
 	type ExtensionAPI,
 	type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
+import { nearestLevel, THINKING_LEVELS, type AgentCapabilities, type AgentModel, type AgentUsage, type ModelOption, type SlashCommand, type ThinkingLevel, type UsageReport } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { decksStage } from "./extension.ts";
@@ -32,6 +32,27 @@ import { handlePiEvent } from "./events.ts";
  * any permission gate (that is an extension's job — DESIGN §6.8).
  */
 /** Pi has no notion of asking first: that is an extension's business (§6.8). */
+/**
+ * The levels a pi model takes, from its own map (a level mapped to null is one it does not take),
+ * in Decks' scale order; nothing when the model has no map.
+ */
+export function levelsOf(model: { thinkingLevelMap?: Record<string, unknown> | undefined }): ThinkingLevel[] | undefined {
+	const map = model.thinkingLevelMap;
+	if (!map) return undefined;
+	return THINKING_LEVELS.filter((level) => map[level] !== null && map[level] !== undefined);
+}
+
+/**
+ * The level to set: the one asked for when the model takes it, else the nearest it does
+ * (`nearestLevel`), so what Decks records is what the model really runs at rather than a level
+ * pi quietly rounds (medium asked of DeepSeek v4.1 Flash ran at high and said so afterwards).
+ */
+export function levelFor(model: { thinkingLevelMap?: Record<string, unknown> | undefined }, wanted: ThinkingLevel | undefined): ThinkingLevel | undefined {
+	const levels = levelsOf(model);
+	if (!levels) return wanted;
+	return nearestLevel(wanted, levels);
+}
+
 export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
 
 /**
@@ -126,7 +147,7 @@ export class PiBackend implements AgentBackend {
 			agentDir,
 			modelRuntime: this.modelRuntime,
 			resourceLoader: loader,
-			...(resumeModel ? { model: resumeModel, thinkingLevel: wanted!.thinking } : {}),
+			...(resumeModel ? { model: resumeModel, ...(levelFor(resumeModel, wanted!.thinking) ? { thinkingLevel: levelFor(resumeModel, wanted!.thinking) } : {}) } : {}),
 			// A fork opens the file it was branched into; everything else starts fresh.
 			sessionManager: this.context.resumeRef ? SessionManager.open(this.context.resumeRef) : SessionManager.create(cwd),
 		});
@@ -277,23 +298,29 @@ export class PiBackend implements AgentBackend {
 		const resolved = this.modelRuntime.getModel(provider, model);
 		if (!resolved) throw new Error(`Model ${provider}/${model} is not available`);
 		await this.session.setModel(resolved);
-		if (thinking) this.session.setThinkingLevel(thinking as never);
+		const level = levelFor(resolved, thinking);
+		if (level) this.session.setThinkingLevel(level as never);
 	}
 
 	setThinking(level: ThinkingLevel): void {
-		this.session.setThinkingLevel(level as never);
+		const taken = this.session.model ? levelFor(this.session.model, level) : level;
+		if (taken) this.session.setThinkingLevel(taken as never);
 	}
 
 	/** Only models with working credentials: a picker of things that fail is a trap. */
 	async models(): Promise<ModelOption[]> {
 		const available = await this.modelRuntime.getAvailable();
 		return available
-			.map((model) => ({
-				provider: model.provider,
-				model: model.id,
-				label: model.name || model.id,
-				reasoning: model.reasoning === true,
-			}))
+			.map((model) => {
+				const levels = levelsOf(model);
+				return {
+					provider: model.provider,
+					model: model.id,
+					label: model.name || model.id,
+					reasoning: levels ? levels.length > 0 : model.reasoning === true,
+					...(levels ? { levels } : {}),
+				};
+			})
 			.sort((a, b) => a.provider.localeCompare(b.provider) || a.label.localeCompare(b.label));
 	}
 

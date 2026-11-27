@@ -49,16 +49,16 @@ export function startingMode(kind: AgentKind, options: { mode?: AgentMode; resto
  * agent made without a model never lands on an expensive one by accident.
  */
 export const STARTING_MODELS: Partial<Record<AgentKind, ReadonlyArray<{ provider: string; model: string; thinking: AgentModel["thinking"] }>>> = {
-	pi: [{ provider: "opencode-go", model: "deepseek-v4.1-flash", thinking: "medium" }],
+	pi: [{ provider: "opencode-go", model: "deepseek-v4.1-flash", thinking: "high" }],
 	opencode: [
-		{ provider: "opencode", model: "deepseek-v4.1-flash-free", thinking: "medium" },
-		{ provider: "deepseek", model: "deepseek-flash", thinking: "medium" },
+		{ provider: "opencode", model: "deepseek-v4.1-flash-free", thinking: "high" },
+		{ provider: "deepseek", model: "deepseek-flash", thinking: "high" },
 	],
 	opencode2: [
-		{ provider: "opencode", model: "deepseek-v4.1-flash-free", thinking: "medium" },
-		{ provider: "deepseek", model: "deepseek-flash", thinking: "medium" },
+		{ provider: "opencode", model: "deepseek-v4.1-flash-free", thinking: "high" },
+		{ provider: "deepseek", model: "deepseek-flash", thinking: "high" },
 	],
-	antigravity: [{ provider: "antigravity", model: "gemini-4-hydrogen-medium", thinking: "off" }],
+	antigravity: [{ provider: "antigravity", model: "gemini-4-hydrogen-high", thinking: "off" }],
 };
 
 /** The model a chat opens on: the one given or kept, else the first starting model its runtime offers; nothing leaves the runtime's own default. */

@@ -51,3 +51,9 @@ test("optionFor matches on provider and id together, because a name is not uniqu
 	assert.equal(optionFor(models, { provider: "openai", model: "opus-5" }), undefined);
 	assert.equal(optionFor(models, undefined), undefined);
 });
+
+test("a model that says which levels it takes is offered only those", async () => {
+	const { levelsFor } = await import("./thinking.ts");
+	assert.deepEqual(levelsFor({ provider: "opencode-go", model: "deepseek-v4.1-flash", label: "DeepSeek", reasoning: true, levels: ["low", "high", "max"] }), ["low", "high", "max"]);
+	assert.deepEqual(levelsFor({ provider: "x", model: "y", label: "y", reasoning: false, levels: ["high"] }), [], "no reasoning: no levels, whatever the list");
+});

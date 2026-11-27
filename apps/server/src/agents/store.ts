@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { AGENT_KINDS, type AgentKind, type AgentMode, type AgentModel, type AgentUsage, type ChatItem, type ModelOption, type ThinkingLevel } from "@decks/protocol";
+import { AGENT_KINDS, THINKING_LEVELS, type AgentKind, type AgentMode, type AgentModel, type AgentUsage, type ChatItem, type ModelOption, type ThinkingLevel } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 
 /**
@@ -603,10 +603,11 @@ function usageOf(raw: unknown): AgentUsage | undefined {
 function optionOf(raw: unknown): ModelOption | undefined {
 	if (!raw || typeof raw !== "object") return undefined;
 	const source = raw as Record<string, unknown>;
-	const { provider, model, label, reasoning } = source;
+	const { provider, model, label, reasoning, levels } = source;
 	if (typeof provider !== "string" || !provider) return undefined;
 	if (typeof model !== "string" || !model) return undefined;
-	return { provider, model, label: typeof label === "string" && label ? label : model, reasoning: reasoning === true };
+	const known = Array.isArray(levels) ? THINKING_LEVELS.filter((level) => levels.includes(level)) : undefined;
+	return { provider, model, label: typeof label === "string" && label ? label : model, reasoning: reasoning === true, ...(known ? { levels: known } : {}) };
 }
 
 function modelOf(raw: unknown): AgentModel | undefined {

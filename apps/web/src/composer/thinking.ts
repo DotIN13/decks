@@ -22,7 +22,8 @@ export type { ThinkingLevel };
  * this is the one function that has to change, and the picker keeps working.
  */
 export function levelsFor(option: ModelOption | undefined): readonly ThinkingLevel[] {
-	return option?.reasoning ?? false ? THINKING_LEVELS : [];
+	if (!(option?.reasoning ?? false)) return [];
+	return option?.levels ?? THINKING_LEVELS;
 }
 
 /** The option in `models` that is the model currently running, if it is still on offer. */

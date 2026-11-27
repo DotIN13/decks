@@ -446,6 +446,7 @@ export class OpencodeBackend implements AgentBackend {
 						// level (a custom "fast" preset, or none at all) has no answer
 						// to "how hard".
 						reasoning: model.capabilities?.reasoning === true && variants.length > 0,
+						...(model.capabilities?.reasoning === true && variants.length > 0 ? { levels: variants } : {}),
 					};
 				}),
 			);
