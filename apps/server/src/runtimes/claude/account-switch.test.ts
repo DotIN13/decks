@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Translator } from "../../agents/translator.ts";
 import { ClaudeBackend } from "./backend.ts";
+import { ClaudeRecovery } from "./recovery.ts";
 
 /**
  * What a switch does to a running Claude process.
@@ -17,7 +19,7 @@ function backend(o: { startedOn?: string; now?: string; streaming?: boolean }) {
 		context: { account: o.now ? { id: () => o.now } : undefined },
 		startedOn: o.startedOn,
 		streaming: o.streaming ?? false,
-		restartForAccount: false,
+		recovery: new ClaudeRecovery({ translator: new Translator("A", () => {}), notice: () => {} }, () => o.startedOn !== o.now),
 		restart: async () => {
 			restarts += 1;
 		},
@@ -48,7 +50,8 @@ test("on macOS a switch during a turn waits for the turn to end", () => {
 		const { b, restarts } = backend({ startedOn: "stanford", now: "tiger", streaming: true });
 		b.accountChanged();
 		assert.equal(restarts(), 0);
-		assert.equal((b as unknown as { restartForAccount: boolean }).restartForAccount, true);
+		// The restart is owed, and comes when the turn ends (`ClaudeRecovery`).
+		assert.deepEqual((b as unknown as { recovery: ClaudeRecovery }).recovery.afterTurn(undefined), { kind: "resume" });
 	});
 });
 
