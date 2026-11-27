@@ -242,6 +242,29 @@ export function createFramedEditor(options: Options): FramedEditor {
 	 * before is told the scheme and the mode as they are now, and asked for what only it knows (its
 	 * selection, its zoom), which the page last heard from another frame.
 	 */
+	/*
+	 * Where the frame is on the page, for the outline the page draws round what the frame selected:
+	 * measured once and kept until the frame changes size or the window resizes or scrolls, not read
+	 * with a forced layout on every outline the frame says (a click said several).
+	 */
+	let kept: { frame: HTMLIFrameElement; rect: DOMRect } | undefined;
+	const forgetRect = () => (kept = undefined);
+	const sized = typeof ResizeObserver === "function" ? new ResizeObserver(forgetRect) : undefined;
+	if (typeof window !== "undefined") {
+		window.addEventListener("resize", forgetRect, { passive: true });
+		window.addEventListener("scroll", forgetRect, { passive: true, capture: true });
+	}
+	const frameRect = (): DOMRect | undefined => {
+		const frame = frameAt();
+		if (!frame) return undefined;
+		if (kept?.frame !== frame) {
+			sized?.disconnect();
+			sized?.observe(frame);
+			kept = { frame, rect: frame.getBoundingClientRect() };
+		}
+		return kept.rect;
+	};
+
 	const attach = (page: PageEnd | undefined, how: { again: boolean; selected?: string | undefined }) => {
 		stopMirror?.();
 		stopMirror = undefined;
@@ -254,7 +277,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 		 */
 		fromFrame = how.again ? { camera: untrack(() => state?.camera?.[0]()) } : how.selected ? { selected: how.selected } : {};
 		if (page) {
-			if (options.pageTools) stopMirror = mirrorTools("page", page, { frameAt: () => frameAt()?.getBoundingClientRect() });
+			if (options.pageTools) stopMirror = mirrorTools("page", page, { frameAt: frameRect });
 			if (how.again) {
 				page.emit("look", { dark: darkNow, mode: modeNow });
 				if (options.pageTools) page.emit("tools", { again: true });
@@ -313,6 +336,11 @@ export function createFramedEditor(options: Options): FramedEditor {
 			stopMirror = undefined;
 			end()?.close();
 			setEnd(undefined);
+			sized?.disconnect();
+			if (typeof window !== "undefined") {
+				window.removeEventListener("resize", forgetRect);
+				window.removeEventListener("scroll", forgetRect, { capture: true });
+			}
 		},
 	};
 	return { handle, surface, dispose: () => handle.dispose() };
