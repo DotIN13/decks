@@ -15,7 +15,7 @@ export interface ItemNodesNeeds {
 	readonly setHolesShown: Setter<ReadonlySet<string>>;
 	readonly props: CanvasViewProps;
 	readonly isRendered: (key: string) => boolean;
-	readonly pageNode: (board: Page) => JSX.Element;
+	readonly pageNode: (card: Page) => JSX.Element;
 	readonly liveFiles: Accessor<LiveFile[]>;
 	readonly liveBox: (id: string) => { x: number; y: number; w: number; h: number; radius: number; } | undefined;
 	readonly holesShown: Accessor<ReadonlySet<string>>;
@@ -34,7 +34,7 @@ export function createItemNodes(d: ItemNodesNeeds) {
 		}
 	};
 
-	/** Every board's slot, in the world. */
+	/** Every card's slot, in the world. */
 	const slots = () => (
 		<>
 
@@ -48,10 +48,10 @@ export function createItemNodes(d: ItemNodesNeeds) {
 				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
 				 * is within reach: only a slot's inside changes, and boards still stack in file order.
 				 */}
-				<For each={d.props.boards} fallback={null}>
-					{(board) => (
+				<For each={d.props.cards} fallback={null}>
+					{(card) => (
 						<div class="card-slot">
-							<Show when={d.isRendered(board.path)}>{d.pageNode(board)}</Show>
+							<Show when={d.isRendered(card.path)}>{d.pageNode(card)}</Show>
 						</div>
 					)}
 				</For>

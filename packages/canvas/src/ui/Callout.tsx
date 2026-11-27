@@ -97,7 +97,7 @@ export function PageCallout(props: PageCalloutProps) {
 	});
 	const { more, setMore, placeMenu, menuAt, pick } = calloutMenu;
 	/** A card's pill, or drawn items' and a group's that can be exported: a ⋯ menu in place of the Delete button. The lasso's has none. */
-	const withMenu = () => !!props.board || !!props.onExport;
+	const withMenu = () => !!props.card || !!props.onExport;
 	const remove = () => props.onDelete;
 	return (
 		<div
@@ -112,10 +112,10 @@ export function PageCallout(props: PageCalloutProps) {
 			onClick={stop}
 		>
 			<Show when={props.ink}>{(ink) => <InkActions ink={ink()} />}</Show>
-			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? m.canvas_pill_fit() : m.canvas_pill_zoom_to()} title={props.board ? m.canvas_pill_fit_title() : m.canvas_pill_zoom_to()} onClick={() => props.onOpen()}>
+			<button type="button" role="menuitem" class="icon-button" aria-label={props.card ? m.canvas_pill_fit() : m.canvas_pill_zoom_to()} title={props.card ? m.canvas_pill_fit_title() : m.canvas_pill_zoom_to()} onClick={() => props.onOpen()}>
 				<Icon of={Scan} size={16} />
 			</button>
-			<Show when={props.board}>
+			<Show when={props.card}>
 				{(board) => (
 				<a role="menuitem" class="icon-button" aria-label={m.canvas_pill_new_tab()} title={m.canvas_pill_new_tab_title()} href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); newTab(board(), event.metaKey || event.ctrlKey); }}>
 					<Icon of={ExternalLink} size={16} />
@@ -128,13 +128,13 @@ export function PageCallout(props: PageCalloutProps) {
 				</button>
 			</Show>
 			{/* On a touch screen the properties drawer opens from here, not with every selection (`Properties.tsx`). */}
-			<Show when={COARSE && !props.board && !props.ink}>
+			<Show when={COARSE && !props.card && !props.ink}>
 				<button type="button" role="menuitem" class="icon-button" aria-label={m.canvas_props_panel()} title={m.canvas_props_panel()} onClick={() => setPropsOpen(true)}>
 					<Icon of={SlidersHorizontal} size={16} />
 				</button>
 			</Show>
 			<Show when={props.onComment}>
-				<button type="button" role="menuitem" class="icon-button" aria-label={m.canvas_pill_comment()} title={props.board ? m.canvas_pill_comment_card() : m.canvas_pill_comment_this()} onClick={() => props.onComment?.()}>
+				<button type="button" role="menuitem" class="icon-button" aria-label={m.canvas_pill_comment()} title={props.card ? m.canvas_pill_comment_card() : m.canvas_pill_comment_this()} onClick={() => props.onComment?.()}>
 					<Icon of={MessageSquarePlus} size={16} />
 				</button>
 			</Show>
@@ -155,7 +155,7 @@ export function PageCallout(props: PageCalloutProps) {
 						</Show>
 						<Show when={props.onHide}>
 							<span class="callout-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="icon-button" aria-label={m.canvas_pill_hide()} title={props.board?.item === "app" ? m.canvas_pill_hide_app() : m.canvas_pill_hide_title()} onClick={() => props.onHide?.()}>
+							<button type="button" role="menuitem" class="icon-button" aria-label={m.canvas_pill_hide()} title={props.card?.item === "app" ? m.canvas_pill_hide_app() : m.canvas_pill_hide_title()} onClick={() => props.onHide?.()}>
 								<Icon of={X} size={17} />
 							</button>
 						</Show>
@@ -163,8 +163,8 @@ export function PageCallout(props: PageCalloutProps) {
 				}
 			>
 				{/* A card's pill: Fit, New tab, Comment, ✕ to hide it and ⋯ for the rest; drawn items' and a group's: their actions and ⋯. */}
-				<Show when={props.board && props.onHide}>
-					<button type="button" role="menuitem" class="icon-button" aria-label={m.canvas_pill_hide()} title={props.board?.item === "app" ? m.canvas_pill_hide_app() : m.canvas_pill_hide_title()} onClick={() => props.onHide?.()}>
+				<Show when={props.card && props.onHide}>
+					<button type="button" role="menuitem" class="icon-button" aria-label={m.canvas_pill_hide()} title={props.card?.item === "app" ? m.canvas_pill_hide_app() : m.canvas_pill_hide_title()} onClick={() => props.onHide?.()}>
 						<Icon of={X} size={17} />
 					</button>
 				</Show>
@@ -177,7 +177,7 @@ export function PageCallout(props: PageCalloutProps) {
 						ref={(menu) => requestAnimationFrame(() => placeMenu(menu))}
 						class="callout-more"
 						role="menu"
-						aria-label={props.board ? m.canvas_pill_more_card() : m.canvas_pill_more_actions()}
+						aria-label={props.card ? m.canvas_pill_more_card() : m.canvas_pill_more_actions()}
 						style={menuAt() ? { left: `${menuAt()!.left}px` } : { visibility: "hidden", left: "0" }}
 					>
 						<Show when={props.onRefresh}>
@@ -204,7 +204,7 @@ export function PageCallout(props: PageCalloutProps) {
 						</Show>
 						<Show when={remove()}>
 							<span class="callout-more-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label={m.canvas_pill_delete()} title={props.board?.item === "document" ? m.canvas_pill_delete_document() : props.board ? m.canvas_pill_delete_card() : m.canvas_pill_delete()} onClick={pick(remove())}>
+							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label={m.canvas_pill_delete()} title={props.card?.item === "document" ? m.canvas_pill_delete_document() : props.card ? m.canvas_pill_delete_card() : m.canvas_pill_delete()} onClick={pick(remove())}>
 								<Icon of={Trash} size={15} />
 								{m.canvas_pill_delete()}
 							</button>

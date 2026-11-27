@@ -43,7 +43,7 @@ export function createTapToDeselect(d: TapToDeselectNeeds) {
 			held = true;
 			d.host.claim(pointer);
 			d.host.keepTouch?.(event);
-			d.host.holdMenu?.({ ids: [], at: from, stage: d.worldAt(event) });
+			d.host.holdMenu?.({ ids: [], at: from, canvas: d.worldAt(event) });
 		}, HOLD_MS);
 		const done = () => {
 			clearTimeout(hold);

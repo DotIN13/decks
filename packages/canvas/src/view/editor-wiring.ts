@@ -26,7 +26,7 @@ export interface WireEditorNeeds {
 	readonly worldAt: (event: { clientX: number; clientY: number; }) => { x: number; y: number; };
 	readonly grabbing: () => boolean;
 	readonly input: ReturnType<typeof createViewInput>;
-	readonly setHoldMenu: Setter<{ ids: string[]; at: { x: number; y: number; }; stage: { x: number; y: number; }; } | undefined>;
+	readonly setHoldMenu: Setter<{ ids: string[]; at: { x: number; y: number; }; canvas: { x: number; y: number; }; } | undefined>;
 	readonly selection: ReturnType<typeof createSelection>;
 	readonly armPenTool: (tool: PenTool) => void;
 	readonly worldEl: HTMLDivElement;
@@ -48,7 +48,7 @@ export function wireEditor(d: WireEditorNeeds) {
 			return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
 		},
 		nextIds: () => d.freshIds(),
-		boards: () => d.props.boards,
+		cards: () => d.props.cards,
 		selectedPage: () => d.props.selected,
 		onPenEdit: (ops) => d.penEdit(ops),
 		effects: {
@@ -65,7 +65,7 @@ export function wireEditor(d: WireEditorNeeds) {
 			onResize: (path, size) => d.props.onResize?.(path, size),
 			toggleMedia: (id, media) => d.items.toggleMedia(id, media),
 		},
-		// The pointer's half (`editor/dom/pointer.ts`): the stage keeps the camera, its finger pool and its pan.
+		// The pointer's half (`editor/dom/pointer.ts`): the canvas keeps the camera, its finger pool and its pan.
 		pointer: {
 			element: () => d.element,
 			worldAt: (event) => d.worldAt(event),
@@ -78,7 +78,7 @@ export function wireEditor(d: WireEditorNeeds) {
 				d.items.pageIndex()
 					.search({ x: at.x, y: at.y, w: 0, h: 0 })
 					.sort((a, b) => a - b)
-					.map((index) => d.props.boards[index]!),
+					.map((index) => d.props.cards[index]!),
 			rendered: () => d.items.renderedPaths(),
 			linkAt: (at) => d.penLayer.questions.linkAt(at),
 			onSelect: (path) => d.props.onSelect(path),
@@ -120,7 +120,7 @@ export function wireEditor(d: WireEditorNeeds) {
 			pan: (event, how) => d.input.panFrom(event, how),
 			toggleMedia: (id, media) => d.items.toggleMedia(id, media),
 			open: { liveFile: (id) => d.items.openLiveFile(id) },
-			handles: { item: () => d.selection.penHandles(), board: () => d.selection.pageHandles(), radius: () => d.selection.radiusHandle(), arrow: () => d.selection.arrowEnds() },
+			handles: { item: () => d.selection.penHandles(), card: () => d.selection.pageHandles(), radius: () => d.selection.radiusHandle(), arrow: () => d.selection.arrowEnds() },
 		},
 		// The drawing's keys (`editor/dom/keys.ts`).
 		keys: {

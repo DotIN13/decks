@@ -70,7 +70,7 @@ export function createStarts(d: StartsNeeds) {
 	 * until the board is at it (`editor/core/gesture.ts`, `landPageResize`).
 	 */
 	const resizePage = (event: PointerEvent, handle: Handle) => {
-		const box = d.host.handles.board();
+		const box = d.host.handles.card();
 		if (event.button !== 0 || !box) return;
 		event.preventDefault();
 		event.stopPropagation();

@@ -27,9 +27,9 @@ export function fitAll(doc: PenDocument, view: { width: number; height: number }
 
 
 /**
- * The Decks canvas editor, made inside a host's own Solid tree: the stage, its camera, the
+ * The Decks canvas editor, made inside a host's own Solid tree: the canvas, its camera, the
  * drawing's tools and properties, and ink. The canvas frame (`frame/inside/frame.tsx`) makes it where
- * its layout wants the stage, with its own mode and ink given in `state`.
+ * its layout wants the canvas, with its own mode and ink given in `state`.
  *
  * One canvas to a page: the tools and the host's answers are module state, as they are in the
  * Decks app.
@@ -70,25 +70,25 @@ export function createEditor(options: EditorOptions): Editor {
 	};
 	paintScheme();
 
-	// Laid out with the stage engine's words, as the server lays its drawing out, so an edit shown ahead of it routes its arrows where the server will.
+	// Laid out with the canvas engine's words, as the server lays its drawing out, so an edit shown ahead of it routes its arrows where the server will.
 	const drawing = createDrawing(first, { look, measure: canvasMeasure, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
 	/** What the drawing's own addresses are read against; a host that moves between canvases says so with `setDocument`. */
 	const [penBase, setPenBase] = createSignal(base);
-	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */
+	/** A glide the host asked for (`glide`): the canvas animates to the camera it is given while the token is new. */
 	const [ownGlide, setGlideAsk] = createSignal<{ token: number; ms: number }>();
 	let glides = 0;
 	const { doc, edit, step, movePage, resizePage, removePage, collapsePage } = drawing;
 
-	/** The stage's engine, once the stage is made (`CanvasView` `onEngine`): the layout the handle answers from. */
+	/** The canvas's engine, once the canvas is made (`CanvasView` `onEngine`): the layout the handle answers from. */
 	let engine: CanvasEngine | undefined;
 	const editorCamera = createEditorCamera({ setCameraSignal, options, views, camera, kept, doc, look });
 	const { setCamera, putCamera, disposeViews } = editorCamera;
 	if (firstView?.selected) setPenSelection([firstView.selected]);
 
 	const editable = !options.readOnly;
-	/* Fixed for the canvas's life: plain objects, so no prop of the stage is a computation of its own. */
+	/* Fixed for the canvas's life: plain objects, so no prop of the canvas is a computation of its own. */
 	/*
-	 * The board pill's Hide takes the board off this drawing (its file stays), and Delete, when the host
+	 * The card pill's Hide takes the card off this drawing (its file stays), and Delete, when the host
 	 * can delete files, takes it off and asks the host to delete the file too.
 	 */
 	const editing = editable
@@ -112,14 +112,14 @@ export function createEditor(options: EditorOptions): Editor {
 		return done;
 	});
 
-	// With what made the drawing from the last one, when known, so the stage's engines apply just that.
+	// With what made the drawing from the last one, when known, so the canvas's engines apply just that.
 	const pen = createMemo(() => {
 		const now = doc();
 		const edits = drawing.editsTo(now);
 		return { doc: now, base: penBase(), ...(edits ? { edits } : {}), ...(drawing.ownTo(now) ? { own: true as const } : {}) };
 	});
 	const { pages } = createEditorPages({ options, doc, drawing });
-	/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
+	/* Memos rather than `a() && b()` in the props: the canvas reads them in its pointer handlers, outside any owner. */
 	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
 	const { surface, root } = createEditorView({
 		mode, options, ownGlide, opening, pages, pen, editing, step, inking, setModeSignal, camera, setCamera, selected, setSelected,

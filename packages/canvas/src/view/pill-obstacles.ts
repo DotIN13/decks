@@ -13,7 +13,7 @@ export function createPillObstacles(d: PillObstaclesNeeds) {
 	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
 	 * round the item. What the *sheet* draws is told separately, as a preview the worker applies to
 	 * its own copy (`penLayer.preview`): a turn used to send the whole drawing to the worker on every
-	 * frame, which is a relayout of the whole stage sixty times a second, and that was the flicker.
+	 * frame, which is a relayout of the whole canvas sixty times a second, and that was the flicker.
 	 *
 	 * Neither is cleared when the gesture ends. The worker lets a preview go when the server's answer
 	 * arrives — "whatever a drag was previewing is now the drawing itself" — and clearing it first is
@@ -28,14 +28,14 @@ export function createPillObstacles(d: PillObstaclesNeeds) {
 	 */
 
 	/**
-	 * What the pill should not sit on (`PageCallout`): every board and drawn item but those touching the
+	 * What the pill should not sit on (`PageCallout`): every card and drawn item but those touching the
 	 * box it is for, which are the selection itself, what is in it and what holds it.
 	 */
 	const pillObstacles = (box: { x: number; y: number; w: number; h: number }) => {
 		const touches = (o: { x: number; y: number; w: number; h: number }) => o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y;
 		const out: Array<{ x: number; y: number; w: number; h: number }> = [];
-		for (const board of d.props.boards) {
-			const b = boxOf(board);
+		for (const card of d.props.cards) {
+			const b = boxOf(card);
 			if (!touches(b)) out.push(b);
 		}
 		for (const [id, placed] of d.penLayer.placed) {

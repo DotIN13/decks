@@ -24,7 +24,7 @@ export interface PressesNeeds {
 }
 
 export function createPresses(d: PressesNeeds) {
-	/** What an item's slot asks of the stage's fingers: a finger its bar or edge took carries the item, and the camera does not pan with it. */
+	/** What an item's slot asks of the canvas's fingers: a finger its bar or edge took carries the item, and the camera does not pan with it. */
 	const gestures: ItemSlotProps["gestures"] = {
 		claimTouch: (id) => {
 			d.claimed.add(id);
@@ -40,7 +40,7 @@ export function createPresses(d: PressesNeeds) {
 
 	/**
 	 * The camera dragged from a press (`editor/core/dispatch.ts`, `pan`): with the middle button, with
-	 * Space held, or on bare canvas, which lets the selected board go (`deselect`).
+	 * Space held, or on bare canvas, which lets the selected card go (`deselect`).
 	 */
 	const panFrom = (event: PointerEvent, how: { deselect: boolean; middle: boolean }) => {
 		const { middle } = how;

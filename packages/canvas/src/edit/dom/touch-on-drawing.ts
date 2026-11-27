@@ -59,7 +59,7 @@ export function createTouchOnDrawing(d: TouchOnDrawingNeeds) {
 			d.editor.pickPages([]);
 			// What it is on joins nothing: it is selected alone, unless it was part of the selection already.
 			if (!selected.includes(hit.id)) d.editor.select([hit.id]);
-			d.host.holdMenu?.({ ids: d.editor.items().slice(), at: from, stage: at });
+			d.host.holdMenu?.({ ids: d.editor.items().slice(), at: from, canvas: at });
 		}, HOLD_MS);
 		const done = () => {
 			clearTimeout(hold);

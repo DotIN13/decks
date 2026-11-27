@@ -18,7 +18,7 @@ export function createAppStates(d: AppStatesNeeds) {
 
 	createEffect(() => {
 		const apps = canvasHost().apps;
-		const names = new Set(d.props.boards.filter((board) => board.item === "app" && board.app).map((board) => board.app!));
+		const names = new Set(d.props.cards.filter((card) => card.item === "app" && card.app).map((card) => card.app!));
 		for (const [name, stop] of appWatched) {
 			if (names.has(name)) continue;
 			stop();

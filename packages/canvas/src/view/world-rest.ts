@@ -20,7 +20,7 @@ export interface WorldRestNeeds {
 
 export function createWorldRest(d: WorldRestNeeds) {
 	/*
-	 * For the browser checks: the camera as the world's transform said it before the stage scrolled
+	 * For the browser checks: the camera as the world's transform said it before the canvas scrolled
 	 * (`translate(half the window) scale(zoom) translate(−camera)`), which they read and parse; the
 	 * world's own transform now holds only the origin and the zoom (`camera/scroll-area.ts`).
 	 */

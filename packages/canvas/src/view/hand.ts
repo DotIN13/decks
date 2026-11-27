@@ -17,7 +17,7 @@ export function createHand(d: HandNeeds) {
 	/** A press is held on the canvas (not on a pill): the drawn items' pill steps aside until it lets go. */
 	const [pressHeld, setPressHeld] = createSignal(false);
 
-	/** When the stage last scrolled: within `COAST_MS` of it, with no finger down, the browser is still coasting after a flick. */
+	/** When the canvas last scrolled: within `COAST_MS` of it, with no finger down, the browser is still coasting after a flick. */
 	let lastScroll = 0;
 
 	const COAST_MS = 100;
@@ -30,10 +30,10 @@ export function createHand(d: HandNeeds) {
 		const release = () => setPressHeld(false);
 		element.addEventListener("pointerdown", press, { capture: true, passive: true });
 		/*
-		 * The hand (or Space held) pans from a press anywhere on the stage, whatever is selected: on an
+		 * The hand (or Space held) pans from a press anywhere on the canvas, whatever is selected: on an
 		 * item's bar or edge, a handle, a grip or an anchor too, which otherwise would carry, size or join
 		 * it (`core/dispatch.ts`, `handPans`). Taken here, before any of them hears the press. A press on
-		 * bare stage goes on to the editor, which pans it already. A card's page is a frame of its own and
+		 * bare canvas goes on to the editor, which pans it already. A card's page is a frame of its own and
 		 * never sends its presses here, so words in it still select.
 		 */
 		const hand = (event: PointerEvent) => {

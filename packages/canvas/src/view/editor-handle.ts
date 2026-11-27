@@ -52,7 +52,7 @@ export function createEditorHandle(d: EditorHandleNeeds) {
 			}),
 		refused: (id) => d.drawing.refused(id),
 		drawn: () => d.doc(),
-		// The destination and the journey written together, so the stage never sees one without the other.
+		// The destination and the journey written together, so the canvas never sees one without the other.
 		glide: (to, ms = 420) =>
 			batch(() => {
 				d.setGlideAsk(ms > 0 ? { token: ++d.glides, ms } : undefined);

@@ -3,7 +3,7 @@ import { type Viewport } from "../camera/camera.ts";
 
 /** What `PageCallout` is given (`Callout.tsx`). */
 export interface PageCalloutProps {
-	board?: Page;
+	card?: Page;
 	/** What the pill sits over, on the stage: the board's box, or the drawn items' together. */
 	box: { x: number; y: number; w: number; h: number };
 	/** What a screen reader calls it. */

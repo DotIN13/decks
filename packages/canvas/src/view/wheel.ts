@@ -16,16 +16,16 @@ export interface WheelNeeds {
 
 export function createWheel(d: WheelNeeds) {
 	/**
-	 * Where the pointer is, in stage coordinates — which are the event's own client ones.
+	 * Where the pointer is, in canvas coordinates — which are the event's own client ones.
 	 *
 	 * There was a cached `getBoundingClientRect` here, refreshed every 250 ms, and a
-	 * subtraction at each of three call sites. The stage element *is* the viewport, so all of
+	 * subtraction at each of three call sites. The canvas element *is* the viewport, so all of
 	 * that was adding zero: `camera/coords.ts` sets out why, and `checkCanvasOrigin` — called
 	 * at mount — is what stops it quietly ceasing to be true.
 	 */
 	const local = viewPoint;
 
-	/** A wheel or a trackpad's pinch, already in stage coordinates (`camera/controller.ts`). */
+	/** A wheel or a trackpad's pinch, already in canvas coordinates (`camera/controller.ts`). */
 	const wheel = d.ctl.wheel;
 
 	/** Safari's pinch is under way (`gesturechange`): a wheel it may send beside it is not a second zoom. */
@@ -59,7 +59,7 @@ export function createWheel(d: WheelNeeds) {
 			}
 		}
 		/*
-		 * A two-finger scroll moves the stage by the wheel's own deltas, and the camera follows from the
+		 * A two-finger scroll moves the canvas by the wheel's own deltas, and the camera follows from the
 		 * scroll event (`onScroll`). Left to the browser, a trackpad's scroll and its momentum are held to
 		 * an axis whenever they run near one (Chrome's rails on a Mac, within about 27 degrees; Safari
 		 * drops the smaller delta), so a flick went only a few ways. The deltas a page is given are the

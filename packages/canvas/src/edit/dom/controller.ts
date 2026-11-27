@@ -34,7 +34,7 @@ export type EditorHost = {
 	/** The window, in stage pixels. */
 	view: () => Rect;
 	nextIds: () => NextId;
-	boards: () => readonly HostPage[];
+	cards: () => readonly HostPage[];
 	/** The board selected by a plain press, which the page keeps apart from the picks: Shift and a press on another starts the picks with it. */
 	selectedPage?: () => string | undefined;
 	onPenEdit: (ops: Op[]) => void;
@@ -79,7 +79,7 @@ export function createEditor(host: EditorHost) {
 
 	const effects = createEffects({
 		...host.effects,
-		boards: host.boards,
+		boards: host.cards,
 		settle: (landing) => host.engine.settle(landing),
 		wake: (at) => {
 			const timer = setTimeout(() => {
@@ -96,7 +96,7 @@ export function createEditor(host: EditorHost) {
 		view: host.view(),
 		generation,
 		nextIds: host.nextIds,
-		pageRev: (path) => untrack(host.boards).find((board) => board.path === path)?.rev ?? 0,
+		pageRev: (path) => untrack(host.cards).find((board) => board.path === path)?.rev ?? 0,
 		linkAt: (point) => host.engine.linkAt(point),
 		overComposer: effects.overComposer,
 		selectedPage: host.selectedPage?.(),
@@ -134,7 +134,7 @@ export function createEditor(host: EditorHost) {
 	});
 	// Boards picked up that are no longer on the canvas are let go.
 	createEffect(() => {
-		const present = new Set(host.boards().map((board) => board.path));
+		const present = new Set(host.cards().map((board) => board.path));
 		update((now) => prunePages(now, present));
 	});
 
@@ -152,20 +152,20 @@ export function createEditor(host: EditorHost) {
 	createEffect(() => {
 		const held = pageResize();
 		if (!held?.released) return;
-		const board = host.boards().find((candidate) => candidate.path === held.path);
+		const board = host.cards().find((candidate) => candidate.path === held.path);
 		update((now) => landPageResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev} : undefined));
 	});
 	/* Boards a drag let go of are held where they were dropped until the boards are there (`landPageDrag`): asked again whenever the boards change. */
 	createEffect(() => {
 		if (!pageDrag()?.released) return;
-		const boards = host.boards();
+		const boards = host.cards();
 		update((now) => landPageDrag(now, boards));
 	});
 	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
 	createEffect(() => {
 		const drag = pageDrag();
 		const held = ownDrag();
-		const board = held ? host.boards().find((one) => one.path === held.path) : undefined;
+		const board = held ? host.cards().find((one) => one.path === held.path) : undefined;
 		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
 		// The boards' pictures are the engine's, and go with the drag there.
 		host.engine.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });

@@ -114,7 +114,7 @@ export type OutlineInput = {
 	glide?: ReadonlyMap<string, Offset> | undefined;
 	/** An item being resized, as the sheet has drawn it. */
 	resize?: (Rect & { id: string }) | undefined;
-	boards: readonly PageBox[];
+	cards: readonly PageBox[];
 	/** Boards picked up with the drawing (a marquee, Shift and a title bar). */
 	pagePicks: readonly string[];
 	/** Boards being dragged. */
@@ -173,14 +173,14 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 	const moving = input.pageDrag;
 	const carried = input.ownDrag;
 	for (const path of input.pagePicks) {
-		const board = input.boards.find((candidate) => candidate.path === path);
+		const board = input.cards.find((candidate) => candidate.path === path);
 		if (!board) continue;
 		const shift = moving?.paths.includes(path) ? moving : { dx: 0, dy: 0 };
 		out.push(outline(`page:${path}`, "page", { x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h }, undefined, board.corners?.[0]));
 	}
 	// The board the app has selected, outlined as a drawn item is, so the two look alike at every zoom.
 	const chosen = input.selected;
-	const board = chosen && !input.pagePicks.includes(chosen) ? input.boards.find((candidate) => candidate.path === chosen) : undefined;
+	const board = chosen && !input.pagePicks.includes(chosen) ? input.cards.find((candidate) => candidate.path === chosen) : undefined;
 	if (board) {
 		const sized = input.pageResize;
 		const shift = moving?.paths.includes(board.path) ? moving : { dx: 0, dy: 0 };
@@ -233,11 +233,11 @@ export function radiusHandle(handles: Outline | undefined, input: Omit<HandleInp
 }
 
 /** The selected board's box, when it alone is selected, can be resized, is not being carried, and is big enough on the screen to wear handles. */
-export function pageHandles(outlines: readonly Outline[], input: { resizable: boolean; carrying: boolean; boards: readonly PageBox[]; zoom?: number }): PageHandles | undefined {
+export function pageHandles(outlines: readonly Outline[], input: { resizable: boolean; carrying: boolean; cards: readonly PageBox[]; zoom?: number }): PageHandles | undefined {
 	if (!input.resizable || input.carrying || outlines.length !== 1 || outlines[0]!.role !== "page") return undefined;
 	if (tooSmallForHandles(outlines[0]!, input.zoom ?? 1)) return undefined;
 	const path = outlines[0]!.id.slice("page:".length);
-	const board = input.boards.find((candidate) => candidate.path === path);
+	const board = input.cards.find((candidate) => candidate.path === path);
 	if (!board) return undefined;
 	return { ...outlines[0]!, path };
 }
@@ -255,11 +255,11 @@ type HoverInput = {
 	item?: string | undefined;
 	typing?: string | undefined;
 	/** The board under the pointer. */
-	board?: string | undefined;
+	card?: string | undefined;
 	selected?: string | undefined;
 	/** A board drag or a pan, which a board's hover outline waits out. */
 	busy: boolean;
-	boards: readonly PageBox[];
+	cards: readonly PageBox[];
 	/** A drop's glide in hand, which the hovered item's outline rides with. */
 	glide?: ReadonlyMap<string, Offset> | undefined;
 };
@@ -275,8 +275,8 @@ export function hoverBox(input: HoverInput, scene: SceneQuery): HoverBox | undef
 	const bounds = id && id !== input.typing && !(hovered && isArrow(hovered)) ? scene.drawn(id) : undefined;
 	const glide = id ? glideShift(input.glide, scene, id) : NO_SHIFT;
 	if (bounds) return { ...bounds, x: bounds.x + glide.dx, y: bounds.y + glide.dy, id, ...(rounded(scene, id!) ? { round: true as const } : {}) };
-	const path = input.board;
-	const board = path && path !== input.selected && !input.busy ? input.boards.find((candidate) => candidate.path === path) : undefined;
+	const path = input.card;
+	const board = path && path !== input.selected && !input.busy ? input.cards.find((candidate) => candidate.path === path) : undefined;
 	return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true, ...(board.corners ? { corner: board.corners[0]! } : {}) } : undefined;
 }
 
@@ -459,7 +459,7 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 	const handles = itemHandles(outlines, scene, input.zoom);
 	const handleInput = { editable: input.editable, drafting: input.drafting, resizing: input.resizing, drag: input.pointerDrag };
 	const busy = !!input.pageDrag || input.panning;
-	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, board: input.hoverPage, selected: input.selected, busy, boards: input.boards, glide: input.glide }, scene);
+	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, card: input.hoverPage, selected: input.selected, busy, cards: input.cards, glide: input.glide }, scene);
 	const grip = gripBox({ block: input.block, busy, editing: input.editing }, scene, input.lineOf);
 	const kin = kinOutlines({ selection: input.selection, drag: input.drag, glide: input.glide, resizing: input.resizing, typing: input.typing, editing: input.editing, hover: input.hoverItem, busy: busy || !!input.gesture }, scene);
 	const frame = selectionFrame(outlines);
@@ -470,7 +470,7 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 		distances: distances({ editing: input.editing, alt: !!input.alt, busy: busy || !!input.gesture || !!input.marquee, selection: frame, over: hover }),
 		handles,
 		anchors: arrowAnchors(handles, handleInput, scene),
-		pageHandles: pageHandles(outlines, { resizable: input.resizable, carrying: !!input.pageDrag || !!input.ownDrag, boards: input.boards, zoom: input.zoom }),
+		pageHandles: pageHandles(outlines, { resizable: input.resizable, carrying: !!input.pageDrag || !!input.ownDrag, cards: input.cards, zoom: input.zoom }),
 		radius: radiusHandle(handles, handleInput, scene),
 		radiusDrag: input.radiusDrag,
 		arrow: arrowEnds(input, scene),

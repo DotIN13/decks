@@ -19,7 +19,7 @@ import type { CanvasViewProps } from "./CanvasView.tsx";
  *
  * Those documents were boards' iframes, which the canvas no longer runs. What goes on a layer now
  * is an awake card's root, a document's editor or an app's window (`canvas.css`, `data-scaling`),
- * a few elements each, and only those are counted: a board is its picture on the sheet and has no
+ * a few elements each, and only those are counted: a card is its picture on the sheet and has no
  * layer to make. Measured on a canvas of 65 cards, all on screen below 25%, a ctrl-wheel zoom
  * across 2%–400% in headed Chrome: with the cards over the old 48 and so off layers, Chrome drew
  * every card again at every step and a third of the frames were late (97 of 300 over 16.7 ms,
@@ -44,7 +44,7 @@ export interface RenderedNeeds {
 	readonly leavingPaths: Accessor<ReadonlySet<string>>;
 	readonly penLayer: CanvasEngine;
 	readonly cardsHidden: Accessor<boolean>;
-	readonly isVisible: (board: Page) => boolean;
+	readonly isVisible: (card: Page) => boolean;
 }
 
 export function createRendered(d: RenderedNeeds) {
@@ -53,11 +53,11 @@ export function createRendered(d: RenderedNeeds) {
 	 * leaving), the selected item, one being dragged or resized, and the sleeping item under the pointer,
 	 * which gets its bar and edge band to move it by. A sleeping item is its picture on the sheet and
 	 * nothing else, at any zoom, its title painted over it by the engine: 400 nodes cost a pan step 10 ms
-	 * of the page's time, and each camera step reached every one. The stage finds the one under a press
+	 * of the page's time, and each camera step reached every one. The canvas finds the one under a press
 	 * itself (`editor/dom/pointer.ts`, `pictureUnder`).
 	 */
 	const rendered = createMemo<readonly Page[]>((was) => {
-		const boards = d.props.boards;
+		const cards = d.props.cards;
 		if (d.view().width === 0) return was ?? [];
 		/*
 		 * Only at rest: a pan or a zoom keeps the nodes it started with, and the items it brings in are
@@ -67,8 +67,8 @@ export function createRendered(d: RenderedNeeds) {
 		const moved = was !== undefined && (d.moving() || d.panning() || d.scaling() || d.gliding());
 		const found = new Set(
 			moved
-				? was.flatMap((board) => {
-						const at = d.pageSlot().get(board.path);
+				? was.flatMap((card) => {
+						const at = d.pageSlot().get(card.path);
 						return at === undefined ? [] : [at];
 					})
 				: [],
@@ -87,20 +87,20 @@ export function createRendered(d: RenderedNeeds) {
 		for (const path of d.editor.heldPages()) keep(path);
 		const next = [...found]
 			.sort((a, b) => a - b)
-			.map((at) => boards[at]!);
-		// The same boards as last frame, which is nearly every frame of a pan: the same array, so nothing downstream runs.
-		return was && was.length === next.length && next.every((board, i) => board === was[i]) ? was : next;
+			.map((at) => cards[at]!);
+		// The same cards as last frame, which is nearly every frame of a pan: the same array, so nothing downstream runs.
+		return was && was.length === next.length && next.every((card, i) => card === was[i]) ? was : next;
 	});
 
-	/** `rendered`, as a set to look a board up in. */
-	const slotPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
+	/** `rendered`, as a set to look a card up in. */
+	const slotPaths = createMemo(() => new Set(rendered().map((card) => card.path)));
 
-	/** Whether a board has a node: each board's slot is told only when its own answer changes. */
+	/** Whether a card has a node: each card's slot is told only when its own answer changes. */
 	const isRendered = createSelector(slotPaths, (path: string, paths) => paths.has(path));
 
 	/**
 	 * The items whose node takes a press: those in `rendered` but a kept card asleep, which is its picture
-	 * on the sheet as any sleeping card is, so the stage finds it under a press itself (`pictureUnder`).
+	 * on the sheet as any sleeping card is, so the canvas finds it under a press itself (`pictureUnder`).
 	 */
 	const renderedPaths = createMemo<ReadonlySet<string>>(() => {
 		const kept = d.keptPaths();
@@ -111,7 +111,7 @@ export function createRendered(d: RenderedNeeds) {
 	createEffect(() => d.penLayer.questions.setNodes(renderedPaths()));
 
 	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
-	const layered = createMemo(() => d.scaling() && rendered().filter((board) => ((board.card && !d.cardsHidden()) || board.item) && d.isVisible(board)).length <= LAYER_BUDGET);
+	const layered = createMemo(() => d.scaling() && rendered().filter((card) => ((card.card && !d.cardsHidden()) || card.item) && d.isVisible(card)).length <= LAYER_BUDGET);
 
 	/** The camera as of its last rest. */
 	const restCamera = createMemo<Camera>((was) => (was !== undefined && (d.moving() || d.scaling() || d.panning() || d.gliding()) ? was : d.props.camera));

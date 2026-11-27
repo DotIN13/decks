@@ -95,13 +95,13 @@ export type PointerHost = {
 	noteAt: (event: Client) => void;
 	/** A finger held still for `HOLD_MS` (`touch-rules.ts`): the item's menu at the finger, or the canvas's with no item (`ui/HoldMenu.tsx`). */
 	/** The hold menu at the finger, or none: a finger that moves after its hold puts it away. */
-	holdMenu?: (menu: { ids: string[]; at: Pt; stage: Pt } | undefined) => void;
+	holdMenu?: (menu: { ids: string[]; at: Pt; canvas: Pt } | undefined) => void;
 	toggleMedia: (id: string, media: MediaItem) => void;
 	open: Openers;
 	/** The handles the overlay draws, as drawn, for the presses on them. */
 	handles: {
 		item: () => Outline | undefined;
-		board: () => PageHandles | undefined;
+		card: () => PageHandles | undefined;
 		radius: () => RadiusHandle | undefined;
 		arrow: () => ArrowHandles | undefined;
 	};

@@ -41,13 +41,13 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 	const radiusHandle = createMemo(() => radiusHandleOf(d.penHandles(), { editable: !!d.props.onPenEdit, resizing: !!d.editor.resize(), drag: d.editor.drag() }, d.scene));
 
 	/**
-	 * The drawn items the same pill is for, when no board has it, or a group picked together, boards
+	 * The drawn items the same pill is for, when no card has it, or a group picked together, cards
 	 * among them: the box round all of it, and what to call it. Not while one is typed into (its
 	 * editor has its own toolbar) or drawn with the pen.
 	 */
 	/*
 	 * What the draw tool's lasso holds (`inkSelection`): the same pill as a selection's, so its strokes can
-	 * go to the agent as the select tool's can (Make a drawing, Make a board, Send), and be commented on, duplicated or deleted.
+	 * go to the agent as the select tool's can (Make a drawing, Make a card, Send), and be commented on, duplicated or deleted.
 	 */
 	const lassoItems = createMemo(() => {
 		if (!d.props.drawing || !d.props.onInk || !d.props.inkAgent) return undefined;
@@ -63,8 +63,8 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 		if ((d.props.selected && !d.groupPicked()) || d.props.drawing || !d.props.onPenEdit || d.editor.text()) return undefined;
 		const all = d.penOutlines().filter((one) => one.id);
 		const outlines = all.filter((one) => !one.id.startsWith("page:"));
-		const boards = all.length - outlines.length;
-		if (outlines.length !== d.editor.items().length || boards !== d.editor.pagePicks().length || !all.length) return undefined;
+		const cardCount = all.length - outlines.length;
+		if (outlines.length !== d.editor.items().length || cardCount !== d.editor.pagePicks().length || !all.length) return undefined;
 		const x = Math.min(...all.map((one) => one.x));
 		const y = Math.min(...all.map((one) => one.y));
 		const box = { x, y, w: Math.max(...all.map((one) => one.x + one.w)) - x, h: Math.max(...all.map((one) => one.y + one.h)) - y };
@@ -73,10 +73,10 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 		const cards = all.filter((one) => one.id.startsWith("page:")).map((one) => one.id.slice(5));
 		const words = ids.map((id) => d.quoteOf(d.penLayer.placed.get(id)?.node)).filter(Boolean).join(" / ").slice(0, 160);
 		const first = d.penLayer.placed.get(ids[0]!)?.node;
-		const name = boards
+		const name = cardCount
 			? ids.length
-				? m.canvas_pill_cards_and_items({ cards: m.canvas_pill_cards({ count: boards }), items: m.canvas_props_items({ count: ids.length }) })
-				: m.canvas_pill_cards({ count: boards })
+				? m.canvas_pill_cards_and_items({ cards: m.canvas_pill_cards({ count: cardCount }), items: m.canvas_props_items({ count: ids.length }) })
+				: m.canvas_pill_cards({ count: cardCount })
 			: ids.length > 1
 				? m.canvas_props_items({ count: ids.length })
 				: words || (typeof first?.name === "string" ? first.name : first?.type) || m.canvas_card_held_item();
@@ -101,11 +101,11 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 		});
 	});
 
-	/** The hovered item's box as it is drawn now, or the board under the pointer. */
+	/** The hovered item's box as it is drawn now, or the card under the pointer. */
 	const hoverBox = createMemo(() => {
 		d.penDrawn();
 		return hoverBoxOf(
-			{ editing: d.props.mode === "edit", item: d.editor.hoverItem(), typing: d.editor.typing(), board: d.editor.hoverPage() ?? d.editor.hoverPicture(), selected: d.props.selected, busy: !!d.editor.pageDrag() || d.panning(), boards: d.scene.boards(), glide: d.editor.glide() },
+			{ editing: d.props.mode === "edit", item: d.editor.hoverItem(), typing: d.editor.typing(), card: d.editor.hoverPage() ?? d.editor.hoverPicture(), selected: d.props.selected, busy: !!d.editor.pageDrag() || d.panning(), cards: d.scene.boards(), glide: d.editor.glide() },
 			d.scene,
 		);
 	});
@@ -122,10 +122,10 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 	/** One box round everything selected, with its size under it. */
 	const penFrame = createMemo(() => selectionFrame(d.penOutlines()));
 
-	/** Alt held over another item or board, in edit mode: the distances to it from the selection. */
+	/** Alt held over another item or card, in edit mode: the distances to it from the selection. */
 	const penDistances = createMemo(() => {
 		const over = hoverBox();
-		// A board picked up with the selection is part of it, not something to measure to.
+		// A card picked up with the selection is part of it, not something to measure to.
 		const path = d.editor.hoverPage() ?? d.editor.hoverPicture();
 		const picked = !!over?.board && !!path && d.editor.pagePicks().includes(path);
 		return distancesOf({ editing: d.props.mode === "edit", alt: d.editor.altHeld(), busy: !!d.editor.gesture() || !!d.editor.pageDrag() || d.panning(), selection: penFrame(), over: picked ? undefined : over });

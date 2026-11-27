@@ -9,14 +9,14 @@ import type { PenTool } from "../edit/pen-tools.ts";
 
 /*
  * The editor's types, apart from the code that makes it: what a host gives it and gets back
- * (`editor.tsx`, `createEditor`), and what the stage reports (`view/CanvasView.tsx`).
+ * (`editor.tsx`, `createEditor`), and what the canvas reports (`view/CanvasView.tsx`).
  * The frame's protocol and an app's chrome read these without importing either.
  */
 
-/** Where the stage's pictures of boards come from (`CanvasView`'s `shots`). */
+/** Where the canvas's pictures of cards come from (`CanvasView`'s `shots`). */
 export interface CanvasShots {
 	/** The picture of a board or a card, as an address the sheet can fetch. */
-	picture(board: Pick<Page, "path" | "rev">, scheme: "light" | "dark"): string;
+	picture(card: Pick<Page, "path" | "rev">, scheme: "light" | "dark"): string;
 }
 
 /** What a comment is about (`CanvasView`'s `onComment`). */
@@ -24,7 +24,7 @@ export interface CanvasComment {
 	path: string;
 	title: string;
 	quote: string;
-	/** The `data-id` of the block the selected words are in, for a comment on words in a board. */
+	/** The `data-id` of the block the selected words are in, for a comment on words in a card. */
 	component?: string;
 	items?: string[];
 	anchor: () => DOMRect | undefined;
@@ -66,7 +66,7 @@ export interface CanvasOptions {
 		/** Turn on the scripts of a card whose scripts are off here (a card pasted from a friend's canvas): a button on it says so. */
 		onScriptsOn?(path: string): void;
 		/**
-		 * The host's own records of the boards (their revision, format and title), as its server keeps
+		 * The host's own records of the cards (their revision, format and title), as its server keeps
 		 * them, in place of the ones read off the drawing. Read reactively.
 		 */
 		list?(): Page[];
@@ -74,11 +74,11 @@ export interface CanvasOptions {
 		onExtent?(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void;
 		/** A link on a card to a board or card of the deck: open it, and say whether this host has it. */
 		onOpenLink?(path: string, from: string): boolean;
-		/** Boards written since the person last looked (path to who wrote them): each shows a dot. Read reactively. */
+		/** Cards written since the person last looked (path to who wrote them): each shows a dot. Read reactively. */
 		news?(): Record<string, string>;
-		/** The person looked at a board with a dot. */
+		/** The person looked at a card with a dot. */
 		onRead?(path: string): void;
-		/** A board's Hide, when the host takes it off the canvas itself (its server); absent: taken off this drawing. */
+		/** A card's Hide, when the host takes it off the canvas itself (its server); absent: taken off this drawing. */
 		onHide?(path: string): void;
 	};
 	/**
@@ -108,11 +108,11 @@ export interface CanvasOptions {
 	};
 	/** The camera moved (a pan, a zoom, a fit). */
 	onCamera?: (camera: Camera) => void;
-	/** The canvas shown, by name: the stage lands on a new one, and each board's token names it. */
+	/** The canvas shown, by name: the canvas lands on a new one, and each card's token names it. */
 	canvasName?: () => string | undefined;
 	/** How big the canvas is on screen, when it changes: a host whose agents ask what the person sees. */
 	onViewport?: (viewport: { width: number; height: number }) => void;
-	/** Boards or items dragged onto the host's composer, to talk about them. */
+	/** Cards or items dragged onto the host's composer, to talk about them. */
 	onRefer?: (pills: Array<{ kind: "card" | "item"; id: string; label: string; name?: string }>) => void;
 	/**
 	 * A drawing the host owns (its server): edits go to `send` as pen operations, each with a name
@@ -121,9 +121,9 @@ export interface CanvasOptions {
 	 * made. Absent: the drawing is this page's, and `onEdits` hears every change.
 	 */
 	document?: { send(ops: unknown[], edit?: string): void | Promise<boolean>; step(direction: "undo" | "redo", edit?: string): void };
-	/** The board selected on the canvas, or none. */
+	/** The card selected on the canvas, or none. */
 	onSelect?: (path: string | undefined) => void;
-	/** Comment on a board or on drawn items (the comment buttons; absent: none). */
+	/** Comment on a card or on drawn items (the comment buttons; absent: none). */
 	onComment?: (comment: CanvasComment) => void;
 	/** Export drawn items as a picture (the properties panel's export; absent: nothing happens). */
 	onExport?: (ids: string[], format?: "png" | "pdf") => void;
@@ -133,8 +133,8 @@ export interface CanvasOptions {
 	 */
 	toolbar?: boolean;
 	/**
-	 * A board's file to delete, from the board pill's Delete: the host deletes it (asking first, if it
-	 * likes) and says whether it did; the board then leaves the drawing. Absent: no Delete on the pill.
+	 * A card's file to delete, from the card pill's Delete: the host deletes it (asking first, if it
+	 * likes) and says whether it did; the card then leaves the drawing. Absent: no Delete on the pill.
 	 */
 	onDeleteCard?: (path: string) => boolean | void | Promise<boolean | void>;
 	/**
@@ -147,13 +147,13 @@ export interface CanvasOptions {
 	onSelection?: (ids: readonly string[]) => void;
 	/**
 	 * What the host draws over the drawing in canvas units (others' cursors and outlines): rendered
-	 * inside the stage's world, so a pan scrolls it with the drawing and a zoom scales it, and a point
-	 * on it is placed as the stage places the drawing, side panel and all. Counter-scale what should
+	 * inside the canvas's world, so a pan scrolls it with the drawing and a zoom scales it, and a point
+	 * on it is placed as the canvas places the drawing, side panel and all. Counter-scale what should
 	 * stay one size on the screen by the zoom.
 	 */
 	world?: () => JSX.Element;
 	/**
-	 * The same, under what the stage itself draws over the drawing: its outlines, handles and guides.
+	 * The same, under what the canvas itself draws over the drawing: its outlines, handles and guides.
 	 * For what belongs to someone else (their selection's outline), so the person's own is always the
 	 * one on top.
 	 */
@@ -169,7 +169,7 @@ export interface CanvasHandle {
 	setDocument(text: string | PenDocument, base?: string, made?: readonly string[]): void;
 	/**
 	 * What changed in the drawing elsewhere, as edits (`@decks/pen`'s `PenEdit`s, what a host hears as
-	 * a delta): applied to the drawing shown, and by the stage's engines to theirs, so a change costs
+	 * a delta): applied to the drawing shown, and by the canvas's engines to theirs, so a change costs
 	 * what it touched rather than the whole drawing parsed, compared and laid out again. Not an edit,
 	 * so no `onEdits`. False when they do not apply to the drawing shown: send it whole with `setDocument`.
 	 */
@@ -178,7 +178,7 @@ export interface CanvasHandle {
 	refused(edit: string): void;
 	/** The drawing as it is shown now, the person's edits on their way included: read reactively. */
 	drawn(): PenDocument;
-	/** An item's box as the stage laid it out, in canvas units, with the item it is inside; undefined before the stage is up or for an id it has not placed. */
+	/** An item's box as the canvas laid it out, in canvas units, with the item it is inside; undefined before the canvas is up or for an id it has not placed. */
 	itemBox(id: string): { x: number; y: number; w: number; h: number; parent?: string | undefined } | undefined;
 	/** Move the camera there, gliding unless `ms` is 0: an agent showing the person something. */
 	glide(camera: Camera, ms?: number): void;
@@ -228,7 +228,7 @@ export interface CanvasHandle {
  */
 export interface EditorState {
 	camera?: [Accessor<Camera>, (camera: Camera) => void];
-	/** A glide the host asked for, with the camera it set: the stage animates to it while the token is new. */
+	/** A glide the host asked for, with the camera it set: the canvas animates to it while the token is new. */
 	glide?: Accessor<{ token: number; ms: number } | undefined>;
 	selected?: [Accessor<string | undefined>, (path: string | undefined) => void];
 	mode?: [Accessor<"edit" | "browse">, (mode: "edit" | "browse") => void];
@@ -252,9 +252,9 @@ export type EditorOwnState = Pick<EditorState, "mode" | "inking">;
 /** The editor, made in the host's own tree (`createEditor`): its handle, and what it draws. */
 export interface Editor {
 	handle: CanvasHandle;
-	/** The stage alone, for a host that lays out its own work area and tool bars (the Decks app). */
+	/** The canvas alone, for a host that lays out its own work area and tool bars (the Decks app). */
 	surface: () => JSX.Element;
-	/** The whole editor: the stage in its work area, the drawing's tools and ink (the frame with no chrome of its own). */
+	/** The whole editor: the canvas in its work area, the drawing's tools and ink (the frame with no chrome of its own). */
 	root: () => JSX.Element;
 	dispose(): void;
 }
@@ -262,7 +262,7 @@ export interface Editor {
 /** What `createEditor` is given (`editor.tsx`): the canvas's options, and what only the host that makes the editor knows. */
 export type EditorOptions = CanvasOptions & {
 	state?: EditorOwnState;
-	/** How big the stage is on screen. Default: the window. */
+	/** How big the canvas is on screen. Default: the window. */
 	size?: () => { width: number; height: number };
 	/** The scheme changed (`setDark`): a host paints it where its own styles read it. */
 	onScheme?: (scheme: "light" | "dark") => void;

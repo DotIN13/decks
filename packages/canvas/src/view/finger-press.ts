@@ -40,7 +40,7 @@ export function createFingerPress(d: FingerPressNeeds) {
 
 	const beginTouch = (event: PointerEvent) => {
 		// A tap on bare canvas clears the selection, exactly as a click does. Decided on
-		// the way down rather than on the way up: a pan that starts on empty stage is not
+		// the way down rather than on the way up: a pan that starts on empty canvas is not
 		// a gesture that wants to keep a component selected either.
 		if (d.outer.onCanvas(event.target)) d.outer.props.onSelect(undefined);
 		/*
@@ -52,7 +52,7 @@ export function createFingerPress(d: FingerPressNeeds) {
 		if (event.isPrimary && d.carried.size > 0) releaseCarried();
 		if (d.carried.size === 0) {
 			/*
-			 * On the window, not on the stage. Capture is a nicety that can be refused,
+			 * On the window, not on the canvas. Capture is a nicety that can be refused,
 			 * and without it a finger that slides off the canvas — onto the conversation,
 			 * the rail, the composer — lifts somewhere this element never hears about,
 			 * and the pool keeps it. The handlers ask `carried` which fingers are theirs,

@@ -45,7 +45,7 @@ export interface PillsNeeds {
 }
 
 export function createPills(d: PillsNeeds) {
-	/** The pills: over the selected board, over drawn items or a group, and over the lasso's strokes. */
+	/** The pills: over the selected card, over drawn items or a group, and over the lasso's strokes. */
 	const pills = () => (
 		<>
 
@@ -58,34 +58,34 @@ export function createPills(d: PillsNeeds) {
 			<Show when={!d.props.drawing ? d.calloutPath() : undefined} keyed>
 				{(path) => {
 					let last = d.calloutPage()!;
-					const board = () => (last = d.calloutPage() ?? last);
+					const card = () => (last = d.calloutPage() ?? last);
 					return (
 					<PageCallout
-						board={board()}
-						box={boxOf(board())}
-						obstacles={() => d.pillObstacles(boxOf(board()))}
-						label={`${board().title}: card actions`}
+						card={card()}
+						box={boxOf(card())}
+						obstacles={() => d.pillObstacles(boxOf(card()))}
+						label={`${card().title}: card actions`}
 						hidden={d.moving() || d.panning() || d.scaling() || d.gliding() || d.editor.carrying()}
 						camera={d.ctl.settled()}
 						view={d.view()}
-						onOpen={() => d.pushCamera(d.frame([boxOf(board())]))}
+						onOpen={() => d.pushCamera(d.frame([boxOf(card())]))}
 						onCopyPath={() => void navigator.clipboard?.writeText(path).catch(() => {})}
-						{...(d.props.onExport && board().item !== "app" ? { onExport: (format: "png" | "pdf") => d.props.onExport?.([path], format) } : {})}
+						{...(d.props.onExport && card().item !== "app" ? { onExport: (format: "png" | "pdf") => d.props.onExport?.([path], format) } : {})}
 						{...(d.props.onHide ? { onHide: () => d.props.onHide?.(path) } : {})}
 						// An app's window is closed here (✕), never deleted: deleting an app is the Apps tab's, where it says what goes.
-						{...(d.props.onDeleteCard && board().item !== "app" ? { onDelete: () => d.props.onDeleteCard?.(path) } : {})}
+						{...(d.props.onDeleteCard && card().item !== "app" ? { onDelete: () => d.props.onDeleteCard?.(path) } : {})}
 						// An app running in its window loads again at a press, this window alone.
-						{...(board().item === "app" && canvasHost().apps?.inCanvas ? { onReload: () => reloadAppWindow(path) } : {})}
+						{...(card().item === "app" && canvasHost().apps?.inCanvas ? { onReload: () => reloadAppWindow(path) } : {})}
 						// ⋯, Reload: a card loads again from its files, an app's window loads its page again; this window alone.
-						{...(board().item === "app" ? (canvasHost().apps?.inCanvas ? { onRefresh: () => reloadAppWindow(path) } : {}) : board().item === "document" ? {} : d.props.onReloadCard ? { onRefresh: () => d.props.onReloadCard?.(path) } : {})}
+						{...(card().item === "app" ? (canvasHost().apps?.inCanvas ? { onRefresh: () => reloadAppWindow(path) } : {}) : card().item === "document" ? {} : d.props.onReloadCard ? { onRefresh: () => d.props.onReloadCard?.(path) } : {})}
 						{...(d.props.onComment
 							? {
 									onComment: () =>
 										d.props.onComment?.({
 											path: path,
 											quote: "",
-											title: board().title,
-											// Under the pill, which follows the board as the camera moves.
+											title: card().title,
+											// Under the pill, which follows the card as the camera moves.
 											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
 											open: true,
 										}),
@@ -108,7 +108,7 @@ export function createPills(d: PillsNeeds) {
 						onOpen={() => d.pushCamera(d.frame([items().box]))}
 						// ⋯ holds a picture of them all, cards included.
 						{...(d.props.onExport ? { onExport: (format: "png" | "pdf") => d.props.onExport?.([...items().ids, ...items().cards], format) } : {})}
-						// What acts on drawn items: a group of boards alone has only Open.
+						// What acts on drawn items: a group of cards alone has only Open.
 						{...(items().ids.length
 							? {
 									...(d.props.onComment
