@@ -89,9 +89,9 @@ export const CLAUDE_COMMANDS: SlashCommand[] = [
 ];
 
 /**
- * Boards are the medium, so edits inside the deck proceed unasked.
+ * Cards are the medium, so edits inside the deck proceed unasked.
  *
- * A confirm per board write would make the app unusable — writing boards is what the agent
+ * A confirm per card write would make the app unusable — writing cards is what the agent
  * is *for*. Everything the CLI judges riskier than an edit still comes through
  * `canUseTool`, which Decks answers with the dialog bridge.
  */
@@ -232,7 +232,7 @@ export class ClaudeBackend implements AgentBackend {
 						 * before the CLI has written the message to its session file, and
 						 * found nothing to pair. Every message after the first was left
 						 * without an id, and a message with no id has no rewind, no fork
-						 * and no board restore.
+						 * and no card restore.
 						 *
 						 * The usage read is in the chain rather than beside it, and that
 						 * ordering is the whole of whether the meter appears. `turnEnded`
@@ -304,7 +304,7 @@ export class ClaudeBackend implements AgentBackend {
 		 */
 		const accounts = this.context.accounts;
 		const account = this.context.account;
-		const accountEnv = accounts && account ? accounts.environmentFor(this.context.stageAgent.id, account.id()) : accounts?.activeEnvironment();
+		const accountEnv = accounts && account ? accounts.environmentFor(this.context.toolAgent.id, account.id()) : accounts?.activeEnvironment();
 		this.startedOn = account?.id();
 
 		const options: Options = {
@@ -335,7 +335,7 @@ export class ClaudeBackend implements AgentBackend {
 			 * `commands/`, `agents/` or `hooks/` beside them to pick up.
 			 */
 			plugins: [{ type: "local", path: runtimeDir() }],
-			mcpServers: { [stageServerName()]: decksMcpServer(gdocsCaller(this.context.port, this.context.agentToken)) },
+			mcpServers: { [decksServerName()]: decksMcpServer(gdocsCaller(this.context.port, this.context.agentToken)) },
 			// Pre-approved: the `decks` command is how the agent answers, and a confirm in
 			// front of it would be a confirm in front of every reply.
 			allowedTools: [...DECKS_COMMAND_RULES, ...gdocsToolNames()],
@@ -363,7 +363,7 @@ export class ClaudeBackend implements AgentBackend {
 			 * token from. `accounts.ts` has the measurement.
 			 */
 			// …and, whichever it is, the `decks` command and who this agent is, for its shell (`runtimes/decks-env.ts`).
-			env: { ...(accountEnv ?? process.env), ...decksEnv(this.context.port, this.context.stageAgent.id, this.context.agentToken, (accountEnv ?? process.env).PATH) },
+			env: { ...(accountEnv ?? process.env), ...decksEnv(this.context.port, this.context.toolAgent.id, this.context.agentToken, (accountEnv ?? process.env).PATH) },
 			stderr: (data: string) => {
 				// The CLI's own diagnostics, which are usually about credentials.
 				if (data.trim()) notice("warn", data.trim().split("\n").slice(-1)[0] ?? "");
@@ -754,7 +754,7 @@ export class ClaudeBackend implements AgentBackend {
 	/**
 	 * Tag each user message with the session message it became.
 	 *
-	 * The ids are what a rewind, a fork and a board restore are addressed to; the walk is
+	 * The ids are what a rewind, a fork and a card restore are addressed to; the walk is
 	 * every runtime's (`agents/entries.ts`), and what is Claude's own is reading the entries.
 	 */
 	async syncEntryIds(): Promise<void> {
@@ -840,7 +840,7 @@ export class ClaudeBackend implements AgentBackend {
 	private configDir(): string {
 		const accounts = this.context.accounts;
 		const account = this.context.account;
-		const env = accounts && account ? accounts.environmentFor(this.context.stageAgent.id, account.id()) : accounts?.activeEnvironment();
+		const env = accounts && account ? accounts.environmentFor(this.context.toolAgent.id, account.id()) : accounts?.activeEnvironment();
 		return env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
 	}
 
@@ -913,7 +913,7 @@ export class ClaudeBackend implements AgentBackend {
 	}
 }
 
-function stageServerName(): string {
+function decksServerName(): string {
 	// Kept as a call rather than an import of the constant so the two files cannot
 	// disagree about it silently.
 	return "decks";

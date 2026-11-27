@@ -34,11 +34,11 @@ for (const dir of [deckDir]) {
 }
 
 const { Translator } = await import("../apps/server/src/agents/translator.ts");
-const { StageBridge } = await import("../apps/server/src/canvas/bridge.ts");
+const { CanvasBridge } = await import("../apps/server/src/canvas/bridge.ts");
 const { Opencode2Backend } = await import("../apps/server/src/runtimes/opencode2/backend.ts");
 
 // The canvas: a stand-in for Decks' /api/stage/eval, routed through the real bridge.
-const bridge = new StageBridge();
+const bridge = new CanvasBridge();
 const tool = { name: "stage_eval", guidelines: [], webShared: () => false, run: async (code: string) => ({ text: `stage ran: ${code}`, isError: false }) };
 const server = http.createServer(async (req, res) => {
 	let body = "";
@@ -60,9 +60,9 @@ function contextFor(translator: InstanceType<typeof Translator>, extra: Record<s
 		translator,
 		bridge: { context: () => ({}) },
 		tool,
-		stageAgent: { id: "agent-live", inPlay: () => [] },
+		toolAgent: { id: "agent-live", inPlay: () => [] },
 		port,
-		stageBridge: bridge,
+		canvasBridge: bridge,
 		model: liveModel,
 		mode: "manual",
 		notice: (level: string, text: string) => notices.push(`${level}: ${text}`),

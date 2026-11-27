@@ -7,7 +7,7 @@ import type { Translator } from "./translator.ts";
  *
  * Every runtime keeps its own list of what the person said (pi's branch, Claude's session
  * file, an opencode session's messages), and the ids in it are what a rewind, a fork and a
- * board restore are addressed to. Each runtime used to walk its list against the transcript
+ * card restore are addressed to. Each runtime used to walk its list against the transcript
  * with its own copy of the loop below; now each fetches its entries and hands them here.
  */
 

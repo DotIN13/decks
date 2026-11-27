@@ -149,7 +149,7 @@ export class Opencode2Backend extends SharedServerBackend {
 		},
 		/**
 		 * OpenCode 2 reverts a session to a message in two steps, staged and then committed, and the
-		 * session keeps its id. Files are left alone (`files: false`): Decks restores the boards from
+		 * session keeps its id. Files are left alone (`files: false`): Decks restores the cards from
 		 * its own revisions, and OpenCode undoing the same files from its snapshots would be a second
 		 * writer racing the first.
 		 */
@@ -189,13 +189,13 @@ export class Opencode2Backend extends SharedServerBackend {
 
 		const handle = await opencode2Manager.acquire({
 			cwd: this.directory,
-			stageUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
+			decksUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
 			decksPort: this.context.port,
 			config: { plugins: [opencode2PluginDir()], skills: [skillsDir()] },
 		});
 		this.hold(handle);
 		// The bridge learns the server's token before any tool call can arrive.
-		this.context.stageBridge?.setServerToken(handle.secret, "opencode2");
+		this.context.canvasBridge?.setServerToken(handle.secret, "opencode2");
 		this.client = connect(this.url, handle.secret);
 
 		// Keys first, so the model list below already has them on a first start.
@@ -206,7 +206,7 @@ export class Opencode2Backend extends SharedServerBackend {
 		this.sessionId = await this.openSession();
 
 		// A `decks` command and the Google Docs tools name this session; the bridge resolves that to this agent.
-		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id, "opencode2");
+		this.context.canvasBridge?.registerSession(this.sessionId, this.context.toolAgent.id, "opencode2");
 		await this.putInstruction(BRIEFING, this.briefing());
 
 		this.stream = new Opencode2Stream(translator, this.sessionId, {

@@ -4,7 +4,7 @@ import type { Principal } from "../auth/principal.ts";
 import { appTool, conversationForApp } from "./app-caller.ts";
 import type { CallsHost } from "./host.ts";
 import { personAgent } from "./person.ts";
-import { personToolOf, stageToolOf } from "./agent-tools.ts";
+import { personToolOf, decksToolOf } from "./agent-tools.ts";
 import type { CallResult, DecksTool } from "./tool.ts";
 
 /**
@@ -17,7 +17,7 @@ import type { CallResult, DecksTool } from "./tool.ts";
  * - an app: the tool of the conversation on screen, under the app's name, once the person has let it;
  * - a canvas frame: the person's tool, on its one canvas.
  */
-export type Caller = { tool: DecksTool; announce?: (verb: string, answer: CallResult) => void; on?: { stage?: string }; /** The person's name for the edit this call makes (`X-Decks-Edit`). */ edit?: string } | { error: string; status: number };
+export type Caller = { tool: DecksTool; announce?: (verb: string, answer: CallResult) => void; on?: { canvas?: string }; /** The person's name for the edit this call makes (`X-Decks-Edit`). */ edit?: string } | { error: string; status: number };
 
 /** The caller a request is: its token's principal, as the tool its calls run through. */
 export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & { principal?: Principal }): Promise<Caller> {
@@ -30,18 +30,18 @@ export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & {
 		case "person":
 		case "site": {
 			// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
-			const stage = header("x-decks-stage");
+			const canvas = header("x-decks-stage");
 			const to = header("x-decks-agent");
 			const edit = header("x-decks-edit")?.slice(0, 80);
-			const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(stage ? { stage } : {}), ...(to ? { agent: to } : {}) });
-			return { tool: personToolOf(agent), on: { ...(stage ? { stage } : {}) }, ...(edit ? { edit } : {}) };
+			const agent = personAgent({ agents: app.agents, pens: app.canvas.pens }, { ...(canvas ? { canvas } : {}), ...(to ? { agent: to } : {}) });
+			return { tool: personToolOf(agent), on: { ...(canvas ? { canvas } : {}) }, ...(edit ? { edit } : {}) };
 		}
 		case "agent": {
 			const agent = app.agents.get(principal.id);
 			if (!agent) return { status: 401, error: "The agent this token was made for is gone." };
 			// An agent that works outside Decks is here while it calls, and what it changes is said in its conversation.
 			agent.inbox.touch();
-			return { tool: stageToolOf(agent), ...(agent.inbox.outsideKey ? { announce: (name: string, answer: CallResult) => {
+			return { tool: decksToolOf(agent), ...(agent.inbox.outsideKey ? { announce: (name: string, answer: CallResult) => {
 						if (answer.ok && VERB_BY_NAME.get(name)?.effect === "change" && name !== "agent.news") agent.inbox.noteAct(actLine(name, answer));
 					},
 				}
@@ -69,13 +69,13 @@ function actLine(name: string, answer: CallResult): string {
  * `refusedForCanvas` has already held to it.
  */
 function canvasCaller(app: CallsHost, principal: Extract<Principal, { kind: "canvas" }>, edit: string | undefined): Caller {
-	const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { stage: principal.canvas });
-	return { tool: personToolOf(agent), on: { stage: principal.canvas }, ...(edit ? { edit } : {}) };
+	const agent = personAgent({ agents: app.agents, pens: app.canvas.pens }, { canvas: principal.canvas });
+	return { tool: personToolOf(agent), on: { canvas: principal.canvas }, ...(edit ? { edit } : {}) };
 }
 
 /**
  * An app's calls: once the person has let it, it acts for the conversation on screen, under the
- * app's own name, and each call is noted in that conversation, as an app's stage code always was.
+ * app's own name, and each call is noted in that conversation, as an app's canvas code always was.
  */
 async function appCaller(app: CallsHost, name: string): Promise<Caller> {
 	if (!app.apps.exists(name)) return { status: 404, error: `There is no app called ${name}.` };

@@ -67,7 +67,7 @@ test("an edit or a step made under a browser's name says so in the delta that ha
 	}
 });
 
-/** A drawing sent whole to one browser (asked again, a picture of the stage) leaves the names for the rest. */
+/** A drawing sent whole to one browser (asked again, a picture of the canvas) leaves the names for the rest. */
 test("a drawing sent whole to one browser takes no names from the others' next delta, and carries the recent ones", () => {
 	const deck = mkdtempSync(join(tmpdir(), "pen-made-frame-"));
 	const pens = new CanvasPens(deck, () => {});

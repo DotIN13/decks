@@ -9,10 +9,10 @@ import type { Box } from "@decks/pen";
 import { serverText } from "./text.ts";
 
 /**
- * A stage picture drawn without a browser: `stage-shot` (`packages/stage/crates/shot`), the stage
+ * A canvas picture drawn without a browser: `stage-shot` (`packages/stage/crates/shot`), the canvas
  * engine's own layout and painter on this machine's graphics card, kept running and spoken to one
- * JSON line at a time. The drawing is painted over the boards' current pictures (`.decks/thumbs`),
- * with a hole for each board, on the stage's paper.
+ * JSON line at a time. The drawing is painted over the cards' current pictures (`.decks/thumbs`),
+ * with a hole for each card, on the canvas's paper.
  *
  * It asks for what only the app has, and this answers from the same places the page does: font
  * files from the server's font cache (`font-files.ts`, `text.ts`), a card's markdown read by the
@@ -20,11 +20,11 @@ import { serverText } from "./text.ts";
  *
  * Whenever it cannot draw the box as the person would see it, it says why rather than drawing
  * something else (`NativeOutcome.why`), and the caller takes the picture in Chromium
- * (`shots.ts`): a formula in the box, a picture or an icon it cannot load, a board with no picture
+ * (`shots.ts`): a formula in the box, a picture or an icon it cannot load, a card with no picture
  * of its current revision, no binary built, no graphics card.
  */
 
-interface NativeBoard {
+interface NativeCard {
 	path: string;
 	x: number;
 	y: number;
@@ -37,9 +37,9 @@ export interface NativeRequest {
 	doc: unknown;
 	/** The folder its image fills are read against: a `file:` URL, as `CanvasPens.frame` gives it. */
 	base: string;
-	boards: NativeBoard[];
+	boards: NativeCard[];
 	box: Box;
-	/** Picture pixels a stage unit. */
+	/** Picture pixels a canvas unit. */
 	scale: number;
 	width: number;
 	height: number;
@@ -61,7 +61,7 @@ interface NativeHost {
 	cardPicture: (path: string, scheme: "light" | "dark", px: number) => { file: string } | { why: string };
 }
 
-/** The stage's own paper (`--stage` in `apps/web/src/index.css`), straight RGB 0 to 1. */
+/** The canvas's own paper (`--stage` in `apps/web/src/index.css`), straight RGB 0 to 1. */
 // The canvas's paper as the harness shows it (`--stage`, v3: #f5f5f5 and #1e1e1e), so a picture matches the screen.
 const PAPER = { light: [245 / 255, 245 / 255, 245 / 255], dark: [30 / 255, 30 / 255, 30 / 255] } as const;
 /** Rounds of asking: fonts, then cards, then pictures and icons, with room to spare. */
@@ -114,11 +114,11 @@ export class NativeShots {
 		if (this.broken?.binary === binary) return { ok: false, why: this.broken.why };
 		const s = request.scale;
 		const inBox = request.boards.filter((b) => b.x < request.box.x2 && b.x + b.w > request.box.x1 && b.y < request.box.y2 && b.y + b.h > request.box.y1);
-		const boards: Array<{ x: number; y: number; w: number; h: number; picture: string }> = [];
-		for (const board of inBox) {
-			const found = this.host.cardPicture(board.path, request.scheme, board.w * s);
+		const cards: Array<{ x: number; y: number; w: number; h: number; picture: string }> = [];
+		for (const card of inBox) {
+			const found = this.host.cardPicture(card.path, request.scheme, card.w * s);
 			if ("why" in found) return { ok: false, why: found.why };
-			boards.push({ x: board.x, y: board.y, w: board.w, h: board.h, picture: found.file });
+			cards.push({ x: card.x, y: card.y, w: card.w, h: card.h, picture: found.file });
 		}
 		const docText = JSON.stringify(request.doc);
 		const docHash = createHash("sha1").update(docText).digest("hex");
@@ -130,7 +130,7 @@ export class NativeShots {
 			width: request.width,
 			height: request.height,
 			paper: PAPER[request.scheme],
-			cards: boards,
+			cards: cards,
 			out: request.out,
 			format: request.format,
 			quality: 90,
@@ -139,7 +139,7 @@ export class NativeShots {
 		try {
 			await this.start(binary);
 			let handover: Record<string, unknown> = {};
-			// The fonts the stage's words need, as the page fetches them: once per document.
+			// The fonts the canvas's words need, as the page fetches them: once per document.
 			if (!this.fontsFor.has(docHash)) {
 				const answer = await this.ask({ ...base, fontNeeds: true });
 				if (!answer.ok) return { ok: false, why: `the native renderer failed: ${answer.error}` };

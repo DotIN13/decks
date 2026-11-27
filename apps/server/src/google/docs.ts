@@ -82,7 +82,7 @@ export class GoogleDocs {
 	start(): void {
 		this.timer ??= setInterval(() => void this.tick(), TICK_MS);
 		this.timer.unref();
-		// Docs linked when they were mirrored as markdown are mirrored again as their indices, so their boards open them.
+		// Docs linked when they were mirrored as markdown are mirrored again as their indices, so their cards open them.
 		for (const linked of this.host.library().googleDocs()) if (!linked.mirror.endsWith(".gdoc.txt")) void this.link(linked.google.id).catch(() => undefined);
 	}
 

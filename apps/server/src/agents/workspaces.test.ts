@@ -70,8 +70,8 @@ test("boards: the ones most members hold come first, ties by path", () => {
 		entry("c", "other", ["boards/plan.html"]),
 	]);
 	// `plan` is held by two of the three, `risk` by one — and the workspace's own list is the
-	// union, not the intersection, because a board one member is working from is still the
-	// workspace's board.
+	// union, not the intersection, because a card one member is working from is still the
+	// workspace's card.
 	assert.deepEqual(list[0]?.boards, ["boards/plan.html", "boards/risk.html"]);
 });
 

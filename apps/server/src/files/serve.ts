@@ -21,7 +21,7 @@ export function isExecutable(path: string): boolean {
  * it may not reach this app's storage, its DOM, or its API. The header rather
  * than only the frame's `sandbox` attribute, because a response that is safe only
  * inside the right frame is a stored cross-site script waiting for someone to
- * open the URL directly — and `/api/file/...` URLs appear in board source, which
+ * open the URL directly — and `/api/file/...` URLs appear in card source, which
  * is exactly the kind of thing people paste into a tab.
  */
 export function quarantine(res: Response, path: string): void {
@@ -34,38 +34,38 @@ export function quarantine(res: Response, path: string): void {
 }
 
 /**
- * Headers for a board, which is ours (§4).
+ * Headers for a card, which is ours (§4).
  *
  * No sandbox: the frame shares this origin so the app can read its DOM, which is
  * what makes the editor ordinary app code instead of a script injected into
- * somebody else's document. The trade is written down in DESIGN §4 — a board's
+ * somebody else's document. The trade is written down in DESIGN §4 — a card's
  * scripts are as privileged as the app, which is no more than the agent that
  * wrote them already had through bash.
  */
-export function boardHeaders(res: Response): void {
+export function cardHeaders(res: Response): void {
 	res.setHeader("X-Content-Type-Options", "nosniff");
 	res.setHeader("Cache-Control", "no-cache");
 }
 
 /**
- * Headers for a file inside the deck that is *not* a board — an asset (§4).
+ * Headers for a file inside the deck that is *not* a card — an asset (§4).
  *
- * Boards get the app's origin because the app edits them. An asset has no such
+ * Cards get the app's origin because the app edits them. An asset has no such
  * claim, and since the user can now drop one in, `assets/` holds files nobody in
  * this codebase wrote: an uploaded `evil.html` served under `/api/board/` with
- * board headers would be a stored cross-site script *on the app's own origin*, and
- * `data-embed="../assets/evil.html"` puts the URL in a board file where somebody
+ * card headers would be a stored cross-site script *on the app's own origin*, and
+ * `data-embed="../assets/evil.html"` puts the URL in a card file where somebody
  * will eventually open it in a tab. So anything a browser *runs* gets the same
  * `sandbox allow-scripts` a foreign file gets — it may still be an embed, it may
  * still run, and it may not reach this app.
  *
  * The rest — images, PDFs, text — is unaffected, and so are the two things that
- * must keep the origin: a board, and `lib/`. A CSP `sandbox` on a subresource is
+ * must keep the origin: a card, and `lib/`. A CSP `sandbox` on a subresource is
  * ignored by browsers (it applies to documents), so an SVG in an `<img>` still
  * draws.
  */
 export function assetHeaders(res: Response, path: string): void {
-	boardHeaders(res);
+	cardHeaders(res);
 	if (isExecutable(path)) {
 		res.setHeader("Content-Security-Policy", "sandbox allow-scripts");
 		res.setHeader("Referrer-Policy", "no-referrer");

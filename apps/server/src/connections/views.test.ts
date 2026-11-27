@@ -44,7 +44,7 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 			report: () => {},
 			brief: (task: string) => task,
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
@@ -82,8 +82,8 @@ function open() {
 	const last = <T extends ServerMessage["type"]>(view: View, type: T) =>
 		inbox.get(view)!.filter((message): message is Extract<ServerMessage, { type: T }> => message.type === type).at(-1);
 	const plan = (message: Extract<ServerMessage, { type: "deck.changed" }> | undefined) => {
-		const board = message?.deck.boards.find((one) => one.path === "canvases/t/cards/plan/index.html");
-		return board && [board.x, board.y];
+		const card = message?.deck.boards.find((one) => one.path === "canvases/t/cards/plan/index.html");
+		return card && [card.x, card.y];
 	};
 	return {
 		app,
@@ -127,8 +127,8 @@ test("each device's board list carries its own conversation's arrangement", asyn
 		await call(phone, "agent.focus", [two]);
 		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 
-		// Something changed the deck: each device hears it as its own stage sees it.
-		app.send({ type: "deck.changed", deck: app.stageState() });
+		// Something changed the deck: each device hears it as its own canvas sees it.
+		app.send({ type: "deck.changed", deck: app.canvasState() });
 		assert.deepEqual(plan(last(laptop, "deck.changed")), [10, 20]);
 		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 		// A card moved on one device names the canvas on its screen: `canvas/card-size-on-canvas.test.ts` holds that it lands there.

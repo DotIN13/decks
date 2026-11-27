@@ -88,8 +88,8 @@ test("a page that hands the harness a Studio key is refused and nothing is kept:
 		const allowed = await post("/v1/now", { args: [] }, { ...STUDIO, "x-decks-person": "studio", authorization: `Bearer ${done.body.token}` });
 		assert.equal(allowed.status, 200);
 		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
-		const board = await fetch(`${base}/card/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
-		assert.equal(board.status, 401, "a token in an address is no longer taken: a frame gets a ticket");
+		const card = await fetch(`${base}/card/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
+		assert.equal(card.status, 401, "a token in an address is no longer taken: a frame gets a ticket");
 	} finally {
 		cleanup();
 	}
@@ -205,7 +205,7 @@ test("Studio trades its token for a canvas pass, and a frame from Studio reads t
 	try {
 		// As a browser at Studio is given one: through the harness's own line to Studio.
 		const { token } = studioToken(app.tokens, { user: { id: "u1", name: "Ada" }, origin: "https://studio.test" });
-		const pens = app.stage.pens!;
+		const pens = app.canvas.pens!;
 		const one = pens.claim("One");
 		const two = pens.claim("Two");
 		for (const name of [one, two]) {

@@ -1,6 +1,6 @@
 import { blockers, placeBy, stepClear, type StepWay } from "@decks/deck-kit";
 import { ARROW, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
-import { boardOf } from "../canvas/pens.ts";
+import { cardOf } from "../canvas/pens.ts";
 
 /**
  * Where a top-level item placed by a canvas call lands: aim, then step clear (`@decks/deck-kit`,
@@ -26,7 +26,7 @@ function inWay(doc: PenDocument, placed: Map<string, Placed>, except?: string) {
 		.filter((one) => one.metadata?.type !== ARROW && one.id !== except)
 		.flatMap((one) => {
 			const box = placed.get(one.id)?.box;
-			return box ? [{ id: boardOf(one) ?? one.id, x: box.x, y: box.y, w: box.w, h: box.h }] : [];
+			return box ? [{ id: cardOf(one) ?? one.id, x: box.x, y: box.y, w: box.w, h: box.h }] : [];
 		});
 }
 
@@ -75,7 +75,7 @@ export function landNew(on: Landing, pen: Op & { box?: { x1: number; y1: number 
 	const landed = landItem(on, aimed as Op & { box?: { x1: number; y1: number } }, typeof node?.id === "string" ? node.id : undefined, ask.label, way, ask.placed);
 	if (!pen.box) {
 		const at = (landed as { box?: { x1: number; y1: number } }).box!;
-		on.said.push(`Warning: no place was given, so ${ask.label} went ${newest ? `beside ${boardOf(newest) ?? newest.id}` : "at the canvas's corner"}, at x1 ${at.x1}, y1 ${at.y1}: say where with at, beside or below.`);
+		on.said.push(`Warning: no place was given, so ${ask.label} went ${newest ? `beside ${cardOf(newest) ?? newest.id}` : "at the canvas's corner"}, at x1 ${at.x1}, y1 ${at.y1}: say where with at, beside or below.`);
 	}
 	return landed;
 }

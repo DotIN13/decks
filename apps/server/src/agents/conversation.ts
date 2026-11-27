@@ -59,7 +59,7 @@ export interface ConversationHost {
 	acted?(event: ToolEvent): void;
 	/** The tool the runtime's calls run through, and what that tool may reach on the agent. */
 	tool(): AgentBackendContext["tool"];
-	hooks(): AgentBackendContext["stageAgent"];
+	hooks(): AgentBackendContext["toolAgent"];
 	/** The runtime opened: its own name for the agent, if it has one, and the canvas a resumed session had. */
 	opened(name: string | undefined): void;
 	/** A rewind: put what the agent held, showed and called itself back as it was at that time. */
@@ -167,7 +167,7 @@ export class Conversation {
 	/** The runtime's `/` menu moved, so the chat row that carries it has to be resent. */
 	private readonly commandsChanged: (() => void) | undefined;
 	/** Where an out-of-process runtime's canvas tool calls back to. */
-	private readonly stageBridge: CanvasBridge | undefined;
+	private readonly canvasBridge: CanvasBridge | undefined;
 
 	constructor(
 		private readonly of: ConversationHost,
@@ -204,7 +204,7 @@ export class Conversation {
 		this.accountsChanged = start.accountsChanged;
 		this.accountNeeded = start.accountNeeded;
 		this.commandsChanged = start.commandsChanged;
-		this.stageBridge = start.bridge;
+		this.canvasBridge = start.bridge;
 
 		/*
 		 * The translator's frames pass through here so the conversation can keep the one piece of
@@ -356,7 +356,7 @@ export class Conversation {
 
 	/** The agent's token stops working: before its runtime has finished dying, so a call from a process that outlives it is refused. */
 	revoke(): void {
-		this.stageBridge?.revoke(this.of.id);
+		this.canvasBridge?.revoke(this.of.id);
 	}
 
 	dispose(): void {
@@ -436,7 +436,7 @@ export class Conversation {
 	 */
 	start(): Promise<void> {
 		// Returned before anything is built, not just before the promise is replaced. The
-		// memo below is on `starting` alone, so every call used to construct a fresh stage
+		// memo below is on `starting` alone, so every call used to construct a fresh canvas
 		// tool and context and throw them away — which was invisible while `start()` was
 		// called once at creation, and is not now that a prompt is what starts an agent.
 		if (this.starting) return this.starting;
@@ -462,17 +462,17 @@ export class Conversation {
 				this.of.writeNow();
 			},
 			tool,
-			stageAgent: this.of.hooks(),
+			toolAgent: this.of.hooks(),
 			// Where a runtime that is not in this process reaches the deck: the same
 			// loopback server the browser talks to.
 			port: this.of.port,
 			// Minted here rather than in the backend, because the token is the *agent's* and
 			// outlives any one runtime process: a rewind reopens the session and the tool on
 			// the other side must not be left holding a token nobody answers.
-			...(this.stageBridge ? { agentToken: this.stageBridge.issue(this.of.id) } : {}),
+			...(this.canvasBridge ? { agentToken: this.canvasBridge.issue(this.of.id) } : {}),
 			// …and the bridge itself, for the one runtime that shares a process and so names
 			// its calls by session id rather than by a token of its own (opencode).
-			...(this.stageBridge ? { stageBridge: this.stageBridge } : {}),
+			...(this.canvasBridge ? { canvasBridge: this.canvasBridge } : {}),
 			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
 			// Opened *on* the model and mode the conversation was last using, rather than
 			// asked what it happened to default to. Both runtimes take them at session
@@ -530,7 +530,7 @@ export class Conversation {
 				/*
 				 * The usual cause is credentials — `pi auth`, or a Claude Code that is not
 				 * installed. So this is a notice in the agent's own column rather than a
-				 * thrown error that takes the deck down: the boards still work, and the
+				 * thrown error that takes the deck down: the cards still work, and the
 				 * reason is where the person is looking.
 				 */
 				this.failure = error instanceof Error ? error.message : String(error);
@@ -575,9 +575,9 @@ export class Conversation {
 		this.translator.user(text, parts);
 		this.translator.setState("thinking");
 		/*
-		 * Anything the user did to a board since the last turn rides along with this
+		 * Anything the user did to a card since the last turn rides along with this
 		 * message rather than arriving as its own interruption. Prefixed, not appended:
-		 * the agent should know the board moved *before* it reads what to do about it.
+		 * the agent should know the card moved *before* it reads what to do about it.
 		 */
 		// A slash command by the one rule every runtime reads it by (`parseSlash`): a message that only begins with a path is a message, and gets its notes.
 		const slash = parseSlash(text) !== undefined;
@@ -703,8 +703,8 @@ export class Conversation {
 			await this.backend?.syncEntryIds();
 			/*
 			 * And the canvas moves with the conversation, which is the whole point of
-			 * rewinding: the boards, the context and the name it was going by at that
-			 * moment. Resolved by time, the same way `App.boardsAt` picks a revision.
+			 * rewinding: the cards, the context and the name it was going by at that
+			 * moment. Resolved by time, the same way `App.cardsAt` picks a revision.
 			 */
 			const when = this.timeline().find((point) => point.id === entryId)?.at;
 			if (when) this.of.restoreAt(when);
@@ -727,7 +727,7 @@ export class Conversation {
 		this.backend?.dispose();
 		this.backend = undefined;
 		this.starting = undefined;
-		this.stageBridge?.revoke(this.of.id);
+		this.canvasBridge?.revoke(this.of.id);
 		this.resumeRef = undefined;
 		this.of.forgetNotes();
 		this.of.store.retire(this.of.id);

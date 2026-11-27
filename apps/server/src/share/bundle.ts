@@ -18,7 +18,7 @@ import { zip, type ZipEntry } from "./zip.ts";
  * - `pictures/` is each card's whole picture in both schemes, so the canvas has something to draw
  *   for a card before it is opened, which is what it always draws first.
  *
- * Nothing from the agents is in it: no transcript, no settings, no other stage. The manifest is
+ * Nothing from the agents is in it: no transcript, no settings, no other canvas. The manifest is
  * the greeting a server would have sent (`App.greet`), cut to the frames a reader needs.
  */
 const BUNDLE_VERSION = 1;
@@ -31,28 +31,28 @@ export interface BundleManifest {
 	stage: { name: string; title: string; rev: number };
 	/** The drawing with its imports resolved, and the folder its image fills are read against, deck-relative. */
 	pen: { doc: PenDocument; base: string };
-	/** Every board on the stage, placed where the stage has it. */
+	/** Every card on the canvas, placed where the canvas has it. */
 	boards: Page[];
-	/** Board path → scheme → zip path of its picture. */
+	/** Card path → scheme → zip path of its picture. */
 	pictures: Record<string, Partial<Record<ThumbScheme, string>>>;
 }
 
 interface BundleSource {
 	deckPath: string;
 	deckName: string;
-	board(path: string): Page | undefined;
-	stage: {
+	card(path: string): Page | undefined;
+	canvas: {
 		dir: string;
 		title: string;
 		rev: number;
 		doc: PenDocument;
-		boards: Array<{ path: string; x: number; y: number; w: number; h: number }>;
+		cards: Array<{ path: string; x: number; y: number; w: number; h: number }>;
 	};
-	/** A picture of a board already on disk, or one taken within the time left; undefined when neither. */
-	picture(board: Page, scheme: ThumbScheme): Promise<string | undefined>;
+	/** A picture of a card already on disk, or one taken within the time left; undefined when neither. */
+	picture(card: Page, scheme: ThumbScheme): Promise<string | undefined>;
 }
 
-/** Larger files are left out: a bundle is for sending, and a video on a board can be fetched from where it lives. */
+/** Larger files are left out: a bundle is for sending, and a video on a card can be fetched from where it lives. */
 const MAX_FILE = 40 * 1024 * 1024;
 
 /** A relative reference in markup or CSS: what an attribute or a `url()` names. */
@@ -117,7 +117,7 @@ function filesUnder(root: string, dir: string): string[] {
 	return out;
 }
 
-/** Every string under a `url` key in the drawing: an image fill, or a board's own `../../boards/x.html`. */
+/** Every string under a `url` key in the drawing: an image fill, or a card's own `../../boards/x.html`. */
 function penUrls(value: unknown, out: string[] = []): string[] {
 	if (Array.isArray(value)) for (const one of value) penUrls(one, out);
 	else if (value && typeof value === "object") {
@@ -133,32 +133,32 @@ const TEXTUAL = /\.(?:html?|css|svg|md|markdown)$/i;
 
 export async function buildBundle(source: BundleSource): Promise<{ manifest: BundleManifest; bytes: Buffer }> {
 	const { deckPath } = source;
-	const stageRel = relative(deckPath, source.stage.dir).split(sep).join("/");
+	const canvasRel = relative(deckPath, source.canvas.dir).split(sep).join("/");
 	const files = new Set<string>();
 
 	for (const file of filesUnder(deckPath, "lib")) files.add(file);
-	for (const file of filesUnder(deckPath, stageRel)) files.add(file);
-	for (const url of penUrls(source.stage.doc)) {
-		const target = resolveRef(`${stageRel}/${CANVAS_FILE}`, url);
+	for (const file of filesUnder(deckPath, canvasRel)) files.add(file);
+	for (const url of penUrls(source.canvas.doc)) {
+		const target = resolveRef(`${canvasRel}/${CANVAS_FILE}`, url);
 		if (target && !/\.x?html?$/i.test(target) && isFile(join(deckPath, target))) files.add(target);
 	}
 
-	const boards: Page[] = [];
-	for (const spot of source.stage.boards) {
-		const board = source.board(spot.path);
-		if (!board) continue;
+	const cards: Page[] = [];
+	for (const spot of source.canvas.cards) {
+		const card = source.card(spot.path);
+		if (!card) continue;
 		// Who wrote it and who read it are this deck's, not the reader's: a file arrives read, so nothing in it glows as news.
-		const { lastWrittenBy: _by, namedAt: _named, ...kept } = board;
-		boards.push({ ...kept, seenAt: Date.now(), inContext: [], x: spot.x, y: spot.y, w: spot.w, h: spot.h });
+		const { lastWrittenBy: _by, namedAt: _named, ...kept } = card;
+		cards.push({ ...kept, seenAt: Date.now(), inContext: [], x: spot.x, y: spot.y, w: spot.w, h: spot.h });
 	}
-	const onStage = new Set(boards.map((board) => board.path));
+	const onCanvas = new Set(cards.map((card) => card.path));
 
 	// Cards, and what they name, one level of CSS deep: a stylesheet's own `url()`s are fonts and pictures.
 	const queue: string[] = [];
-	for (const board of boards) {
-		if (isFile(join(deckPath, board.path))) {
-			files.add(board.path);
-			queue.push(board.path);
+	for (const card of cards) {
+		if (isFile(join(deckPath, card.path))) {
+			files.add(card.path);
+			queue.push(card.path);
 		}
 	}
 	const scanned = new Set<string>();
@@ -174,7 +174,7 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 		}
 		for (const target of referencesOf(deckPath, file, text)) {
 			// Another card is a link to open beside this one, not a part of it: only the canvas's own come along.
-			if (isCardPath(target) && !onStage.has(target)) continue;
+			if (isCardPath(target) && !onCanvas.has(target)) continue;
 			if (files.has(target)) continue;
 			files.add(target);
 			if (/\.css$/i.test(target) || /\.svg$/i.test(target)) queue.push(target);
@@ -183,14 +183,14 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 
 	const pictures: BundleManifest["pictures"] = {};
 	const pictureEntries: ZipEntry[] = [];
-	for (const board of boards) {
+	for (const card of cards) {
 		for (const scheme of ["light", "dark"] as const) {
-			const file = await source.picture(board, scheme);
+			const file = await source.picture(card, scheme);
 			if (!file || !isFile(file)) continue;
 			const ext = file.endsWith(".webp") ? "webp" : "jpg";
-			const name = `pictures/${scheme}/${board.path}.${ext}`;
+			const name = `pictures/${scheme}/${card.path}.${ext}`;
 			pictureEntries.push({ name, data: readFileSync(file) });
-			(pictures[board.path] ??= {})[scheme] = name;
+			(pictures[card.path] ??= {})[scheme] = name;
 		}
 	}
 
@@ -209,9 +209,9 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 		decks: BUNDLE_VERSION,
 		made: new Date().toISOString(),
 		from: source.deckName,
-		stage: { name: posix.basename(stageRel), title: source.stage.title, rev: source.stage.rev },
-		pen: { doc: source.stage.doc, base: `${stageRel}/` },
-		boards,
+		stage: { name: posix.basename(canvasRel), title: source.canvas.title, rev: source.canvas.rev },
+		pen: { doc: source.canvas.doc, base: `${canvasRel}/` },
+		boards: cards,
 		pictures,
 	};
 	const bytes = zip([{ name: "manifest.json", data: Buffer.from(JSON.stringify(manifest), "utf8") }, ...entries, ...pictureEntries]);

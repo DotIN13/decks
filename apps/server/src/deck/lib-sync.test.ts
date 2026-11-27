@@ -72,7 +72,7 @@ test("a mtime that moved without the bytes changing is not a change", () => {
 	syncRuntimeLib(from, to);
 
 	// What a fresh clone or an `npm ci` does. An mtime comparison would rewrite the
-	// whole of lib/ here and reload every board on screen for nothing.
+	// whole of lib/ here and reload every card on screen for nothing.
 	const later = new Date(Date.now() + 60_000);
 	utimesSync(source, later, later);
 

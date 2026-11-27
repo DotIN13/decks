@@ -13,7 +13,7 @@ import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas } from
  * in is what the person copied, as the drawing had it.
  *
  * A paste copies what the items need from the canvas they were copied on into the one they land on:
- * a card's folder (`cards/<name>-2/` when the name is taken there), a board in that canvas's folder,
+ * a card's folder (`cards/<name>-2/` when the name is taken there), a card in that canvas's folder,
  * a picture or a document in its folder (an identical file already there is used as it is). Every
  * path is held inside the source canvas's folder: one that climbs out, names another canvas or is
  * absolute refuses the paste. A deck file outside any canvas (`assets/…`) is left as it is named,

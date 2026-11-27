@@ -375,7 +375,7 @@ export function doorRoutes(app: App): express.Router {
 			res.set("cache-control", "no-store").json({ pass, expires, url: `/app/${encodeURIComponent(name)}/?decks_pass=${encodeURIComponent(pass)}` });
 			return;
 		}
-		const pens = app.stage.pens;
+		const pens = app.canvas.pens;
 		const canvas = String(body.canvas ?? "");
 		if (!canvas || !pens || !pens.has(canvas)) {
 			res.status(404).json({ error: `There is no canvas called ${canvas || "that"}.` });

@@ -2,10 +2,10 @@ import { existsSync, statSync } from "node:fs";
 import type { Router } from "express";
 import { unstampCard } from "@decks/card-host";
 import { LIB_FOREVER, libVersion, splitLibVersion } from "../../deck/lib-version.ts";
-import { normalizeBoardPath } from "../../deck/schema.ts";
+import { normalizeCardPath } from "../../deck/schema.ts";
 import { NotFound, PathRefused, resolveServed } from "../../deck/roots.ts";
 import { canvasOfPath, isCardPath, isSharedCanvas, servedAs } from "@decks/hub/layout";
-import { assetHeaders, boardHeaders } from "../../files/serve.ts";
+import { assetHeaders, cardHeaders } from "../../files/serve.ts";
 import { assetAnswer } from "./assets.ts";
 import { cardModuleAnswer, cardPageAnswer } from "./cards.ts";
 import { asyncRoute, sharedHeaders, wildcard, type RouteDeps } from "./shared.ts";
@@ -41,12 +41,12 @@ export function register(api: Router, { app }: RouteDeps): void {
 			 * whatever a browser would run: a board file left from before cards among them, whose
 			 * `../lib/board.css|js` land on card.css and card.js (`libName`).
 			 */
-			if (isCardPath(requested)) boardHeaders(res);
+			if (isCardPath(requested)) cardHeaders(res);
 			else assetHeaders(res, target);
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 			// `?raw=1` is the card's file as it is, for the editor; without it a card is its page.
 			const raw = req.query.raw !== undefined;
-			const card = raw ? undefined : app.deck.board(normalizeBoardPath(requested));
+			const card = raw ? undefined : app.deck.card(normalizeCardPath(requested));
 			if (await cardPageAnswer(app, asked, requested, target, card, raw, res)) return;
 			await assetAnswer(target, res);
 		}),

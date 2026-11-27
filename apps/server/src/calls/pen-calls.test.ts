@@ -22,14 +22,14 @@ function put(file: string, data: string | Uint8Array): void {
  * finding empty space.
  */
 
-const board = (title: string, w = 900, h = 400) =>
+const card = (title: string, w = 900, h = 400) =>
 	`<!doctype html><html><head><title>${title}</title><meta name="board" content='{"w":${w},"h":${h},"bg":"grid"}' /></head><body class="board"></body></html>`;
 
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-pen-calls-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	put(join(deck, "canvases", "t", "cards", "a", "index.html"), board("Revenue is up"));
+	put(join(deck, "canvases", "t", "cards", "a", "index.html"), card("Revenue is up"));
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));
@@ -39,7 +39,7 @@ async function open() {
 	type Answer = { ok: boolean; value?: any; error?: string; notes: string[] };
 	// The agent's calls name the canvas it works on, the one its chat is on here (`names-canvas.test-helper.ts`).
 	const call = async (verb: string, given: unknown[] = []): Promise<Answer> => {
-		const args = namingCanvas(verb, given, agent.seat.stageName(true));
+		const args = namingCanvas(verb, given, agent.seat.canvasFolder(true));
 		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
 		return (await response.json()) as Answer;
 	};
@@ -202,13 +202,13 @@ test("a placeholder frame an agent draws names that agent as the canvas's writer
 	const { app, agent, must, cleanup } = await open();
 	try {
 		await must("canvas.insert", [{ type: "frame", name: "Hero", placeholder: true, width: 400, height: 200 }, { at: { x1: 0, y1: 0 } }]);
-		const stage = agent.seat.stageName()!;
-		assert.equal(app.pens.log.writerOf(stage), agent.id);
-		assert.equal(app.pens.log.frame(stage).by, agent.id);
+		const canvas = agent.seat.canvasFolder()!;
+		assert.equal(app.pens.log.writerOf(canvas), agent.id);
+		assert.equal(app.pens.log.frame(canvas).by, agent.id);
 		// A person's edit over the wire leaves the writer as it was.
-		app.pens.edit(stage, [{ op: "update", id: "hero", set: { x: 10 } }] as never);
-		assert.equal(app.pens.log.writerOf(stage), agent.id);
-		const delta = app.pens.log.changes(stage);
+		app.pens.edit(canvas, [{ op: "update", id: "hero", set: { x: 10 } }] as never);
+		assert.equal(app.pens.log.writerOf(canvas), agent.id);
+		const delta = app.pens.log.changes(canvas);
 		assert.equal(delta.type === "canvas.changed" && delta.by, agent.id);
 	} finally {
 		cleanup();
@@ -228,7 +228,7 @@ test("canvas.export writes a frame as one HTML page in the deck, as flexbox or a
 			] },
 			{ at: { x1: 0, y1: 0 } },
 		]);
-		const deck = app.stage.deckPath();
+		const deck = app.canvas.deckPath();
 		const html = (await must("canvas.export", ["price-card", { format: "html" }])).value;
 		assert.deepEqual(html, { file: "exports/price-card.html" });
 		const page = readFileSync(join(deck, html.file), "utf8");
@@ -339,7 +339,7 @@ test("a link is placed by what it opens, kept as a tagged pill, and read back as
 		assert.deepEqual({ type: chip.type, to: chip.to, title: chip.title }, { type: "link", to: `#canvas/${notes}`, title: "Research notes" });
 		assert.ok(chip.box.x2 - chip.box.x1 > 80 && chip.box.y2 - chip.box.y1 > 20, JSON.stringify(chip.box));
 		// The file keeps a pill pen.dev can open: a frame with a mark, the name and an arrow, tagged with the address.
-		const kept = app.stage.pens!.get(agent.seat.stageName(true)!).doc.children!.find((node) => node.id === chip.id)!;
+		const kept = app.canvas.pens!.get(agent.seat.canvasFolder(true)!).doc.children!.find((node) => node.id === chip.id)!;
 		assert.equal(kept.type, "frame");
 		assert.deepEqual(kept.metadata, { type: "decks.link", to: `#canvas/${notes}` });
 		assert.deepEqual(kept.children!.map((child) => [child.type, child.icon ?? child.content]), [["icon", "layers"], ["text", "Research notes"], ["icon", "arrow-up-right"]]);
@@ -416,7 +416,7 @@ test("placed beside, below or nowhere, an item aims there and steps on past what
 test("a link can point at any item, by its id or its address, and says how it opens", async () => {
 	const { must, call, agent, cleanup } = await open();
 	try {
-		const canvas = agent.seat.stageName(true) ?? "";
+		const canvas = agent.seat.canvasFolder(true) ?? "";
 		await must("canvas.insert", [{ type: "note", name: "Risks", content: "Three risks" }, { at: { x1: 0, y1: 0 } }]);
 		// By its id on this canvas: an item's address, opened on the canvas unless it says otherwise.
 		const chip = (await must("canvas.insert", [{ type: "link", to: "risks" }, { at: { x1: 0, y1: 600 } }])).value;

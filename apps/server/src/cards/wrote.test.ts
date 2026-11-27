@@ -19,7 +19,7 @@ function serviceOn(root: string): { deck: Deck; service: CardService; sent: Serv
 	const sent: ServerMessage[] = [];
 	const service = new CardService(deck, {
 		send: (message) => void sent.push(message),
-		state: () => ({ boards: deck.boards }) as unknown as DeckState,
+		state: () => ({ boards: deck.cards }) as unknown as DeckState,
 		removed: () => {},
 	});
 	return { deck, service, sent };
@@ -42,19 +42,19 @@ test("an agent's byline and act time reach every browser, are on disk, and come 
 	assert.equal(changes[1]?.type === "card.changed" && changes[1].card?.namedAt, 2000);
 	assert.match(readFileSync(join(root, ".decks", "authors.json"), "utf8"), /"canvases\/t\/cards\/plan\/index\.html": \{\s*"who": "agent-1",\s*"at": 2000\s*\}/);
 
-	// The loader re-describes boards from disk and knows no authors.
+	// The loader re-describes cards from disk and knows no authors.
 	deck.reload();
-	assert.equal(deck.board("canvases/t/cards/plan/index.html")?.lastWrittenBy, undefined);
+	assert.equal(deck.card("canvases/t/cards/plan/index.html")?.lastWrittenBy, undefined);
 	service.restamp();
-	assert.equal(deck.board("canvases/t/cards/plan/index.html")?.lastWrittenBy, "agent-1");
-	assert.equal(deck.board("canvases/t/cards/plan/index.html")?.namedAt, 2000, "the act time comes back with the byline");
+	assert.equal(deck.card("canvases/t/cards/plan/index.html")?.lastWrittenBy, "agent-1");
+	assert.equal(deck.card("canvases/t/cards/plan/index.html")?.namedAt, 2000, "the act time comes back with the byline");
 
 	// A new process on the same deck.
-	assert.equal(serviceOn(root).deck.board("canvases/t/cards/plan/index.html")?.lastWrittenBy, "agent-1");
-	assert.equal(serviceOn(root).deck.board("canvases/t/cards/plan/index.html")?.namedAt, 2000);
+	assert.equal(serviceOn(root).deck.card("canvases/t/cards/plan/index.html")?.lastWrittenBy, "agent-1");
+	assert.equal(serviceOn(root).deck.card("canvases/t/cards/plan/index.html")?.namedAt, 2000);
 
 	// Gone from the disk, gone from the file.
-	service.forgetBoard("canvases/t/cards/plan/index.html");
+	service.forgetCard("canvases/t/cards/plan/index.html");
 	assert.doesNotMatch(readFileSync(join(root, ".decks", "authors.json"), "utf8"), /plan\.html/);
 	rmSync(root, { recursive: true, force: true });
 });
@@ -64,15 +64,15 @@ test("a board the person has read is stamped once, and a later write makes it ne
 	mkdirSync(join(root, "boards"), { recursive: true });
 	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="board"></body>`);
 	const { deck, service, sent } = serviceOn(root);
-	const modified = deck.board("canvases/t/cards/plan/index.html")?.modifiedAt ?? 0;
+	const modified = deck.card("canvases/t/cards/plan/index.html")?.modifiedAt ?? 0;
 
 	// A clock behind the disk still clears the mark.
 	service.seen("canvases/t/cards/plan/index.html", modified - 5000);
 	service.seen("canvases/t/cards/plan/index.html");
 	const changes = sent.filter((message) => message.type === "card.changed");
 	assert.equal(changes.length, 1, "the second look says nothing");
-	assert.equal(deck.board("canvases/t/cards/plan/index.html")?.seenAt, modified);
-	assert.equal(serviceOn(root).deck.board("canvases/t/cards/plan/index.html")?.seenAt, modified, "kept across a restart");
+	assert.equal(deck.card("canvases/t/cards/plan/index.html")?.seenAt, modified);
+	assert.equal(serviceOn(root).deck.card("canvases/t/cards/plan/index.html")?.seenAt, modified, "kept across a restart");
 
 	// Written again: the reading is carried forward, and is now older than the file.
 	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan, again</title><body class="board"></body>`);
@@ -82,10 +82,10 @@ test("a board the person has read is stamped once, and a later write makes it ne
 	// Read, then named by an agent after the file moved (a fit after a write): news again, and a
 	// read stamps it even though the file itself is older than the last look.
 	service.seen("canvases/t/cards/plan/index.html", (later?.modifiedAt ?? 0) + 10);
-	const read = deck.board("canvases/t/cards/plan/index.html")?.seenAt ?? 0;
+	const read = deck.card("canvases/t/cards/plan/index.html")?.seenAt ?? 0;
 	service.wrote("canvases/t/cards/plan/index.html", "agent-1", read + 500);
-	assert.equal(deck.board("canvases/t/cards/plan/index.html")?.namedAt, read + 500);
+	assert.equal(deck.card("canvases/t/cards/plan/index.html")?.namedAt, read + 500);
 	service.seen("canvases/t/cards/plan/index.html", read + 900);
-	assert.equal(deck.board("canvases/t/cards/plan/index.html")?.seenAt, read + 900, "the read is stamped against the naming act, not the file");
+	assert.equal(deck.card("canvases/t/cards/plan/index.html")?.seenAt, read + 900, "the read is stamped against the naming act, not the file");
 	rmSync(root, { recursive: true, force: true });
 });

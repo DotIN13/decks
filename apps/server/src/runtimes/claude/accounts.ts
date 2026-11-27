@@ -94,7 +94,7 @@ import { basename, dirname, join } from "node:path";
  *
  * ### Where the list lives
  *
- * `<dataDir>`, not the deck. A deck is a working directory full of boards; an account is a
+ * `<dataDir>`, not the deck. A deck is a working directory full of cards; an account is a
  * property of the *machine*, like the credentials it stands for. Two decks on one install
  * share the accounts, which is what somebody with two decks would expect, and a deck copied
  * to another machine carries no tokens with it.

@@ -19,13 +19,13 @@ test("a new agent's canvas is not named after it, and the first name chosen name
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	try {
 		const one = app.agents.create({ name: "Wren", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
-		const first = one.seat.stageName(true)!;
+		const first = one.seat.canvasFolder(true)!;
 		assert.equal(first, "untitled-canvas");
 		renameCanvas(app, first, "Launch plan");
-		assert.equal(one.seat.stageName(), "launch-plan", "the folder takes the first name");
+		assert.equal(one.seat.canvasFolder(), "launch-plan", "the folder takes the first name");
 		assert.ok(existsSync(join(deck, "canvases", "launch-plan", "canvas.json")));
 		renameCanvas(app, "launch-plan", "Launch plan, week two");
-		assert.equal(one.seat.stageName(), "launch-plan", "and keeps it after that");
+		assert.equal(one.seat.canvasFolder(), "launch-plan", "and keeps it after that");
 		assert.equal(app.pens.titleOf("launch-plan"), "Launch plan, week two");
 	} finally {
 		app.dispose();

@@ -18,9 +18,9 @@ function put(file: string, data: string | Uint8Array): void {
  *
  * A move is written on the canvas of the agent that made it (`decks.canvas.move` → `host.place`), and
  * the read used to be served from **whichever conversation the browser was last looking at**
- * (`stageState()` with no argument → `agents.looking()`). An agent working while the person is
- * reading another chat therefore moved a board and then read back the other stage's number for
- * it — which, for a board neither had moved before, is the place they were both seeded with: the
+ * (`canvasState()` with no argument → `agents.looking()`). An agent working while the person is
+ * reading another chat therefore moved a card and then read back the other canvas's number for
+ * it — which, for a card neither had moved before, is the place they were both seeded with: the
  * value before the move, exactly, with the move itself on disk and correct.
  *
  * That is the bug reported on 21 September 2026 as "stage.boards() returned pre-move positions
@@ -45,18 +45,18 @@ test("a board an agent moved reads back moved, whoever the browser is looking at
 		// Restored rows: a chat that exists and starts no runtime, which is all this needs.
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
-		// Both have the board up, so both have a place for it — as two agents on one project do.
+		// Both have the card up, so both have a place for it — as two agents on one project do.
 		for (const agent of [mover, elsewhere]) agent.seat.setInPlay(["canvases/t/cards/plan/index.html"], { place: true });
-		// Each canvas places its own copy of a library board (`deck/layout.ts`).
-		const plan = app.pens.cards.copyOf(mover.seat.stageName()!, "canvases/t/cards/plan/index.html");
-		const before = app.stage.boards(mover.id).find((board) => board.path === plan)!;
+		// Each canvas places its own copy of a library card (`deck/layout.ts`).
+		const plan = app.pens.cards.copyOf(mover.seat.canvasFolder()!, "canvases/t/cards/plan/index.html");
+		const before = app.canvas.cards(mover.id).find((card) => card.path === plan)!;
 
 		// The person is reading the other conversation while this one works.
 		app.agents.look(elsewhere.id);
-		const moved = app.stage.move(mover.id, "canvases/t/cards/plan/index.html", { x: before.x - 1140, y: before.y + 60 });
+		const moved = app.canvas.move(mover.id, "canvases/t/cards/plan/index.html", { x: before.x - 1140, y: before.y + 60 });
 		assert.equal(moved?.x, before.x - 1140, "the move answers with what was asked for");
 
-		const read = app.stage.boards(mover.id).find((board) => board.path === plan)!;
+		const read = app.canvas.cards(mover.id).find((card) => card.path === plan)!;
 		assert.equal(read.x, before.x - 1140, "and the read agrees: this is the caller's canvas");
 		assert.equal(read.y, before.y + 60);
 		cleanup();
@@ -73,15 +73,15 @@ test("the other conversation's canvas is untouched, which is what made the stale
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		for (const agent of [mover, elsewhere]) agent.seat.setInPlay(["canvases/t/cards/risks/index.html"], { place: true });
-		const own = (agent: typeof mover) => app.pens.cards.copyOf(agent.seat.stageName()!, "canvases/t/cards/risks/index.html");
-		const before = app.stage.boards(mover.id).find((board) => board.path === own(mover))!;
+		const own = (agent: typeof mover) => app.pens.cards.copyOf(agent.seat.canvasFolder()!, "canvases/t/cards/risks/index.html");
+		const before = app.canvas.cards(mover.id).find((card) => card.path === own(mover))!;
 
 		app.agents.look(elsewhere.id);
-		app.stage.move(mover.id, "canvases/t/cards/risks/index.html", { x: before.x - 2000, y: before.y });
+		app.canvas.move(mover.id, "canvases/t/cards/risks/index.html", { x: before.x - 2000, y: before.y });
 
-		const theirs = app.stage.boards(elsewhere.id).find((board) => board.path === own(elsewhere))!;
+		const theirs = app.canvas.cards(elsewhere.id).find((card) => card.path === own(elsewhere))!;
 		assert.equal(theirs.x, before.x, "a move on one canvas is not a move on another");
-		const ours = app.stage.boards(mover.id).find((board) => board.path === own(mover))!;
+		const ours = app.canvas.cards(mover.id).find((card) => card.path === own(mover))!;
 		assert.equal(ours.x, before.x - 2000);
 		cleanup();
 	} catch (error) {

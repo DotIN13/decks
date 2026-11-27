@@ -30,7 +30,7 @@ export class Translator {
 	constructor(
 		readonly agentId: string,
 		private readonly emit: (message: ServerMessage) => void,
-		/** The deck, so a tool call on a board reads as `boards/plan.html`. */
+		/** The deck, so a tool call on a card reads as `boards/plan.html`. */
 		private readonly deckPath?: string,
 		/**
 		 * The transcript reached a stable shape — persist it (`agents/store.ts`).
@@ -165,7 +165,7 @@ export class Translator {
 	 *
 	 * Asked before re-sending a turn that a rate limit refused (`claude/backend.ts`): a turn
 	 * that had not started is safe to try again on another account, and one that had already
-	 * called tools is not, because Decks agents write boards and a replayed turn could write
+	 * called tools is not, because Decks agents write cards and a replayed turn could write
 	 * the same one twice.
 	 *
 	 * "Anything" is anything after the newest user message — a tool call, or words the agent
@@ -186,7 +186,7 @@ export class Translator {
 	/**
 	 * Note which session entry a user message became.
 	 *
-	 * The id is what a rewind, a fork and a board restore are all addressed to, so
+	 * The id is what a rewind, a fork and a card restore are all addressed to, so
 	 * until this happens a message has no actions on it. Re-emitted rather than quietly
 	 * mutated, because the browser is holding its own copy.
 	 */

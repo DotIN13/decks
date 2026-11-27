@@ -40,8 +40,8 @@ test("a message is sent with the line as its last note, and a slash command with
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	try {
 		const agent = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
-		const canvas = agent.seat.stageName(true)!;
-		const title = app.stage.pens!.titleOf(canvas);
+		const canvas = agent.seat.canvasFolder(true)!;
+		const title = app.canvas.pens!.titleOf(canvas);
 		const card = `canvases/${canvas}/cards/q3/index.html`;
 		mkdirSync(dirname(join(deck, card)), { recursive: true });
 		writeFileSync(join(deck, card), "<title>Q3 is up</title><meta name=\"card\" content='{\"w\":600}' /><div class=\"doc\"></div>\n");
@@ -102,19 +102,19 @@ test("a camera moved between canvases is not told to the agent; a canvas deleted
 		const conversation = agent.conversation as unknown as { start: () => Promise<void>; backend: unknown };
 		conversation.start = async () => {};
 		conversation.backend = new Proxy({ prompt: async (text: string) => void sent.push(text), isStreaming: false } as Record<string, unknown>, { get: (own, key: string) => (key in own ? own[key] : () => undefined) });
-		const first = agent.seat.stageName(true)!;
+		const first = agent.seat.canvasFolder(true)!;
 		// The person looks at one tab and then another, five times over, between two messages.
-		const plan = agent.seat.newStage("Plan");
+		const plan = agent.seat.newCanvas("Plan");
 		for (let i = 0; i < 5; i++) {
-			agent.seat.openStage(first);
-			agent.seat.openStage(plan);
+			agent.seat.openCanvas(first);
+			agent.seat.openCanvas(plan);
 		}
 		await agent.prompt("hello", undefined, { kind: "canvas", target: plan });
 		assert.ok(!/moved|home canvas/.test(sent[0]!), sent[0]);
 		assert.ok(sent[0]!.endsWith('[The person wrote this while looking at the canvas "Plan" (--canvas plan).]\n\nhello'), sent[0]);
 		// The canvas its camera is on is deleted: said once, by the name a call would now be refused for.
-		agent.seat.stageDeleted(plan);
-		const fresh = agent.seat.stageName(true)!;
+		agent.seat.canvasDeleted(plan);
+		const fresh = agent.seat.canvasFolder(true)!;
 		assert.notEqual(fresh, plan);
 		await agent.prompt("and now?");
 		assert.ok(sent[1]!.includes(`[The canvas "plan" was deleted, with the cards on it. Your chat's camera is on a new, empty canvas now (--canvas ${fresh}).]`), sent[1]);

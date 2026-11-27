@@ -9,12 +9,12 @@ import { isHidden } from "@decks/hub/layout";
  * nowhere else.
  *
  * Every route that turns a URL into a file goes through here. Three rules, kept
- * separate on purpose: a *board* may only come from inside the deck, because a
- * board is part of the deck; a *file* may be read from any root the deck
+ * separate on purpose: a *card* may only come from inside the deck, because a
+ * card is part of the deck; a *file* may be read from any root the deck
  * declares, because the whole point of an embed is to show a document that lives
  * somewhere else; and a *write* may only land in the deck's `assets/`, or in a
  * canvas's own `files/`, because the one thing the app itself writes on the user's
- * behalf is a file they dropped on a board or a canvas.
+ * behalf is a file they dropped on a card or a canvas.
  *
  * Symlinks are resolved before the comparison, not after. A link inside the deck
  * pointing at `~/.ssh` is otherwise a path that passes a string test and reads a
@@ -151,9 +151,9 @@ export function resolveAssetWrite(deckRoot: string, name: string, folder = "asse
 /**
  * A file request -> an absolute path inside the deck or a declared root.
  *
- * `from` is the board the request came from, deck-relative, so a path resolves
+ * `from` is the card the request came from, deck-relative, so a path resolves
  * the way it looks like it should: `../docs/notes.md` in `boards/sources.html`
- * means what it would mean in an `<img src>`, because a board is a document and
+ * means what it would mean in an `<img src>`, because a card is a document and
  * that is a document's rule. Without a `from` a relative path is deck-relative,
  * which is what the agent's own tools use.
  *
@@ -197,7 +197,7 @@ const SHOTS = /^\.decks\/shots\/[^/]+$/;
 /**
  * Whether a path below the deck or a root may be read: nothing in a hidden folder (`.decks/`,
  * `.git`, `.env`, `.ssh`), by the path asked for or by where it really is, but for the harness's
- * own pictures of canvases. The deck's records and keys live in `.decks/`, and a board that could
+ * own pictures of canvases. The deck's records and keys live in `.decks/`, and a card that could
  * read them could act as the person.
  */
 function refuseHidden(place: string, below: string, requested: string): void {
@@ -215,7 +215,7 @@ function visible(place: string, candidate: string, real: string, requested: stri
 /**
  * Where a file named by an absolute path that is gone has moved to, inside the deck or a root.
  *
- * Boards and records write a full path for a file outside the deck, and sometimes for one inside
+ * Cards and records write a full path for a file outside the deck, and sometimes for one inside
  * it; move the deck or a project folder and every such path names nothing. The file is usually
  * still there, under the deck or root it was always in, at the same path below it. So the old
  * path's tail is tried under each, longest first: `/old/home/deck/docs/resume/resume.gdoc.txt` is

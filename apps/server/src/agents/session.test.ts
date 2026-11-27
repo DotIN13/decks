@@ -27,7 +27,7 @@ function put(file: string, data: string | Uint8Array): void {
  * on the canvas is always a subset of what the agent is holding.
  */
 function agentOn(
-	boards: string[],
+	cards: string[],
 	options: {
 		parentId?: string;
 		resumeRef?: string;
@@ -57,7 +57,7 @@ function agentOn(
 ) {
 	const root = mkdtempSync(join(tmpdir(), "decks-sets-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
-	for (const name of boards) {
+	for (const name of cards) {
 		put(join(root, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><title>${name}</title><body class="board"></body>`);
 	}
 	const sent: ServerMessage[] = [];
@@ -90,11 +90,11 @@ function agentOn(
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
 			report: () => {},
-			// The real one pastes the board source in; here the task is the whole briefing, so
+			// The real one pastes the card source in; here the task is the whole briefing, so
 			// a drained item is recognisable in the transcript by its own words.
 			brief: (task: string) => task,
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 		// Given a store, but nothing reaches it here: an agent with no user message is never
 		// written down, which is what keeps these tests off the disk. A restored row's transcript
@@ -351,7 +351,7 @@ test("showing a board holds it, and taking it off the stage keeps holding it", (
 	agent.seat.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
 	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html");
 
-	// What `decks.canvas.delete` and the board's × both do: off the stage, still held.
+	// What `decks.canvas.delete` and the card's × both do: off the canvas, still held.
 	agent.seat.setInPlay(["canvases/t/cards/b/index.html"]);
 	assert.equal(inPlay(), "canvases/t/cards/b/index.html");
 	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html", "a board taken off stays held");
@@ -396,7 +396,7 @@ test("forgetting a board nobody holds says so, and stays quiet", () => {
 	agent.seat.setInPlay(["canvases/t/cards/a/index.html"]);
 	const before = agent.seat.context.join(" ");
 
-	// The watcher reports every deletion in the deck, so most calls are about boards this
+	// The watcher reports every deletion in the deck, so most calls are about cards this
 	// agent never held; those must not emit a context.changed and re-render every rail.
 	assert.equal(agent.seat.forget("canvases/t/cards/b/index.html"), false);
 	assert.equal(agent.seat.context.join(" "), before);
@@ -469,20 +469,20 @@ function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ 
 			},
 			queue: () => [],
 			report: (agentId, text) => reportCalls.push({ agentId, text }),
-			brief: (task: string, boards: string[]) => (boards.length > 0 ? `${task} [${boards.join(" ")}]` : task),
+			brief: (task: string, cards: string[]) => (cards.length > 0 ? `${task} [${cards.join(" ")}]` : task),
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	return { agent, sent, reportCalls, sentTos, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-const item = (task: string, boards: string[] = [], reply = false) => ({
+const item = (task: string, cards: string[] = [], reply = false) => ({
 	from: "a1",
 	fromName: "Ada",
 	task,
-	boards,
+	boards: cards,
 	at: 1,
 	...(reply ? { reply: true as const } : {}),
 });
@@ -518,7 +518,7 @@ test("the queue drains once the agent has been quiet, one item at a time", async
 	// Two quiet spells of 10 ms each: waited for rather than timed, since a loaded machine (the whole
 	// suite at once) can take longer than any fixed sleep to fire both.
 	for (let tries = 0; tries < 100 && agent.ran.length < 2; tries++) await settle(20);
-	// The brief is composed when the item runs, so the board source is the one that exists
+	// The brief is composed when the item runs, so the card source is the one that exists
 	// then — here the stub just names what it was handed.
 	assert.deepEqual(agent.ran, ["first [canvases/t/cards/plan/index.html]", "second"]);
 	assert.equal(agent.turns.queued, 0);
@@ -815,11 +815,11 @@ test("a restored row shows its last line before its transcript is read", () => {
 });
 
 /*
- * Where a board lands when it joins the canvas (`deck/place.ts`).
+ * Where a card lands when it joins the canvas (`deck/place.ts`).
  *
- * The bug these pin down: every way of putting a board on a canvas fell through to the deck's own
- * auto-layout, which stacks *every board a stage has a place for* into rows of three. On a real
- * deck that is a column a million pixels tall, so a board arrived forty screens from the one being
+ * The bug these pin down: every way of putting a card on a canvas fell through to the deck's own
+ * auto-layout, which stacks *every card a canvas has a place for* into rows of three. On a real
+ * deck that is a column a million pixels tall, so a card arrived forty screens from the one being
  * read and nothing moved to show it.
  */
 test("a board joining the stage lands beside the stage's newest board", () => {
@@ -848,9 +848,9 @@ test("a board given a place when it joins keeps it, far from the rest or not", (
 });
 
 /*
- * The bug that came back twice: a board was placed at the middle of a camera, and the camera was
- * another canvas's, then whichever browser panned last, so boards landed in somebody else's
- * cluster, 95,000 px from their own. Placement reads the stage now and no camera at all.
+ * The bug that came back twice: a card was placed at the middle of a camera, and the camera was
+ * another canvas's, then whichever browser panned last, so cards landed in somebody else's
+ * cluster, 95,000 px from their own. Placement reads the canvas now and no camera at all.
  */
 test("where any browser is looking, this chat's included, does not move where a board lands", () => {
 	const far = { x: -18_000, y: 950_000, zoom: 1, width: 1378, height: 702 };
@@ -866,7 +866,7 @@ test("where any browser is looking, this chat's included, does not move where a 
 
 test("a board whose only place is the old deck-wide column is placed again, beside the canvas", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
-	// One board on the canvas, and another carrying the sort of place the deck-wide layout left.
+	// One card on the canvas, and another carrying the sort of place the deck-wide layout left.
 	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
 	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
 	agent.seat.setPosition("canvases/t/cards/two/index.html", 0, 967_333);
@@ -905,7 +905,7 @@ test("clearing the canvas and playing a board back leaves it where it was", () =
 	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
 	agent.seat.setInPlay([], { place: true });
 	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
-	// The canvas was empty, and that is no reason to move a board somebody put somewhere.
+	// The canvas was empty, and that is no reason to move a card somebody put somewhere.
 	assert.deepEqual(agent.seat.positions()["canvases/t/cards/one/index.html"], { x: 0, y: 0 });
 	cleanup();
 });

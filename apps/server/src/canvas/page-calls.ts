@@ -33,7 +33,7 @@ export class PageCalls {
 	 * Ask the browser to do something to the canvas, and wait for it.
 	 *
 	 * Broadcast rather than addressed: two tabs on one deck are looking at the same
-	 * stage, and both should move. The first answer wins, and a browser that never
+	 * canvas, and both should move. The first answer wins, and a browser that never
 	 * answers times out into a result rather than leaving the agent's tool call
 	 * hanging on a tab that was closed mid-gesture.
 	 */

@@ -49,7 +49,7 @@ export interface RosterEntry {
 	state: AgentState;
 	tags: string[];
 	workspace?: string;
-	/** The boards it holds, newest first. */
+	/** The cards it holds, newest first. */
 	context: string[];
 }
 
@@ -59,10 +59,10 @@ export interface Workspace {
 	/** Members, in the order they were handed in — the same order `decks.agent.list()` reports. */
 	agents: Array<{ id: string; name: string; state: AgentState; tags: string[] }>;
 	/**
-	 * Every board at least one member holds, **the ones most of them hold first**.
+	 * Every card at least one member holds, **the ones most of them hold first**.
 	 *
-	 * This is the whole reason to ask about a workspace rather than about an agent: a board two
-	 * members are working from is the workspace's, where a board one of them has open is that
+	 * This is the whole reason to ask about a workspace rather than about an agent: a card two
+	 * members are working from is the workspace's, where a card one of them has open is that
 	 * agent's. Ties break on the path, so the answer is stable between calls.
 	 */
 	boards: string[];
@@ -86,7 +86,7 @@ export function roster(entries: RosterEntry[]): Workspace[] {
 			groups.set(name, group);
 		}
 		group.members.push(entry);
-		// Once per member, not once per board: two agents holding the same board twice each is
+		// Once per member, not once per card: two agents holding the same card twice each is
 		// still two out of two, and `Set` is what says so.
 		for (const path of new Set(entry.context)) group.boards.set(path, (group.boards.get(path) ?? 0) + 1);
 	}

@@ -8,12 +8,12 @@ import { linksFollow } from "./link-chips.ts";
 import type { CanvasPens } from "./pens.ts";
 
 /**
- * Renaming and deleting stages, from the stage manager.
+ * Renaming and deleting canvases, from the canvas manager.
  *
- * A stage's name is its folder, and the boards a stage keeps in its own folder carry that name in
- * their paths (`deck/card-folders.ts`). So both change more than a label: the deck's list of boards,
- * the stage file's board items, and every agent on the stage follow. Neither is allowed while an
- * agent on that stage is in the middle of a turn, because its tools would be holding paths that
+ * A canvas's name is its folder, and the cards a canvas keeps in its own folder carry that name in
+ * their paths (`deck/card-folders.ts`). So both change more than a label: the deck's list of cards,
+ * the canvas file's card items, and every agent on the canvas follow. Neither is allowed while an
+ * agent on that canvas is in the middle of a turn, because its tools would be holding paths that
  * are about to stop existing.
  */
 
@@ -24,15 +24,15 @@ interface Context {
 }
 
 function refuseIfBusy(context: Context, name: string, verb: string): void {
-	const busy = context.agents.find((agent) => agent.seat.stageName(false) === name && agent.conversation.running);
+	const busy = context.agents.find((agent) => agent.seat.canvasFolder(false) === name && agent.conversation.running);
 	if (busy) throw new Error(`${busy.name} is working on "${name}" right now; ${verb} it when that turn ends.`);
 }
 
 /**
- * Rename a stage. The new name is made folder-safe the way a new stage's is (lowercase, dashes),
+ * Rename a canvas. The new name is made folder-safe the way a new canvas's is (lowercase, dashes),
  * refused when empty or taken. Returns the name it got.
  */
-export function renameStage(context: Context, from: string, title: string): string {
+export function renameCanvas(context: Context, from: string, title: string): string {
 	const to = slug(title, 40);
 	if (!to) throw new Error("A canvas needs a name with a letter or a number in it.");
 	if (to === from) return from;
@@ -41,7 +41,7 @@ export function renameStage(context: Context, from: string, title: string): stri
 	return moveCanvas(context, from, to);
 }
 
-/** Move a canvas to a new folder; its kept boards and its agents follow. */
+/** Move a canvas to a new folder; its kept cards and its agents follow. */
 function moveCanvas(context: Context, from: string, to: string): string {
 	const before = `${canvasFolder(from)}/`;
 	const after = `${canvasFolder(to)}/`;
@@ -50,7 +50,7 @@ function moveCanvas(context: Context, from: string, to: string): string {
 	context.deck.reload();
 	// The links to it on every canvas, and to what is kept in it, follow it to its new folder.
 	linksFollow(context.pens, { did: "moved", from, to });
-	for (const agent of context.agents) agent.seat.stageRenamed(from, to, repoint);
+	for (const agent of context.agents) agent.seat.canvasRenamed(from, to, repoint);
 	return to;
 }
 
@@ -58,7 +58,7 @@ function moveCanvas(context: Context, from: string, to: string): string {
  * Name a canvas. A canvas nobody has named yet is in a placeholder folder (`untitled-canvas`, or an
  * agent's name from before canvases were the deck's), so the first name chosen for it names its
  * folder as well; after that the folder stays and only the name changes. The folder is not moved
- * while an agent on it is mid-turn with boards kept in it, since its tools hold their paths.
+ * while an agent on it is mid-turn with cards kept in it, since its tools hold their paths.
  * Returns the folder the canvas is in afterwards.
  */
 export function titleCanvas(context: Context, name: string, title: string): string {
@@ -69,20 +69,20 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 	if (clean !== was) linksFollow(context.pens, { did: "titled", canvas: name, was, title: clean });
 	if (!unchosen) return name;
 	if (slug(clean, 40) === name || !slug(clean, 40)) return name;
-	const keepsBoards = existsSync(join(context.deck.path, canvasFolder(name), "cards"));
-	if (keepsBoards && context.agents.some((agent) => agent.seat.stageName(false) === name && agent.conversation.running)) return name;
+	const keepsCards = existsSync(join(context.deck.path, canvasFolder(name), "cards"));
+	if (keepsCards && context.agents.some((agent) => agent.seat.canvasFolder(false) === name && agent.conversation.running)) return name;
 	return moveCanvas(context, name, context.pens.freshName(clean));
 }
 
-/** Delete a stage, with its drawing and any boards kept in its own folder. The deck's own boards are untouched. */
+/** Delete a canvas, with its drawing and any cards kept in its own folder. The deck's own cards are untouched. */
 export function deleteCanvas(context: Context, name: string): { boards: number } {
 	refuseIfBusy(context, name, "delete");
 	const folder = join(context.deck.path, canvasFolder(name), "cards");
-	const boards = existsSync(folder) ? readdirSync(folder).length : 0;
+	const cards = existsSync(folder) ? readdirSync(folder).length : 0;
 	context.pens.remove(name);
 	context.deck.reload();
 	// A chip that pointed at it, or at something kept in it, stays where it is, dimmed.
 	linksFollow(context.pens, { did: "removed", canvas: name });
-	for (const agent of context.agents) agent.seat.stageDeleted(name);
-	return { boards };
+	for (const agent of context.agents) agent.seat.canvasDeleted(name);
+	return { boards: cards };
 }

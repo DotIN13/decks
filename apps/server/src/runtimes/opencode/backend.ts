@@ -214,7 +214,7 @@ export class OpencodeBackend extends SharedServerBackend {
 		 * opencode's revert marks the session and drops the marked messages when the next prompt
 		 * arrives, so the session keeps its id and the chat its place on the shared server. It also
 		 * undoes file edits from its own snapshots, but only in a git project: a deck is not one, so
-		 * the boards are left to Decks' own revisions, as on every other runtime.
+		 * the cards are left to Decks' own revisions, as on every other runtime.
 		 */
 		revert: async (sessionId, entryId) => {
 			const answered = await this.client.session.revert({ path: { id: sessionId }, body: { messageID: entryId } });
@@ -253,7 +253,7 @@ export class OpencodeBackend extends SharedServerBackend {
 		// words change is the server's own doing.
 		const handle = await opencodeManager.acquire({
 			cwd: deck.path,
-			stageUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
+			decksUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
 			decksPort: this.context.port,
 			config: { instructions: [this.briefingFile()] },
 		});
@@ -262,7 +262,7 @@ export class OpencodeBackend extends SharedServerBackend {
 		// The server's token, told to the bridge before any tool call can arrive: a call
 		// from this process is trusted because it carries the token the process holds, and
 		// the bridge has to recognise it to trust it.
-		this.context.stageBridge?.setServerToken(token);
+		this.context.canvasBridge?.setServerToken(token);
 
 		this.client = createOpencodeClient({ baseUrl: this.url, directory: deck.path });
 
@@ -270,7 +270,7 @@ export class OpencodeBackend extends SharedServerBackend {
 
 		// A `decks` command and the Google Docs tools name this session; the bridge resolves that to this
 		// agent. Registered before the conversation can run a single turn.
-		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id);
+		this.context.canvasBridge?.registerSession(this.sessionId, this.context.toolAgent.id);
 
 		this.stream = new OpencodeStream(translator, this.sessionId, {
 			idle: () => {
@@ -332,8 +332,8 @@ export class OpencodeBackend extends SharedServerBackend {
 			/*
 			 * Only when it has changed, which is not an optimisation.
 			 *
-			 * The deck is watched, and a write to anything that is not a board makes every
-			 * board on the canvas reload — a cost the watcher's own comment calls "cheap,
+			 * The deck is watched, and a write to anything that is not a card makes every
+			 * card on the canvas reload — a cost the watcher's own comment calls "cheap,
 			 * and rare". Writing this unconditionally would make it once per agent start,
 			 * which is neither: the user would watch the canvas blink every time a chat
 			 * woke up. One file per deck, written when the words actually differ.

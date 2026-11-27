@@ -115,7 +115,7 @@ export class AntigravityBackend implements AgentBackend {
 			"--input-format", "stream-json",
 			"--output-format", "stream-json",
 			"-p", "",
-			// A board turn can take a while; the desktop default of five minutes is a
+			// A card turn can take a while; the desktop default of five minutes is a
 			// ceiling a long answer could brush. Ten is a ceiling the model will not.
 			"--print-timeout", "10m",
 			// Asking is impossible here, so the CLI's own answer-to-itself is armed —
@@ -135,9 +135,9 @@ export class AntigravityBackend implements AgentBackend {
 				...(this.context.agentToken ? { DECKS_STAGE_TOKEN: this.context.agentToken } : {}),
 				// The MCP child inherits this process's environment, so the identity rides
 				// in env rather than in any per-agent config file.
-				DECKS_AGENT: this.context.stageAgent.id,
+				DECKS_AGENT: this.context.toolAgent.id,
 				// The `decks` command and where Decks is, for the CLI's shell (`runtimes/decks-env.ts`).
-				...decksEnv(this.context.port, this.context.stageAgent.id, this.context.agentToken),
+				...decksEnv(this.context.port, this.context.toolAgent.id, this.context.agentToken),
 			},
 			stdio: ["pipe", "pipe", "pipe"],
 		});
@@ -236,7 +236,7 @@ export class AntigravityBackend implements AgentBackend {
 	 * What the model should know about the deck before its first word.
 	 *
 	 * The same briefing the other backends hand their runtimes — a deck is a directory of
-	 * HTML boards, each one flowing page, and the `decks` command is the way to reach the
+	 * HTML cards, each one flowing page, and the `decks` command is the way to reach the
 	 * user's view. It belongs in the prompt because that is the one channel print mode
 	 * reads; it belongs in the *first* prompt because that is the one the model cannot
 	 * miss, and a conversation that resumes already has it in its history.

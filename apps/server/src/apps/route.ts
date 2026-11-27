@@ -12,8 +12,8 @@ import { readFile } from "node:fs/promises";
  *
  * A static or built app is its folder's files. A server app is proxied to the port it was given,
  * and started first if it is asleep, so the request that finds it asleep is the one that wakes it:
- * the board needs no "wake" button, and an API call from a page that was left open works too. Each
- * request counts as the app being seen, and so does the board's own heartbeat (`lib/live-app.js`).
+ * the card needs no "wake" button, and an API call from a page that was left open works too. Each
+ * request counts as the app being seen, and so does the card's own heartbeat (`lib/live-app.js`).
  *
  * The path the server sees is the path inside the app, `/api/items`, unless its manifest says
  * `prefix` (a framework told its base path, which Decks also passes as `BASE_PATH`).

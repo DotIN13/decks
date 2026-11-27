@@ -15,7 +15,7 @@ import { mcpServerPath } from "./install.ts";
  */
 
 /** A stand-in for Decks' own `/api/gdocs/call`, which answers and remembers. */
-async function stageServer(answer: { text: string; isError?: boolean }) {
+async function canvasServer(answer: { text: string; isError?: boolean }) {
 	const seen: Array<{ token: string | undefined; code: unknown }> = [];
 	const server = createServer((request, response) => {
 		let body = "";
@@ -77,8 +77,8 @@ async function mcpClient(url: string): Promise<McpClient> {
 }
 
 test("the handshake lists the Google Docs tools, and no canvas tool", { skip: false }, async () => {
-	const stage = await stageServer({ text: "4" });
-	const client = await mcpClient(stage.url);
+	const canvas = await canvasServer({ text: "4" });
+	const client = await mcpClient(canvas.url);
 	try {
 		const init = (await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } })) as {
 			capabilities?: Record<string, unknown>;
@@ -93,13 +93,13 @@ test("the handshake lists the Google Docs tools, and no canvas tool", { skip: fa
 		assert.deepEqual(listed.tools?.map((t) => t.name), ["gdocs_read", "gdocs_edit"], "the canvas is the decks command in the CLI's shell");
 	} finally {
 		client.close();
-		stage.close();
+		canvas.close();
 	}
 });
 
 test("a tool call reaches Decks with the agent's token, and the answer comes back", { skip: false }, async () => {
-	const stage = await stageServer({ text: "# The doc" });
-	const client = await mcpClient(stage.url);
+	const canvas = await canvasServer({ text: "# The doc" });
+	const client = await mcpClient(canvas.url);
 	try {
 		await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } });
 		client.send({ jsonrpc: "2.0", method: "notifications/initialized" });
@@ -107,18 +107,18 @@ test("a tool call reaches Decks with the agent's token, and the answer comes bac
 			content?: Array<{ type?: string; text?: string }>;
 			isError?: boolean;
 		};
-		assert.deepEqual(stage.seen, [{ token: "test-token", code: "gdocs_read" }]);
+		assert.deepEqual(canvas.seen, [{ token: "test-token", code: "gdocs_read" }]);
 		assert.equal(outcome.isError, false);
 		assert.equal(outcome.content?.[0]?.text, "# The doc");
 	} finally {
 		client.close();
-		stage.close();
+		canvas.close();
 	}
 });
 
 test("the old canvas tool is an unknown tool, said as a failed call", { skip: false }, async () => {
-	const stage = await stageServer({ text: "4" });
-	const client = await mcpClient(stage.url);
+	const canvas = await canvasServer({ text: "4" });
+	const client = await mcpClient(canvas.url);
 	try {
 		await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } });
 		const outcome = (await client.call("tools/call", { name: "stage_eval", arguments: { code: "x" } })) as { isError?: boolean; content?: Array<{ text?: string }> };
@@ -126,6 +126,6 @@ test("the old canvas tool is an unknown tool, said as a failed call", { skip: fa
 		assert.match(outcome.content?.[0]?.text ?? "", /Unknown tool: stage_eval/);
 	} finally {
 		client.close();
-		stage.close();
+		canvas.close();
 	}
 });

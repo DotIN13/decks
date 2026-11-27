@@ -39,8 +39,8 @@ test("what is inside something added or deleted is not told again", () => {
 });
 
 test("moves and resizes say by how much", () => {
-	const board = (x: number, w: number) => ({ id: "b", type: "browser", x, y: 0, width: w, height: 400, metadata: { type: "decks.card", path: "canvases/t/cards/plan/index.html" } }) as PenNode;
-	const lines = news(doc([board(0, 800)]), doc([board(380, 1000)]), [{ rev: 2, by: { kind: "person" }, edits: [], ids: ["b"] }]);
+	const card = (x: number, w: number) => ({ id: "b", type: "browser", x, y: 0, width: w, height: 400, metadata: { type: "decks.card", path: "canvases/t/cards/plan/index.html" } }) as PenNode;
+	const lines = news(doc([card(0, 800)]), doc([card(380, 1000)]), [{ rev: 2, by: { kind: "person" }, edits: [], ids: ["b"] }]);
 	assert.deepEqual(lines.slice(1, -1), [" you moved the card (canvases/t/cards/plan/index.html) by (380, 0)", " you resized the card (canvases/t/cards/plan/index.html) to 1000 × 400"]);
 });
 

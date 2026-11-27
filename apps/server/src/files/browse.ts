@@ -23,7 +23,7 @@ export interface BrowseResult {
  *
  * A picker that can browse further than the route can serve is a picker that
  * offers you a file and then a broken embed, so both answer to the same roots.
- * With no path, it lists the roots themselves — the deck first, since a board
+ * With no path, it lists the roots themselves — the deck first, since a card
  * embedding a sibling asset is the common case.
  */
 export function browse(roots: ResolvedRoots, requested: string | undefined): BrowseResult {

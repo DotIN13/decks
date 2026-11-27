@@ -9,13 +9,13 @@ import { needAgent, notice, type PersonVerbs } from "./person-call.ts";
 
 /**
  * The person's verbs about a conversation (`chat.*`): say something, stop, queue, read back, and go
- * back in it: rewind, fork, or put the boards back as they were at a message.
+ * back in it: rewind, fork, or put the cards back as they were at a message.
  */
 
-/** What the chat verbs need of the harness: the agents, and the boards with their revisions on the deck. */
+/** What the chat verbs need of the harness: the agents, and the cards with their revisions on the deck. */
 export interface ChatTableHost {
 	readonly agents: Registry;
-	readonly boards: CardService;
+	readonly cards: CardService;
 	readonly deck: Deck;
 }
 
@@ -68,7 +68,7 @@ export function chatTable(host: ChatTableHost): PersonVerbs {
 		"chat.preview": async ([id, entry], call) => {
 			const agent = need(id);
 			const entryId = entry === null || entry === undefined ? null : String(entry);
-			call.tell({ type: "chat.preview", agentId: agent.id, entryId, boards: entryId ? host.boards.boardsAt(agent.conversation, entryId) : {} });
+			call.tell({ type: "chat.preview", agentId: agent.id, entryId, boards: entryId ? host.cards.cardsAt(agent.conversation, entryId) : {} });
 		},
 		"chat.rewind": async ([id, entry], call) => {
 			const agent = need(id);
@@ -102,14 +102,14 @@ export function chatTable(host: ChatTableHost): PersonVerbs {
 		},
 		"chat.restore": async ([id, entry], call) => {
 			const agent = need(id);
-			const wanted = host.boards.boardsAt(agent.conversation, String(entry));
+			const wanted = host.cards.cardsAt(agent.conversation, String(entry));
 			let restored = 0;
 			for (const [path, sha] of Object.entries(wanted)) {
 				try {
-					const content = host.boards.revisions.read(sha);
+					const content = host.cards.revisions.read(sha);
 					if (content === readFileSync(host.deck.fileOf(path), "utf8")) continue;
 					writeFileSync(host.deck.fileOf(path), content);
-					host.boards.revisions.record(path, content);
+					host.cards.revisions.record(path, content);
 					restored++;
 				} catch (error) {
 					notice(call, "warn", `Could not restore ${path}: ${(error as Error).message}`);

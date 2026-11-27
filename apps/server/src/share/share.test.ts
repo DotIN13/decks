@@ -17,7 +17,7 @@ test("a zip written here is read back by the browser's reader, stored and deflat
 	assert.deepEqual(await files[1]!.bytes(), random);
 });
 
-function board(path: string, extra: Partial<Page> = {}): Page {
+function card(path: string, extra: Partial<Page> = {}): Page {
 	return { path, title: path, x: 0, y: 0, w: 1000, h: 400, rev: 1, ...extra } as Page;
 }
 
@@ -38,13 +38,13 @@ test("a bundle carries the canvas, its cards, what they name, lib, and pictures,
 	writeFileSync(join(deck, "canvases/plan/photo.jpg"), "jpg");
 	const picture = join(deck, "pic.webp");
 	writeFileSync(picture, "webp");
-	const records: Record<string, Page> = { [A]: board(A, { lastWrittenBy: "agent-1", namedAt: Date.now() }), [B]: board(B) };
+	const records: Record<string, Page> = { [A]: card(A, { lastWrittenBy: "agent-1", namedAt: Date.now() }), [B]: card(B) };
 
 	const { manifest, bytes } = await buildBundle({
 		deckPath: deck,
 		deckName: "decks",
-		board: (path) => records[path],
-		stage: { dir: join(deck, "canvases/plan"), title: "Plan", rev: 3, doc: { version: "2.9", children: [{ type: "rectangle", id: "r", fill: { type: "image", url: "photo.jpg" } }] } as never, boards: [{ path: A, x: 10, y: 20, w: 1000, h: 400 }, { path: B, x: 1200, y: 20, w: 760, h: 300 }] },
+		card: (path) => records[path],
+		canvas: { dir: join(deck, "canvases/plan"), title: "Plan", rev: 3, doc: { version: "2.9", children: [{ type: "rectangle", id: "r", fill: { type: "image", url: "photo.jpg" } }] } as never, cards: [{ path: A, x: 10, y: 20, w: 1000, h: 400 }, { path: B, x: 1200, y: 20, w: 760, h: 300 }] },
 		picture: async (one, scheme) => (one.path === A && scheme === "light" ? picture : undefined),
 	});
 	const names = readZip(new Uint8Array(bytes).buffer).map((one) => one.name);

@@ -12,7 +12,7 @@ export async function moveHome(ctx: VerbContext, name: string, keep = false): Pr
 	if (!agent.setHome || agent.app) throw new Error("Only an agent's chat has a camera to put on a canvas.");
 	const may = await service.mayMove(agent.id, name, agent.person === true, keep);
 	// There already: nothing moves, and the answer still says whether the person is looking at it.
-	if (agent.stageName?.() === name) return { moved: false, onScreen: may.onScreen };
+	if (agent.canvasName?.() === name) return { moved: false, onScreen: may.onScreen };
 	if (!may.apply) return { moved: false, onScreen: true, ...(may.offered ? { offered: may.offered } : {}) };
 	agent.setHome(name);
 	// Who is on which canvas is in every browser's canvas list: the screen follows the conversation on it there.
@@ -20,7 +20,7 @@ export async function moveHome(ctx: VerbContext, name: string, keep = false): Pr
 	return { moved: true, onScreen: may.onScreen };
 }
 
-/** The canvas a card's or board's deck path names (`canvases/<name>/…`, `shared/canvases/<owner>/<name>/…`), if it names one. */
+/** The canvas a card's deck path names (`canvases/<name>/…`, `shared/canvases/<owner>/<name>/…`), if it names one. */
 export function canvasOfPath(path: string): string | undefined {
 	const own = /^canvases\/([^/]+)\//.exec(path);
 	if (own) return own[1];

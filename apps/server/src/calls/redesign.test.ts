@@ -19,20 +19,20 @@ function put(file: string, data: string | Uint8Array): void {
 
 
 /**
- * The calls of the SDK redesign, end to end over `/api/v1`: a board as a canvas item, beside and
+ * The calls of the SDK redesign, end to end over `/api/v1`: a card as a canvas item, beside and
  * below, batch's all or nothing, `here()`, the old names' notes, and
  * `send` against `queue`.
  */
 
-const board = (title: string, w = 900, h = 400) =>
+const card = (title: string, w = 900, h = 400) =>
 	`<!doctype html><html><head><title>${title}</title><meta name="board" content='{"w":${w},"h":${h},"bg":"grid"}' /></head><body class="board"></body></html>`;
 
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-redesign-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	put(join(deck, "canvases", "t", "cards", "a", "index.html"), board("Revenue is up"));
-	put(join(deck, "canvases", "t", "cards", "b", "index.html"), board("Costs are flat", 600, 300));
+	put(join(deck, "canvases", "t", "cards", "a", "index.html"), card("Revenue is up"));
+	put(join(deck, "canvases", "t", "cards", "b", "index.html"), card("Costs are flat", 600, 300));
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));
@@ -43,7 +43,7 @@ async function open() {
 	type Answer = { ok: boolean; value?: any; error?: string; notes: string[] };
 	// The agent's own calls name the canvas it works on, the one its chat is on here (`names-canvas.test-helper.ts`); another caller's go as they are.
 	const call = async (verb: string, given: unknown[] = [], headers?: Record<string, string>): Promise<Answer> => {
-		const args = headers ? given : namingCanvas(verb, given, agent.seat.stageName(true));
+		const args = headers ? given : namingCanvas(verb, given, agent.seat.canvasFolder(true));
 		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...(headers ?? as(agent.id)) }, body: JSON.stringify({ args }) });
 		return (await response.json()) as Answer;
 	};
@@ -76,7 +76,7 @@ test("a pen browser item tagged decks.card reads as a card item, and other items
 	const item = toItem({ type: "browser", id: "a", name: "Revenue is up", url: "../../boards/a.html", width: 900, height: 400, metadata: { type: "decks.card", path: "canvases/t/cards/a/index.html" }, box: { x1: 0, y1: 0, x2: 900, y2: 400 } });
 	assert.deepEqual(item, { type: "card", id: "a", width: 900, height: 400, box: { x1: 0, y1: 0, x2: 900, y2: 400 }, card: "canvases/t/cards/a/index.html", title: "Revenue is up" });
 	assert.deepEqual(toItem({ type: "note", id: "n", content: "hi" }), { type: "note", id: "n", content: "hi" });
-	// A browser item that is not a deck board stays pen's own.
+	// A browser item that is not a deck card stays pen's own.
 	assert.equal(toItem({ type: "browser", id: "w", url: "https://example.com" }).type, "browser");
 });
 
@@ -91,7 +91,7 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 		const a = `canvases/${here.name}/cards/a/index.html`;
 		const b = `canvases/${here.name}/cards/b/index.html`;
 		assert.equal(put.card, a);
-		assert.ok(app.deck.board("canvases/t/cards/a/index.html"), "the other canvas keeps its own");
+		assert.ok(app.deck.card("canvases/t/cards/a/index.html"), "the other canvas keeps its own");
 		assert.deepEqual(put.box, { x1: 0, y1: 0, x2: 900, y2: 400 });
 		const file = JSON.parse(readFileSync(join(deck, "canvases", here.name, "canvas.pen"), "utf8"));
 		const node = file.children.find((one: { id: string }) => one.id === put.id);
@@ -121,7 +121,7 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 
 		const gone = (await must("canvas.delete", [b])).value;
 		assert.equal(gone.deleted, b);
-		assert.ok(app.deck.board(b), "a board's file stays in the deck");
+		assert.ok(app.deck.card(b), "a board's file stays in the deck");
 		assert.deepEqual((await must("card.canvases", [a])).value.map((one: { canvas: string }) => one.canvas), [here.name], "a canvas's card is on that canvas, and only there");
 		assert.deepEqual((await must("card.canvases", ["canvases/t/cards/a/index.html"])).value, [], "the card it was copied from is on no canvas, and says so");
 		assert.deepEqual((await must("card.canvases", [b])).value, []);
@@ -168,7 +168,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		const updated = (await must("agent.update", [{ canvas: other.name }])).value;
 		assert.equal(updated.canvas, other.name);
 		assert.equal((await must("here")).value.name, other.name);
-		assert.equal(agent.seat.stageName(), other.name);
+		assert.equal(agent.seat.canvasFolder(), other.name);
 		// The person's here is the canvas on screen they name.
 		const person = { authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id, "x-decks-stage": home };
 		assert.equal((await must("here", [], person)).value.name, home);
@@ -285,7 +285,7 @@ test("clearing your tags is answered with a request to set them again: they show
 test("an arrow joined at both ends goes between them, with no note to say where", async () => {
 	const { must, cleanup } = await open();
 	try {
-		// A placed board is copied into the canvas and has an id there; an arrow joins those ids.
+		// A placed card is copied into the canvas and has an id there; an arrow joins those ids.
 		const a = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }])).value.id;
 		const b = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/b/index.html" }, { beside: a }])).value.id;
 		const arrow = await must("canvas.insert", [{ type: "path", id: "a-to-b", stroke: "#888", strokeWidth: 4, metadata: { type: "decks.arrow", from: { item: a, side: "right" }, to: { item: b, side: "left" } } }]);

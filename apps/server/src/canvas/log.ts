@@ -45,9 +45,9 @@ export interface CanvasFrame {
 
 /** How many writes of each canvas are kept for the agents' notes (`changesSince`). */
 const CHANGE_LOG = 400;
-/** How many of a stage's recent names a drawing sent whole carries. */
+/** How many of a canvas's recent names a drawing sent whole carries. */
 const MADE_LATELY = 64;
-/** How many of the person's edits each stage can take back. */
+/** How many of the person's edits each canvas can take back. */
 const HISTORY = 100;
 
 export class CanvasLog {
@@ -93,7 +93,7 @@ export class CanvasLog {
 
 	private readonly history = new Map<string, { undo: Array<{ before: string; after: string }>; redo: Array<{ before: string; after: string }> }>();
 
-	/** The browsers' names for the edits written to each stage since its drawing was last sent (`penEditBy`). */
+	/** The browsers' names for the edits written to each canvas since its drawing was last sent (`penEditBy`). */
 	private readonly made = new Map<string, string[]>();
 
 	/** The agent that last wrote each canvas (`penWriter`), since this server started. */
@@ -168,7 +168,7 @@ export class CanvasLog {
 		return this.writers.get(name);
 	}
 
-	/** The last names sent with each stage's drawings, for a drawing sent whole to one browser (`frame`). */
+	/** The last names sent with each canvas's drawings, for a drawing sent whole to one browser (`frame`). */
 	private readonly madeLately = new Map<string, string[]>();
 
 	/**

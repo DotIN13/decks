@@ -19,7 +19,7 @@ async function open() {
 	const deck = join(dataDir, "decks");
 	mkdirSync(deck, { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
-	const pens = app.stage.pens!;
+	const pens = app.canvas.pens!;
 	const one = pens.claim("One");
 	const two = pens.claim("Two");
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
@@ -113,7 +113,7 @@ test("a stream opened on a pass ends when the pass stops working, at the next me
 		const reader = response.body!.getReader();
 		await reader.read();
 		app.tokens.revoke(person.id);
-		app.stage.pens!.edit(one, [{ op: "insert", node: { type: "note", id: "after", content: "x" } }] as never);
+		app.canvas.pens!.edit(one, [{ op: "insert", node: { type: "note", id: "after", content: "x" } }] as never);
 		const ended = await Promise.race([
 			(async () => {
 				for (;;) {
@@ -187,13 +187,13 @@ test("from a sandboxed page, the pass edits, undoes and reads its own canvas, an
 
 		const made = await post("/api/v1/canvas.insert", { ...frame, "x-decks-edit": "e1" }, { args: [{ type: "note", id: "n1", content: "Hi" }, { at: { x1: 0, y1: 0 } }] });
 		assert.equal(made.status, 200, made.text);
-		assert.ok(app.stage.pens!.get(one).text?.includes("n1"));
-		assert.equal(app.stage.pens!.get(two).text?.includes("n1") ?? false, false, "written on its own canvas, the one the call did not name");
+		assert.ok(app.canvas.pens!.get(one).text?.includes("n1"));
+		assert.equal(app.canvas.pens!.get(two).text?.includes("n1") ?? false, false, "written on its own canvas, the one the call did not name");
 
 		const back = await post("/api/v1/canvas.step", frame, { args: ["undo"] });
 		assert.equal(back.status, 200, back.text);
 		assert.deepEqual((back.body as { value: unknown }).value, { undo: false, redo: true });
-		assert.equal(app.stage.pens!.get(one).text?.includes("n1") ?? false, false, "undone");
+		assert.equal(app.canvas.pens!.get(one).text?.includes("n1") ?? false, false, "undone");
 
 		const read = await post("/api/v1/canvas.read", frame);
 		assert.equal(read.status, 200);
@@ -250,7 +250,7 @@ test("its stream carries its own canvas's drawing and nothing else", async () =>
 				/* stopped */
 			}
 		})();
-		const pens = app.stage.pens!;
+		const pens = app.canvas.pens!;
 		pens.edit(two, [{ op: "insert", node: { type: "note", id: "theirs", content: "x" } }] as never);
 		pens.edit(one, [{ op: "insert", node: { type: "note", id: "mine", content: "x" } }] as never);
 		await new Promise((done) => setTimeout(done, 300));

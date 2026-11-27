@@ -4,17 +4,17 @@ import { join } from "node:path";
 import type { Deck } from "./loader.ts";
 
 /**
- * Every version of every board, content-addressed (DESIGN §6.7).
+ * Every version of every card, content-addressed (DESIGN §6.7).
  *
  * Rewinding a conversation leaves the disk where it is, which is right when the
- * artifact is a repository and wrong when it is the boards. So each new version is
+ * artifact is a repository and wrong when it is the cards. So each new version is
  * stored under `.decks/revisions/<sha>` as it appears — whoever wrote it — and the
- * order they appeared in is kept per board. That one store answers two questions:
- * what ⌘Z should go back to, and what a board looked like at a point in the
+ * order they appeared in is kept per card. That one store answers two questions:
+ * what ⌘Z should go back to, and what a card looked like at a point in the
  * transcript.
  *
  * Content-addressed rather than git: no repository to interfere with, no history to
- * pollute, and an edit that puts a board back the way it was costs nothing because
+ * pollute, and an edit that puts a card back the way it was costs nothing because
  * it is the same sha.
  */
 /** One stored version, and when it was stored. */
@@ -24,7 +24,7 @@ interface Revision {
 }
 
 export class Revisions {
-	/** Per board, oldest first. Persisted, because the sequence is the point. */
+	/** Per card, oldest first. Persisted, because the sequence is the point. */
 	private readonly order = new Map<string, Revision[]>();
 
 	constructor(private deck: Deck) {
@@ -46,7 +46,7 @@ export class Revisions {
 	}
 
 	/**
-	 * Read the order back, then take the current state of every board as the newest.
+	 * Read the order back, then take the current state of every card as the newest.
 	 *
 	 * The order has to be on disk, not only in memory. The files were always durable,
 	 * but the *sequence* was not — so a restart made "the oldest version I know of"
@@ -79,11 +79,11 @@ export class Revisions {
 			// No index yet, or an unreadable one: start from what is on disk now.
 		}
 
-		for (const board of this.deck.boards) {
+		for (const card of this.deck.cards) {
 			try {
-				this.record(board.path, readFileSync(this.deck.fileOf(board.path), "utf8"));
+				this.record(card.path, readFileSync(this.deck.fileOf(card.path), "utf8"));
 			} catch {
-				// A board that cannot be read is one the loader will drop anyway.
+				// A card that cannot be read is one the loader will drop anyway.
 			}
 		}
 	}
@@ -92,7 +92,7 @@ export class Revisions {
 	 * Write the order down.
 	 *
 	 * Called on every change, which is cheap: it is one small JSON file, and losing
-	 * it is exactly the bug this exists to fix. Trimmed per board, because a long
+	 * it is exactly the bug this exists to fix. Trimmed per card, because a long
 	 * session should not make an unbounded index — the files stay, so an older
 	 * revision referenced by a session entry is still readable, it just no longer
 	 * takes part in undo.
@@ -125,9 +125,9 @@ export class Revisions {
 	}
 
 	/**
-	 * The version a board was at, at a moment in time.
+	 * The version a card was at, at a moment in time.
 	 *
-	 * This is the fallback the timeline needs for a board the conversation has not
+	 * This is the fallback the timeline needs for a card the conversation has not
 	 * written to: the newest version that already existed then. Without the
 	 * timestamps it had to fall back to "the oldest version I have", which — once the
 	 * index became durable — reached back further than the conversation did and
@@ -149,7 +149,7 @@ export class Revisions {
 		for (const revision of history) {
 			if (revision.at <= when && (!match || revision.at >= match.at)) match = revision;
 		}
-		// Nothing that old: the board is newer than the moment asked about, so its
+		// Nothing that old: the card is newer than the moment asked about, so its
 		// first version is the closest true answer.
 		return (match ?? history[0])!.sha;
 	}

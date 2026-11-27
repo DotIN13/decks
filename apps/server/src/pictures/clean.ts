@@ -7,14 +7,14 @@ import { lookOf } from "./ladder.ts";
  * The pictures folder, cleaned of what nothing will ask for again (`PictureService.cleanDaily`):
  *
  * - every picture of a page the deck no longer has (a card deleted while the server was off, a whole
- *   canvas removed, a board the migration turned into a card under a new path);
+ *   canvas removed, a card the migration turned into a card under a new path);
  * - every picture of a page in a look other than the one it is drawn in now (`lookOf`), which a
  *   card's next picture would replace anyway, and which a page nobody pictures again keeps forever;
  * - a compressed picture (`.astc`) whose brotli copy (`.astc.br`) is beside it: the copy is what is
  *   sent, and the plain one is unpacked from it again for a browser that takes no brotli.
  *
  * A file written in the last ten minutes is left, since it may be one being made. Names that are not
- * pictures (a folder, a stage's shots) are left too.
+ * pictures (a folder, a canvas's shots) are left too.
  */
 interface CleanResult {
 	removed: number;

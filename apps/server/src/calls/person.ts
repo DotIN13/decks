@@ -4,21 +4,21 @@ import type { CanvasPens } from "../canvas/pens.ts";
 import { personToolOf } from "./agent-tools.ts";
 
 /**
- * Whose stage the person's click acts on.
+ * Whose canvas the person's click acts on.
  *
  * The browser names the canvas on screen (`X-Decks-Stage`, or `stage` on a socket message) and the
- * agent it is talking to (`X-Decks-Agent`). The stage wins: the change goes to the agent on that
+ * agent it is talking to (`X-Decks-Agent`). The canvas wins: the change goes to the agent on that
  * canvas, the one the browser is looking at first; with no canvas named, to the agent it names, and
- * then to the focused conversation, which is what every board frame acts on.
+ * then to the focused conversation, which is what every card frame acts on.
  */
-export function personAgent(context: { agents: Registry; pens?: CanvasPens | undefined }, asked: { stage?: string; agent?: string }): DeckAgent {
+export function personAgent(context: { agents: Registry; pens?: CanvasPens | undefined }, asked: { canvas?: string; agent?: string }): DeckAgent {
 	const named = asked.agent ? context.agents.get(asked.agent) : undefined;
 	const fallback = named ?? context.agents.focused();
-	const stage = asked.stage && context.pens?.has(asked.stage) ? asked.stage : undefined;
-	if (!stage || fallback.seat.stageName() === stage) return fallback;
+	const canvas = asked.canvas && context.pens?.has(asked.canvas) ? asked.canvas : undefined;
+	if (!canvas || fallback.seat.canvasFolder() === canvas) return fallback;
 	const looking = context.agents.looking();
-	if (looking?.seat.stageName() === stage) return looking;
-	return context.agents.all().find((one) => one.seat.stageName() === stage) ?? fallback;
+	if (looking?.seat.canvasFolder() === canvas) return looking;
+	return context.agents.all().find((one) => one.seat.canvasFolder() === canvas) ?? fallback;
 }
 
 /**
@@ -28,7 +28,7 @@ export function personAgent(context: { agents: Registry; pens?: CanvasPens | und
  */
 export async function asPerson(
 	context: { agents: Registry; pens?: CanvasPens | undefined },
-	asked: { stage?: string; agent?: string },
+	asked: { canvas?: string; agent?: string },
 	verb: string,
 	args: unknown[],
 	reply: (message: { type: "harness.notice"; level: "warn"; text: string }) => void,

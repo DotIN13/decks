@@ -1,9 +1,9 @@
 import type { WebTarget } from "../canvas/service.ts";
-import type { Verbs as Stage } from "@decks/sdk";
+import type { Verbs } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /** The person's own Chrome, shared through the Decks extension. */
-export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
+export function webVerbs(ctx: VerbContext): Pick<Verbs, "web"> {
 	const { images, needWeb, needTarget } = ctx;
 	return {
 		/**
@@ -54,7 +54,7 @@ export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
 			select: async (field: WebTarget, option: string) => needWeb().select(needTarget(field, "select needs the field's label, or a { ref } from decks web read"), option),
 			/**
 			 * Click a button or link. One whose words say it sends, emails, invites, pays or deletes
-			 * waits for the user's Allow on the status board, as submit does; `{ ask: false }` only
+			 * waits for the user's Allow on the status card, as submit does; `{ ask: false }` only
 			 * when the user has said not to be asked for this site.
 			 */
 			click: async (what: WebTarget, options?: { ask?: boolean }) => needWeb().click(needTarget(what, "click needs the button's or link's name, or a { ref } from decks web read"), options),
@@ -66,7 +66,7 @@ export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
 				needWeb().type(String(text ?? ""), into === undefined ? undefined : needTarget(into, "type needs the field's label, or a { ref } from decks web read")),
 			/**
 			 * Press the named button, or Enter, once the user has allowed it on the status
-			 * board. Pass `{ ask: false }` only when the user has said they do not want to be
+			 * card. Pass `{ ask: false }` only when the user has said they do not want to be
 			 * asked for this site.
 			 */
 			submit: async (what?: WebTarget, options?: { ask?: boolean }) =>

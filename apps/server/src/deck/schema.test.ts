@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile } from "./schema.ts";
+import { declaredRoots, normalizeCardPath, parseDeckFile, serializeDeckFile } from "./schema.ts";
 
 test("a deck file round-trips, keeping keys it does not know about", () => {
 	const source = `{
@@ -23,8 +23,8 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	assert.ok(written.indexOf('"version"') < written.indexOf('"name"'));
 	assert.ok(written.indexOf('"roots"') < written.indexOf('"somethingNewer"'));
 	/*
-	 * And a `sizes` map that was in the source is gone from the write. A board's size is its own file's
-	 * business — `withBoardSize` writes it there — and a copy here was what made a resize that wrote
+	 * And a `sizes` map that was in the source is gone from the write. A card's size is its own file's
+	 * business — `withCardSize` writes it there — and a copy here was what made a resize that wrote
 	 * the file look like it had done nothing.
 	 */
 	assert.equal(written.includes('"sizes"'), false);
@@ -32,8 +32,8 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 
 test("a legacy boards map gives up its places as a seed, and none of its sizes", () => {
 	const { file, arrangement, warnings } = parseDeckFile('{"boards":{"a.html":{"x":10,"y":20,"w":500}}}');
-	// The place belongs to a stage now, so it is not written back — but it is kept as the arrangement a
-	// stage starts from. The size is not kept anywhere: it belonged to the board, and the board's file
+	// The place belongs to a canvas now, so it is not written back — but it is kept as the arrangement a
+	// canvas starts from. The size is not kept anywhere: it belonged to the card, and the card's file
 	// is where one lives.
 	assert.deepEqual(arrangement, { "a.html": { x: 10, y: 20 } });
 	assert.equal("boards" in file, false, "the old key is consumed, so a write does not carry it on");
@@ -75,6 +75,6 @@ test("roots take both spellings", () => {
 });
 
 test("one board has one key", () => {
-	assert.equal(normalizeBoardPath("./boards\\a.html"), "boards/a.html");
-	assert.equal(normalizeBoardPath("boards/a.html"), "boards/a.html");
+	assert.equal(normalizeCardPath("./boards\\a.html"), "boards/a.html");
+	assert.equal(normalizeCardPath("boards/a.html"), "boards/a.html");
 });

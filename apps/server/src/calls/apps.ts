@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { cloneRepo, initRepo, isRepo, nameFromUrl, repoState, type RepoState } from "../apps/repo.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
 import type { AppKind } from "../apps/service.ts";
-import type { Verbs as Stage } from "@decks/sdk";
+import type { Verbs } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /** The item that shows an app on a canvas, as `canvas.insert` takes it (`calls/canvas.ts`). */
@@ -18,16 +18,16 @@ function nextSteps(name: string, kind: AppKind, first = "Edit the files"): strin
 }
 
 /** Apps: folders in the deck's apps/ that Decks serves, builds or runs. */
-export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
+export function appsVerbs(ctx: VerbContext): Pick<Verbs, "apps"> {
 	const { service, agent } = ctx;
 	return {
 		/**
 		 * Apps in the deck's `apps/` (`apps/service.ts`): an app is a folder the agent writes with its
 		 * own tools, and these are what Decks does with it. Each answers at once or within fifteen
-		 * seconds: an install can take minutes, and a stage run is abandoned after twenty, so a
+		 * seconds: an install can take minutes, and a canvas run is abandoned after twenty, so a
 		 * `pending` answer means ask `status` again on the next call.
 		 *
-		 * Agents' verbs: a board's own code may read the list and an app's state, nothing more.
+		 * Agents' verbs: a card's own code may read the list and an app's state, nothing more.
 		 */
 		apps: (() => {
 			const service_ = () => {
@@ -198,7 +198,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					return { deleted: text, trash: trash.split("\\").join("/"), items: takeOff(text) };
 				},
 				logs: async (name: string, options?: { tail?: number }) => service_().log(known(name), options?.tail ?? 80),
-				/** The app opened in the server's own browser: errors, failed requests and a picture, as `decks.canvas.fit` is for a board. */
+				/** The app opened in the server's own browser: errors, failed requests and a picture, as `decks.canvas.fit` is for a card. */
 				check: async (name: string) => {
 					agentOnly("check");
 					const text = known(name);

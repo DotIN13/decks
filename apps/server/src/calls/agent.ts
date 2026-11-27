@@ -1,4 +1,4 @@
-import type { Verbs as Stage } from "@decks/sdk";
+import type { Verbs } from "@decks/sdk";
 import { escapeXml } from "./context.ts";
 import type { VerbContext } from "./context.ts";
 import { moveHome } from "./move-home.ts";
@@ -8,7 +8,7 @@ import { moveHome } from "./move-home.ts";
  * claim, your inbox, the other agents, and handing work over: `send` delivers now, `queue` waits
  * for the turn running to end, `create` makes an agent first.
  */
-export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
+export function agentVerbs(ctx: VerbContext): Pick<Verbs, "agent" | "here"> {
 	const { service, agent, notes, canvasOf, canvasRow, askedWorkspace } = ctx;
 
 	/** One agent from the registry's summaries, as the `Agent` type has it. */
@@ -39,7 +39,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 	const me = () => {
 		const identity = agent.identity();
 		const row = agent.agents().find((one) => one.id === agent.id);
-		const home = agent.stageName?.();
+		const home = agent.canvasName?.();
 		return {
 			...(agent.app ? {} : { id: agent.id }),
 			name: identity.name,
@@ -77,7 +77,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 			},
 			claim: async (cards: string | string[]) => {
 				const paths = Array.isArray(cards) ? cards : [cards];
-				for (const one of paths) if (!service.fileBoard(one)) throw new Error(`No such card: ${one}`);
+				for (const one of paths) if (!service.fileCard(one)) throw new Error(`No such card: ${one}`);
 				for (const one of paths) agent.worked?.(one);
 				return paths;
 			},

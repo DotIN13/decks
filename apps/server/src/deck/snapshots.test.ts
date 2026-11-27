@@ -84,7 +84,7 @@ test("an index written by an older build still loads", () => {
 
 	const after = new Revisions(Deck.open(root));
 	const history = after.history("canvases/t/cards/a/index.html");
-	// Both legacy entries survive; the board's current content is appended as the
+	// Both legacy entries survive; the card's current content is appended as the
 	// newest, which is right — the file saying "one" again is its own event.
 	assert.ok(history.length >= shas.length, `${history.length} >= ${shas.length}`);
 	assert.equal(after.read(history[0]!), "<title>one</title>");
@@ -108,7 +108,7 @@ test("the index only keeps revisions whose files are still there", () => {
 	revisions.record("canvases/t/cards/a/index.html", "<title>three</title>");
 	put(join(root, "canvases", "t", "cards", "a", "index.html"), "<title>three</title>");
 
-	// The middle one: not what the board says now, so nothing will re-create it.
+	// The middle one: not what the card says now, so nothing will re-create it.
 	const middle = revisions.history("canvases/t/cards/a/index.html")[1]!;
 	rmSync(join(root, ".decks", "revisions", `${middle}.html`));
 

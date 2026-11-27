@@ -21,19 +21,19 @@ import { runCode } from "./run-code.test-helper.ts";
  * Neither is reachable from a browser check — the e2e suite needs a model to make an agent
  * call a tool at all — and both are the part a model actually reads.
  */
-/** The board the tests fit, show and move: the agent's canvas's own. */
+/** The card the tests fit, show and move: the agent's canvas's own. */
 const PLAN = "canvases/ada/cards/plan/index.html";
 
 function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }>; measureAway?: CanvasServiceHost["measureAway"] } = {}) {
 	/*
-	 * A stage that remembers what is up, for the checks on the person's gestures. Placement here is a
+	 * A canvas that remembers what is up, for the checks on the person's gestures. Placement here is a
 	 * stand-in (a named place is kept, anything else goes to x 5000): the rule is `deck/place.ts`.
 	 */
 	const stageful = options.stageful === true;
 	let playing: string[] = [];
 	const spots: Record<string, { x: number; y: number }> = {};
 	const root = mkdtempSync(join(tmpdir(), "decks-tool-"));
-	// The board the agent's canvas holds, in that canvas's own folder (`deck/layout.ts`).
+	// The card the agent's canvas holds, in that canvas's own folder (`deck/layout.ts`).
 	mkdirSync(join(root, "canvases", "ada", "cards", "plan"), { recursive: true });
 	writeFileSync(join(root, PLAN), `<!doctype html><title>plan</title><body class="board"></body>`);
 	const deck = Deck.open(root);
@@ -51,18 +51,18 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** What a browser would have reported, if one were looking. */
 	const extents = new Map<string, { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	const worked: string[] = [];
-	/** The stage ops sent to the browser, in order. */
+	/** The canvas ops sent to the browser, in order. */
 	const calls: unknown[] = [];
-	/** Every move written, with the stage it was written on. */
+	/** Every move written, with the canvas it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new CanvasService(deck, {
-		writeBoard: (path, html) => {
+		writeCard: (path, html) => {
 			// A card in its own folder, as the real service writes it (`newBoard` writes a card now).
 			mkdirSync(dirname(join(root, path)), { recursive: true });
 			writeFileSync(join(root, path), html);
-			const board = deck.refresh(path);
-			if (!board) throw new Error(`no board at ${path}`);
-			return board;
+			const card = deck.refresh(path);
+			if (!card) throw new Error(`no board at ${path}`);
+			return card;
 		},
 		extent: (path, rev) => (extents.get(path)?.rev === rev ? extents.get(path) : undefined),
 		/*
@@ -70,7 +70,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		 *
 		 * The cached reading is per revision, so a resize invalidates it — and `fit` now
 		 * resizes and then asks again, which is the second pass. A real frame answers that,
-		 * with the same content: narrowing the board does not narrow components that carry
+		 * with the same content: narrowing the card does not narrow components that carry
 		 * their own width. So this answers whatever revision is asked for.
 		 */
 		awaitExtent: async (path) => extents.get(path),
@@ -89,17 +89,17 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		/* Who a move was written for, so a test can read back *whose* canvas it landed on. */
 		place: (agentId, path, x, y) => {
 			moved.push({ agentId, path, x, y });
-			return deck.board(path);
+			return deck.card(path);
 		},
 		broadcast: () => {},
 		camera: () => camera,
 		agents: () => others,
-		...(options.stageful ? { boards: () => deck.boards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
+		...(options.stageful ? { cards: () => deck.cards.map((card) => ({ ...card, ...(spots[card.path] ?? { x: 0, y: 0 }) })) } : {}),
 	});
 
 	// The agent in these tests works on its canvas, "ada", and its calls name it (`names-canvas.test-helper.ts`).
 	const tool = onCanvas(createDecksTool({
-		stage: service,
+		canvas: service,
 		port: 4329,
 		agent: {
 			id: "a1",
@@ -134,18 +134,18 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			queue: () => waiting,
 			recordRevision: () => undefined,
 			worked: (path) => void worked.push(path),
-			boardPathOf: () => undefined,
-			stageName: () => "ada",
+			cardPathOf: () => undefined,
+			canvasName: () => "ada",
 		},
 	}), "ada");
 	/** The deck's canvases, which `card.create` and every canvas call need. */
 	const withPens = () => (service.pens ??= new CanvasPens(root, () => {}));
-	/** Put a board on the agent's canvas ("ada") at its file's size: `canvas.fit` measures at the width it has there. */
+	/** Put a card on the agent's canvas ("ada") at its file's size: `canvas.fit` measures at the width it has there. */
 	const hold = (path: string) => {
 		const pens = withPens();
-		const board = deck.refresh(path) ?? deck.board(path);
-		if (!board) throw new Error(`no board at ${path}`);
-		pens.cards.placeBoards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
+		const card = deck.refresh(path) ?? deck.card(path);
+		if (!card) throw new Error(`no board at ${path}`);
+		pens.cards.placeCards("ada", [{ path, title: card.title, x: 0, y: 0, w: card.w, h: card.h }]);
 	};
 	return {
 		tool,
@@ -159,9 +159,9 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		deck,
 		extents,
 		service,
-		/** What was actually written to disk, which is the only place a board's size lives. */
+		/** What was actually written to disk, which is the only place a card's size lives. */
 		read: (path: string) => readFileSync(join(root, path), "utf8"),
-		/** For a test that needs a board `card.create` does not write. */
+		/** For a test that needs a card `card.create` does not write. */
 		write: (path: string, html: string) => {
 			mkdirSync(dirname(join(root, path)), { recursive: true });
 			writeFileSync(join(root, path), html);
@@ -209,7 +209,7 @@ test("with no reading from a browser, it says nothing rather than making a numbe
  * default and the fact that an explicit width is never touched.
  */
 test("a default width is the board's own, or the screen when the screen is smaller", async () => {
-	/** The width the file was written with — the only place a board's size lives. */
+	/** The width the file was written with — the only place a card's size lives. */
 	const widthOf = (text: string) => Number(/"w":(\d+)/.exec(text)?.[1]);
 
 	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
@@ -226,7 +226,7 @@ test("a default width is the board's own, or the screen when the screen is small
 	assert.match(onPhone.text, /card width 390\. One screen/);
 	phone.cleanup();
 
-	// A huge screen is not an invitation: the board's own width is still the answer.
+	// A huge screen is not an invitation: the card's own width is still the answer.
 	const huge = toolOn({ x: 0, y: 0, zoom: 1, width: 3840, height: 2160 });
 	huge.withPens();
 	await runCode(huge.tool, `return await stage.card.create({ title: "Huge" })`);
@@ -301,7 +301,7 @@ test("a card is the agent's once it is named: card.create, canvas.fit and agent.
 	assert.equal(read.isError, false, read.text);
 	assert.deepEqual(worked, []);
 
-	const rev = deck.board("canvases/ada/cards/two/index.html")!.rev;
+	const rev = deck.card("canvases/ada/cards/two/index.html")!.rev;
 	extents.set("canvases/ada/cards/two/index.html", { rev, w: 900, h: 1200 });
 	hold("canvases/ada/cards/two/index.html");
 	const fitted = await runCode(tool, `return await stage.canvas.fit("canvases/ada/cards/two/index.html")`);
@@ -345,20 +345,20 @@ test("agent.list carries what each one is working on, and what is waiting for th
 });
 
 /*
- * `resize` and `fit` are the two ways a board's size gets written, and both go through
+ * `resize` and `fit` are the two ways a card's size gets written, and both go through
  * the server so the deck's own record cannot fall behind the file. What is worth testing
- * is the honesty of `fit`: it refuses when nothing has measured the board, because the
+ * is the honesty of `fit`: it refuses when nothing has measured the card, because the
  * alternative is a plausible number nobody took.
  */
 test("a person's resize writes the meta and the deck agrees immediately", async () => {
 	const { tool, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const before = deck.board(PLAN);
+	const before = deck.card(PLAN);
 	assert.equal(before?.w, 1000, "the default width, since this board's file says nothing");
 
 	const result = await tool.gesture("resize", [PLAN, { w: 1600, h: 1100 }]);
 	assert.equal(result.ok, true, result.error);
 	assert.equal((result.value as { w: number }).w, 1600);
-	assert.equal(deck.board(PLAN)?.h, 1100);
+	assert.equal(deck.card(PLAN)?.h, 1100);
 
 	const onlyHeight = await tool.gesture("resize", [PLAN, { h: 900 }]);
 	assert.deepEqual([(onlyHeight.value as { w: number }).w, (onlyHeight.value as { h: number }).h], [1600, 900], "the dimension that was not named is kept");
@@ -376,8 +376,8 @@ test("fit says to put the board on the canvas rather than guessing a height", as
 });
 
 /*
- * A board nobody is looking at has no frame to measure it, which was most fits by an agent working
- * on its own stage. The server's own browser measures it then, and fit acts on that reading.
+ * A card nobody is looking at has no frame to measure it, which was most fits by an agent working
+ * on its own canvas. The server's own browser measures it then, and fit acts on that reading.
  */
 test("fit measures a board no canvas is showing in the server's own browser", async () => {
 	const asked: string[] = [];
@@ -391,7 +391,7 @@ test("fit measures a board no canvas is showing in the server's own browser", as
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(asked, [PLAN]);
-	assert.equal(deck.board(PLAN)?.h, 612, "the document's own height, with no margin added");
+	assert.equal(deck.card(PLAN)?.h, 612, "the document's own height, with no margin added");
 	assert.match(result.text, /90 words/, "and the reading it took is the one fit reports");
 	cleanup();
 });
@@ -406,19 +406,19 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 	});
 	hold(PLAN);
 	const pens = service.pens!;
-	pens.cards.placeBoards("narrow", [{ path: PLAN, title: "plan", x: 0, y: 0, w: 640, h: 300 }]);
-	const ada = pens.cards.boards("ada").find((one) => one.path === PLAN)!;
+	pens.cards.placeCards("narrow", [{ path: PLAN, title: "plan", x: 0, y: 0, w: 640, h: 300 }]);
+	const ada = pens.cards.cards("ada").find((one) => one.path === PLAN)!;
 
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { canvas: "canvases/narrow/canvas.pen" })`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(asked, [640], "measured at the width the board has on that canvas");
-	// Placed on narrow, the board is narrow's own copy, a card (`canvas/copy-in.ts`): that copy is what is fitted.
+	// Placed on narrow, the card is narrow's own copy, a card (`canvas/copy-in.ts`): that copy is what is fitted.
 	const copy = pens.cards.copyOf("narrow", PLAN);
 	assert.equal(copy, "canvases/narrow/cards/plan/index.html");
-	assert.deepEqual([deck.board(copy)?.w, deck.board(copy)?.h], [640, 812], "both numbers go to the copy's file");
-	const narrow = pens.cards.boards("narrow").find((one) => one.path === copy)!;
+	assert.deepEqual([deck.card(copy)?.w, deck.card(copy)?.h], [640, 812], "both numbers go to the copy's file");
+	const narrow = pens.cards.cards("narrow").find((one) => one.path === copy)!;
 	assert.deepEqual([narrow.w, narrow.h], [640, 812], "and to the canvas it was fitted on");
-	const still = pens.cards.boards("ada").find((one) => one.path === PLAN)!;
+	const still = pens.cards.cards("ada").find((one) => one.path === PLAN)!;
 	assert.deepEqual([still.w, still.h], [ada.w, ada.h], "the agent's own canvas keeps its size");
 	cleanup();
 });
@@ -438,19 +438,19 @@ test("fit says what to do when the board is not on the canvas, rather than picki
 
 test("fit takes the height from the content and leaves the width alone", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const board = deck.board(PLAN);
-	assert.equal(board?.w, 1000, "a board that says nothing about itself gets the default");
-	extents.set(PLAN, { rev: board!.rev, w: 700, h: 1400 });
+	const card = deck.card(PLAN);
+	assert.equal(card?.w, 1000, "a board that says nothing about itself gets the default");
+	extents.set(PLAN, { rev: card!.rev, w: 700, h: 1400 });
 
 	hold(PLAN);
 	await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
-	const fitted = deck.board(PLAN);
+	const fitted = deck.card(PLAN);
 	assert.equal(fitted?.h, 1448, "the content, plus the margin its components start at");
 	/*
 	 * The change this test exists for. `fit` used to take the width too, in two passes, which made
 	 * it the one call that could reflow a document to a number it measured for a moment — and on a
-	 * board written as a document, whose block is `width: 100%` of the frame, the width it read
-	 * back was the frame's own, so every fit grew the board by the margin.
+	 * card written as a document, whose block is `width: 100%` of the frame, the width it read
+	 * back was the frame's own, so every fit grew the card by the margin.
 	 */
 	assert.equal(fitted?.w, 1000, "and the width is exactly what the board had");
 	cleanup();
@@ -466,7 +466,7 @@ test("fit takes the height from the content and leaves the width alone", async (
 test("a board that ends in its own padding is fitted exactly, with no margin to scroll", async () => {
 	const { tool, hold, deck, extents, write, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	write("canvases/ada/cards/page/index.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board"><div class="doc" data-id="doc"></div></body>`);
-	const page = deck.board("canvases/ada/cards/page/index.html");
+	const page = deck.card("canvases/ada/cards/page/index.html");
 	assert.ok(page);
 	extents.set("canvases/ada/cards/page/index.html", { rev: page!.rev, w: 956, h: 604, page: 604 });
 
@@ -476,20 +476,20 @@ test("a board that ends in its own padding is fitted exactly, with no margin to 
 	// two are the pair that has to agree. 604 + a margin is the document that scrolled.
 	assert.match(read("canvases/ada/cards/page/index.html"), /"h":604/, "the measurement, and nothing added to it");
 	// A reading whose page is shorter than its height (from an older frame) still gets the margin.
-	const plan = deck.board(PLAN);
+	const plan = deck.card(PLAN);
 	extents.set(PLAN, { rev: plan!.rev, w: 700, h: 1400, page: 900 });
 	hold(PLAN);
 	await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
-	assert.equal(deck.board(PLAN)?.h, 1448);
+	assert.equal(deck.card(PLAN)?.h, 1448);
 	cleanup();
 });
 
 /*
- * A view taller than the board is cut, and the check was measuring it against the width.
+ * A view taller than the card is cut, and the check was measuring it against the width.
  *
- * A board's height is measured in the view it opens on, so a tab 125px taller than the board
- * loses its last lines. The old limit was 0.8 of the board's *width*, which on a 1000px board
- * is 800px: a 667px view on a 542px board passed, and the reader saw it cut.
+ * A card's height is measured in the view it opens on, so a tab 125px taller than the card
+ * loses its last lines. The old limit was 0.8 of the card's *width*, which on a 1000px card
+ * is 800px: a 667px view on a 542px card passed, and the reader saw it cut.
  */
 test("fit says when a view is taller than the board, not only when it is long", async () => {
 	const { tool, hold, extents, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 }, {
@@ -498,8 +498,8 @@ test("fit says when a view is taller than the board, not only when it is long", 
 		views: [{ label: "Where it lives", h: 667, overflowX: 0 }],
 		errors: [],
 	});
-	const board = deck.board(PLAN);
-	extents.set(PLAN, { rev: board!.rev, w: 956, h: 542, words: 120 });
+	const card = deck.card(PLAN);
+	extents.set(PLAN, { rev: card!.rev, w: 956, h: 542, words: 120 });
 
 	hold(PLAN);
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
@@ -510,30 +510,30 @@ test("fit says when a view is taller than the board, not only when it is long", 
 
 test("fit still grows the height past a board its content has outgrown", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const board = deck.board(PLAN);
-	extents.set(PLAN, { rev: board!.rev, w: 1300, h: 600 });
+	const card = deck.card(PLAN);
+	extents.set(PLAN, { rev: card!.rev, w: 1300, h: 600 });
 
 	hold(PLAN);
 	await runCode(tool, `return await stage.canvas.fit("${PLAN}", { margin: 0 })`);
-	assert.equal(deck.board(PLAN)?.w, 1000, "the width is not what grew");
-	assert.equal(deck.board(PLAN)?.h, 600);
+	assert.equal(deck.card(PLAN)?.w, 1000, "the width is not what grew");
+	assert.equal(deck.card(PLAN)?.h, 600);
 	cleanup();
 });
 
 /*
- * And a wide board stays wide: the width is the author's, and a fit is not the place to disagree
- * with it silently. Nothing is said about it either — a note on every fit of a wide board is a
+ * And a wide card stays wide: the width is the author's, and a fit is not the place to disagree
+ * with it silently. Nothing is said about it either — a note on every fit of a wide card is a
  * note nobody reads, and narrowing is the person's or `canvas.update`'s job.
  */
 test("a fit of a wide board leaves it wide and says nothing about width", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const board = deck.board(PLAN);
-	extents.set(PLAN, { rev: board!.rev, w: 1900, h: 600 });
+	const card = deck.card(PLAN);
+	extents.set(PLAN, { rev: card!.rev, w: 1900, h: 600 });
 
 	hold(PLAN);
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { margin: 0 })`);
-	assert.equal(deck.board(PLAN)?.w, 1000, "the width the board has, not the content's");
-	assert.equal(deck.board(PLAN)?.h, 600);
+	assert.equal(deck.card(PLAN)?.w, 1000, "the width the board has, not the content's");
+	assert.equal(deck.card(PLAN)?.h, 600);
 	assert.equal(/came out \d+ wide/.test(result.text), false, result.text);
 	cleanup();
 });
@@ -642,11 +642,11 @@ test("the stage object has exactly the verbs in the table, and no old name", asy
 	try {
 		for (const verb of VERBS) {
 			const path = verb.name.split(".");
-			let owner: unknown = tool.stage;
+			let owner: unknown = tool.verbs;
 			for (const key of path.slice(0, -1)) owner = (owner as Record<string, unknown>)[key];
 			assert.equal(typeof (owner as Record<string, unknown>)[path.at(-1)!], "function", `${verb.name} is in the table but not on the stage`);
 		}
-		// And the other way round: every function on the stage is a verb in the table.
+		// And the other way round: every function on the canvas is a verb in the table.
 		const names = new Set(VERBS.map((verb) => verb.name));
 		const walk = (owner: Record<string, unknown>, prefix: string): void => {
 			for (const [key, value] of Object.entries(owner)) {
@@ -654,7 +654,7 @@ test("the stage object has exactly the verbs in the table, and no old name", asy
 				else if (value && typeof value === "object") walk(value as Record<string, unknown>, `${prefix + key}.`);
 			}
 		};
-		walk(tool.stage as unknown as Record<string, unknown>, "");
+		walk(tool.verbs as unknown as Record<string, unknown>, "");
 		// An old name is refused with what to call now.
 		const old = await tool.call("newBoard", [{ title: "x" }]);
 		assert.equal(old.ok, false);
@@ -680,15 +680,15 @@ test("agent.update writes a patch and says what was stored; agent.me reads it", 
 });
 
 /*
- * `fit` says what the browser read, so an agent can tell whether a board is one screen
- * without taking a picture of it. Only what is over is named; a board inside every limit
+ * `fit` says what the browser read, so an agent can tell whether a card is one screen
+ * without taking a picture of it. Only what is over is named; a card inside every limit
  * gets its numbers and is told there is nothing to fix.
  */
 test("fit reports the height, the words, the smallest type and any spill, and names only what is over", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	const board = deck.refresh(PLAN);
+	const card = deck.refresh(PLAN);
 
-	extents.set(PLAN, { rev: board!.rev, w: 1000, h: 600, words: 130, minFont: 15 });
+	extents.set(PLAN, { rev: card!.rev, w: 1000, h: 600, words: 130, minFont: 15 });
 	hold(PLAN);
 	const fine = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.match(fine.text, /One screen: 600 px tall, 130 words, smallest text 15px\. Nothing to fix\./);
@@ -708,7 +708,7 @@ test("a move is written on the canvas of the caller, not on whichever chat is op
 	const result = await tool.gesture("move", [PLAN, { x: 40, y: 80 }]);
 	assert.equal(result.ok, true, result.error);
 	// `a1` is this tool's own. It used to be whoever the browser last acted on, so a move on one
-	// canvas moved the board on somebody else's and left its own where it was.
+	// canvas moved the card on somebody else's and left its own where it was.
 	assert.deepEqual(moved, [{ agentId: "a1", path: PLAN, x: 40, y: 80 }]);
 	cleanup();
 });
@@ -722,7 +722,7 @@ test("a person's hide takes off only what it names", async () => {
 	}
 	const deck = Deck.open(root);
 	const service = new CanvasService(deck, {
-		writeBoard: () => {
+		writeCard: () => {
 			throw new Error("not used here");
 		},
 		extent: () => undefined,
@@ -736,7 +736,7 @@ test("a person's hide takes off only what it names", async () => {
 	let up: string[] = ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html", "canvases/t/cards/c/index.html"];
 	let held: string[] = [];
 	const tool = createDecksTool({
-		stage: service,
+		canvas: service,
 		port: 4329,
 		agent: {
 			id: "a1",
@@ -755,7 +755,7 @@ test("a person's hide takes off only what it names", async () => {
 			send: () => ({ queued: true, position: 1 }),
 			queue: () => [],
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 	});
 
@@ -780,7 +780,7 @@ test("the person's drawing edit is pen's own words, answers with boxes, and canv
 		assert.equal(edited.ok, true, edited.error);
 		const answer = edited.value as { results: Array<{ id: string; box?: { x1: number; x2: number } }> };
 		assert.deepEqual(answer.results[0]!.box, { x1: 1060, y1: 0, x2: 1300, y2: 120 });
-		// The arrow to the board was drawn: the board is where the deck's own list has it.
+		// The arrow to the card was drawn: the card is where the deck's own list has it.
 		assert.ok(answer.results[1]!.box, "the arrow has a box once it is routed");
 		const read = JSON.parse((await runCode(tool, `return await stage.canvas.read()`)).text) as { canvas: string; items: Array<{ id: string }> };
 		assert.equal(read.canvas, "ada");
@@ -796,7 +796,7 @@ test("the person's drawing edit is pen's own words, answers with boxes, and canv
 });
 
 /**
- * `view.focus` on a **drawn item**: what travels is the box, measured off the stage's layout here,
+ * `view.focus` on a **drawn item**: what travels is the box, measured off the canvas's layout here,
  * because the browser paints the drawing on a canvas and has no node to look an id up in.
  */
 test("view.focus takes a drawn item's id and sends the browser its box", async () => {

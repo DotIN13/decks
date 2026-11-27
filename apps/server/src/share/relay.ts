@@ -6,7 +6,7 @@ import type { Request, Response } from "express";
 /**
  * Another Decks server, passed through this one, for a page that has no service worker.
  *
- * A board's page has to come from the app's own address (`web/src/connections`). On HTTPS or
+ * A card's page has to come from the app's own address (`web/src/connections`). On HTTPS or
  * localhost the service worker does that in the browser; on a plain `http://` address on a network
  * the browser has no service workers, so this server does it instead: the page tells it which
  * server `/c/<id>/` stands for, with that server's token, and every request under the prefix is

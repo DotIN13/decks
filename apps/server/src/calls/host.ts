@@ -15,8 +15,8 @@ import type { CanvasService } from "../canvas/service.ts";
 export interface CallsHost {
 	deck: Deck;
 	readonly agents: Registry;
-	readonly stage: CanvasService;
-	readonly boards: CardService;
+	readonly canvas: CanvasService;
+	readonly cards: CardService;
 	readonly cameras: Cameras;
 	readonly apps: Apps;
 	/** The apps the person lets call for good, and the ones let until the harness restarts. */

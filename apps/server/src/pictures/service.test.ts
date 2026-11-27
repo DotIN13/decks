@@ -263,8 +263,8 @@ test("what stands in for a picture: this revision at the nearest size, else the 
 test("a whole picture somebody asks for is taken before the background's small ones", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const boards = ["a", "b", "c", "d"].map((n) => board(`boards/${n}.html`));
-	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
+	const cards = ["a", "b", "c", "d"].map((n) => board(`boards/${n}.html`));
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, cards: () => cards }, async () => chrome.browser);
 	const sweep = thumbs.index();
 	await tick();
 	const asked = thumbs.picture(board("boards/z.html"), "light", "whole");
@@ -282,8 +282,8 @@ test("a whole picture somebody asks for is taken before the background's small o
 test("the indexer takes every board's small pictures, not its whole one, and says how far it has got", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const boards = [board("boards/a.html"), board("boards/b.html"), board("boards/c.html")];
-	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
+	const cards = [board("boards/a.html"), board("boards/b.html"), board("boards/c.html")];
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, cards: () => cards }, async () => chrome.browser);
 	assert.deepEqual(thumbs.progress(), { total: 3, ready: 0, working: false, failed: 0 });
 	const sweep = thumbs.index();
 	await tick();
@@ -295,7 +295,7 @@ test("the indexer takes every board's small pictures, not its whole one, and say
 	for (let i = 0; i < 20 && !done; i++) await chrome.release();
 	await sweep;
 	assert.deepEqual(thumbs.progress(), { total: 3, ready: 3, working: false, failed: 0 });
-	for (const one of boards) {
+	for (const one of cards) {
 		const whole = thumbName(one.path, one.rev, "light", "whole");
 		assert.ok(!existsSync(join(dir, whole)), `${one.path} has no whole picture until one is asked for`);
 		assert.ok(existsSync(join(dir, thumbName(one.path, one.rev, "light", "small"))), `${one.path} has its 480 px picture`);

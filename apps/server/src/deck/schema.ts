@@ -1,4 +1,4 @@
-import { oldBoardPlaces } from "./old-shapes.ts";
+import { oldCardPlaces } from "./old-shapes.ts";
 import type { Root } from "@decks/protocol";
 
 /**
@@ -9,10 +9,10 @@ import type { Root } from "@decks/protocol";
 default and a warning, never a refusal to open the deck — and writing preserves keys we do not know
  * about.
  *
- * **It holds no board state.** A place belongs to a stage (`AgentRecord.positions`), a size belongs
- * to the board's own file, and this app never writes this file at all: what is left is the deck's
+ * **It holds no card state.** A place belongs to a canvas (`AgentRecord.positions`), a size belongs
+ * to the card's own file, and this app never writes this file at all: what is left is the deck's
  * name and the roots its embeds may reach. A `boards` map from an older build is still read — for
- * the arrangement, which seeds a stage — and is not written back.
+ * the arrangement, which seeds a canvas — and is not written back.
  */
 export interface DeckFile {
 	version: 1;
@@ -28,10 +28,10 @@ interface ParsedDeckFile {
 	/**
 	 * The arrangement an older `boards` map held, kept as a **seed** rather than as state.
 	 *
-	 * Where a board sits belongs to a stage now, so this is never written back and never read after
-	 * the first send. It is the place a conversation that has not moved that board starts from, so a
+	 * Where a card sits belongs to a canvas now, so this is never written back and never read after
+	 * the first send. It is the place a conversation that has not moved that card starts from, so a
 	 * deck somebody laid out by hand does not open in rows of three the day the map stops being
-	 * authoritative. The stage records whatever it is handed, and the map is gone from the file on
+	 * authoritative. The canvas records whatever it is handed, and the map is gone from the file on
 	 * the next write — which is what makes this a migration rather than a second source of truth.
 	 */
 	arrangement: Record<string, { x: number; y: number }>;
@@ -41,10 +41,10 @@ interface ParsedDeckFile {
 /**
  * The keys this build understands.
  *
- * `boards` and `sizes` are here and not on `DeckFile`: both are names an older build wrote for board
+ * `boards` and `sizes` are here and not on `DeckFile`: both are names an older build wrote for card
  * state, and both are consumed so a write drops them rather than carrying them forward forever. A
- * `boards` map still gives up its `x`/`y` as the arrangement a stage is seeded from; its `w`/`h`, and
- * everything under `sizes`, are ignored — a size is the board file's business.
+ * `boards` map still gives up its `x`/`y` as the arrangement a canvas is seeded from; its `w`/`h`, and
+ * everything under `sizes`, are ignored — a size is the card file's business.
  */
 const KNOWN = new Set(["version", "name", "boards", "sizes", "roots"]);
 
@@ -72,7 +72,7 @@ export function parseDeckFile(text: string, options: { oldPlaces?: boolean } = {
 	}
 
 	// And the places an older `boards` map held, a seed rather than state: in a deck old enough to hold one (`old-shapes.ts`).
-	const arrangement = options.oldPlaces === false ? {} : oldBoardPlaces(source.boards, normalizeBoardPath, warnings);
+	const arrangement = options.oldPlaces === false ? {} : oldCardPlaces(source.boards, normalizeCardPath, warnings);
 
 	if (source.roots !== undefined) {
 		if (Array.isArray(source.roots)) file.roots = source.roots as DeckFile["roots"];
@@ -86,8 +86,8 @@ export function parseDeckFile(text: string, options: { oldPlaces?: boolean } = {
 	return { file, arrangement, warnings };
 }
 
-/** Forward slashes everywhere, no leading "./", so one board has one key. */
-export function normalizeBoardPath(path: string): string {
+/** Forward slashes everywhere, no leading "./", so one card has one key. */
+export function normalizeCardPath(path: string): string {
 	return path.split("\\").join("/").replace(/^\.\//, "");
 }
 
@@ -95,7 +95,7 @@ export function serializeDeckFile(file: DeckFile): string {
 	// version first, then the parts a human scans for, then whatever else was
 	// in the file — key order is the only formatting a JSON file has.
 	// `boards` and `sizes` are destructured only to be dropped: `boards` is the older name for the
-	// arrangement, and a size is the board file's own business now, so neither is carried forward.
+	// arrangement, and a size is the card file's own business now, so neither is carried forward.
 	const { version, name, roots, boards: _legacy, sizes: _sizes, ...rest } = file;
 	const ordered: Record<string, unknown> = { version: version ?? 1 };
 	if (name !== undefined) ordered.name = name;

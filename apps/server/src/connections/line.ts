@@ -238,7 +238,7 @@ export class Line {
 					return;
 				}
 				if (message.type === "card.seen") {
-					this.app.boards.seen(message.path);
+					this.app.cards.seen(message.path);
 					return;
 				}
 				const num = (key: string) => (typeof message[key] === "number" && Number.isFinite(message[key]) ? (message[key] as number) : undefined);
@@ -254,7 +254,7 @@ export class Line {
 					const value = num(key);
 					if (value !== undefined) extra[key] = value;
 				}
-				this.app.boards.noteExtent(message.path, { rev, w, h, ...extra });
+				this.app.cards.noteExtent(message.path, { rev, w, h, ...extra });
 				return;
 			}
 			case "presence.set": {

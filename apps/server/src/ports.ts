@@ -6,7 +6,7 @@ import type { Duplex } from "node:stream";
 
 /**
  * Port forwarding, the way Open OnDemand does it: a server running on this machine is reached
- * through Decks' own address, so a board can show it in a frame.
+ * through Decks' own address, so a card can show it in a frame.
  *
  * - `/node/localhost/<port>/…` sends the path on **as it came**, for a server told it lives
  *   under that base path (VS Code's `--server-base-path`, Jupyter's `base_url`).

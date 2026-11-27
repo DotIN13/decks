@@ -2,7 +2,7 @@
  * Who is calling the harness: what a token says, and the only thing that says it (`tokens.ts`).
  *
  * Every request to the harness carries a token, and who is calling comes from that token alone. A
- * header that names the person, a board, an app or an agent says nothing about who sent it; nor
+ * header that names the person, a card, an app or an agent says nothing about who sent it; nor
  * does reaching the harness from this machine, or from a page on its own address. So identity is
  * one of these, read off a token by `TokenStore.verify`, and attached to the request by the gate
  * (`guard.ts`) as `req.principal`.

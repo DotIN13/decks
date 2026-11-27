@@ -10,14 +10,14 @@ import { inCall, verbContext } from "./context.ts";
  */
 test("two calls at once keep their own canvas and their own notes", async () => {
 	const ctx = verbContext({
-		stage: { pens: { has: () => true } } as never,
-		agent: { id: "person", person: true, stageName: () => "home" } as never,
+		canvas: { pens: { has: () => true } } as never,
+		agent: { id: "person", person: true, canvasName: () => "home" } as never,
 		port: 0,
 	});
-	const call = (stage: string, wait: number) =>
-		inCall(stage, async (frame) => {
+	const call = (canvas: string, wait: number) =>
+		inCall(canvas, async (frame) => {
 			await sleep(wait);
-			ctx.notes.push(`said on ${stage}`);
+			ctx.notes.push(`said on ${canvas}`);
 			const before = ctx.hereCanvas();
 			await sleep(5);
 			return { before, after: ctx.hereCanvas(), notes: [...frame.notes] };

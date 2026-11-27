@@ -37,7 +37,7 @@ test("changedBlocks: the blocks whose markup differs, and the new ones", () => {
 });
 
 /*
- * A board is one flowing page, so its named blocks sit inside its `.doc`: a change inside one is
+ * A card is one flowing page, so its named blocks sit inside its `.doc`: a change inside one is
  * that block's, and a change to the page around them is the page's.
  */
 const page = (card: string, line: string) => board(`<div class="doc" data-id="doc"><h1>T</h1><p>${line}</p><div class="grid"><section class="card" data-id="cost">${card}</section></div></div>`);
@@ -48,7 +48,7 @@ test("named blocks inside the page are found at any depth", () => {
 	assert.deepEqual(changedBlocks(page("12", "a"), page("13", "b")), ["doc", "cost"]);
 	assert.equal(blockAt(page("12", "a"), "12"), "cost", "the innermost block the text is in");
 	assert.equal(blockAt(page("12", "a"), "<p>a</p>"), "doc");
-	// No names at all: nothing to outline, so the whole board is marked.
+	// No names at all: nothing to outline, so the whole card is marked.
 	const bare = (line: string) => board(`<div class="doc"><p>${line}</p></div>`);
 	assert.deepEqual(changedBlocks(bare("a"), bare("b")), []);
 });
@@ -60,7 +60,7 @@ function host(files: Record<string, string>) {
 	const acts = new Acts({
 		emit: (message) => sent.push(message),
 		identity: (id) => (id === "gone" ? undefined : { name: `Agent ${id}`, color: "#123456" }),
-		boardPathOf: (file) => (file.startsWith("/deck/") && files[file.slice(6)] !== undefined ? file.slice(6) : undefined),
+		cardPathOf: (file) => (file.startsWith("/deck/") && files[file.slice(6)] !== undefined ? file.slice(6) : undefined),
 		read: (path) => files[path],
 		schedule: (ms, run) => {
 			const timer = { ms, run, live: true };
@@ -155,8 +155,8 @@ test("a second tool call on the same board replaces the first hold", () => {
 
 test("a drawing edit says which items it touched and their boxes on the stage, and an edit with none says nothing", () => {
 	const h = host({});
-	h.acts.act("a1", { kind: "draw", stage: "main", ids: ["note-1"], boxes: [{ x1: 10, y1: 20, x2: 110, y2: 80 }] });
+	h.acts.act("a1", { kind: "draw", canvas: "main", ids: ["note-1"], boxes: [{ x1: 10, y1: 20, x2: 110, y2: 80 }] });
 	assert.deepEqual(h.acted(), [{ type: "agent.act", agentId: "a1", path: "canvases/main/canvas.pen", phase: "done", what: "draw", ids: ["note-1"], boxes: [{ x1: 10, y1: 20, x2: 110, y2: 80 }], label: "Agent a1", color: "#123456", at: 1000 }]);
-	h.acts.act("a1", { kind: "draw", stage: "main", ids: [], boxes: [] });
+	h.acts.act("a1", { kind: "draw", canvas: "main", ids: [], boxes: [] });
 	assert.equal(h.acted().length, 1);
 });

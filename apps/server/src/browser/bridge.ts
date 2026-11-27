@@ -12,9 +12,9 @@
  * - **The pairing code is checked at the upgrade.** A socket without it is refused before a
  *   single command; the code lives in `<dataDir>/web-bridge.json` and is shown to the user
  *   once, to paste into the extension.
- * - **Submitting asks first.** `submit` parks a question on the status board and waits for
+ * - **Submitting asks first.** `submit` parks a question on the status card and waits for
  *   the user's Allow; an agent can only skip that when the user has said it may.
- * - **Nothing is streamed back.** The tab is in the user's Chrome, so the board for it is a
+ * - **Nothing is streamed back.** The tab is in the user's Chrome, so the card for it is a
  *   status card (`lib/live-web.js`): which tab, connected or not, what the agent did.
  */
 import { randomBytes, randomUUID } from "node:crypto";
@@ -247,7 +247,7 @@ export class WebBridge {
 		this.wss.close();
 	}
 
-	// --- what the board shows ---------------------------------------------------------
+	// --- what the card shows ---------------------------------------------------------
 
 	status(): WebStatus {
 		const tabs = (this.relay?.tabs() ?? []).map((tab) => ({ title: (tab.url && this.titles.get(tab.url)) || tab.title || "", url: tab.url ?? "" }));
@@ -262,7 +262,7 @@ export class WebBridge {
 		};
 	}
 
-	/** The user's answer to a pending submit, from the status board. */
+	/** The user's answer to a pending submit, from the status card. */
 	answer(id: string, ok: boolean): boolean {
 		if (!this.pending || this.pending.id !== id) return false;
 		this.settle(ok);
@@ -389,8 +389,8 @@ export class WebBridge {
 	 *
 	 * The one thing `read` cannot give: what is actually on screen — a thumbnail, a chart, a
 	 * layout that the accessibility tree flattens. PNG, the viewport by default or the whole
-	 * page with `full`, saved under the data directory and handed back as bytes so the stage
-	 * tool can put it in the result the agent reads. Nothing goes to the board: the tab is on
+	 * page with `full`, saved under the data directory and handed back as bytes so the canvas
+	 * tool can put it in the result the agent reads. Nothing goes to the card: the tab is on
 	 * the user's own screen, and the picture is for the agent.
 	 *
 	 * Chrome only paints a tab it is showing. A tab in the background of its window, or on
@@ -592,7 +592,7 @@ export class WebBridge {
 	/**
 	 * Submit: press the named button, or Enter, **after the user allows it**.
 	 *
-	 * The question goes on the status board with Allow and Deny; the answer comes back as
+	 * The question goes on the status card with Allow and Deny; the answer comes back as
 	 * `web.answer`. Two minutes with no answer is a refusal. `ask: false` skips the question
 	 * and is for when the user has said, for this site, that they do not want to be asked.
 	 */

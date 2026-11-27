@@ -29,7 +29,7 @@ async function open() {
 	writeFileSync(join(shared, "cards", "chart", "index.html"), `<title>Chart</title><meta name="card" content='{"w":400}' /><p>Chart</p><script>document.title = "ran"</script>`);
 	writeFileSync(join(shared, "canvas.pen"), JSON.stringify({ version: "2.8", children: [{ type: "browser", id: "chart", name: "Chart", url: "cards/chart/index.html", x: 0, y: 0, width: 400, height: 300, metadata: { type: "decks.card", path: "cards/chart/index.html" } }] }));
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
-	const pens = app.stage.pens!;
+	const pens = app.canvas.pens!;
 	const one = pens.claim("One");
 	const two = pens.claim("Two");
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
@@ -140,8 +140,8 @@ test("a path out of the source canvas's folder refuses the paste, and nothing is
 	const { app, deck, one, two, call, must, frame, items, cleanup } = await open();
 	try {
 		for (const url of ["../../../../etc/passwd", "/etc/passwd", `../${two}/files/x.png`]) {
-			app.stage.pens!.edit(one, [{ op: "insert", node: { type: "rectangle", id: `bad${n++}`, x: 0, y: 0, width: 10, height: 10, fill: { type: "image", url, mode: "fill" } } as never }]);
-			const bad = app.stage.pens!.get(one).doc.children.at(-1)!.id;
+			app.canvas.pens!.edit(one, [{ op: "insert", node: { type: "rectangle", id: `bad${n++}`, x: 0, y: 0, width: 10, height: 10, fill: { type: "image", url, mode: "fill" } } as never }]);
+			const bad = app.canvas.pens!.get(one).doc.children.at(-1)!.id;
 			const id = fresh();
 			await must("canvas.clip", [[bad], { id }], frame(one));
 			const refused = await call("canvas.paste", [{ v: 1, id, canvas: one }, { at: { x: 0, y: 0 } }], frame(two));
@@ -170,7 +170,7 @@ test("a copy the harness does not hold, or from a canvas the caller cannot read,
 		await must("canvas.clip", [["n"], { id }], frame(one));
 		const mismatch = await call("canvas.paste", [{ v: 1, id, canvas: two }, {}], frame(two));
 		assert.equal(mismatch.ok, false, "the clip says another canvas");
-		app.stage.pens!.remove(one);
+		app.canvas.pens!.remove(one);
 		const gone = await call("canvas.paste", [{ v: 1, id, canvas: one }, {}], frame(two));
 		assert.equal(gone.ok, false);
 		assert.match(gone.error ?? "", /not one you can read/);

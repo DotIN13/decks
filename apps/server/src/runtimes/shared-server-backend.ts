@@ -129,7 +129,7 @@ export abstract class SharedServerBackend implements AgentBackend {
 		if (this.closed) return;
 		this.closed = true;
 		this.streamingNow = false;
-		this.context.stageBridge?.unregisterSession(this.sessionId);
+		this.context.canvasBridge?.unregisterSession(this.sessionId);
 		this.sessionId = undefined;
 		this.context.translator.setState("idle");
 		this.context.notice("error", `${this.runtimeName} exited. This chat needs restarting.`);
@@ -349,7 +349,7 @@ export abstract class SharedServerBackend implements AgentBackend {
 
 	/**
 	 * Go back to just before a message, in place: the session keeps its id and the chat its place
-	 * on the shared server. The boards are left to Decks' own revisions, as on every runtime.
+	 * on the shared server. The cards are left to Decks' own revisions, as on every runtime.
 	 */
 	async rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }> {
 		if (!this.sessionId) return { cancelled: true };
@@ -379,7 +379,7 @@ export abstract class SharedServerBackend implements AgentBackend {
 		this.unwatchDeath = undefined;
 		// The session stops answering the moment the agent goes: a tool call that arrives on its
 		// tail is refused rather than run against a chat that is being torn down.
-		this.context.stageBridge?.unregisterSession(this.sessionId);
+		this.context.canvasBridge?.unregisterSession(this.sessionId);
 		// The server itself is not this agent's to kill: the manager counts and the last one out
 		// stops it. Released even when the server already died under this agent; a claim against a
 		// dead server is a no-op by the time it surfaces.

@@ -4,24 +4,24 @@ import type { DefaultTreeAdapterMap } from "parse5";
 import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
 
 /**
- * What an agent is doing to a board, said by the server rather than the agent.
+ * What an agent is doing to a card, said by the server rather than the agent.
  *
  * The canvas draws a cursor and editing marks for an agent at work (`canvas/acts.ts`), and it
  * used to have one source for where to draw them: `stage.cursor`, which an agent had to call
  * itself, and almost never did. Everything the drawing needs is already passing through here:
  *
- * - **A tool call starts.** A write or edit tool naming a file under `boards/` says which board
+ * - **A tool call starts.** A write or edit tool naming a file under `boards/` says which card
  *   is about to change. For an edit, the old text it names is looked for in the file as it is
  *   now, and the innermost named block it sits in is the one being held.
- * - **The file lands.** The watcher says the board changed; the file as it was when the tool
+ * - **The file lands.** The watcher says the card changed; the file as it was when the tool
  *   call started is diffed against the new one by `data-id`, at any depth, and the blocks whose
- *   own markup differs are what changed. A board with no names is marked whole.
+ *   own markup differs are what changed. A card with no names is marked whole.
  * - **A canvas call.** `decks.card.create`, `decks.canvas.fit`, and `decks.canvas.insert`,
- *   `update`, `move` or `delete` on a board name a board and need no diff.
+ *   `update`, `move` or `delete` on a card name a card and need no diff.
  *
  * Two phases go out: `start` when the tool call begins, so the held outline can be drawn
  * while the agent writes, and `done` when the file lands or the tool ends without a landing.
- * One message per tool call, never per keystroke, and nothing here writes a byte to a board.
+ * One message per tool call, never per keystroke, and nothing here writes a byte to a card.
  *
  * The file diff is by named block rather than by character on purpose: the canvas can only
  * outline a block, and a character diff of two HTML documents would be a lot of work to answer
@@ -39,18 +39,18 @@ export interface ToolEvent {
 }
 
 /**
- * `draw` is an edit to a stage's drawing (`decks.canvas.batch`): the items it touched and their boxes
- * on the stage, which the server already has, so the canvas outlines them without a lookup.
+ * `draw` is an edit to a canvas's drawing (`decks.canvas.batch`): the items it touched and their boxes
+ * on the canvas, which the server already has, so the canvas outlines them without a lookup.
  */
-export type Act = { kind: "tool"; event: ToolEvent } | { kind: "verb"; what: ActKind; path: string } | { kind: "draw"; stage: string; ids: string[]; boxes: ActBox[] };
+export type Act = { kind: "tool"; event: ToolEvent } | { kind: "verb"; what: ActKind; path: string } | { kind: "draw"; canvas: string; ids: string[]; boxes: ActBox[] };
 
 interface ActsHost {
 	emit(message: ServerMessage): void;
 	/** The agent's name and colour for the label; absent for an agent that is gone. */
 	identity(agentId: string): { name: string; color: string } | undefined;
-	/** Deck-relative path for a file, or undefined when it is not a board the deck knows. */
-	boardPathOf(file: string): string | undefined;
-	/** The board's bytes as they are now, or undefined when it cannot be read. */
+	/** Deck-relative path for a file, or undefined when it is not a card the deck knows. */
+	cardPathOf(file: string): string | undefined;
+	/** The card's bytes as they are now, or undefined when it cannot be read. */
 	read(path: string): string | undefined;
 	/** A timer, so a test can fire it by hand. Answers with what cancels it. */
 	schedule?(ms: number, run: () => void): () => void;
@@ -61,7 +61,7 @@ interface ActsHost {
 export const END_GRACE_MS = 2500;
 /** A tool call that never ends — a runtime that lost the result — still lets go after this. */
 export const HOLD_LIMIT_MS = 30_000;
-/** More than this many changed blocks is a rewrite: the outline goes on the board, not on each. */
+/** More than this many changed blocks is a rewrite: the outline goes on the card, not on each. */
 export const MAX_IDS = 12;
 
 interface Pending {
@@ -72,7 +72,7 @@ interface Pending {
 }
 
 export class Acts {
-	/** One hold per board: a second tool call on the same file replaces the first. */
+	/** One hold per card: a second tool call on the same file replaces the first. */
 	private readonly pending = new Map<string, Pending>();
 
 	constructor(private readonly host: ActsHost) {}
@@ -84,13 +84,13 @@ export class Acts {
 		}
 		if (act.kind === "draw") {
 			if (act.boxes.length === 0) return;
-			this.say(agentId, canvasFile(act.stage), "done", "draw", act.ids.slice(0, MAX_IDS), act.boxes.slice(0, MAX_IDS));
+			this.say(agentId, canvasFile(act.canvas), "done", "draw", act.ids.slice(0, MAX_IDS), act.boxes.slice(0, MAX_IDS));
 			return;
 		}
 		const { event } = act;
 		const file = fileNamed(event.name, event.args);
 		if (!file) return;
-		const path = this.host.boardPathOf(file);
+		const path = this.host.cardPathOf(file);
 		if (!path) return;
 		if (event.phase === "start") {
 			this.let(path);
@@ -109,7 +109,7 @@ export class Acts {
 		held.cancel = this.later(END_GRACE_MS, () => this.finish(path, agentId, event.callId));
 	}
 
-	/** The watcher saw the board change: whoever held it is done, and the diff says with what. */
+	/** The watcher saw the card change: whoever held it is done, and the diff says with what. */
 	landed(path: string, html: string): void {
 		const held = this.pending.get(path);
 		if (!held) return;
@@ -184,7 +184,7 @@ function oldText(args: unknown): string | undefined {
 }
 
 /**
- * Every named block of a board (an element with a `data-id`, at any depth), in document order.
+ * Every named block of a card (an element with a `data-id`, at any depth), in document order.
  *
  * `own` is the block's markup with each named block inside it cut out, so a change inside a named
  * child is that child's change and not also its parent's; `start` and `end` are where it sits in
@@ -266,10 +266,10 @@ export function blockAt(html: string, text: string): string | undefined {
 }
 
 /**
- * The named blocks whose own markup differs between two versions of a board, plus the ones that
+ * The named blocks whose own markup differs between two versions of a card, plus the ones that
  * are new. A block that was removed has nowhere to be drawn, so it is not named. A change inside a
- * named block is that block's, not its parent's too. A board with no named blocks gives none, and
- * the mark falls back to the whole board.
+ * named block is that block's, not its parent's too. A card with no named blocks gives none, and
+ * the mark falls back to the whole card.
  */
 export function changedBlocks(before: string, after: string): string[] {
 	const was = namedBlocks(before);

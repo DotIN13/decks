@@ -21,7 +21,7 @@ import { fromSharedCanvas } from "./old-records.ts";
  * Which agents exist, and which one the browser is looking at.
  *
  * One agent in M2; the shape is already plural because M5 adds a chat list and
- * subagents, and because "the focused agent" is a question the stage asks on every
+ * subagents, and because "the focused agent" is a question the canvas asks on every
  * frame — it should not have to know whether there is one or ten.
  */
 const COLORS = ["#3b5cf6", "#2eaf5a", "#e7af36", "#623be2", "#d92e3c", "#0f9ba8"];
@@ -78,22 +78,22 @@ export class Registry {
 	constructor(
 		private deck: Deck,
 		private readonly emit: (message: ServerMessage) => void,
-		private readonly stage: CanvasService,
+		private readonly canvas: CanvasService,
 		private readonly host: {
 			port: number;
 			/** The runtime a new agent gets unless it asks for another one. */
 			defaultKind: AgentKind;
 			camera(agentId: string): Camera;
-			/** Say that a board was placed, so the deck state goes out before the canvas changes. */
+			/** Say that a card was placed, so the deck state goes out before the canvas changes. */
 			arranged?(): void;
 			/** Send the runtime list again: one of them reported a model catalogue. */
 			publishRuntimes?(): void;
 			recordRevision(path: string): string | undefined;
-			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
+			/** An agent said it wrote this card — the byline the gallery shows. Optional so a bare test host can omit it. */
 			wrote?(path: string, who: string): void;
-			/** An agent is acting on a board: the canvas draws its cursor and marks (`agents/acts.ts`). Optional like `wrote`. */
+			/** An agent is acting on a card: the canvas draws its cursor and marks (`agents/acts.ts`). Optional like `wrote`. */
 			act?(agentId: string, act: Act): void;
-			boardPathOf(file: string): string | undefined;
+			cardPathOf(file: string): string | undefined;
 			/** The Claude subscriptions this install can use, for the backends that can. */
 			accounts?: ClaudeAccountSwitcher;
 			/** Tell the browser the list moved, after a login or an automatic switch. */
@@ -144,7 +144,7 @@ export class Registry {
 	 * cost figure: an agent choosing who to hand work to should be choosing on what they are
 	 * doing and what they can do, not on which of them is cheaper.
 	 *
-	 * `context` is the twenty newest boards, not everything held. That is a cap, not a
+	 * `context` is the twenty newest cards, not everything held. That is a cap, not a
 	 * truncation: `holding` carries the true total, so a reader can tell a slice from the
 	 * whole before deciding whether to ask for more. And `kind` is the runtime, because it is
 	 * now load-bearing — whether the row you are handing to is a Claude one or an antigravity
@@ -176,8 +176,8 @@ export class Registry {
 				// who is in which, and `roster` for the aggregation.
 				workspace: agent.workspace,
 				queued: agent.turns.queued,
-				// The stage it has open, so `decks.canvas.list()` can say who is on each (`canvas/pens.ts`).
-				stage: agent.seat.stageName(),
+				// The canvas it has open, so `decks.canvas.list()` can say who is on each (`canvas/pens.ts`).
+				stage: agent.seat.canvasFolder(),
 				// The picture it drew, `/api/avatar/<id>?rev=…`, for another front end's agent rows (Studio).
 				...(chat.avatar ? { avatar: chat.avatar } : {}),
 				// An agent that works outside Decks: its app, when it last called, what waits for it.
@@ -262,7 +262,7 @@ export class Registry {
 				id: string;
 				context: string[];
 				inPlay: string[];
-				/** Where this conversation had put its boards: a stage's own arrangement. */
+				/** Where this conversation had put its cards: a canvas's own arrangement. */
 				positions?: Record<string, { x: number; y: number }>;
 				avatar?: string;
 				createdAt: number;
@@ -295,11 +295,11 @@ export class Registry {
 		const agent = new DeckAgent(
 			this.deck,
 			this.emit,
-			this.stage,
+			this.canvas,
 			{
 				port: this.host.port,
 				camera: (agentId: string) => this.host.camera(agentId),
-				// A board that was given a place: the browsers need the arrangement, not just the list.
+				// A card that was given a place: the browsers need the arrangement, not just the list.
 				arranged: () => this.host.arranged?.(),
 				runtimesChanged: () => this.host.publishRuntimes?.(),
 				agents: () => this.summaries(),
@@ -309,12 +309,12 @@ export class Registry {
 				create: (fromId, spec) => this.createFor(fromId, spec),
 			report: (agentId, text) => this.get(agentId)?.conversation.translator.notice("info", text),
 				queue: (agentId) => this.get(agentId)?.turns.queue() ?? [],
-				brief: (task, boards, person) => brief(task, boards, this.deck, person),
+				brief: (task, cards, person) => brief(task, cards, this.deck, person),
 				recordRevision: (path) => this.host.recordRevision(path),
 				wrote: (path, who) => this.host.wrote?.(path, who),
 				act: (agentId, act) => this.host.act?.(agentId, act),
 				working: (agentId, working) => this.working.set(agentId, working),
-				boardPathOf: (file) => this.host.boardPathOf(file),
+				cardPathOf: (file) => this.host.cardPathOf(file),
 			},
 			{
 				...options,
@@ -425,7 +425,7 @@ export class Registry {
 
 	/** A record from the shared-canvas days, made the chat's own (`old-records.ts`). */
 	private fromCanvas(record: AgentRecord): AgentRecord {
-		return fromSharedCanvas(record, this.deck.path, (path) => !!this.deck.board(path), (next) => this.store.writeRecord(next));
+		return fromSharedCanvas(record, this.deck.path, (path) => !!this.deck.card(path), (next) => this.store.writeRecord(next));
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {
@@ -457,7 +457,7 @@ export class Registry {
 	 *
 	 * `focused()` mints an agent on demand because a deck nobody has spoken to should still have a
 	 * row to speak *in* — right when somebody is about to talk to it, wrong for a read that only
-	 * wants to know where that conversation put its boards. A broadcast must not start a runtime as
+	 * wants to know where that conversation put its cards. A broadcast must not start a runtime as
 	 * a side effect of being sent, and "no stage" is a real answer: the deck's own auto-layout.
 	 *
 	 * `undefined` after a dispose and before the first agent on a fresh deck.
@@ -485,7 +485,7 @@ export class Registry {
 	 * Take an agent off the list.
 	 *
 	 * Refused while it is working: stopping a turn is `agent.abort`, and quietly killing a
-	 * session mid-reply loses whatever it was about to write to a board.
+	 * session mid-reply loses whatever it was about to write to a card.
 	 *
 	 * Children are kept and promoted rather than removed with the parent. A subagent's row
 	 * is the only place its transcript can be opened (the reason it is a row at all), so
@@ -558,12 +558,12 @@ export class Registry {
 	 * has a canvas, and a new agent then makes its own.
 	 */
 	latestCanvas(workspace: string | undefined, except?: string): string | undefined {
-		const pens = this.stage.pens;
+		const pens = this.canvas.pens;
 		if (!pens) return undefined;
 		const canvases = new Set<string>();
 		for (const one of this.agents) {
 			if (one.id === except || one.workspace !== workspace) continue;
-			const name = one.seat.stageName();
+			const name = one.seat.canvasFolder();
 			if (name) canvases.add(name);
 		}
 		let best: { name: string; at: number } | undefined;
@@ -618,8 +618,8 @@ export class Registry {
 		 * (the old send's { name, kind }), it joins its workspace's latest canvas on first use.
 		 */
 		// Where it starts is where it was made, not a move: nothing to tell it.
-		if (spec.canvas) made.seat.openStage(spec.canvas);
-		else if (spec.newCanvas && this.stage.pens) made.seat.newStage("");
+		if (spec.canvas) made.seat.openCanvas(spec.canvas);
+		else if (spec.newCanvas && this.canvas.pens) made.seat.newCanvas("");
 		this.publish();
 		const model = made.conversation.model;
 		const mode = made.conversation.mode;
@@ -629,7 +629,7 @@ export class Registry {
 			kind: made.kind,
 			...(model ? { model: `${model.provider}/${model.model}`, thinking: model.thinking } : spec.thinking ? { thinking: spec.thinking } : {}),
 			...(mode ? { mode } : {}),
-			...(made.seat.stageName() ? { canvas: made.seat.stageName()! } : {}),
+			...(made.seat.canvasFolder() ? { canvas: made.seat.canvasFolder()! } : {}),
 		};
 	}
 
@@ -641,7 +641,7 @@ export class Registry {
 	deliver(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
 		const from = this.sender(fromId);
 		const to = this.resolve(target);
-		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
+		const handed = (spec.boards ?? []).filter((path) => this.deck.card(path));
 		to.waits.asked();
 		const answer = to.turns.deliver({ ...from, task: spec.task.trim(), boards: handed, at: Date.now() });
 		this.publish();
@@ -659,7 +659,7 @@ export class Registry {
 	 * Put work in an existing agent's queue and return — the handover that does not block.
 	 *
 	 * The only handover there is. Waiting for an agent was `spawn`, and it could not work: a
-	 * stage run is abandoned after twenty seconds and a turn is minutes, so the report never
+	 * canvas run is abandoned after twenty seconds and a turn is minutes, so the report never
 	 * came back. This hands the work over and returns; `reply` is how the answer arrives.
 	 *
 	 * The target may be given as an id or as a name, because a model reading
@@ -671,10 +671,10 @@ export class Registry {
 		const from = this.sender(fromId);
 
 		const to = this.resolve(target);
-		// Only boards that exist, and no context change on the receiver: what it is holding is
+		// Only cards that exist, and no context change on the receiver: what it is holding is
 		// its own decision, and a sender that could rewrite it would be a sender that can take
 		// somebody's canvas away. The source rides in the briefing instead.
-		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
+		const handed = (spec.boards ?? []).filter((path) => this.deck.card(path));
 		to.waits.asked();
 		const position = to.turns.enqueue({
 			...from,
@@ -714,8 +714,8 @@ export class Registry {
 		this.snapshots.forget(id);
 	}
 
-	/** A board was deleted: no agent should still be holding it. */
-	boardRemoved(path: string): void {
+	/** A card was deleted: no agent should still be holding it. */
+	cardRemoved(path: string): void {
 		let touched = false;
 		for (const agent of this.agents) touched = agent.seat.forget(path) || touched;
 		if (touched) this.publish();
@@ -772,24 +772,24 @@ export class Registry {
 }
 
 /**
- * What the child is told, and why it is the whole board and not a summary.
+ * What the child is told, and why it is the whole card and not a summary.
  *
  * A briefing paraphrased by the parent is a second version of the plan, and the two
- * drift within a turn. The board source is the plan of record — the child reads the
+ * drift within a turn. The card source is the plan of record — the child reads the
  * same bytes the user is looking at, and reports by changing them.
  */
-export function brief(task: string, boards: string[], deck: Deck, person?: boolean): string {
+export function brief(task: string, cards: string[], deck: Deck, person?: boolean): string {
 	// A slash command the person handed over (a card's button they pressed): the exact line it is, with nothing after it for the runtime to take as its argument.
 	if (person && parseSlash(task)) return task.trim();
 	// When the work runs, not when it was queued: "since yesterday" is read against this.
 	const parts = [task.trim(), "", `It is now ${nowWords(Date.now(), processZone())}.`];
 
-	if (boards.length > 0) {
+	if (cards.length > 0) {
 		parts.push(
 			"",
-			`You have been handed ${boards.length === 1 ? "a card" : `${boards.length} cards`}. These are the plan of record: they are what the user is looking at, and reporting means updating them rather than only describing what you did.`,
+			`You have been handed ${cards.length === 1 ? "a card" : `${cards.length} cards`}. These are the plan of record: they are what the user is looking at, and reporting means updating them rather than only describing what you did.`,
 		);
-		for (const path of boards) {
+		for (const path of cards) {
 			try {
 				parts.push("", `## ${path}`, "", "```html", readFileSync(deck.fileOf(path), "utf8").trimEnd(), "```");
 			} catch (error) {

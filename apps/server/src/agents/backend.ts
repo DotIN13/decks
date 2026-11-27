@@ -39,7 +39,7 @@ export interface AgentBackendContext {
 	 * The agent behind the tool, for the parts of a backend that are not the tool itself: its id
 	 * (every runtime puts it in the shell's environment, `decksEnv`), and for Pi the revision a turn wrote.
 	 */
-	stageAgent: AgentHooks;
+	toolAgent: AgentHooks;
 	/**
 	 * The port Decks' own HTTP server is on.
 	 *
@@ -56,14 +56,14 @@ export interface AgentBackendContext {
 	 */
 	agentToken?: string;
 	/**
-	 * The stage bridge, for a runtime whose canvas tool is an HTTP call back here.
+	 * The canvas bridge, for a runtime whose canvas tool is an HTTP call back here.
 	 *
 	 * opencode shares one `opencode serve` across every opencode agent, so its tool cannot
 	 * carry a per-agent token any more — it sends the session id opencode gave it, and the
 	 * backend needs the bridge to bind that session to this agent (`canvas/bridge.ts`). The
 	 * in-process runtimes have no use for it and antigravity authenticates by token alone.
 	 */
-	stageBridge?: import("../canvas/bridge.ts").CanvasBridge;
+	canvasBridge?: import("../canvas/bridge.ts").CanvasBridge;
 	/** A session file to open instead of starting a new one — see `forkFrom`. */
 	resumeRef?: string;
 	/**
@@ -255,11 +255,11 @@ export interface AgentBackend {
 	 */
 	syncEntryIds(): Promise<void>;
 	/**
-	 * Which revision each board was at, at that point in the conversation.
+	 * Which revision each card was at, at that point in the conversation.
 	 *
 	 * Only pi has this: it writes a `board-rev` entry per write, which names the exact revision
-	 * a board was at. The others have no entry Decks can write into, and leave this out;
-	 * `App.boardsAt` then falls back to the revision store's own times, which is the same answer
+	 * a card was at. The others have no entry Decks can write into, and leave this out;
+	 * `App.cardsAt` then falls back to the revision store's own times, which is the same answer
 	 * except where two writes share a second.
 	 */
 	revisionsAt?(entryId: string): Record<string, string>;
