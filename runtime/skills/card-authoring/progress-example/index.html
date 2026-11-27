@@ -43,7 +43,8 @@
 	.sep { position: sticky; top: 0; z-index: 1; background: var(--b-bg); padding: 12px 0 6px; font-size: 14px; font-weight: 700; color: var(--b-muted); display: flex; gap: 8px; align-items: center }
 	.sep::after { content: ""; flex: 1; height: 1px; background: var(--b-border) }
 	.e > .x { min-width: 0 }
-	.e { display: grid; grid-template-columns: 46px 20px minmax(0, 1fr); gap: 8px; align-items: start; padding: 5px 6px; border-radius: 8px; font-size: 15px; line-height: 1.4 }
+	.e { display: grid; grid-template-columns: 46px 20px minmax(0, 1fr); gap: 8px; align-items: start; padding: 8px 8px; border-radius: 8px; font-size: 15px; line-height: 1.4 }
+	.e + .e { margin-top: 6px }
 	.e.lit { background: var(--b-accent-soft) }
 	.at { color: var(--b-faint); font-family: var(--b-mono); font-size: 14px; padding-top: 2px }
 	.ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; line-height: 1; margin-top: 1px }
@@ -100,7 +101,7 @@
 	.viz .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
 	.viz .compare > div { border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px }
 	.viz .compare .big { font-size: 24px; font-weight: 650; line-height: 1.2 }
-	.viz .compare h4 { margin: 0 0 4px; font-size: 14px; color: var(--b-muted); letter-spacing: .04em }
+	.viz .compare .side { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--b-muted) }
 </style>
 <div class="doc" data-id="doc">
 	<div class="head">
@@ -201,7 +202,13 @@
 			}
 			const title = (n) => (data.steps ?? []).find((s, i) => String(s.id ?? i + 1) === String(n))?.title;
 			log.innerHTML = groups.length ? groups.map((g) => `<div class="grp"><div class="sep" data-s="${esc(g.step)}">Step ${esc(g.step)}${title(g.step) ? `: ${esc(title(g.step))}` : ""}</div>${g.items.map(entry).join("")}</div>`).join("") : `<p class="empty">Nothing run yet.</p>`;
-			if (follow || atFoot) log.scrollTop = log.scrollHeight;
+			if (follow || atFoot) glide(log, log.scrollHeight - log.clientHeight);
+		}
+
+		/** Scroll a pane to `top`: a glide when it is within about a screen and a half, a jump when farther. */
+		function glide(pane, top) {
+			const near = Math.abs(top - pane.scrollTop) < pane.clientHeight * 1.5;
+			pane.scrollTo({ top, behavior: near ? "smooth" : "instant" });
 		}
 
 		/** Keep the chosen step in view in the steps pane. */
@@ -236,7 +243,7 @@
 			follow = false;
 			drawSteps(); drawLog();
 			const head = $("log").querySelector(`.sep[data-s="${CSS.escape(chosen)}"]`);
-			if (head) $("log").scrollTop = head.parentElement.offsetTop - $("log").offsetTop;
+			if (head) glide($("log"), head.parentElement.offsetTop - $("log").offsetTop);
 		}, { signal: card.signal });
 		// Following the newest line stops when the reader scrolls up, and starts again at the foot. Only the
 		// reader's own scrolling counts: the panes resizing as the card settles scrolls the log too.

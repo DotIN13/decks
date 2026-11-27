@@ -1,0 +1,46 @@
+<!-- Process: how a run makes or changes something, as boxes and arrows. Each box is a stage: a
+     bold title and one or two short lines (about 20 characters each) on what goes in or what rule
+     applies; the stage that matters (the fix, the bottleneck). Put it on the run that carries out the process, so it says what is about to happen is filled with the accent. Boxes are
+     180 wide in a 600-wide viewBox, three to a row; a second row runs back right to left. -->
+<svg viewBox="0 0 600 278">
+	<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--b-muted)"/></marker></defs>
+	<rect x="0" y="0" width="180" height="96" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)"/>
+	<text class="lab" x="12" y="24" style="font-weight:650">14 syllables</text>
+	<text x="12" y="48">ka lo mi ren ta</text>
+	<text x="12" y="70">vo shi bri del …</text>
+	<line x1="184" y1="48" x2="204" y2="48" stroke="var(--b-muted)" stroke-width="2" marker-end="url(#ah)"/>
+	<rect x="210" y="0" width="180" height="96" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)"/>
+	<text class="lab" x="222" y="24" style="font-weight:650">50,000 words</text>
+	<text x="222" y="48">1 to 4 syllables</text>
+	<text x="222" y="70">kalo, renta, voshi</text>
+	<line x1="394" y1="48" x2="414" y2="48" stroke="var(--b-muted)" stroke-width="2" marker-end="url(#ah)"/>
+	<rect x="420" y="0" width="180" height="96" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)"/>
+	<text class="lab" x="432" y="24" style="font-weight:650">Zipf weights</text>
+	<text x="432" y="48">word n is drawn</text>
+	<text x="432" y="70">1/n as often</text>
+	<rect x="432" y="74" width="8" height="16" fill="var(--b-accent)"/>
+	<rect x="444" y="82" width="8" height="8" fill="var(--b-accent)"/>
+	<rect x="456" y="85" width="8" height="5" fill="var(--b-accent)"/>
+	<rect x="468" y="86" width="8" height="4" fill="var(--b-accent)"/>
+	<rect x="480" y="87" width="8" height="3" fill="var(--b-accent)"/>
+	<rect x="492" y="87" width="8" height="3" fill="var(--b-accent)"/>
+	<rect x="504" y="88" width="8" height="2" fill="var(--b-accent)"/>
+	<rect x="516" y="88" width="8" height="2" fill="var(--b-accent)"/>
+	<line x1="510" y1="100" x2="510" y2="142" stroke="var(--b-muted)" stroke-width="2" marker-end="url(#ah)"/>
+	<rect x="420" y="148" width="180" height="126" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)"/>
+	<text class="lab" x="432" y="172" style="font-weight:650">Sentence rules</text>
+	<text x="432" y="196">8 to 22 words</text>
+	<text x="432" y="218">45% stop words:</text>
+	<text x="432" y="240">the, of, and …</text>
+	<text x="432" y="262">3% un-, well-, ’s</text>
+	<line x1="416" y1="196" x2="396" y2="196" stroke="var(--b-muted)" stroke-width="2" marker-end="url(#ah)"/>
+	<rect x="210" y="148" width="180" height="96" rx="8" fill="var(--b-accent-soft)" stroke="var(--b-accent)"/>
+	<text class="lab" x="222" y="172" style="font-weight:650">Draw in batches</text>
+	<text x="222" y="196">10,000 words a draw,</text>
+	<text x="222" y="218">not one at a time</text>
+	<line x1="206" y1="196" x2="186" y2="196" stroke="var(--b-muted)" stroke-width="2" marker-end="url(#ah)"/>
+	<rect x="0" y="148" width="180" height="96" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)"/>
+	<text class="lab" x="12" y="172" style="font-weight:650">10.5 MB of text</text>
+	<text x="12" y="196">1.87 million words</text>
+	<text x="12" y="218">made in 0.83 s</text>
+</svg>

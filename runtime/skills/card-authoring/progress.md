@@ -54,7 +54,9 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
   [templates/](progress-example/templates/), copy it into `log/`, and put your numbers in:
   - `tally.html`: the words or items a run looked at, then how many of each;
   - `tests.html`: one block per test, green or red, with the failing ones named and why;
-  - `cloud.html`: a word cloud and a few example lines, for data you made or read;
+  - `process.html`: how a run makes or changes something, as boxes and arrows (what goes in, the
+    rules, what comes out), the stage that matters in the accent;
+  - `cloud.html`: a word cloud and a few example lines, when what the data looks like is the point;
   - `waterfall.html`: a trace of where the time went, one lane per variant;
   - `bars.html`: a few numbers side by side, the one that matters in the accent colour;
   - `compare.html`: before and after, as large numbers or two pictures.

@@ -91,7 +91,8 @@
 			"kind": "run",
 			"command": "timeout 300 python3 make_corpus.py",
 			"why": "build the 10 MB test text",
-			"status": "done"
+			"status": "done",
+			"file": "log/step3-process.html"
 		},
 		{
 			"step": 3,
@@ -110,8 +111,7 @@
 			"step": 3,
 			"at": "18:17",
 			"kind": "result",
-			"text": "10.5 MB in 0.83 s",
-			"file": "log/step3-cloud.html"
+			"text": "10.5 MB in 0.83 s"
 		},
 		{
 			"step": 4,
