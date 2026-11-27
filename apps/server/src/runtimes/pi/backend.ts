@@ -53,7 +53,8 @@ export function levelFor(model: { thinkingLevelMap?: Record<string, unknown> | u
 	return nearestLevel(wanted, levels);
 }
 
-export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
+/** No modes (permissions are an extension's business); a message mid-turn steers it (`streamingBehavior: "steer"`). */
+export const PI_CAPABILITIES: AgentCapabilities = { modes: [], steers: "now" };
 
 /**
  * The `/` commands Decks interprets for a pi agent.

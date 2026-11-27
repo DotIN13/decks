@@ -83,6 +83,14 @@ export type AgentMode = "manual" | "acceptEdits" | "plan" | "auto";
 export interface AgentCapabilities {
 	/** Empty for a runtime with no notion of asking first. */
 	modes: AgentMode[];
+	/**
+	 * What a message sent in the middle of a turn does: `now`, it steers the turn at once;
+	 * `next-step`, the turn takes it at its next step, after the model call or tool call it is in;
+	 * absent or false, it waits for the turn to end.
+	 */
+	steers?: false | "now" | "next-step";
+	/** Whether its agents spend the install's Claude accounts, so a chat can be moved between them. */
+	accounts?: boolean;
 }
 
 /**

@@ -112,12 +112,13 @@ export function DockBar(props: { parts: Parts }) {
 					/*
 					 * Which subscription this conversation spends.
 					 *
-					 * Only for a Claude chat: the other runtimes have no Claude account, and a
+					 * Only for a chat whose runtime spends the install's Claude accounts
+					 * (`capabilities.accounts`): the others have none, and a
 					 * section offering to change one they do not have would be a control that
 					 * does nothing. `agentId` is what makes the switch reach this agent alone —
 					 * without it the server reads it as the default for the *next* one.
 					 */
-					{...(focusedChat()?.kind === "claude" && state.accounts.length > 1 ? { accounts: state.accounts } : {})}
+					{...(runtimeFor(focusedChat()?.kind)?.capabilities?.accounts && state.accounts.length > 1 ? { accounts: state.accounts } : {})}
 					/* Falling back to the default, because that is what an agent with no entry in
 					   the mapping is actually on — and a picker showing nothing selected reads
 					   as "no subscription" rather than as "the list has not arrived". */

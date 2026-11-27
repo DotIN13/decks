@@ -5,6 +5,7 @@ import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "@decks/ui";
 import { formatNumber, m } from "@decks/i18n";
 import { contextLevel, contextPercent, usageLevel } from "../lib/context-usage.ts";
+import { runtimeFor } from "../state/deck.ts";
 import { ago, behaviorLabel, duration, exact, modelLabel, money, planLabel, resetsAt, resetsIn, tokens } from "./usage-format.ts";
 
 /** A share out of a hundred, whole, as the language shown writes a percentage. */
@@ -258,11 +259,11 @@ export function UsageModal(props: {
 										fallback={
 											/*
 											 * Three different nothings, and the difference is worth the words: a
-											 * runtime with no notion of a plan, an account that is not on one,
-											 * and a plan that reported no active window.
+											 * runtime with no notion of a plan (no Claude accounts, `capabilities.accounts`),
+											 * an account that is not on one, and a plan that reported no active window.
 											 */
 											<p class="usage-empty">
-												{report().kind !== "claude"
+												{!runtimeFor(report().kind)?.capabilities?.accounts
 													? m.settings_usage_per_token({ kind: report().kind })
 													: report().limits === null
 														? m.settings_usage_no_plan()

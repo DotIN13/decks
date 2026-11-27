@@ -395,9 +395,9 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"agent.settings": async ([id, options]) => {
 			const agent = need(id);
 			if ((options as { limits?: unknown } | undefined)?.limits) void app.accountList.refreshLimits();
-			let accounts: { accounts?: unknown[]; active?: string } = {};
-			if (agent.kind === "claude") await app.accountList.publish((frame) => frame.type === "account.list" && (accounts = frame));
 			const runtime = app.runtimes().find((one) => one.kind === agent.kind);
+			let accounts: { accounts?: unknown[]; active?: string } = {};
+			if (runtime?.capabilities.accounts) await app.accountList.publish((frame) => frame.type === "account.list" && (accounts = frame));
 			return {
 				id: agent.id,
 				kind: agent.kind,

@@ -351,10 +351,11 @@ export class App {
 		});
 		this.claudeLogin = new ClaudeLogin(
 			this.claudeAccounts,
-			// A sign-in landed: the list, and every Claude agent's models read anew for it.
+			// A sign-in landed: the list, and the models read anew for it by every agent whose runtime
+			// cares (`AgentBackend.signedIn`, which only Claude's has).
 			() => {
 				void this.accountList.publish(undefined, { reread: true });
-				for (const agent of this.agents.all()) if (agent.kind === "claude") void agent.conversation.signedIn();
+				for (const agent of this.agents.all()) void agent.conversation.signedIn();
 			},
 			(event) => this.send({ type: "account.login", ...event }),
 		);

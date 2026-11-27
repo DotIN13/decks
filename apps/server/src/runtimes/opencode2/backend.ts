@@ -33,8 +33,11 @@ import { DEFAULT_MODE, SharedServerBackend, type PermissionTable, type SessionCa
  *   mode set here is the one that applies.
  */
 
-/** OpenCode 2 asks before writes and commands, so three of Decks' four modes mean something. */
-export const OPENCODE2_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"] };
+/**
+ * OpenCode 2 asks before writes and commands, so three of Decks' four modes mean something. A
+ * message mid-turn steers it (`delivery: "steer"`).
+ */
+export const OPENCODE2_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"], steers: "now" };
 
 /** The `/` commands Decks interprets for an OpenCode 2 agent; the server's own are merged under these. */
 export const OPENCODE2_COMMANDS: SlashCommand[] = [

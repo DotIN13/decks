@@ -58,7 +58,7 @@ const CLI_MODE: Record<AgentMode, PermissionMode> = {
 	auto: "auto",
 };
 
-export const CLAUDE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "plan", "auto"] };
+export const CLAUDE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "plan", "auto"], steers: "next-step", accounts: true };
 
 /**
  * The `/` commands a Claude agent can run, and every one is the deck's own.

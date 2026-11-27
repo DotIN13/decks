@@ -44,8 +44,14 @@ import { DEFAULT_MODE, SharedServerBackend, type PermissionTable, type SessionCa
  * SDK's type catching up with a server that grew a field its generator never saw.
  */
 
-/** opencode asks before writes and commands, so three of Decks' four modes mean something. */
-export const OPENCODE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"] };
+/**
+ * opencode asks before writes and commands, so three of Decks' four modes mean something.
+ *
+ * A message mid-turn is taken at the turn's next step: `prompt_async` saves the message and joins
+ * the session's running loop (`SessionPrompt.loop` -> `ensureRunning`), which reads the newest
+ * user message before every step and does not stop until it has answered it.
+ */
+export const OPENCODE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"], steers: "next-step" };
 
 /**
  * The `/` commands Decks interprets for an opencode agent.

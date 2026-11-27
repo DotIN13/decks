@@ -38,7 +38,11 @@ import { decksEnv } from "../decks-env.ts";
  */
 
 /** The CLI's execution modes: accept-edits, auto and plan (`agy --mode`). `manual` would be a lie: headless agy cannot ask. */
-export const ANTIGRAVITY_CAPABILITIES: AgentCapabilities = { modes: ["acceptEdits", "auto", "plan"] };
+export const ANTIGRAVITY_CAPABILITIES: AgentCapabilities = {
+	modes: ["acceptEdits", "auto", "plan"],
+	// Print mode reads one prompt line per turn, so a message sent mid-turn waits for the turn to end.
+	steers: false,
+};
 
 export const ANTIGRAVITY_COMMANDS: SlashCommand[] = [
 	{ name: "cost", hint: "Open the usage panel: spend, tokens, context", source: "deck" },
