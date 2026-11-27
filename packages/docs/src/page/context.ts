@@ -14,7 +14,7 @@ import { base, el, svg } from "./ui.ts";
  * page's frame of elements, the little state more than one panel reads, and the calls one panel
  * makes on another.
  *
- * Each panel (`tools.ts`, `source.ts`, …) is mounted with this and fills in its own calls
+ * Each panel (`tools.ts`, `source.ts`, `pdf.ts`, …) is mounted with this and fills in its own calls
  * in `hooks`; `page.ts` mounts them all, so a panel reaches another only through here.
  */
 
@@ -85,7 +85,7 @@ export interface PageHooks {
 	isViewing(): boolean;
 	/** `page.ts`: back from a kept version to the page as it is now. */
 	closeVersion(): void;
-	/** `page.ts`: typeset again once typing has paused, when the PDF is open. */
+	/** `pdf.ts`: typeset again once typing has paused, when the PDF is open. */
 	compileSoon(): void;
 	/** `page.ts`: send a Doc's styles to Google once the typing before them has gone. */
 	sendStyle(requests: DocsRequest[]): void;

@@ -1,4 +1,4 @@
-import type { CompileError, DocClientMessage, DocRemoteStatus, GitStatus, DocServerMessage, DocVersion, Splice } from "../index.ts";
+import type { DocClientMessage, DocRemoteStatus, GitStatus, DocServerMessage, DocVersion, Splice } from "../index.ts";
 import { DocSync } from "../client.ts";
 import { spliceDiff } from "../merge.ts";
 import type { DocSync as Sync } from "../client.ts";
@@ -8,9 +8,10 @@ import { LiveEditor } from "./live.ts";
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
 import type { DocsRequest } from "../gdoc/types.ts";
-import { formatList, formatNumber, getLocale, m } from "@decks/i18n";
+import { formatList, getLocale, m } from "@decks/i18n";
 import { pageDom, type PageContext, type PageHooks, type View } from "./context.ts";
 import { addStyle } from "./style.ts";
+import { mountPdf } from "./pdf.ts";
 import { mountSource } from "./source.ts";
 import { mountTools } from "./tools.ts";
 import { base, clip, dir, el, iconButton, initial, svg, when, whoOf } from "./ui.ts";
@@ -68,19 +69,13 @@ interface GComment {
 export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPage {
 	addStyle();
 	const dom = pageDom(host, options.path);
-	const { name, status, changesButton, commentsButton, gitBox, googleBox, pdfButton, sourceButton, historyButton, tools, main, scroll, text, panel, banner, old, pill, divider, pdfPane } = dom;
+	const { name, status, changesButton, commentsButton, gitBox, googleBox, pdfButton, sourceButton, historyButton, tools, main, scroll, text, panel, banner, old, pill } = dom;
 	const gitButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_git_title() });
 	const gitMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
 	gitBox.append(gitButton, gitMenu);
 	const googleButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_google_title() });
 	const googleMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
 	googleBox.append(googleButton, googleMenu);
-	const pdfBar = el("div", { class: "dp-pdfbar" });
-	const pdfState = el("span", { class: "dp-pdfstate" }, m.docs_pdf_not_yet());
-	const errButton = el("button", { type: "button", class: "dp-btn dp-sm dp-errs", hidden: "", "aria-pressed": "false" });
-	const errList = el("div", { class: "dp-errlist", hidden: "" });
-	const pdfBody = el("div", { class: "dp-pdfbody" });
-	pdfPane.append(pdfBar, errList, pdfBody);
 
 	/** A Google Doc's open comments, from Drive, or why they cannot be shown. */
 	let comments: GComment[] = [];
@@ -172,7 +167,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	scroll.append(live.root, reading.root, gview.root, old);
 	reading.root.hidden = true;
 	gview.root.hidden = true;
-	const cleanups = [mountTools(ctx), mountSource(ctx)];
+	const cleanups = [mountTools(ctx), mountSource(ctx), mountPdf(ctx)];
 	/**
 	 * Styles for Google, each with the text the page had when it was made, sent in order once the
 	 * typing before it has reached the server: the server brings the Doc to that text, applies the
@@ -248,7 +243,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			else if (isGoogle()) gview.update(applied ?? []);
 			else live.remote(applied ?? []);
 		}
-		if (why !== "open") compileSoon();
+		if (why !== "open") ctx.hooks.compileSoon();
 		refresh();
 	}
 
@@ -598,143 +593,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		}
 	}
 
-	// --- the PDF, for a LaTeX page ------------------------------------------------------------
-
-	let pdfOpen = false;
-	let pdfTimer: ReturnType<typeof setTimeout> | undefined;
-	let pdfBusy = false;
-	let pdfAgain = false;
-	let pdfPath: string | undefined;
-	let pdfBytes: ArrayBuffer | undefined;
-	let pdfDrawn = 0;
-	const recompile = iconButton("refresh", m.docs_typeset_again(), "dp-ib dp-sm");
-	const openPdf = iconButton("external", m.docs_open_pdf(), "dp-ib dp-sm");
-	const closePdf = iconButton("x", m.docs_close_pdf(), "dp-ib dp-sm");
-	pdfBar.append(pdfState, errButton, recompile, openPdf, closePdf);
-	openPdf.disabled = true;
-
-	const savedWidth = Number(localStorage.getItem("dp-pdf-width") ?? 0);
-	if (savedWidth > 0) pdfPane.style.setProperty("--pdf-w", `${savedWidth}px`);
-
-	function compileNow(): void {
-		if (!pdfOpen) return;
-		clearTimeout(pdfTimer);
-		if (pdfBusy) {
-			pdfAgain = true;
-			return;
-		}
-		pdfBusy = true;
-		pdfState.dataset.state = "busy";
-		pdfState.textContent = m.docs_typesetting();
-		pdfBody.toggleAttribute("data-stale", pdfDrawn > 0);
-		sync.compile();
-	}
-
-	/** Typeset again once typing has paused, and everything typed has reached the file. */
-	function compileSoon(): void {
-		if (!pdfOpen) return;
-		clearTimeout(pdfTimer);
-		pdfTimer = setTimeout(() => (sync.settled ? compileNow() : compileSoon()), 1200);
-	}
-
-	function showPdf(open: boolean): void {
-		pdfOpen = open;
-		pdfButton.setAttribute("aria-pressed", String(open));
-		pdfPane.hidden = !open;
-		divider.hidden = !open;
-		if (open) {
-			if (!pdfDrawn) pdfBody.replaceChildren(el("div", { class: "dp-pdfempty" }, m.docs_first_typeset()));
-			compileNow();
-		} else clearTimeout(pdfTimer);
-	}
-
-	async function drawPdf(path: string): Promise<void> {
-		if (!options.file) return;
-		const bytes = await options.file(path);
-		pdfBytes = bytes;
-		await drawPages();
-	}
-
-	/** The pages, drawn off to the side and swapped in, so the reader keeps their place in the PDF. */
-	async function drawPages(): Promise<void> {
-		if (!pdfBytes) return;
-		const width = Math.max(200, pdfBody.clientWidth - 36);
-		const into = el("div", { style: "display: contents" });
-		const ratio = pdfBody.scrollHeight > pdfBody.clientHeight ? pdfBody.scrollTop / (pdfBody.scrollHeight - pdfBody.clientHeight) : 0;
-		if (options.pdf) {
-			const shadow = el("div", { style: `position: absolute; visibility: hidden; width: ${width}px` });
-			document.body.append(shadow);
-			try {
-				pdfDrawn = await options.pdf(shadow, pdfBytes.slice(0), width);
-				into.append(...shadow.childNodes);
-			} finally {
-				shadow.remove();
-			}
-		} else {
-			const frame = el("iframe", { style: "width: 100%; flex: 1; border: 0; min-height: 600px" });
-			frame.src = URL.createObjectURL(new Blob([pdfBytes], { type: "application/pdf" }));
-			into.append(frame);
-			pdfDrawn = 1;
-		}
-		pdfBody.replaceChildren(into);
-		pdfBody.removeAttribute("data-stale");
-		pdfBody.scrollTop = ratio * Math.max(0, pdfBody.scrollHeight - pdfBody.clientHeight);
-	}
-
-	function lineOffset(line: number): number {
-		let at = 0;
-		for (let n = 1; n < line; n++) {
-			const next = sync.text.indexOf("\n", at);
-			if (next === -1) return sync.text.length;
-			at = next + 1;
-		}
-		return at;
-	}
-
-	function showErrors(errors: CompileError[]): void {
-		errButton.hidden = errors.length === 0;
-		errButton.textContent = m.docs_errors({ count: errors.length });
-		errList.replaceChildren(
-			...errors.map((error) => {
-				const row = el("div", { class: "dp-err", title: error.line ? m.docs_go_to_line() : "" });
-				row.append(el("span", { class: "e-line" }, error.line ? m.docs_line({ line: error.line }) : "—"), el("span", { class: "e-msg" }, error.message));
-				if (error.line) row.onclick = () => live.goto(lineOffset(error.line!));
-				return row;
-			}),
-		);
-		if (errors.length === 0) {
-			errList.hidden = true;
-			errButton.setAttribute("aria-pressed", "false");
-		}
-	}
-
-	function compiled(message: Extract<DocServerMessage, { type: "doc.compiled" }>): void {
-		pdfBusy = false;
-		const when = new Date(message.at).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit" });
-		pdfState.dataset.state = message.ok ? "ok" : "failed";
-		pdfState.replaceChildren();
-		if (message.error && !message.pdf) pdfState.textContent = message.error;
-		else if (message.pdf) pdfState.append(el("b", {}, message.ok ? m.docs_typeset() : m.docs_typeset_errors()), m.docs_typeset_when({ time: when, seconds: formatNumber(message.ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }));
-		else pdfState.append(el("b", {}, m.docs_not_typeset()), when);
-		showErrors(message.errors);
-		openPdf.disabled = !message.pdf;
-		if (message.pdf) {
-			pdfPath = message.pdf;
-			void drawPdf(message.pdf).catch(() => (pdfState.textContent = m.docs_pdf_unreadable()));
-		} else {
-			pdfBody.removeAttribute("data-stale");
-			if (!pdfDrawn) pdfBody.replaceChildren(el("div", { class: "dp-pdfempty" }, message.error ?? m.docs_latex_stopped()));
-			if (message.errors.length) {
-				errList.hidden = false;
-				errButton.setAttribute("aria-pressed", "true");
-			}
-		}
-		if (pdfAgain) {
-			pdfAgain = false;
-			compileSoon();
-		}
-	}
-
 	// --- git ------------------------------------------------------------------------------------
 
 	let repo: GitStatus | undefined;
@@ -788,7 +646,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			if (message.status) repo = message.status;
 			gitSaid = { ok: message.ok, message: message.message ?? (message.ok ? m.docs_git_done() : m.docs_git_stopped()) };
 			// The PDF follows what the pull brought in.
-			if (message.ok && pdfOpen) compileSoon();
+			if (message.ok) ctx.hooks.compileSoon();
 		}
 		drawGit();
 	}
@@ -883,35 +741,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		}
 	});
 
-	pdfButton.onclick = () => showPdf(!pdfOpen);
-	closePdf.onclick = () => showPdf(false);
-	recompile.onclick = () => compileNow();
-	errButton.onclick = () => {
-		errList.hidden = !errList.hidden;
-		errButton.setAttribute("aria-pressed", String(!errList.hidden));
-	};
-	openPdf.onclick = () => {
-		if (pdfBytes) window.open(URL.createObjectURL(new Blob([pdfBytes], { type: "application/pdf" })), "_blank");
-	};
-	divider.addEventListener("pointerdown", (event) => {
-		event.preventDefault();
-		divider.setPointerCapture(event.pointerId);
-		divider.dataset.drag = "";
-		const right = main.getBoundingClientRect().right - (panel.hidden ? 0 : panel.getBoundingClientRect().width);
-		const move = (e: PointerEvent) => {
-			const width = Math.max(260, Math.min(right - e.clientX, main.clientWidth - 320));
-			pdfPane.style.setProperty("--pdf-w", `${width}px`);
-		};
-		const up = () => {
-			delete divider.dataset.drag;
-			divider.removeEventListener("pointermove", move);
-			localStorage.setItem("dp-pdf-width", String(Math.round(pdfPane.getBoundingClientRect().width)));
-			void drawPages();
-		};
-		divider.addEventListener("pointermove", move);
-		divider.addEventListener("pointerup", up, { once: true });
-	});
-
 	historyButton.onclick = () => show("history");
 	commentsButton.onclick = () => show("comments");
 	changesButton.onclick = () => show("changes");
@@ -920,7 +749,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		versions = message.versions;
 		if (ctx.view === "history") drawHistory();
 	});
-	ctx.on("doc.compiled", (message) => compiled(message));
 	ctx.on("doc.repo", (message) => repoAnswered(message));
 	ctx.on("doc.gdoc", (message) => {
 		gview.load(message.document as never, message.text);
@@ -961,7 +789,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		newComment,
 		isViewing: () => !!viewing,
 		closeVersion: () => closeVersion(),
-		compileSoon,
 		sendStyle,
 		drawGoogle,
 		signInParts,
