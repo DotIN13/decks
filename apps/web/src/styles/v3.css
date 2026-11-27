@@ -3890,7 +3890,9 @@ body {
 		gap: 10px;
 	}
 	.switcher-thumb {
-		display: block;
+		position: relative;
+		display: grid;
+		place-items: center;
 		width: 34px;
 		height: 24px;
 		flex: none;
@@ -3899,15 +3901,29 @@ body {
 		background: var(--v3-bg2);
 		box-shadow: inset 0 0 0 1px var(--v3-line);
 	}
+	.switcher-thumb-mark {
+		color: var(--v3-fg3);
+	}
+	/* Over the mark, the whole canvas shrunk into the box, on the box's own ground. */
 	.switcher-thumb > img {
+		position: absolute;
+		inset: 0;
 		display: block;
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
+		object-fit: contain;
+		background: var(--v3-bg2);
 	}
 	.switcher-faces {
 		display: flex;
 		flex: none;
+	}
+	.switcher-faces:empty {
+		display: none;
+	}
+	/* Faces overlap one another, never the name before them. */
+	.switcher-face:first-child {
+		margin-left: 0;
 	}
 	.switcher-face {
 		display: grid;
@@ -3920,6 +3936,14 @@ body {
 		color: #fff;
 		font-size: 9px;
 		font-weight: 600;
+	}
+	/* A long name ends in an ellipsis before the faces, not cut mid-letter. */
+	body .popover [data-row].switcher-canvas .row-label {
+		/* A block: a row label is a flex box elsewhere, and text in one takes no ellipsis. */
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	body .popover [data-row].switcher-canvas .menu-note {
 		min-width: 24px;

@@ -1,5 +1,6 @@
 import { formatAgo, m } from "@decks/i18n";
 import type { StageRow } from "@decks/protocol";
+import Layers from "lucide-solid/icons/layers";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
@@ -81,6 +82,8 @@ export function CanvasSwitcher(props: {
 					{(stage) => (
 						<button type="button" role="menuitem" data-row data-flat="true" class="switcher-canvas" data-current={stage.name === props.here ? "true" : undefined} onClick={() => pick(() => props.onPick(stage.name))}>
 							<span class="switcher-thumb" aria-hidden="true">
+								{/* The canvas's mark, under its picture: what shows while the picture loads, and for a canvas with none. */}
+								<Icon of={Layers} size={13} class="switcher-thumb-mark" />
 								<Show when={stage.boards > 0}>
 									<AuthedImg alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(stage.name)}?v=${stage.shot ?? stage.rev}&scheme=${props.scheme}`)} />
 								</Show>
