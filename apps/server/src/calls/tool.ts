@@ -7,7 +7,7 @@ import type { Verbs as Stage } from "@decks/sdk";
 import type { CreateSpec, QueuedWork, SendSpec, CanvasSnapshot } from "../agents/work.ts";
 import { penWriter } from "../canvas/pens.ts";
 import type { CanvasService } from "../canvas/service.ts";
-import { verbContext } from "./context.ts";
+import { inCall, verbContext } from "./context.ts";
 import { appsVerbs } from "./apps.ts";
 import { webVerbs } from "./web.ts";
 import { miscVerbs } from "./misc.ts";
@@ -173,7 +173,6 @@ export function createDecksTool(deps: {
 }): DecksTool {
 	const { stage: service, agent, port } = deps;
 	const ctx = verbContext({ stage: service, agent, port });
-	const { notes, images } = ctx;
 
 	/**
 	 * The verbs, one module per group (`calls/`), on one object: what `call` looks a verb up on, and
@@ -210,24 +209,26 @@ export function createDecksTool(deps: {
 		webShared: () => service.web?.status().paired === true,
 
 		async gesture(name, args) {
-			notes.length = 0;
-			images.length = 0;
-			let answer: CallResult;
-			try {
-				const value = await (hands[name] as (...given: unknown[]) => Promise<unknown>)(...args);
-				answer = { ok: true, value, notes: [...notes] };
-			} catch (error) {
-				answer = { ok: false, error: error instanceof Error ? error.message : String(error), notes: [] };
-			}
-			deps.persist?.(snapshot());
-			return answer;
+			return inCall(undefined, async (frame) => {
+				let answer: CallResult;
+				try {
+					const value = await (hands[name] as (...given: unknown[]) => Promise<unknown>)(...args);
+					answer = { ok: true, value, notes: [...frame.notes] };
+				} catch (error) {
+					answer = { ok: false, error: error instanceof Error ? error.message : String(error), notes: [] };
+				}
+				deps.persist?.(snapshot());
+				return answer;
+			});
 		},
 
 		async call(name: string, args: readonly unknown[], on: { stage?: string } = {}): Promise<CallResult> {
-			notes.length = 0;
-			images.length = 0;
-			// The canvas the request says it was made on, which is what `here()` means for this call.
-			ctx.callOn.stage = on.stage;
+			// A frame of its own: its notes, pictures and canvas (what `here()` means for it), whatever runs beside it.
+			return inCall(on.stage, (frame) => runCall(name, args, frame));
+		},
+	};
+
+	async function runCall(name: string, args: readonly unknown[], frame: { notes: string[]; images: Array<{ data: string; mimeType: string }> }): Promise<CallResult> {
 			const path = name.split(".");
 			let owner: unknown = stage;
 			for (const key of path.slice(0, -1)) owner = (owner as Record<string, unknown> | undefined)?.[key];
@@ -244,8 +245,7 @@ export function createDecksTool(deps: {
 			}
 			// After the verb's own notes, the agent's reminders: who it is, and what its canvas is called.
 			// Not for the person, whose clicks are theirs and not the agent's.
-			const said = [...notes];
-			ctx.callOn.stage = undefined;
+			const said = [...frame.notes];
 			if (!agent.person) {
 				const unsaid = identityReminder(agent.identity(), { afterCall: true });
 				if (unsaid) said.push(unsaid);
@@ -253,7 +253,6 @@ export function createDecksTool(deps: {
 				if (unnamed) said.push(unnamed);
 			}
 			deps.persist?.(snapshot());
-			return { ...answer, notes: said, ...(images.length > 0 ? { images: [...images] } : {}) };
-		},
-	};
+			return { ...answer, notes: said, ...(frame.images.length > 0 ? { images: [...frame.images] } : {}) };
+	}
 }

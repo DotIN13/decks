@@ -1,11 +1,13 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import type { CanvasService, WebTarget } from "../canvas/service.ts";
 import type { AgentHooks } from "./tool.ts";
 
 /**
  * What every verb's handler is given: the stage service, the caller's hooks, and the helpers the
- * handlers share. Made once per caller by `createDecksTool` (`calls/tool.ts`), which also owns the
- * notes and pictures a call collects and empties them before each one.
+ * handlers share. Made once per caller by `createDecksTool` (`calls/tool.ts`). The notes, pictures and
+ * canvas of one call are that call's own (`inCall`), though the context is shared by every call of
+ * the caller.
  */
 export interface VerbContext {
 	service: CanvasService;
@@ -40,14 +42,56 @@ export interface VerbContext {
 	callOn: { stage?: string };
 }
 
+/**
+ * What one call collects and means: its notes, its pictures, and the canvas the request says it was
+ * made on.
+ *
+ * A caller's context is shared by all its calls, and the person's by every tab and canvas frame they
+ * have open, so two calls run at once. These used to sit on the context itself: one call emptied the
+ * other's notes as it started, and could read the other's canvas as its own, or none once the other
+ * finished. Each call now runs in a frame of its own, carried through its awaits (`AsyncLocalStorage`),
+ * and `notes`, `images` and `callOn` read the frame of the call that is asking.
+ */
+interface CallFrame {
+	notes: string[];
+	images: Array<{ data: string; mimeType: string }>;
+	stage: string | undefined;
+}
+const frames = new AsyncLocalStorage<CallFrame>();
+
+/** Run one call in a frame of its own; `work` is handed the frame, to read its notes and pictures after. */
+export function inCall<T>(stage: string | undefined, work: (frame: CallFrame) => Promise<T>): Promise<T> {
+	const frame: CallFrame = { notes: [], images: [], stage };
+	return frames.run(frame, () => work(frame));
+}
+
+/** An array that is the asking call's own (`pick` of its frame), or `outside` for work outside any call. */
+function perCall<T extends unknown[]>(pick: (frame: CallFrame) => T, outside: T): T {
+	const target = () => {
+		const frame = frames.getStore();
+		return frame ? pick(frame) : outside;
+	};
+	return new Proxy(outside, {
+		get: (_t, key) => {
+			const array = target();
+			const value = Reflect.get(array, key, array);
+			return typeof value === "function" ? value.bind(array) : value;
+		},
+		set: (_t, key, value) => Reflect.set(target(), key, value),
+		has: (_t, key) => Reflect.has(target(), key),
+		ownKeys: () => Reflect.ownKeys(target()),
+		getOwnPropertyDescriptor: (_t, key) => Reflect.getOwnPropertyDescriptor(target(), key),
+	});
+}
+
 /** What an agent is told when a canvas call names no canvas. */
 const NAME_A_CANVAS =
 	"Name the canvas this call works on: --canvas <name or title> (in a script, { canvas }). An agent has no home canvas, so its work lands where it says whatever the person is looking at. decks canvas list names them, decks canvas create makes one, and decks here says which one the person has open beside your chat.";
 
 export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; port: number }): VerbContext {
 	const { stage: service, agent, port } = deps;
-	const notes: string[] = [];
-	const images: Array<{ data: string; mimeType: string }> = [];
+	const notes = perCall((frame) => frame.notes, [] as string[]);
+	const images = perCall((frame) => frame.images, [] as Array<{ data: string; mimeType: string }>);
 	const asList = (path: string | string[]) => (Array.isArray(path) ? path : [path]);
 
 
@@ -103,7 +147,11 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 		if (!clean) throw new Error('workspace is a project name, as in { workspace: "political-llm" }.');
 		return clean;
 	};
-	const callOn: { stage?: string } = {};
+	const callOn: { stage?: string } = {
+		get stage() {
+			return frames.getStore()?.stage;
+		},
+	};
 	const hereCanvas = (): string | undefined => {
 		const pens = service.pens;
 		if (callOn.stage && pens?.has(callOn.stage)) return callOn.stage;
