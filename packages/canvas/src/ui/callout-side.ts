@@ -114,8 +114,13 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 		const { top, bottom } = edges();
 		const gap = d.props.gap ?? GAP;
 		const below = side().below;
-		// Centred on what it is for, wherever that is: its arrow points at the middle.
-		return { x: top.x, y: below ? bottom.y + gap : top.y - gap, below, arrow: d.width() > 0 ? d.width() / 2 : undefined };
+		// Centred on what it is for, and slid inside the screen when that middle is on it but the pill
+		// would hang off an edge (a note at a phone's edge): its arrow still points at the middle.
+		const half = d.width() / 2;
+		const room = canvasBox(d.props.view);
+		let x = top.x;
+		if (half > 0 && top.x >= room.x && top.x <= room.x + room.width) x = Math.max(room.x + half + 8, Math.min(room.x + room.width - half - 8, top.x));
+		return { x, y: below ? bottom.y + gap : top.y - gap, below, arrow: half > 0 ? half + top.x - x : undefined };
 	};
 
 	return {
