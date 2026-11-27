@@ -1,7 +1,7 @@
 import type { Accessor } from "solid-js";
 import { createEffect, createSignal, on, onCleanup, untrack } from "solid-js";
 import { toScreen } from "../camera/camera.ts";
-import { canvasBox } from "../camera/insets.ts";
+import { canvasBox, fitBox } from "../camera/insets.ts";
 import { COARSE } from "../edit/core/touch-rules.ts";
 import type { PageCalloutProps } from "./callout-props.ts";
 
@@ -14,6 +14,13 @@ export interface CalloutSideNeeds {
 	readonly width: Accessor<number>;
 	readonly element: HTMLDivElement | undefined;
 }
+
+/*
+ * The span of the screen a pill may stand in: the canvas's box, and top to bottom clear of the chrome
+ * that floats over its edge too (the composer), which the page tells the frame (`fitBox`) and the
+ * frame's own elementFromPoint cannot see, the composer being the page's.
+ */
+const roomFor = (view: { width: number; height: number }) => ({ ...canvasBox(view), y: fitBox(view).y, height: fitBox(view).height });
 
 /** Which side of what is picked the pill sits on, above or below, chosen once things rest so it does not jump while they move. */
 export function createCalloutSide(d: CalloutSideNeeds) {
@@ -37,9 +44,9 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 	 * covering less of them. With neither on screen when it was chosen (the camera on its way to the
 	 * selection), it is chosen again once the camera has stopped.
 	 */
-	const choose = (): { below: boolean; sure: boolean } => {
-		const { camera, view } = d.props;
-		const room = canvasBox(view);
+	/** The two slots, above and below, each with whether it is on screen and clear of floating chrome, with the camera as it is now. */
+	const slotsNow = () => {
+		const room = roomFor(d.props.view);
 		const { top, bottom } = edges();
 		const x = top.x;
 		const half = d.width() / 2;
@@ -54,10 +61,18 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 				return !!hit && !hit.closest(".canvas");
 			});
 		};
-		const slots = [
+		return [
 			{ from: top.y - gap - tall(), to: top.y - gap, below: false },
 			{ from: bottom.y + gap, to: bottom.y + gap + tall(), below: true },
-		].filter((slot) => slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot));
+		].map((slot) => ({ ...slot, clear: slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot) }));
+	};
+
+	const choose = (): { below: boolean; sure: boolean } => {
+		const { camera, view } = d.props;
+		const { top } = edges();
+		const x = top.x;
+		const half = d.width() / 2;
+		const slots = slotsNow().filter((slot) => slot.clear);
 		if (!slots.length) return { below: false, sure: false };
 		// Under a finger the pill goes below whenever below is on screen: never over what the hand holds, and the same place every time.
 		if (COARSE) return { below: slots.some((slot) => slot.below), sure: true };
@@ -105,7 +120,19 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 		on(
 			() => d.props.hidden,
 			(hidden) => {
-				if (!hidden && !untrack(side).sure) setSide(untrack(choose));
+				if (hidden) return;
+				/*
+				 * Shown again once the camera rests: chosen again if it was never sure, or if the edge it
+				 * rode is on screen but its slot is not (a Fit that framed the item close under the top
+				 * bar left the pill hidden under it, its buttons out of reach). An edge carried off the
+				 * screen keeps its side, so a pan still takes the pill away with it.
+				 */
+				const now = untrack(side);
+				if (!now.sure) return setSide(untrack(choose));
+				const room = roomFor(d.props.view);
+				const edge = untrack(edges)[now.below ? "bottom" : "top"];
+				const edgeShown = edge.y >= room.y && edge.y <= room.y + room.height && edge.x >= room.x && edge.x <= room.x + room.width;
+				if (edgeShown && !untrack(slotsNow).find((slot) => slot.below === now.below)?.clear) setSide(untrack(choose));
 			},
 		),
 	);
@@ -120,7 +147,16 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 		const room = canvasBox(d.props.view);
 		let x = top.x;
 		if (half > 0 && top.x >= room.x && top.x <= room.x + room.width) x = Math.max(room.x + half + 8, Math.min(room.x + room.width - half - 8, top.x));
-		return { x, y: below ? bottom.y + gap : top.y - gap, below, arrow: half > 0 ? half + top.x - x : undefined };
+		/*
+		 * And slid down or up onto the screen the same way when its edge is on screen but its slot is not
+		 * (the item framed close under the top bar, with no room below either): over the item's edge,
+		 * where its buttons can be pressed, rather than hidden under the bar.
+		 */
+		const span = roomFor(d.props.view);
+		const edge = below ? bottom.y : top.y;
+		let y = below ? bottom.y + gap : top.y - gap;
+		if (edge >= span.y && edge <= span.y + span.height) y = below ? Math.min(y, span.y + span.height - 4 - tall()) : Math.max(y, span.y + 4 + tall());
+		return { x, y, below, arrow: half > 0 ? half + top.x - x : undefined };
 	};
 
 	return {
