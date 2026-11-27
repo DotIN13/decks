@@ -50,7 +50,8 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
 - **Show, do not only tell.** Any log entry can carry its own HTML, drawn under it, so the reader
   sees what the run did: `"html"` for a line or two inline, or `"file"` for a piece in the card's
   folder (`"file": "log/bench.html"`), read again whenever it changes. A piece is plain HTML and SVG
-  styled with the card's colours; its scripts do not run. Start from a template in
+  styled with the card's colours, drawn with no box around it (give it its own when it needs one);
+  its scripts do not run. Start from a template in
   [templates/](progress-example/templates/), copy it into `log/`, and put your numbers in:
   - `tally.html`: the words or items a run looked at, then how many of each;
   - `tests.html`: one block per test, green or red, with the failing ones named and why;

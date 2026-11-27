@@ -78,7 +78,8 @@
 </style>
 <style>
 	/* What an entry's own HTML can use (templates/ shows each). */
-	.viz { box-sizing: border-box; max-width: 100%; min-width: 0; overflow: hidden; color: var(--b-fg); font-weight: 400; margin-top: 8px; border: 1px solid var(--b-border); border-radius: 8px; background: var(--b-bg); padding: 10px 12px; font-size: 14px }
+	/* An entry's own HTML brings its own look: no box around it, only room above. */
+	.viz { box-sizing: border-box; max-width: 100%; min-width: 0; color: var(--b-fg); font-weight: 400; margin-top: 8px; font-size: 14px }
 	.viz .cap { color: var(--b-muted); margin-top: 6px }
 	.viz .words { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px }
 	.viz .w { padding: 1px 7px; border-radius: 5px; font-family: var(--b-mono); font-size: 14px }
@@ -99,10 +100,10 @@
 	.viz svg .lab { fill: var(--b-fg) }
 	.viz img { max-width: 100%; border-radius: 6px; display: block }
 	.viz .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
-	.viz .compare > div { border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px }
+	.viz .compare > div { background: var(--b-bg); border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px }
 	.viz .compare .big { font-size: 24px; font-weight: 650; line-height: 1.2 }
 	.viz .code-ba { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
-	.viz .code-ba > div { border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px; min-width: 0 }
+	.viz .code-ba > div { background: var(--b-bg); border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px; min-width: 0 }
 	.viz .tree { font-family: var(--b-mono); font-size: 14px; line-height: 1.6; margin-top: 4px }
 	.viz .tree .in { padding-left: 16px; display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline }
 	.viz .tree .n { color: var(--b-muted) }
