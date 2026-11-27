@@ -48,6 +48,15 @@ const focusOn = (ctx: FrameContext, targets: string[]) => {
  * files' ticketed address, the pages' trust, the documents' line, the apps, the composer and the
  * cards' `card.decks` calls.
  */
+/**
+ * A page by its path, from a map made once per list: the stage asks this for every card each time it
+ * lists them, and a search of the whole list per card made that O(n²).
+ */
+let pagesIndexed: { list: readonly Page[]; byPath: Map<string, Page> } | undefined;
+function pageOf(list: readonly Page[], path: string): Page | undefined {
+	if (pagesIndexed?.list !== list) pagesIndexed = { list, byPath: new Map(list.map((one) => [one.path, one])) };
+	return pagesIndexed.byPath.get(path);
+}
 export function installHost(ctx: FrameContext): void {
 	const { start, end, studio, backend, address, inFolder, folder, docListeners } = ctx;
 	setCanvasHost({
@@ -243,11 +252,11 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 			page: (path) => {
 				// A document or an app item has no page to load: it is drawn in place, and only needs saying it may be.
 				if (path.startsWith("item:")) return path;
-				const page = pages().find((one) => one.path === path);
+				const page = pageOf(pages(), path);
 				return page ? `${address(path)}?rev=${page.rev}` : undefined;
 			},
 			picture: (path, scheme) => {
-				const page = untrack(pages).find((one) => one.path === path);
+				const page = pageOf(untrack(pages), path);
 				const at = path.split("/").map(encodeURIComponent).join("/");
 				const picturesAt = ctx.picturesAt();
 				if (picturesAt.includes("{path}")) return picturesAt.replace("{path}", at).replace("{scheme}", scheme);

@@ -17,7 +17,7 @@ export interface PageNodeNeeds {
 	readonly isLeaving: (key: string) => boolean;
 	readonly isPictured: (key: string) => boolean;
 	readonly isNear: (key: string) => boolean;
-	readonly markLive: (path: string, on: boolean) => Map<string, number>;
+	readonly markLive: (path: string, on: boolean) => void;
 	readonly carriedPages: Accessor<ReadonlySet<string>>;
 	readonly draggedAsPicture: Accessor<ReadonlySet<string>>;
 	readonly gestures: { claimTouch(id: number): void; pinching(): boolean; panTouch(id: number): void; caught(): boolean; };

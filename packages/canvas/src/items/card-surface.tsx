@@ -31,6 +31,28 @@ export function cardShot(path: string): CardShot | undefined {
  * module's and act through `card.decks` (`card.ts`), answered where the host says
  * (`CanvasHost.cardCall`). A card has no `data-eval` blocks.
  */
+/*
+ * A card's file by its address, kept in memory: the address names the card's revision
+ * (`cards/<name>@<rev>/index.html`), so what it answers never changes, and a card waking again (a pan
+ * back and forth) was fetched again each time, a round trip per card per wake on a phone. Answers that
+ * failed are not kept; the oldest go past 300.
+ */
+const cardFiles = new Map<string, Promise<Response>>();
+function readCardFile(url: string, reload: number): Promise<Response> {
+	const key = `${url} ${reload}`;
+	let kept = cardFiles.get(key);
+	if (!kept) {
+		kept = fetch(url, { cache: "no-cache" }).then((response) => {
+			if (!response.ok) cardFiles.delete(key);
+			return response;
+		});
+		kept.catch(() => cardFiles.delete(key));
+		cardFiles.set(key, kept);
+		if (cardFiles.size > 300) cardFiles.delete(cardFiles.keys().next().value!);
+	}
+	return kept.then((response) => response.clone());
+}
+
 export function CardSurface(props: CardSurfaceProps) {
 	let host!: HTMLDivElement;
 	// For the checks: how many surfaces were made for each card, and how many times each mounted its file.
@@ -55,7 +77,8 @@ export function CardSurface(props: CardSurfaceProps) {
 			url.searchParams.set("raw", "1");
 			return url.href;
 		},
-		read: (url) => fetch(url, { cache: "no-cache" }),
+		// A Reload (⋯, `decks view reload`) asks afresh: its count is part of what the file is kept under.
+		read: (url) => readCardFile(url, props.reload ?? 0),
 		missing: () => markMissing(props.path),
 		mount: (html) => {
 			if (!host) return;

@@ -67,14 +67,31 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * another comes for the same card never leaves it wrongly unmarked.
 	 */
 	const [liveCards, setLiveCards] = createSignal<ReadonlyMap<string, number>>(new Map());
-	const markLive = (path: string, on: boolean) =>
-		setLiveCards((was) => {
-			const next = new Map(was);
-			const count = (next.get(path) ?? 0) + (on ? 1 : -1);
-			if (count > 0) next.set(path, count);
-			else next.delete(path);
-			return next;
-		});
+	/*
+	 * Cards waking and sleeping together are counted together: each mark used to make a new map and so a
+	 * rebuild of the card list the engine draws (`covering.ts`), a dozen at a pan's rest. The marks of one
+	 * moment are kept and applied once, at the end of it.
+	 */
+	let marks: Map<string, number> | undefined;
+	const markLive = (path: string, on: boolean): void => {
+		if (!marks) {
+			marks = new Map();
+			queueMicrotask(() => {
+				const due = marks!;
+				marks = undefined;
+				setLiveCards((was) => {
+					const next = new Map(was);
+					for (const [one, delta] of due) {
+						const count = (next.get(one) ?? 0) + delta;
+						if (count > 0) next.set(one, count);
+						else next.delete(one);
+					}
+					return next;
+				});
+			});
+		}
+		marks.set(path, (marks.get(path) ?? 0) + (on ? 1 : -1));
+	};
 
 	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
 	const [holesShown, setHolesShown] = createSignal<ReadonlySet<string>>(new Set());

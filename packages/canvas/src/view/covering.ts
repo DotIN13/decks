@@ -79,7 +79,9 @@ export function createCovering(d: CoveringNeeds) {
 			d.props.boards
 				.map((board) => {
 					const sized = resize?.path === board.path ? resize : undefined;
-					const id = itemIds.get(board.path) ?? [...itemIds].find(([path]) => board.path.endsWith(path))?.[1];
+					// The drawing names a card from its canvas (`cards/x/index.html`), the stage from the deck: one look-up
+					// each way, where a scan of every item per card made each rebuild O(n²) (about 30 ms at 1,000 cards).
+					const id = itemIds.get(board.path) ?? itemIds.get(board.path.replace(/^canvases\/[^/]+\//, ""));
 					return {
 						path: board.path,
 						...(id ? { id } : {}),
