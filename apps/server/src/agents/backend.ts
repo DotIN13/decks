@@ -7,10 +7,9 @@ import type { Translator } from "./translator.ts";
 /**
  * What the shell needs from an agent, and nothing about how it works.
  *
- * There are two implementations: Pi and Claude Code. The interface predates the second
- * one, for the same reason `translator.ts` is separate from `pi/events.ts` — the
- * transcript, the identity and the chat list are the same for every agent — and the
- * second one arriving is what tested the claim.
+ * There are five implementations (`runtimes/`: Claude Code, Pi, opencode, OpenCode 2 and
+ * antigravity). The transcript, the identity and the chat list are the same for every agent,
+ * which is why `translator.ts` is separate from any runtime's events.
  *
  * What differs between runtimes lives in `capabilities` rather than in a method that
  * throws: a client that can see what an agent cannot do never offers it.
@@ -31,17 +30,14 @@ export interface AgentBackendContext {
 	 */
 	turnEnded?(): void;
 	/**
-	 * The canvas tool, defined once and adapted by each backend (§6.3).
-	 *
-	 * Not a Pi extension any more: Pi takes a tool definition directly, the Claude SDK
-	 * takes an in-process MCP server, and the description and guidelines are the part
-	 * that matters and must not drift between them.
+	 * The agent's Decks tool. Every runtime reaches the canvas through the `decks` command in its
+	 * shell; what a backend reads here is the briefing's part (`agentBriefing`: the guidelines, and
+	 * whether a Chrome tab is shared).
 	 */
 	tool: DecksTool;
 	/**
-	 * The agent behind the tool, for the parts of a backend that are not the tool itself.
-	 *
-	 * Pi's adapter needs it to attribute a board revision to a turn; nothing else does.
+	 * The agent behind the tool, for the parts of a backend that are not the tool itself: its id
+	 * (every runtime puts it in the shell's environment, `decksEnv`), and for Pi the revision a turn wrote.
 	 */
 	stageAgent: AgentHooks;
 	/**
@@ -55,10 +51,8 @@ export interface AgentBackendContext {
 	/**
 	 * This agent's canvas token, for a runtime that is not in this process.
 	 *
-	 * Pi and Claude reach `tool` directly — a closure in this process. opencode registers a
-	 * TypeScript tool that runs in its own Bun runtime and antigravity a Python function
-	 * inside its SDK's, so for those two the tool body is an HTTP call and this is what it
-	 * authenticates with. Absent for the in-process runtimes, which have no use for it.
+	 * The `decks` command in the agent's shell calls Decks over HTTP, so every runtime passes it
+	 * (`DECKS_TOKEN` in `decksEnv`); opencode's shared server trades its session for it instead.
 	 */
 	agentToken?: string;
 	/**
