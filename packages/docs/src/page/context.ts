@@ -51,13 +51,13 @@ export interface PageContext {
 
 /** The calls one panel makes on another, each filled in by the panel named beside it. */
 export interface PageHooks {
-	/** `page.ts`: the text moved; every view follows it. */
+	/** `updates.ts`: the text moved; every view follows it. */
 	updated(why: Why, applied?: readonly Splice[]): void;
-	/** `page.ts`: the status and the Changes count, as they stand. */
+	/** `bar.ts`: the status and the Changes count, as they stand. */
 	refresh(): void;
-	/** `page.ts`: open a side panel, or close it when it is the one open. */
+	/** `bar.ts`: open a side panel, or close it when it is the one open. */
 	show(view: View): void;
-	/** `page.ts`: a side panel's header, with its title, any buttons, and a close. */
+	/** `bar.ts`: a side panel's header, with its title, any buttons, and a close. */
 	header(title: string, ...extra: HTMLElement[]): HTMLElement;
 	/** `tools.ts`: the toolbar for the kind of file this is. */
 	buildTools(): void;
