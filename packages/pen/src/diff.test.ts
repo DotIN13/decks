@@ -76,3 +76,51 @@ test("an edit shares every item it does not reach", () => {
 	assert.equal(b.children[0]!.children![0]!.content, "y");
 	assert.equal(a.children[0]!.children![0]!.content, "x");
 });
+
+/*
+ * Exact under any change: random drawings changed at random (moves, inserts, removals, items taken
+ * into or out of a frame, fields), and the edits applied to the old drawing give the new one. And few:
+ * bringing one old item to the front is one move, not one per item above it.
+ */
+test("random changes: the edits rebuild the new drawing exactly", () => {
+	let seed = 7;
+	const rand = (n: number) => ((seed = (seed * 1103515245 + 12345) % 2147483648) % n);
+	const make = (count: number): PenDocument => {
+		const children: PenNode[] = [];
+		for (let i = 0; i < count; i++) {
+			if (rand(5) === 0) children.push({ id: `f${i}`, type: "frame", x: i, children: [{ id: `f${i}a`, type: "rectangle", x: 1 }, { id: `f${i}b`, type: "text", x: 2 }] });
+			else children.push({ id: `n${i}`, type: "rectangle", x: i, y: rand(100) });
+		}
+		return { version: "2.11", children };
+	};
+	for (let round = 0; round < 300; round++) {
+		const prev = make(5 + rand(25));
+		const next = structuredClone(prev);
+		const top = next.children as PenNode[];
+		for (let change = 0, many = 1 + rand(6); change < many; change++) {
+			const pick = rand(6);
+			if (!top.length) break;
+			if (pick === 0) top.push(top.splice(rand(top.length), 1)[0]!); // to the front
+			else if (pick === 1) top.unshift(top.splice(rand(top.length), 1)[0]!); // to the back
+			else if (pick === 2) top.splice(rand(top.length + 1), 0, { id: `new${round}-${change}`, type: "ellipse", x: 0 });
+			else if (pick === 3) top.splice(rand(top.length), 1);
+			else if (pick === 4) {
+				const frame = top.find((n) => Array.isArray(n.children));
+				const i = rand(top.length);
+				if (frame && top[i] !== frame) (frame.children as PenNode[]).push(top.splice(i, 1)[0]!);
+			} else top[rand(top.length)]!.x = rand(1000);
+		}
+		const edits = diff(prev, next);
+		assert.deepEqual(editDocument(prev, edits), next, `round ${round}`);
+		assert.deepEqual(canon(applyEdits(prev, edits)), canon(next), `round ${round}, applyEdits`);
+	}
+});
+
+test("bringing one old item to the front of many is one move", () => {
+	const children: PenNode[] = Array.from({ length: 500 }, (_, i) => ({ id: `n${i}`, type: "rectangle", x: i }));
+	const prev: PenDocument = { version: "2.11", children };
+	const next: PenDocument = { version: "2.11", children: [...children.slice(0, 10), ...children.slice(11), children[10]!] };
+	const edits = diff(prev, next);
+	assert.deepEqual(edits, [{ op: "place", id: "n10", parent: null, after: "n499" }]);
+	assert.deepEqual(editDocument(prev, edits), next);
+});

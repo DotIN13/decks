@@ -47,6 +47,37 @@ function fieldsOf(node: PenNode): Record<string, unknown> {
 	return rest;
 }
 
+/**
+ * Of the items already in a list (`have`, in their old order), those that keep their order in the new
+ * one (`list`): the longest run whose old places rise along the new list. Moving only the others is the
+ * fewest moves that give the new order.
+ */
+function kept(have: readonly string[], list: readonly PenNode[]): Set<string> {
+	const oldAt = new Map(have.map((id, i) => [id, i]));
+	const seq: Array<{ id: string; at: number }> = [];
+	for (const node of list) {
+		const at = oldAt.get(node.id);
+		if (at !== undefined) seq.push({ id: node.id, at });
+	}
+	// Patience sorting: `tails[k]` ends the best run of length k + 1 found so far; `back` walks it back.
+	const tails: number[] = [];
+	const back = new Array<number>(seq.length).fill(-1);
+	for (let i = 0; i < seq.length; i++) {
+		let lo = 0;
+		let hi = tails.length;
+		while (lo < hi) {
+			const mid = (lo + hi) >> 1;
+			if (seq[tails[mid]!]!.at < seq[i]!.at) lo = mid + 1;
+			else hi = mid;
+		}
+		if (lo > 0) back[i] = tails[lo - 1]!;
+		tails[lo] = i;
+	}
+	const keep = new Set<string>();
+	for (let i = tails.length ? tails[tails.length - 1]! : -1; i >= 0; i = back[i]!) keep.add(seq[i]!.id);
+	return keep;
+}
+
 /** The edits that make `prev` into `next`, in an order that applies one after another. */
 export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 	const edits: PenEdit[] = [];
@@ -76,17 +107,25 @@ export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 	// New and moved, parents before children, each list put in order from its start.
 	const visit = (list: readonly PenNode[], parent: string | null) => {
 		const have = working(parent);
+		// Only what leaves its order moves: the items keeping their order are the longest run whose old
+		// places rise (`kept`), and the rest are taken out to be put back in place. Without this, bringing
+		// one old item to the front moved every item above it, one edit each (6,791 on a 7,000-item canvas).
+		const keep = kept(have, list);
+		for (let i = have.length - 1; i >= 0; i--) if (!keep.has(have[i]!)) have.splice(i, 1);
 		let previous: string | null = null;
+		// Where `previous` sits in `have`: the next item is usually right after it, so no search is needed.
+		let previousAt = -1;
+		const placeOf = (id: string, near: number) => (have[near] === id ? near : have.indexOf(id));
 		for (const node of list) {
 			const id = node.id;
 			const was = before.get(id);
 			if (!was) {
 				edits.push({ op: "insert", id, parent, after: previous, props: fieldsOf(node), list: Array.isArray(node.children) });
-				have.splice(previous === null ? 0 : have.indexOf(previous) + 1, 0, id);
+				have.splice(previous === null ? 0 : placeOf(previous, previousAt) + 1, 0, id);
 				current.set(id, []);
 			} else {
-				const at = have.indexOf(id);
-				const expected = previous === null ? 0 : have.indexOf(previous) + 1;
+				const expected = previous === null ? 0 : placeOf(previous, previousAt) + 1;
+				const at = placeOf(id, expected);
 				if (was.parent !== parent || at !== expected) {
 					edits.push({ op: "place", id, parent, after: previous });
 					if (at >= 0) have.splice(at, 1);
@@ -96,7 +135,15 @@ export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 						const i = from.indexOf(id);
 						if (i >= 0) from.splice(i, 1);
 					}
-					have.splice(previous === null ? 0 : have.indexOf(previous) + 1, 0, id);
+					have.splice(previous === null ? 0 : placeOf(previous, previousAt) + 1, 0, id);
+				}
+				// The same object is the same item, fields and all: nothing to compare (a commit that shares
+				// what it did not change). Its children are the same too, but are walked for their places.
+				if (was.node === node) {
+					if (Array.isArray(node.children)) visit(node.children, id);
+					previous = id;
+					previousAt = placeOf(id, previousAt + 1);
+					continue;
 				}
 				const a = fieldsOf(was.node);
 				const b = fieldsOf(node);
@@ -111,6 +158,7 @@ export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 			}
 			if (Array.isArray(node.children)) visit(node.children, id);
 			previous = id;
+			previousAt = placeOf(id, previousAt + 1);
 		}
 	};
 	// Items moved out of a list are taken from it before anything is put in order there.
