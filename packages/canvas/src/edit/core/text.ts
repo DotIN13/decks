@@ -1,5 +1,5 @@
 /**
- * The words typed on the stage, decided with no page under it: how an item's words are set for
+ * The words typed on the canvas, decided with no page under it: how an item's words are set for
  * the editor laid over them (`textLook`, `cardLook`), what an item is part of that opens for typing
  * (a shape, a card, a file), how wide a card's words are, and what putting the typing away writes
  * (`commitOf`, `cancelOps`, `legacyCard`).

@@ -31,7 +31,7 @@ export function createTouchOnDrawing(d: TouchOnDrawingNeeds) {
 		const since = performance.now();
 		const selected = d.editor.items();
 		/*
-		 * One finger pans, whatever it lands on, selected or not: the finger is the stage's to scroll with,
+		 * One finger pans, whatever it lands on, selected or not: the finger is the canvas's to scroll with,
 		 * and a tap selects. Held still first, it selects what it is on (`hold`), and moving from there
 		 * carries it: the finger is the editor's from the hold.
 		 */

@@ -4,16 +4,16 @@ import { ARROW } from "@decks/pen";
 import { arrowHandles, arrowLine, arrowOp, bendAt, bendStart, pageAt, droppedEnd, endOf, joinAt, nearSide, newArrowEnds, onSide, pointEnd, resetBendOp, resetEndOp, routeDraft, sideNear, slideAt, slideJoin } from "./arrows.ts";
 import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";
 
-const board = { path: "boards/x.html", x: 0, y: 200, w: 400, h: 300 };
+const card = { path: "boards/x.html", x: 0, y: 200, w: 400, h: 300 };
 const box = { x: 0, y: 0, w: 100, h: 50 };
-/** Two boxes side by side, a board under them, and an arrow `ar` with the given metadata. */
+/** Two boxes side by side, a card under them, and an arrow `ar` with the given metadata. */
 const scene = (meta: Record<string, unknown> = { from: "a", to: "b" }) => {
 	const items: FakeItem[] = [
 		{ id: "a", box },
 		{ id: "b", box: { x: 300, y: 0, w: 100, h: 50 } },
 		{ id: "ar", type: "path", box: { x: 0, y: 0, w: 400, h: 50 }, line: true, extra: { strokeWidth: 2, metadata: { type: ARROW, ...meta } } },
 	];
-	return fakeScene(items, [board]);
+	return fakeScene(items, [card]);
 };
 
 test("an end near a side's middle keeps to that side; the reach is 14 screen px, or a quarter of a small box", () => {
@@ -22,7 +22,7 @@ test("an end near a side's middle keeps to that side; the reach is 14 screen px,
 	// A quarter of this box is 12.5, under 14.
 	assert.equal(sideNear(box, { x: 50, y: 13 }, 1), undefined);
 	assert.equal(sideNear(box, { x: 50, y: 25 }, 1), undefined);
-	// At zoom 2 the reach is 7 stage px.
+	// At zoom 2 the reach is 7 canvas px.
 	assert.equal(sideNear(box, { x: 50, y: 10 }, 1), "top");
 	assert.equal(sideNear(box, { x: 50, y: 10 }, 2), undefined);
 	// A 20 px box: a quarter is 5, but never under 6.
@@ -41,7 +41,7 @@ test("an end joins the item picked there, else the board, never an arrow or the 
 	const s = scene();
 	assert.deepEqual(joinAt(s, { x: 99, y: 26 }, { zoom: 1 }), { name: "a", box, side: "right" });
 	assert.deepEqual(joinAt(s, { x: 40, y: 30 }, { zoom: 1 }), { name: "a", box });
-	// The arrow's own line is looked through, to the board under it and then nothing.
+	// The arrow's own line is looked through, to the card under it and then nothing.
 	assert.deepEqual(joinAt(s, { x: 200, y: 25 }, { zoom: 1 }), undefined);
 	assert.deepEqual(joinAt(s, { x: 50, y: 300 }, { zoom: 1 }), { name: "boards/x.html", box: { x: 0, y: 200, w: 400, h: 300 } });
 	assert.deepEqual(joinAt(s, { x: 200, y: 200 }, { zoom: 1 }), { name: "boards/x.html", box: { x: 0, y: 200, w: 400, h: 300 }, side: "top" });
@@ -75,7 +75,7 @@ test("a selected arrow's handles: its ends, their sides, its middle, moved by th
 	// Not an arrow, or an end that cannot be found.
 	assert.equal(arrowHandles(scene(), "a"), undefined);
 	assert.equal(arrowHandles(scene({ from: "a", to: "gone" }), "ar"), undefined);
-	// A board end is found by its path.
+	// A card end is found by its path.
 	assert.deepEqual(arrowLine(scene(), { from: "a", to: "boards/x.html" }), [[50, 50], [50, 200]]);
 });
 
@@ -89,7 +89,7 @@ test("a join slides along its side to a thousandth, clicking to the ends and mid
 	assert.equal(slideAt(box, "top", { x: 30, y: 0 }, { zoom: 1 }), 0.3);
 	assert.equal(slideAt(box, "top", { x: 45, y: 0 }, { zoom: 1 }), 0.5);
 	assert.equal(slideAt(box, "top", { x: 45, y: 0 }, { zoom: 1, free: true }), 0.45);
-	// At zoom 0.5 the click is 16 stage px.
+	// At zoom 0.5 the click is 16 canvas px.
 	assert.equal(slideAt(box, "top", { x: 36, y: 0 }, { zoom: 0.5 }), 0.5);
 	assert.equal(slideAt(box, "left", { x: 0, y: 10 }, { zoom: 1 }), 0.2);
 	assert.equal(slideAt(box, "left", { x: 0, y: 20 }, { zoom: 1 }), 0.5);

@@ -25,12 +25,12 @@ export interface SceneQuery {
 	node(id: string): PenNode | undefined;
 	/** The node an item sits in, in the document; `undefined` at the top. */
 	parent(id: string): PenNode | undefined;
-	/** The boards on the stage, as placed, in file order. */
-	boards(): readonly PageBox[];
+	/** The cards on the canvas, as placed, in file order. */
+	cards(): readonly PageBox[];
 	/** The item on the drawing that is this page, by its path, when the scene can say. */
 	pageItem?(path: string): string | undefined;
 	/**
-	 * Every item under a stage point, topmost first, unfiltered: raw geometry, with a press's
+	 * Every item under a canvas point, topmost first, unfiltered: raw geometry, with a press's
 	 * reach round each so a thin line can be hit. Which of them a press means is `pick.ts`'s.
 	 */
 	under(point: Pt): string[];
@@ -58,12 +58,12 @@ export interface EngineSeam {
 	 * answers it glides each of them from there to where it lands.
 	 */
 	settle(landing?: ReadonlyMap<string, Rect>): void;
-	/** The boards a drag carries, and how far: their pictures go with it. */
+	/** The cards a drag carries, and how far: their pictures go with it. */
 	carry(paths: readonly string[], offset: { dx: number; dy: number }): void;
 	/** A mark for what has been sent so far, and whether a frame painted after it is on screen. */
 	mark(): number;
 	shows(mark: number): boolean;
-	/** The link of a card under a stage point. */
+	/** The link of a card under a canvas point. */
 	linkAt(point: Pt): string | undefined;
 	/** Leave out the words of these items, which the editor laid over them is showing; `undefined` draws them all again. */
 	muteText(ids: ReadonlySet<string> | undefined): void;

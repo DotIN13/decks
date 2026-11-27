@@ -82,7 +82,7 @@ export function createSelection(deps: SelectionDeps) {
 				drag: shownDrag(),
 				glide: editor.glide(),
 				resize: editor.shownResize(),
-				cards: scene.boards(),
+				cards: scene.cards(),
 				pagePicks: editor.pagePicks(),
 				pageDrag: editor.pageDrag(),
 				ownDrag: editor.ownDrag(),
@@ -116,7 +116,7 @@ export function createSelection(deps: SelectionDeps) {
 		setPenBoxes(boxes);
 	});
 	/** The selected card's box, when it alone is selected and can be resized: the same eight handles as an item. */
-	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), cards: scene.boards(), zoom: ctl.zoom() }));
+	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), cards: scene.cards(), zoom: ctl.zoom() }));
 
 	const { pillObstacles } = createPillObstacles({
 		props,

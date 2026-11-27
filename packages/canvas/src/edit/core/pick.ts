@@ -37,7 +37,7 @@ const contains = (box: Rect, point: Pt) => point.x >= box.x && point.x <= box.x 
 
 /**
  * The topmost item a press at a point lands on. Never an item inside an instance, a group itself
- * or a board. The press's reach is for lines: anything else is hit only inside what it draws, so
+ * or a card. The press's reach is for lines: anything else is hit only inside what it draws, so
  * of two close shapes the nearer one wins.
  */
 function topAt(scene: SceneQuery, point: Pt, skip?: (node: PenNode) => boolean): Placed | undefined {
@@ -77,7 +77,7 @@ function groupGapAt(scene: SceneQuery, point: Pt, above: number, skip?: (node: P
 	return top;
 }
 
-/** The item a press at a stage point picks. Boards are not found here, and an item inside an instance is found as the instance. */
+/** The item a press at a canvas point picks. Cards are not found here, and an item inside an instance is found as the instance. */
 export function pickAt(scene: SceneQuery, point: Pt, options: PickOptions = {}): Picked | undefined {
 	const policy = options.policy ?? "exact";
 	let best = topAt(scene, point, options.skip);
@@ -92,7 +92,7 @@ export function pickAt(scene: SceneQuery, point: Pt, options: PickOptions = {}):
 	return { id: best.node.id, node: best.node, box: { ...(scene.box(best.node.id) ?? best.box) } };
 }
 
-/** The node an item sits in that the editor can select: not a board, not inside an instance. */
+/** The node an item sits in that the editor can select: not a card, not inside an instance. */
 export function parentOf(scene: SceneQuery, id: string): string | undefined {
 	const up = scene.item(id)?.parent;
 	const node = up ? scene.item(up)?.node : undefined;
@@ -111,7 +111,7 @@ export function childrenOf(scene: SceneQuery, id: string): string[] {
 }
 
 /**
- * The text block of a card at a stage point: the one under it, or in the card's margin, the one
+ * The text block of a card at a canvas point: the one under it, or in the card's margin, the one
  * level with it (4 px either side). Not in the card open for typing (`typing`), which has its own
  * way of moving things.
  */
@@ -129,15 +129,15 @@ export function blockAt(scene: SceneQuery, point: Pt, typing?: string): string |
 }
 
 /**
- * The board whose picture is under a point and that has no node of its own to take the press:
+ * The card whose picture is under a point and that has no node of its own to take the press:
  * one not in `rendered`. The last in file order, as the sheet draws it on top.
- * `boards` may be only the candidates a spatial index found near the point, as long as they keep file order.
+ * `cards` may be only the candidates a spatial index found near the point, as long as they keep file order.
  */
-export function pictureAt(boards: readonly PageBox[], point: Pt, rendered: ReadonlySet<string>): string | undefined {
+export function pictureAt(cards: readonly PageBox[], point: Pt, rendered: ReadonlySet<string>): string | undefined {
 	let top: string | undefined;
-	for (const board of boards) {
-		if (rendered.has(board.path)) continue;
-		if (contains(board, point)) top = board.path;
+	for (const card of cards) {
+		if (rendered.has(card.path)) continue;
+		if (contains(card, point)) top = card.path;
 	}
 	return top;
 }
@@ -148,10 +148,10 @@ export const marqueeRect = (m: { x1: number; y1: number; x2: number; y2: number 
 const wholly = (box: Rect, r: Rect) => box.x >= r.x && box.y >= r.y && box.x + box.w <= r.x + r.w && box.y + box.h <= r.y + r.h;
 
 /**
- * Every item and board wholly inside a stage rectangle: a marquee. Never an instance's inside, a
- * board's own node, or a part of a shape; an item whose parent is picked too is left to its parent.
+ * Every item and card wholly inside a canvas rectangle: a marquee. Never an instance's inside, a
+ * card's own node, or a part of a shape; an item whose parent is picked too is left to its parent.
  */
-export function marqueePick(scene: SceneQuery, r: Rect): { items: string[]; boards: string[] } {
+export function marqueePick(scene: SceneQuery, r: Rect): { items: string[]; cards: string[] } {
 	const inside = new Set<string>();
 	for (const placed of scene.items()) {
 		const { node } = placed;
@@ -164,5 +164,5 @@ export function marqueePick(scene: SceneQuery, r: Rect): { items: string[]; boar
 		for (let parent = scene.item(id)?.parent; parent; parent = scene.item(parent)?.parent) if (inside.has(parent)) return false;
 		return true;
 	});
-	return { items, boards: scene.boards().filter((board) => wholly(board, r)).map((board) => board.path) };
+	return { items, cards: scene.cards().filter((card) => wholly(card, r)).map((card) => card.path) };
 }

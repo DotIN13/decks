@@ -5,9 +5,9 @@
  * effects for the page to run (`dom/effects.ts`). Nothing here touches the page or the engine.
  *
  * A gesture is a press followed to its lift: carrying the selection (`press`, then `move` once it
- * has moved; boards go with it, which is a board's drag), a marquee, an item's or a board's
+ * has moved; cards go with it, which is a card's drag), a marquee, an item's or a card's
  * handles, the corner radius, and an arrow's end or middle. The page follows the pointer and says
- * each step here, in stage coordinates with the keys held, the pointer's kind and the time.
+ * each step here, in canvas coordinates with the keys held, the pointer's kind and the time.
  *
  * What is drawn after the lift waits for the engine's redraw, and that wait is state too: the
  * drag's offset and the resized outline stay until a new drawing is drawn (`drawn`), or until the
@@ -29,22 +29,22 @@ import { readingTargets, selectionBox, SNAP_PX, snapTargets } from "./snapping.t
 export const SETTLE_MS = 2000;
 /** How long a let-go radius is held for the drawing to have it. */
 export const RADIUS_HOLD_MS = 3000;
-/** How long a let-go board size is held for the board to be at it. */
+/** How long a let-go card size is held for the card to be at it. */
 export const PAGE_HOLD_MS = 4000;
 /** Two presses on one handle within this long, with no drag: the handle's double-click. */
 const HANDLE_TAP_MS = 400;
 
-/** Where the pointer is and how: in stage coordinates and on the screen, the keys held, its kind, and when. */
+/** Where the pointer is and how: in canvas coordinates and on the screen, the keys held, its kind, and when. */
 export type PointerInput = { at: Pt; client: Pt; mods: Mods; pointer: PointerKind; time: number };
 
 /** What a click that does not move does, besides selecting: follow a link (`browser`: with ⌘ or Ctrl held, which asks for the browser's own tab where the host has tabs of its own), or play a film or a sound. */
 export type Tap = { do: "open-link"; href: string; browser?: true; chip?: true } | { do: "media"; id: string; media: MediaItem };
 
-/** Carrying the selection: items and boards together. `press` until it has moved, `move` after. */
+/** Carrying the selection: items and cards together. `press` until it has moved, `move` after. */
 type Carry = {
 	ids: readonly string[];
-	boards: readonly string[];
-	/** The selection's box as the press found it, what it snaps to, and the boards it keeps the reading gap from. */
+	cards: readonly string[];
+	/** The selection's box as the press found it, what it snaps to, and the cards it keeps the reading gap from. */
 	start: Rect | undefined;
 	targets: readonly Rect[];
 	reading: readonly Rect[];
@@ -60,7 +60,7 @@ type Carry = {
 export type Gesture =
 	| ({ kind: "press" } & Carry)
 	| ({ kind: "move" } & Carry)
-	| { kind: "marquee"; from: Pt; kept: { items: readonly string[]; boards: readonly string[] } }
+	| { kind: "marquee"; from: Pt; kept: { items: readonly string[]; cards: readonly string[] } }
 	| { kind: "resize"; id: string; handle: Handle; start: Rect; given: Rect; words: boolean; floor: number; narrowest: number; targets: readonly Rect[]; from: Pt; next: Rect; moved: boolean }
 	| { kind: "radius"; start: Rect & RadiusStart & { id: string }; radius: number; moved: boolean }
 	| { kind: "arrowEnd"; id: string; which: Which; node: PenNode; metadata: Record<string, unknown>; stays: Pt; own?: JoinedEnd | undefined; slid?: { item: string; side: JoinedEnd["side"]; at: number } | undefined; moved: boolean }
@@ -72,12 +72,12 @@ export type Input =
 	/** A press on the drawing or bare canvas with the select tool: an item picked up, or a marquee. */
 	| ({ type: "press-canvas" } & PointerInput)
 	/** A press on a board (its node or its picture): it moves with whatever else is picked up. */
-	| ({ type: "press-board"; path: string } & PointerInput)
+	| ({ type: "press-card"; path: string } & PointerInput)
 	/** A press on a card block's grip: the block alone, carried. */
 	| ({ type: "press-block"; id: string } & PointerInput)
 	/** A press on one of the selected item's eight handles (`box` is the handles' box as drawn). */
 	| ({ type: "press-handle"; handle: Handle; box: Rect & { id: string } } & PointerInput)
-	| ({ type: "press-board-handle"; handle: Handle; box: Rect & { path: string } } & PointerInput)
+	| ({ type: "press-card-handle"; handle: Handle; box: Rect & { path: string } } & PointerInput)
 	| ({ type: "press-radius"; handle: Rect & RadiusStart & { id: string } } & PointerInput)
 	| ({ type: "press-arrow-end"; which: Which; ends: ArrowHandles } & PointerInput)
 	| ({ type: "press-arrow-bend"; ends: ArrowHandles } & PointerInput)
@@ -100,19 +100,19 @@ export type Input =
 
 /** What the page does for the editor: run in order by `dom/effects.ts`. */
 export type Effect =
-	/** The app's selected board: picked, or let go (`undefined`). */
-	| { do: "select-board"; path?: string | undefined }
+	/** The app's selected card: picked, or let go (`undefined`). */
+	| { do: "select-card"; path?: string | undefined }
 	/** A picture of what a drag carries, cut as it starts, for the ghost over a card. */
 	| { do: "ghost-take"; ids: readonly string[] }
 	| { do: "ghost-show"; over: boolean; client: Pt; gap: number }
 	| { do: "ghost-drop" }
 	/** Mark the composer under `client` as a drop target for these, or no composer (`client` absent). */
-	| { do: "composer"; client?: Pt | undefined; ids: readonly string[]; boards: readonly string[] }
+	| { do: "composer"; client?: Pt | undefined; ids: readonly string[]; cards: readonly string[] }
 	/** What was let go on the composer is mentioned there instead of moved. */
-	| { do: "refer"; ids: readonly string[]; boards: readonly string[] }
+	| { do: "refer"; ids: readonly string[]; cards: readonly string[] }
 	| Tap
-	| { do: "move-boards"; moves: readonly PageMove[] }
-	| { do: "board-size"; path: string; size: { w: number; h: number } }
+	| { do: "move-cards"; moves: readonly PageMove[] }
+	| { do: "card-size"; path: string; size: { w: number; h: number } }
 	/**
 	 * Tell the engine a gesture was let go (`EngineSeam.settle`); a drop says where what it can move
 	 * was let go (`glide.ts`, `landingBoxes`), for the drawing that answers it to glide them from.
@@ -128,19 +128,19 @@ export type Effect =
 /** What the reducer reads besides the state and the scene. */
 export type GestureContext = {
 	zoom: number;
-	/** The window, in stage pixels: what a drag snaps against. */
+	/** The window, in canvas pixels: what a drag snaps against. */
 	view: Rect;
 	/** The drawing generation: counted up by the page each time a new drawing is drawn. */
 	generation: number;
 	/** Ids for what a copy makes, none taken. */
 	nextIds: () => NextId;
-	/** A board's revision now, which a write of its size moves on. */
+	/** A card's revision now, which a write of its size moves on. */
 	pageRev: (path: string) => number;
-	/** A card's link under a stage point (`EngineSeam.linkAt`). */
+	/** A card's link under a canvas point (`EngineSeam.linkAt`). */
 	linkAt: (point: Pt) => string | undefined;
 	/** Whether the composer is under a screen point, for a drag of these to mention them. */
-	overComposer: (client: Pt, ids: readonly string[], boards: readonly string[]) => boolean;
-	/** The board selected by a plain press (the page's own selection, not a pick), if any. */
+	overComposer: (client: Pt, ids: readonly string[], cards: readonly string[]) => boolean;
+	/** The card selected by a plain press (the page's own selection, not a pick), if any. */
 	selectedPage?: string | undefined;
 };
 
@@ -151,12 +151,12 @@ const ZERO: Offset = { dx: 0, dy: 0 };
 
 /** The editor before anything is selected or pressed. */
 export function initialState(mode: EditorState["mode"] = "browse", tool: PenTool = "select"): EditorState {
-	return { mode, tool, selection: { items: [], boards: [], awaited: [] }, hover: { link: false }, drag: ZERO, guides: [], drop: {}, joins: [], sides: [], carryPending: false, settling: [] };
+	return { mode, tool, selection: { items: [], cards: [], awaited: [] }, hover: { link: false }, drag: ZERO, guides: [], drop: {}, joins: [], sides: [], carryPending: false, settling: [] };
 }
 
-/** The selection with its items, its boards, or both replaced. */
-export function withSelection(state: EditorState, next: { items?: readonly string[]; boards?: readonly string[] }): EditorState {
-	return { ...state, selection: { ...state.selection, ...(next.items ? { items: next.items } : {}), ...(next.boards ? { boards: next.boards } : {}) } };
+/** The selection with its items, its cards, or both replaced. */
+export function withSelection(state: EditorState, next: { items?: readonly string[]; cards?: readonly string[] }): EditorState {
+	return { ...state, selection: { ...state.selection, ...(next.items ? { items: next.items } : {}), ...(next.cards ? { cards: next.cards } : {}) } };
 }
 
 /** Select what was just asked for, which the drawing does not have until the server answers. */
@@ -164,24 +164,24 @@ export function selectMade(state: EditorState, made: readonly string[]): EditorS
 	return { ...state, selection: { ...state.selection, items: made, awaited: [...new Set([...state.selection.awaited, ...made])] } };
 }
 
-/** The boards picked up that are no longer on the canvas, let go. */
+/** The cards picked up that are no longer on the canvas, let go. */
 export function prunePages(state: EditorState, present: ReadonlySet<string>): EditorState {
-	const picks = state.selection.boards;
-	return picks.some((path) => !present.has(path)) ? withSelection(state, { boards: picks.filter((path) => present.has(path)) }) : state;
+	const picks = state.selection.cards;
+	return picks.some((path) => !present.has(path)) ? withSelection(state, { cards: picks.filter((path) => present.has(path)) }) : state;
 }
 
 /**
- * A board size let go is let go of once the board is at it: the write's revision has come (or the
- * board is exactly the box already) and the board is where the box is, as wide, and at least as
- * tall, since a board's height is a floor its content can raise. A board gone lets it go too.
+ * A card size let go is let go of once the card is at it: the write's revision has come (or the
+ * card is exactly the box already) and the card is where the box is, as wide, and at least as
+ * tall, since a card's height is a floor its content can raise. A card gone lets it go too.
  */
-export function landPageResize(state: EditorState, board: (PageBox & { rev: number }) | undefined): EditorState {
+export function landPageResize(state: EditorState, card: (PageBox & { rev: number }) | undefined): EditorState {
 	const held = state.pageResize;
 	if (!held?.released) return state;
-	if (!board) return { ...state, pageResize: undefined };
-	const at = board.x === held.x && board.y === held.y && board.w === held.w;
-	if (board.rev === held.released.rev && !(at && board.h === held.h)) return state;
-	return at && board.h >= held.h ? { ...state, pageResize: undefined } : state;
+	if (!card) return { ...state, pageResize: undefined };
+	const at = card.x === held.x && card.y === held.y && card.w === held.w;
+	if (card.rev === held.released.rev && !(at && card.h === held.h)) return state;
+	return at && card.h >= held.h ? { ...state, pageResize: undefined } : state;
 }
 
 /** A second press on the same handle, without a drag, soon after: a handle's double-click. */
@@ -197,16 +197,16 @@ const landed = (state: EditorState): EditorState => ({ ...state, drag: ZERO, res
 const isFree = (mods: Mods) => mods.meta || mods.ctrl;
 const done = (state: EditorState, effects: Effect[] = [], ops: Op[] = []): Step => ({ state, ops, effects });
 
-/** Start carrying `ids` and `boards` from a press. The ghost's picture is cut now, before anything leaves the sheet. */
-function carry(state: EditorState, scene: SceneQuery, ctx: GestureContext, p: PointerInput, ids: readonly string[], boards: readonly string[], tap?: Tap, touch?: { from: { at: Pt; client: Pt } }): { state: EditorState; effect: Effect } {
+/** Start carrying `ids` and `cards` from a press. The ghost's picture is cut now, before anything leaves the sheet. */
+function carry(state: EditorState, scene: SceneQuery, ctx: GestureContext, p: PointerInput, ids: readonly string[], cards: readonly string[], tap?: Tap, touch?: { from: { at: Pt; client: Pt } }): { state: EditorState; effect: Effect } {
 	const gesture: Gesture = {
 		kind: touch ? "move" : "press",
 		ids,
-		boards,
-		start: selectionBox(scene, ids, boards),
+		cards,
+		start: selectionBox(scene, ids, cards),
 		// A finger does not snap, so it never asks what is around.
-		targets: touch ? [] : snapTargets(scene, ids, boards, ctx.view),
-		reading: touch ? [] : readingTargets(scene, ids, boards, ctx.view),
+		targets: touch ? [] : snapTargets(scene, ids, cards, ctx.view),
+		reading: touch ? [] : readingTargets(scene, ids, cards, ctx.view),
 		from: touch ? touch.from.at : p.at,
 		fromClient: touch ? touch.from.client : p.client,
 		...(touch ? { touch: true as const } : {}),
@@ -224,12 +224,12 @@ function pressCanvas(state: EditorState, p: PointerInput, scene: SceneQuery, ctx
 	const inner = pickAt(scene, at, { deep: true });
 	const hit: Picked | undefined = inner && selected.includes(inner.id) ? inner : pickAt(scene, at);
 	if (hit) {
-		const effects: Effect[] = [{ do: "select-board" }];
+		const effects: Effect[] = [{ do: "select-card" }];
 		if (p.mods.shift) return done(withSelection(state, { items: selected.includes(hit.id) ? selected.filter((id) => id !== hit.id) : [...selected, hit.id] }), effects);
 		const group = selected.includes(hit.id);
 		const moving = group ? selected : [hit.id];
-		const boards = group ? state.selection.boards : [];
-		let next = group ? state : withSelection(state, { items: moving, boards: [] });
+		const cards = group ? state.selection.cards : [];
+		let next = group ? state : withSelection(state, { items: moving, cards: [] });
 		next = { ...next, hover: { ...next.hover, item: undefined } };
 		/*
 		 * A link in a card: a click that does not move follows it, in a new tab. While browsing,
@@ -243,38 +243,38 @@ function pressCanvas(state: EditorState, p: PointerInput, scene: SceneQuery, ctx
 		// A link chip is all link: its click opens it and leaves it unselected, where a click on a card's link also selects the card.
 		const chip = follows && !group && chipLink(hit.node) === href;
 		const tap: Tap | undefined = follows ? { do: "open-link", href, ...(isFree(p.mods) ? { browser: true as const } : {}), ...(chip ? { chip: true as const } : {}) } : playable && media && !p.mods.shift ? { do: "media", id: playable.id, media } : undefined;
-		const started = carry(next, scene, ctx, p, moving, boards, tap);
+		const started = carry(next, scene, ctx, p, moving, cards, tap);
 		return done(started.state, [...effects, started.effect]);
 	}
 	/*
-	 * Bare canvas: a marquee, as in a design tool, picking the items and the boards wholly inside
+	 * Bare canvas: a marquee, as in a design tool, picking the items and the cards wholly inside
 	 * it as it goes. Shift adds to what is already selected.
 	 */
 	const adding = p.mods.shift;
-	const kept = { items: adding ? selected : [], boards: adding ? state.selection.boards : [] };
-	const next = adding ? state : withSelection(state, { items: [], boards: [] });
-	return done({ ...next, marquee: { x1: at.x, y1: at.y, x2: at.x, y2: at.y }, gesture: { kind: "marquee", from: at, kept } }, [{ do: "select-board" }]);
+	const kept = { items: adding ? selected : [], cards: adding ? state.selection.cards : [] };
+	const next = adding ? state : withSelection(state, { items: [], cards: [] });
+	return done({ ...next, marquee: { x1: at.x, y1: at.y, x2: at.x, y2: at.y }, gesture: { kind: "marquee", from: at, kept } }, [{ do: "select-card" }]);
 }
 
-/** A press on a board: Shift adds it to the picks or takes it out; otherwise it is carried with the selection it is part of, or alone. */
+/** A press on a card: Shift adds it to the picks or takes it out; otherwise it is carried with the selection it is part of, or alone. */
 function pressPage(state: EditorState, path: string, p: PointerInput, scene: SceneQuery, ctx: GestureContext): Step {
 	/*
-	 * A plain press selects a board on its own, the page's selection rather than a pick: Shift and a
+	 * A plain press selects a card on its own, the page's selection rather than a pick: Shift and a
 	 * press on another starts the picks with both, so the two are carried together. Without it the
-	 * first board was left out of the group, and a drag by it moved it alone (or by the other, the other alone).
+	 * first card was left out of the group, and a drag by it moved it alone (or by the other, the other alone).
 	 */
 	const own = ctx.selectedPage;
-	const picks = state.selection.boards.length === 0 && state.selection.items.length === 0 && own && scene.boards().some((board) => board.path === own) ? [own] : state.selection.boards;
-	if (p.mods.shift) return done(withSelection(state, { boards: picks.includes(path) ? picks.filter((one) => one !== path) : [...picks, path] }));
+	const picks = state.selection.cards.length === 0 && state.selection.items.length === 0 && own && scene.cards().some((card) => card.path === own) ? [own] : state.selection.cards;
+	if (p.mods.shift) return done(withSelection(state, { cards: picks.includes(path) ? picks.filter((one) => one !== path) : [...picks, path] }));
 	const group = picks.includes(path);
-	const next = group ? state : withSelection(state, { items: [], boards: [] });
+	const next = group ? state : withSelection(state, { items: [], cards: [] });
 	const started = carry(next, scene, ctx, p, group ? state.selection.items : [], group ? picks : [path]);
-	return done(started.state, [{ do: "select-board", path }, started.effect]);
+	return done(started.state, [{ do: "select-card", path }, started.effect]);
 }
 
 /** A move of the selection being carried by a mouse or a pen. */
 function moveCarry(state: EditorState, g: Carry, p: PointerInput, scene: SceneQuery, ctx: GestureContext): Step {
-	const { ids, boards, start } = g;
+	const { ids, cards, start } = g;
 	const now = p.at;
 	let offset: Offset;
 	let lines: Guide[] = [];
@@ -325,17 +325,17 @@ function moveCarry(state: EditorState, g: Carry, p: PointerInput, scene: SceneQu
 			offset = { dx: now.x + gap - start!.x, dy: now.y + gap - start!.y };
 			lines = [];
 		}
-		effects.push({ do: "ghost-show", over, client: p.client, gap: 12 }, { do: "composer", client: p.client, ids, boards }, { do: "panned" });
+		effects.push({ do: "ghost-show", over, client: p.client, gap: 12 }, { do: "composer", client: p.client, ids, cards }, { do: "panned" });
 	}
 	const slot = onto ? dropSlot(scene, onto, now, ids) : undefined;
 	/*
 	 * The other places it could go, near the pointer: dashed, round the one it would take. Not for
-	 * boards alone, which drop nowhere, nor with ⌘ or Ctrl, which keeps what is carried where it is.
+	 * cards alone, which drop nowhere, nor with ⌘ or Ctrl, which keeps what is carried where it is.
 	 */
 	const near = ids.length && (g.touch || !isFree(p.mods)) ? nearDrops(scene, now, ids, NEAR_PX / ctx.zoom, { into: onto, line: slot?.line }) : undefined;
 	const drop = { into: onto, slot, ...(near && (near.slots.length || near.frames.length) ? { near } : {}) };
-	// A finger carries the boards picked up as they are now; a mouse the ones it picked up.
-	const carried = g.touch ? state.selection.boards : boards;
+	// A finger carries the cards picked up as they are now; a mouse the ones it picked up.
+	const carried = g.touch ? state.selection.cards : cards;
 	let next: EditorState = { ...state, gesture: { ...g, kind: "move", offset }, drop };
 	if (!g.touch) next = { ...next, guides: lines };
 	if (ids.length || g.touch) next = { ...next, drag: offset };
@@ -346,7 +346,7 @@ function moveCarry(state: EditorState, g: Carry, p: PointerInput, scene: SceneQu
 
 /** The lift of a carry. */
 function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, scene: SceneQuery, ctx: GestureContext): Step {
-	const { ids, boards, offset } = g;
+	const { ids, cards, offset } = g;
 	const effects: Effect[] = [{ do: "ghost-drop" }];
 	let next: EditorState = { ...state, gesture: undefined };
 	if (g.touch) {
@@ -355,19 +355,19 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 		next = { ...next, drop: {} };
 		const ops = moveOps(scene, ids, offset.dx, offset.dy, into, slot);
 		if (ids.length) next = settle(next, p.time, ctx, effects, landingBoxes(scene, ids, offset, into));
-		const moves = pageMoves(scene.boards(), state.selection.boards, offset.dx, offset.dy);
-		effects.push({ do: "move-boards", moves });
+		const moves = pageMoves(scene.cards(), state.selection.cards, offset.dx, offset.dy);
+		effects.push({ do: "move-cards", moves });
 		return { state: holdPages(next, state.pageDrag, moves, p.time, effects), ops, effects };
 	}
 	const moved = g.kind === "move";
-	const referring = moved && ctx.overComposer(p.client, ids, boards);
-	effects.push({ do: "composer", ids, boards });
+	const referring = moved && ctx.overComposer(p.client, ids, cards);
+	effects.push({ do: "composer", ids, cards });
 	next = { ...next, guides: [] };
 	if (!moved) {
 		next = { ...next, drop: {}, pageDrag: undefined };
 		if (g.tap) effects.push(g.tap);
 		// A chip's click was for its link: the press selected it to carry it, and nothing is left selected.
-		if (g.tap?.do === "open-link" && g.tap.chip) next = withSelection(next, { items: [], boards: [] });
+		if (g.tap?.do === "open-link" && g.tap.chip) next = withSelection(next, { items: [], cards: [] });
 		return done(next, effects);
 	}
 	/*
@@ -376,7 +376,7 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 	 * to the box and it goes back where it was, with its name now in what you are typing.
 	 */
 	if (referring) {
-		effects.push({ do: "refer", ids, boards });
+		effects.push({ do: "refer", ids, cards });
 		return { state: { ...next, drop: {}, drag: ZERO, pageDrag: undefined }, ops: [], preview: null, effects };
 	}
 	const into = state.drop.into;
@@ -398,17 +398,17 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 		next = { ...next, drag: ZERO };
 	} else if (ids.length) next = settle(next, p.time, ctx, effects, p.mods.alt ? undefined : landingBoxes(scene, ids, offset, into));
 	// A copy lands where it was let go and moves nothing else: only a move glides.
-	const moves = pageMoves(scene.boards(), boards, offset.dx, offset.dy);
-	effects.push({ do: "move-boards", moves });
+	const moves = pageMoves(scene.cards(), cards, offset.dx, offset.dy);
+	effects.push({ do: "move-cards", moves });
 	next = holdPages(next, state.pageDrag, moves, p.time, effects);
 	return { state: next, ops, effects, ...(preview === null ? { preview } : {}) };
 }
 
 /**
- * The boards a drag let go of stay where they were dropped, carried as they were, until they are at
+ * The cards a drag let go of stay where they were dropped, carried as they were, until they are at
  * the places the move asked for (`landPageDrag`): the move is the server's to make, and until its
- * answer the boards' boxes are still the old ones, so letting the carry go at the lift drew each
- * board back where it was picked up for the round trip, then where it was dropped. Let go of anyway
+ * answer the cards' boxes are still the old ones, so letting the carry go at the lift drew each
+ * card back where it was picked up for the round trip, then where it was dropped. Let go of anyway
  * after `PAGE_HOLD_MS`, if the move is refused or lands elsewhere.
  */
 function holdPages(state: EditorState, carried: EditorState["pageDrag"], moves: readonly PageMove[], time: number, effects: Effect[]): EditorState {
@@ -420,15 +420,15 @@ function holdPages(state: EditorState, carried: EditorState["pageDrag"], moves: 
 }
 
 /**
- * Boards let go of after a drag are put down once every one is where its move asked (the boards
+ * Cards let go of after a drag are put down once every one is where its move asked (the cards
  * as the host has them now), or is gone; a new drag replaces the hold.
  */
-export function landPageDrag(state: EditorState, boards: readonly PageBox[]): EditorState {
+export function landPageDrag(state: EditorState, cards: readonly PageBox[]): EditorState {
 	const held = state.pageDrag?.released;
 	if (!held) return state;
 	const landed = held.to.every((move) => {
-		const board = boards.find((one) => one.path === move.path);
-		return !board || (Math.abs(board.x - move.x) <= 1 && Math.abs(board.y - move.y) <= 1);
+		const card = cards.find((one) => one.path === move.path);
+		return !card || (Math.abs(card.x - move.x) <= 1 && Math.abs(card.y - move.y) <= 1);
 	});
 	return landed ? { ...state, pageDrag: undefined } : state;
 }
@@ -467,10 +467,10 @@ function pressHandle(state: EditorState, input: Input & PointerInput, scene: Sce
 				},
 			});
 		}
-		case "press-board-handle": {
+		case "press-card-handle": {
 			const { path } = input.box;
 			const start = { x: input.box.x, y: input.box.y, w: input.box.w, h: input.box.h };
-			const least = scene.boards().find((board) => board.path === path)?.least;
+			const least = scene.cards().find((card) => card.path === path)?.least;
 			return done({ ...state, gesture: { kind: "pageResize", path, handle: input.handle, least, start, targets: snapTargets(scene, [], [path], ctx.view), from: input.at, next: start, moved: false } });
 		}
 		case "press-radius":
@@ -509,7 +509,7 @@ function move(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: Gestu
 		case "marquee": {
 			const m = { x1: g.from.x, y1: g.from.y, x2: p.at.x, y2: p.at.y };
 			const picked = marqueePick(scene, marqueeRect(m));
-			const next = withSelection(state, { items: [...new Set([...g.kept.items, ...picked.items])], boards: [...new Set([...g.kept.boards, ...picked.boards])] });
+			const next = withSelection(state, { items: [...new Set([...g.kept.items, ...picked.items])], cards: [...new Set([...g.kept.cards, ...picked.cards])] });
 			return done({ ...next, marquee: m }, [{ do: "panned" }]);
 		}
 		case "resize": {
@@ -579,9 +579,9 @@ function release(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: Ge
 			const next = { ...after, guides: [] };
 			if (!g.moved) return done({ ...next, pageResize: undefined });
 			const { move, size } = pageResizeEnd(g.start, g.next);
-			if (move) effects.push({ do: "move-boards", moves: [{ path: g.path, x: move.x, y: move.y }] });
-			if (size) effects.push({ do: "board-size", path: g.path, size });
-			// The box is let go of when the board is at it (`landPageResize`), or after a moment if the file settles elsewhere.
+			if (move) effects.push({ do: "move-cards", moves: [{ path: g.path, x: move.x, y: move.y }] });
+			if (size) effects.push({ do: "card-size", path: g.path, size });
+			// The box is let go of when the card is at it (`landPageResize`), or after a moment if the file settles elsewhere.
 			const until = p.time + PAGE_HOLD_MS;
 			effects.push({ do: "wake", at: until });
 			return done({ ...next, pageResize: { path: g.path, ...shownPageResize(g.next, g.least), released: { rev: ctx.pageRev(g.path), until } } }, effects);
@@ -624,21 +624,21 @@ export function step(state: EditorState, input: Input, scene: SceneQuery, ctx: G
 	switch (input.type) {
 		case "press-canvas":
 			return pressCanvas(state, input, scene, ctx);
-		case "press-board":
+		case "press-card":
 			return pressPage(state, input.path, input, scene, ctx);
 		case "press-block": {
-			const next = withSelection(state, { items: [input.id], boards: [] });
+			const next = withSelection(state, { items: [input.id], cards: [] });
 			const started = carry(next, scene, ctx, input, [input.id], []);
-			return done(started.state, [{ do: "select-board" }, started.effect]);
+			return done(started.state, [{ do: "select-card" }, started.effect]);
 		}
 		case "press-handle":
-		case "press-board-handle":
+		case "press-card-handle":
 		case "press-radius":
 		case "press-arrow-end":
 		case "press-arrow-bend":
 			return pressHandle(state, input, scene, ctx) ?? done(state);
 		case "carry": {
-			const started = carry(state, scene, ctx, input, state.selection.items, state.selection.boards, undefined, { from: input.from });
+			const started = carry(state, scene, ctx, input, state.selection.items, state.selection.cards, undefined, { from: input.from });
 			return done(started.state, [started.effect]);
 		}
 		case "move":

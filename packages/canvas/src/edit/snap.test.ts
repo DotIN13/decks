@@ -50,15 +50,15 @@ test("an alignment marks every point on it that lines up: each box's corners and
 });
 
 test("a board keeps the reading gap: 160 beside, above or below another, marked with its size", () => {
-	const board = { x: 0, y: 0, w: 400, h: 300 };
+	const card = { x: 0, y: 0, w: 400, h: 300 };
 	// 3 short of 160 to the right of it: it settles at 560.
-	const right = snapMove({ x: 557, y: 40, w: 400, h: 300 }, [], 5, [board]);
+	const right = snapMove({ x: 557, y: 40, w: 400, h: 300 }, [], 5, [card]);
 	assert.equal(right.dx, 3);
 	assert.deepEqual(right.guides, [{ kind: "gap", x1: 400, y1: 170, x2: 560, y2: 170, label: "160" }]);
 	// 4 past 160 above it: the bottom settles 160 over its top.
-	const above = snapMove({ x: 0, y: -464, w: 400, h: 300 }, [], 5, [board]);
+	const above = snapMove({ x: 0, y: -464, w: 400, h: 300 }, [], 5, [card]);
 	assert.equal(above.dy, 4);
 	assert.deepEqual(above.guides.find((g) => g.label), { kind: "gap", x1: 200, y1: -160, x2: 200, y2: 0, label: "160" });
 	// Further than the reach: nothing.
-	assert.deepEqual(snapMove({ x: 570, y: 40, w: 400, h: 300 }, [], 5, [board]).guides, []);
+	assert.deepEqual(snapMove({ x: 570, y: 40, w: 400, h: 300 }, [], 5, [card]).guides, []);
 });

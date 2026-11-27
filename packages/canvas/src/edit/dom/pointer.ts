@@ -1,15 +1,15 @@
 /**
- * The editor's half of the stage's pointer: a press followed to its lift (`follow`, with pointer
+ * The editor's half of the canvas's pointer: a press followed to its lift (`follow`, with pointer
  * capture, window listeners, and the last step replayed when the camera moves under a held press),
  * the hover outline, the double-click, a finger's taps and carries on the drawing, and the presses
  * on what the overlay draws (handles, the radius, an arrow's ends and middle, a block's grip).
  *
  * Which gesture a press starts is decided in `core/dispatch.ts`; the gestures are stepped in
- * `core/gesture.ts` through the controller (`dom/controller.ts`). The stage keeps the camera: it
+ * `core/gesture.ts` through the controller (`dom/controller.ts`). The canvas keeps the camera: it
  * hands this its finger pool and its pan (`PointerHost`), and tells it when the camera moves
  * (`cameraMoved`) and when it was dragged (`panned`).
  *
- * A board's frame reads what the editor says about it through `pageView(path)`, and nothing else.
+ * A card's frame reads what the editor says about it through `pageView(path)`, and nothing else.
  */
 import { type MediaItem, type PenNode } from "@decks/pen";
 import type { ArrowHandles } from "../core/arrows.ts";
@@ -52,9 +52,9 @@ export type Openers = {
 
 export type PointerHost = {
 	scene: SceneQuery;
-	/** The stage's element: what a press is captured by, unless said otherwise. */
+	/** The canvas's element: what a press is captured by, unless said otherwise. */
 	element: () => HTMLElement;
-	/** Where a screen point is on the stage, from the camera now. */
+	/** Where a screen point is on the canvas, from the camera now. */
 	worldAt: (event: Client) => Pt;
 	/** Whether the drawing can be edited here (`CanvasView`'s `onPenEdit`). */
 	editable: () => boolean;
@@ -68,22 +68,22 @@ export type PointerHost = {
 	mode: () => "browse" | "edit";
 	tool: () => PenTool;
 	spaceHeld: () => boolean;
-	/** The boards near a stage point, in file order (the stage's spatial index): candidates for the picture under it. */
+	/** The cards near a canvas point, in file order (the canvas's spatial index): candidates for the picture under it. */
 	pagesNear: (at: Pt) => readonly PageBox[];
-	/** The boards that have a node of their own to take a press. */
+	/** The cards that have a node of their own to take a press. */
 	rendered: () => ReadonlySet<string>;
 	/** The item open for typing, whose blocks have no grip. */
 	typing: () => string | undefined;
 	linkAt: (at: Pt) => string | undefined;
-	/** The app's selected board. */
+	/** The app's selected card. */
 	onSelect: (path: string | undefined) => void;
-	/** The stage's finger pool: how many fingers are down, a finger the camera must not pan with, a finger handed to it. */
+	/** The canvas's finger pool: how many fingers are down, a finger the camera must not pan with, a finger handed to it. */
 	fingers: () => number;
 	/** The first finger caught a moving canvas (a glide or a coast): its lift is no tap, as a hand stopping a list does not press it. */
 	caught?: () => boolean;
 	claim: (pointer: number) => void;
 	beginTouch: (event: PointerEvent) => void;
-	/** A finger's press is the editor's (an item, a handle, a board): the stage keeps it from scrolling natively. */
+	/** A finger's press is the editor's (an item, a handle, a card): the canvas keeps it from scrolling natively. */
 	keepTouch?: (event: PointerEvent) => void;
 	/** The camera dragged from this press (`decidePress`, `pan`). */
 	pan: (event: PointerEvent, how: { deselect: boolean; middle: boolean }) => void;
@@ -131,7 +131,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	});
 
 	/**
-	 * The text block of a card at a stage point: the one under it, or in the card's margin, the one
+	 * The text block of a card at a canvas point: the one under it, or in the card's margin, the one
 	 * level with it. Not while the card is open for typing, which has its own way of moving things.
 	 */
 	const blockUnder = (at: Pt): string | undefined => blockAt(host.scene, at, host.typing());

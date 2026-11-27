@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { decideHover, decidePress, handPans, isBareSecondTap, isSecondTap, type HoverAction, type HoverFacts, type PressAction, type PressFacts } from "./dispatch.ts";
 
-/** A mouse's main button on bare stage, the drawing editable, the select tool, nothing under it. */
-const base: PressFacts = { pointer: "mouse", button: 0, target: "stage", editable: true, drawing: false, tool: "select", space: false, fingers: 0, onItem: () => false, picture: () => undefined };
+/** A mouse's main button on bare canvas, the drawing editable, the select tool, nothing under it. */
+const base: PressFacts = { pointer: "mouse", button: 0, target: "canvas", editable: true, drawing: false, tool: "select", space: false, fingers: 0, onItem: () => false, picture: () => undefined };
 const press = (over: Partial<PressFacts>) => decidePress({ ...base, ...over });
 const ITEM = { onItem: () => true };
 const PICTURE = { picture: () => "boards/one.html" };
@@ -63,7 +63,7 @@ test("press: what is under it is asked only when it decides", () => {
 	assert.equal(asked, 0, "Space asks nothing");
 });
 
-const hoverBase: HoverFacts = { pointer: "mouse", editable: true, editing: true, drawing: false, onGrip: false, buttons: 0, tool: "select", target: "stage" };
+const hoverBase: HoverFacts = { pointer: "mouse", editable: true, editing: true, drawing: false, onGrip: false, buttons: 0, tool: "select", target: "canvas" };
 const hovers: Array<[string, Partial<HoverFacts>, HoverAction]> = [
 	["a mouse over the stage: followed", {}, { do: "track", outlines: true }],
 	["a pen over a drawn click shape: followed", { pointer: "pen", target: "drawn" }, { do: "track", outlines: true }],
@@ -104,7 +104,7 @@ test("the hand: a press anywhere pans, whatever it lands on, but a control keeps
 	assert.equal(handPans({ hand: true, pointer: "touch", button: 0, control: false }), false);
 	assert.equal(handPans({ hand: true, pointer: "mouse", button: 2, control: false }), false);
 	assert.equal(handPans({ hand: false, pointer: "mouse", button: 0, control: false }), false);
-	// And on the stage's own path, a press on a drawn item with the hand pans rather than picking it up.
+	// And on the canvas's own path, a press on a drawn item with the hand pans rather than picking it up.
 	const facts: PressFacts = { pointer: "mouse", button: 0, target: "drawn", editable: true, drawing: false, tool: "select", space: true, fingers: 0, onItem: () => true, picture: () => undefined };
 	assert.deepEqual(decidePress(facts), { do: "pan", deselect: true, middle: false });
 	assert.deepEqual(decidePress({ ...facts, target: "other" }), { do: "pan", deselect: false, middle: false });

@@ -35,7 +35,7 @@ export function frameAt(scene: SceneQuery, point: Pt, stacking = false): string 
 	return best?.id;
 }
 
-/** The frame under a point that a drag could drop into: never one of the items being carried, and never inside one. `null` is the stage. */
+/** The frame under a point that a drag could drop into: never one of the items being carried, and never inside one. `null` is the canvas. */
 export function frameUnder(scene: SceneQuery, point: Pt, carrying: readonly string[]): string | null {
 	const found = frameAt(scene, point, true);
 	if (!found) return null;
@@ -109,7 +109,7 @@ export const NEAR_PX = 200;
 type NearDrops = { slots: readonly Rect[]; frames: readonly Rect[] };
 
 /**
- * What a drag could drop into, within `reach` stage pixels of the pointer (`NEAR_PX` over the
+ * What a drag could drop into, within `reach` canvas pixels of the pointer (`NEAR_PX` over the
  * zoom): each slot of every frame that arranges its children whose line passes that near, and
  * every frame that places them where they say whose box does. The frames `frameUnder` could
  * answer: never what is carried or inside it, an instance's inside or a library shape. Not the

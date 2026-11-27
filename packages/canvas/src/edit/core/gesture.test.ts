@@ -5,8 +5,8 @@ import { PAGE_HOLD_MS, initialState, landPageDrag, landPageResize, RADIUS_HOLD_M
 import type { EditorState, Mods } from "./model.ts";
 
 /**
- * `a` and `b` side by side on the stage, `b` 290 to the right of `a`'s corner; a column frame `col`
- * holding `c1 c2`; a board to the right; and the window round all of it.
+ * `a` and `b` side by side on the canvas, `b` 290 to the right of `a`'s corner; a column frame `col`
+ * holding `c1 c2`; a card to the right; and the window round all of it.
  */
 const items: FakeItem[] = [
 	{ id: "a", box: { x: 10, y: 20, w: 100, h: 50 }, extra: { x: 10, y: 20 } },
@@ -16,15 +16,15 @@ const items: FakeItem[] = [
 	{ id: "c2", parent: "col", box: { x: 18, y: 370, w: 264, h: 40 } },
 	{ id: "media", type: "rectangle", box: { x: 700, y: 700, w: 80, h: 60 }, extra: { metadata: { type: "decks.media", kind: "video", file: "films/one.mp4" } } },
 ];
-const boards = [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }];
-const scene = fakeScene(items, boards);
+const cards = [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }];
+const scene = fakeScene(items, cards);
 
 const NONE: Mods = { shift: false, alt: false, meta: false, ctrl: false };
 const ctx = (over: Partial<GestureContext> = {}): GestureContext => {
 	let n = 0;
 	return {
 		zoom: 1,
-		// A window that shows nothing to snap to, unless a test asks for the whole stage (`WIDE`).
+		// A window that shows nothing to snap to, unless a test asks for the whole canvas (`WIDE`).
 		view: { x: -5000, y: -5000, w: 1, h: 1 },
 		generation: 1,
 		nextIds: () => () => `new${++n}`,
@@ -35,7 +35,7 @@ const ctx = (over: Partial<GestureContext> = {}): GestureContext => {
 	};
 };
 const WIDE = { view: { x: -2000, y: -2000, w: 6000, h: 6000 } };
-/** A pointer at a stage point, the screen the same, with these keys, at this time. */
+/** A pointer at a canvas point, the screen the same, with these keys, at this time. */
 const at = (x: number, y: number, mods: Partial<Mods> = {}, time = 1000, pointer: PointerInput["pointer"] = "mouse"): PointerInput => ({ at: { x, y }, client: { x, y }, mods: { ...NONE, ...mods }, pointer, time });
 
 /** Step a list of inputs from a state, the answers kept in order. */
@@ -58,13 +58,13 @@ test("a press on an item selects it, a drag carries it with the pointer, and the
 	]);
 	assert.deepEqual(steps[0]!.state.selection.items, ["a"]);
 	assert.equal(steps[0]!.state.gesture?.kind, "press");
-	assert.deepEqual(kinds(steps[0]!.effects), ["select-board", "ghost-take"]);
+	assert.deepEqual(kinds(steps[0]!.effects), ["select-card", "ghost-take"]);
 	// Moved by the pointer's 41 × 100, with nothing in the window to snap to.
 	assert.deepEqual(steps[1]!.state.drag, { dx: 41, dy: 100 });
 	assert.deepEqual([...steps[1]!.preview!], [["a", { dx: 41, dy: 100 }]]);
 	assert.deepEqual(kinds(steps[1]!.effects), ["ghost-show", "composer", "panned"]);
 	assert.deepEqual(steps[2]!.ops, [{ op: "update", id: "a", set: { x: 51, y: 120 } }]);
-	assert.deepEqual(kinds(steps[2]!.effects), ["ghost-drop", "composer", "settle", "wake", "move-boards"]);
+	assert.deepEqual(kinds(steps[2]!.effects), ["ghost-drop", "composer", "settle", "wake", "move-cards"]);
 	assert.equal(steps[2]!.preview, undefined);
 	// The offset is still on the item: what it waits for is the drawing that answers the move.
 	assert.deepEqual(state.drag, { dx: 41, dy: 100 });
@@ -138,7 +138,7 @@ test("Alt lets go of copies, selected and awaited, and leaves the originals wher
 	const without = step(state, { type: "drawn", fresh: true, current: true, present: new Set(["a", "b"]) }, scene, ctx()).state;
 	assert.deepEqual(without.selection.items, ["new1"]);
 	const withIt = step(state, { type: "drawn", fresh: true, current: true, present: new Set(["a", "b", "new1"]) }, scene, ctx()).state;
-	assert.deepEqual(withIt.selection, { items: ["new1"], boards: [], awaited: [] });
+	assert.deepEqual(withIt.selection, { items: ["new1"], cards: [], awaited: [] });
 });
 
 test("over a frame that stacks its children, a drag aims at the slot between them and drops there", () => {
@@ -156,7 +156,7 @@ test("over a frame that stacks its children, a drag aims at the slot between the
 		{ x: 8, y: 313, w: 284, h: 0 },
 		{ x: 8, y: 415, w: 284, h: 0 },
 	]);
-	// Zoomed in to 500%, 200 screen pixels is 40 on the stage, and the slots 49 and 53 away drop out.
+	// Zoomed in to 500%, 200 screen pixels is 40 on the canvas, and the slots 49 and 53 away drop out.
 	const close = run(initialState("edit"), [{ type: "press-canvas", ...at(50, 40) }, { type: "move", ...at(150, 362) }], ctx({ zoom: 5 }));
 	assert.equal(close.steps[1]!.state.drop.near, undefined);
 	assert.deepEqual(steps[2]!.ops, [{ op: "move", id: "a", parent: "col", index: 1, box: { x1: 110, y1: 342, x2: 210, y2: 392 } }]);
@@ -182,7 +182,7 @@ test("let go on the composer, a drag mentions what it carried instead of moving 
 	);
 	assert.deepEqual(steps[2]!.ops, []);
 	assert.equal(steps[2]!.preview, null);
-	assert.deepEqual(steps[2]!.effects.at(-1), { do: "refer", ids: ["a"], boards: [] });
+	assert.deepEqual(steps[2]!.effects.at(-1), { do: "refer", ids: ["a"], cards: [] });
 	assert.deepEqual(state.drag, { dx: 0, dy: 0 });
 	assert.deepEqual(state.settling, []);
 });
@@ -217,38 +217,38 @@ test("a marquee picks what is wholly inside it as it goes, and Shift adds that t
 	assert.deepEqual(kinds(steps[2]!.effects), ["panned"]);
 	assert.equal(state.marquee, undefined);
 	assert.deepEqual(state.selection.items, ["c1", "a", "b"]);
-	// Without Shift the press lets go of what was selected first, boards too.
-	const fresh = step(withSelection(start, { boards: ["boards/one.html"] }), { type: "press-canvas", ...at(-50, -50) }, scene, ctx()).state;
-	assert.deepEqual(fresh.selection, { items: [], boards: [], awaited: [] });
-	// A marquee round the board picks it up.
+	// Without Shift the press lets go of what was selected first, cards too.
+	const fresh = step(withSelection(start, { cards: ["boards/one.html"] }), { type: "press-canvas", ...at(-50, -50) }, scene, ctx()).state;
+	assert.deepEqual(fresh.selection, { items: [], cards: [], awaited: [] });
+	// A marquee round the card picks it up.
 	const round = run(initialState("edit"), [{ type: "press-canvas", ...at(950, -10) }, { type: "move", ...at(1450, 350) }]).state;
-	assert.deepEqual(round.selection.boards, ["boards/one.html"]);
+	assert.deepEqual(round.selection.cards, ["boards/one.html"]);
 });
 
 test("a board pressed is the app's selected board, and a drag carries it, moves it on the lift, and holds it there until it lands", () => {
 	const { state, steps } = run(withSelection(initialState("edit"), { items: ["a"] }), [
-		{ type: "press-board", path: "boards/one.html", ...at(1100, 100) },
+		{ type: "press-card", path: "boards/one.html", ...at(1100, 100) },
 		{ type: "move", ...at(1150, 160) },
 		{ type: "release", ...at(1150, 160) },
 	]);
-	assert.deepEqual(steps[0]!.state.selection, { items: [], boards: [], awaited: [] });
-	assert.deepEqual(steps[0]!.effects, [{ do: "select-board", path: "boards/one.html" }, { do: "ghost-take", ids: [] }]);
+	assert.deepEqual(steps[0]!.state.selection, { items: [], cards: [], awaited: [] });
+	assert.deepEqual(steps[0]!.effects, [{ do: "select-card", path: "boards/one.html" }, { do: "ghost-take", ids: [] }]);
 	assert.deepEqual(steps[1]!.state.pageDrag, { paths: ["boards/one.html"], dx: 50, dy: 60 });
-	// Boards alone: the drawn items' offset and preview are not touched.
+	// Cards alone: the drawn items' offset and preview are not touched.
 	assert.deepEqual(steps[1]!.state.drag, { dx: 0, dy: 0 });
 	assert.equal(steps[1]!.preview, undefined);
-	assert.deepEqual(steps[2]!.effects.find((effect) => effect.do === "move-boards"), { do: "move-boards", moves: [{ path: "boards/one.html", x: 1050, y: 60 }] });
+	assert.deepEqual(steps[2]!.effects.find((effect) => effect.do === "move-cards"), { do: "move-cards", moves: [{ path: "boards/one.html", x: 1050, y: 60 }] });
 	assert.ok(!kinds(steps[2]!.effects).includes("settle"));
-	// Still carried where it was dropped until the boards have it there, or the hold runs out.
+	// Still carried where it was dropped until the cards have it there, or the hold runs out.
 	const until = steps[2]!.effects.find((effect) => effect.do === "wake");
 	assert.deepEqual(state.pageDrag, { paths: ["boards/one.html"], dx: 50, dy: 60, released: { to: [{ path: "boards/one.html", x: 1050, y: 60 }], until: (until as { at: number }).at } });
 	assert.equal(landPageDrag(state, [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }]).pageDrag, state.pageDrag);
 	assert.equal(landPageDrag(state, [{ path: "boards/one.html", x: 1050, y: 60, w: 400, h: 300 }]).pageDrag, undefined);
 	assert.equal(landPageDrag(state, []).pageDrag, undefined);
 	assert.equal(step(state, { type: "tick", time: (until as { at: number }).at }, scene, ctx()).state.pageDrag, undefined);
-	// Shift takes the board into the picks, or out, and carries nothing.
-	const shift = step(initialState("edit"), { type: "press-board", path: "boards/one.html", ...at(1100, 100, { shift: true }) }, scene, ctx());
-	assert.deepEqual(shift.state.selection.boards, ["boards/one.html"]);
+	// Shift takes the card into the picks, or out, and carries nothing.
+	const shift = step(initialState("edit"), { type: "press-card", path: "boards/one.html", ...at(1100, 100, { shift: true }) }, scene, ctx());
+	assert.deepEqual(shift.state.selection.cards, ["boards/one.html"]);
 	assert.equal(shift.state.gesture, undefined);
 });
 
@@ -257,10 +257,10 @@ test("a board selected by a press, then Shift and a press on another: both are p
 		{ path: "boards/one.html", x: 0, y: 0, w: 400, h: 300 },
 		{ path: "boards/two.html", x: 900, y: 0, w: 400, h: 300 },
 	]);
-	// The page's own selection is the first board, from the plain press; the picks are still empty.
+	// The page's own selection is the first card, from the plain press; the picks are still empty.
 	const selected = ctx({ ...WIDE, selectedPage: "boards/one.html" });
-	const picked = step(initialState("edit"), { type: "press-board", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, selected).state;
-	assert.deepEqual(picked.selection.boards, ["boards/one.html", "boards/two.html"]);
+	const picked = step(initialState("edit"), { type: "press-card", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, selected).state;
+	assert.deepEqual(picked.selection.cards, ["boards/one.html", "boards/two.html"]);
 	for (const [path, x] of [["boards/one.html", 100], ["boards/two.html", 1000]] as const) {
 		let state = picked;
 		const go = (input: Input) => {
@@ -268,14 +268,14 @@ test("a board selected by a press, then Shift and a press on another: both are p
 			state = result.state;
 			return result;
 		};
-		go({ type: "press-board", path, ...at(x, 100) });
+		go({ type: "press-card", path, ...at(x, 100) });
 		go({ type: "move", ...at(x + 37, 141, { meta: true }) });
 		const lift = go({ type: "release", ...at(x + 37, 141, { meta: true }) });
-		assert.deepEqual(lift.effects.find((effect) => effect.do === "move-boards"), { do: "move-boards", moves: [{ path: "boards/one.html", x: 37, y: 41 }, { path: "boards/two.html", x: 937, y: 41 }] }, path);
+		assert.deepEqual(lift.effects.find((effect) => effect.do === "move-cards"), { do: "move-cards", moves: [{ path: "boards/one.html", x: 37, y: 41 }, { path: "boards/two.html", x: 937, y: 41 }] }, path);
 	}
-	// A selected board that is not on the canvas any more starts nothing.
-	const gone = step(initialState("edit"), { type: "press-board", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, ctx({ selectedPage: "boards/old.html" })).state;
-	assert.deepEqual(gone.selection.boards, ["boards/two.html"]);
+	// A selected card that is not on the canvas any more starts nothing.
+	const gone = step(initialState("edit"), { type: "press-card", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, ctx({ selectedPage: "boards/old.html" })).state;
+	assert.deepEqual(gone.selection.cards, ["boards/two.html"]);
 });
 
 test("a board dragged near another settles 160 from it, the reading gap, and says so", () => {
@@ -289,8 +289,8 @@ test("a board dragged near another settles 160 from it, the reading gap, and say
 		state = result.state;
 		return result;
 	};
-	go({ type: "press-board", path: "boards/two.html", ...at(1000, 100) });
-	// Dragged 343 left puts its left edge at 557, 157 from the first board: it settles at 560.
+	go({ type: "press-card", path: "boards/two.html", ...at(1000, 100) });
+	// Dragged 343 left puts its left edge at 557, 157 from the first card: it settles at 560.
 	const moved = go({ type: "move", ...at(657, 140) });
 	assert.deepEqual(moved.state.pageDrag, { paths: ["boards/two.html"], dx: -340, dy: 40 });
 	assert.deepEqual(moved.state.guides.find((guide) => guide.label), { kind: "gap", x1: 400, y1: 170, x2: 560, y2: 170, label: "160" });
@@ -306,10 +306,10 @@ test("a document's bottom handle writes the height dragged, a floor, and shows i
 		state = result.state;
 		return result;
 	};
-	go({ type: "press-board-handle", handle: "s", box: { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
+	go({ type: "press-card-handle", handle: "s", box: { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
 	assert.deepEqual(go({ type: "move", ...at(380, 342) }).state.pageResize, { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 });
 	const lifted = go({ type: "release", ...at(380, 342, {}, 2000) });
-	assert.deepEqual(lifted.effects.find((one) => one.do === "board-size"), { do: "board-size", path: "boards/doc.html", size: { w: 760, h: 342 } });
+	assert.deepEqual(lifted.effects.find((one) => one.do === "card-size"), { do: "card-size", path: "boards/doc.html", size: { w: 760, h: 342 } });
 	assert.equal(lifted.state.pageResize?.h, 642);
 });
 
@@ -330,7 +330,7 @@ test("a corner handle with Shift keeps the shape; the lift writes the size and w
 	assert.deepEqual(kinds(steps[2]!.effects), ["settle", "wake"]);
 	assert.deepEqual(state.resize, steps[1]!.state.resize);
 	assert.deepEqual(step(state, { type: "drawn", fresh: true, current: true, present: new Set(["a"]) }, scene, ctx()).state.resize, undefined);
-	// Without Shift the corner follows the pointer each way; with the stage in the window its bottom
+	// Without Shift the corner follows the pointer each way; with the canvas in the window its bottom
 	// edge snaps back to b's at 70, 3 away, and ⌘ keeps it where the pointer is.
 	const free = run(withSelection(initialState("edit"), { items: ["a"] }), [{ type: "press-handle", handle: "se", box, ...at(110, 70) }, { type: "move", ...at(160, 73) }]).state;
 	assert.deepEqual(free.resize, { id: "a", x: 10, y: 20, w: 150, h: 53, given: { x: 10, y: 20 } });
@@ -362,20 +362,20 @@ test("two presses on a frame's top handle hug it again; slower, or on another ha
 test("a board's handle sizes it with Shift keeping its shape; the box is held until the board is at it", () => {
 	const box = { path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 };
 	const { state, steps } = run(initialState("edit"), [
-		{ type: "press-board-handle", handle: "se", box, ...at(1400, 300) },
+		{ type: "press-card-handle", handle: "se", box, ...at(1400, 300) },
 		{ type: "move", ...at(1600, 310, { shift: true }) },
 		{ type: "release", ...at(1600, 310, { shift: true }, 5000) },
 	]);
 	assert.deepEqual(steps[1]!.state.pageResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450 });
 	assert.deepEqual(steps[2]!.effects, [
-		{ do: "board-size", path: "boards/one.html", size: { w: 600, h: 450 } },
+		{ do: "card-size", path: "boards/one.html", size: { w: 600, h: 450 } },
 		{ do: "wake", at: 5000 + PAGE_HOLD_MS },
 	]);
 	assert.deepEqual(state.pageResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, released: { rev: 7, until: 5000 + PAGE_HOLD_MS } });
 	// The write has not come back (same revision): held. It has, at the size: let go.
 	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300, rev: 7 }), state);
 	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, rev: 8 }).pageResize, undefined);
-	// Its content made it taller than the box: that is the board at it too.
+	// Its content made it taller than the box: that is the card at it too.
 	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 520, rev: 8 }).pageResize, undefined);
 	assert.equal(step(state, { type: "tick", time: 5000 + PAGE_HOLD_MS }, scene, ctx()).state.pageResize, undefined);
 });
@@ -410,7 +410,7 @@ test("a finger carries the selection by as far as it has gone on the screen, and
 		],
 		ctx({ zoom: 2 }),
 	);
-	// 20 × 50 screen pixels at 200%: 10 × 25 on the stage, unsnapped.
+	// 20 × 50 screen pixels at 200%: 10 × 25 on the canvas, unsnapped.
 	assert.deepEqual(carried.state.drag, { dx: 10, dy: 25 });
 	assert.deepEqual(carried.state.guides, []);
 	assert.deepEqual(kinds(carried.steps[1]!.effects), ["ghost-show"]);

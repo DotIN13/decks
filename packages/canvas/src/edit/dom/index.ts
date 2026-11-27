@@ -1,8 +1,8 @@
 /**
- * The editor, as the stage (`view/CanvasView.tsx`) uses it: the one way in. `createCanvasEditor` puts
+ * The editor, as the canvas (`view/CanvasView.tsx`) uses it: the one way in. `createCanvasEditor` puts
  * the state (`dom/controller.ts`), the pointer (`dom/pointer.ts`), the keys (`dom/keys.ts`), the
  * typing (`dom/TextEditing.tsx`) and the adding (`dom/InsertMenu.tsx`) together as one object; the
- * rest is what the stage still does with the editor's pieces itself (the overlay's parts, the ops
+ * rest is what the canvas still does with the editor's pieces itself (the overlay's parts, the ops
  * the pill and the ink write), until those move in too.
  */
 import { createEditor, type EditorHost } from "./controller.ts";
@@ -21,7 +21,7 @@ export type CanvasEditorHost = Omit<EditorHost, "effects"> & {
 	insert: Omit<InsertHost, "scene" | "zoom" | "edit" | "follow">;
 };
 
-/** The stage's editor: its state and what reads it, the pointer's handlers, the drawing's keys (`key`), the typing (`textEditing`) and the adding (`insert`). */
+/** The canvas's editor: its state and what reads it, the pointer's handlers, the drawing's keys (`key`), the typing (`textEditing`) and the adding (`insert`). */
 export function createCanvasEditor(host: CanvasEditorHost) {
 	let pointer: Pointer | undefined;
 	const editor = createEditor({ ...host, effects: { ...host.effects, panned: () => pointer?.panned() } });

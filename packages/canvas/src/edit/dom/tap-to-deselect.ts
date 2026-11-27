@@ -15,7 +15,7 @@ export interface TapToDeselectNeeds {
 
 export function createTapToDeselect(d: TapToDeselectNeeds) {
 	/**
-	 * A tap on bare canvas lets go of the drawn items and boards selected, as a click there does
+	 * A tap on bare canvas lets go of the drawn items and cards selected, as a click there does
 	 * (`penPress`, the marquee). On the lift, not the landing: a finger that pans or becomes a pinch
 	 * keeps the selection, so you can look around something you have picked.
 	 */

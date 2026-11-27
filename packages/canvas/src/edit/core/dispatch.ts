@@ -1,5 +1,5 @@
 /**
- * What a press, a hover or a tap on the stage starts, decided: given what it landed on, the tool
+ * What a press, a hover or a tap on the canvas starts, decided: given what it landed on, the tool
  * in hand, whether the drawing can be edited, and what is pressing (a mouse, a pen or a finger).
  * `dom/pointer.ts` asks here and does what it says; the gestures themselves are `gesture.ts`'s.
  *
@@ -23,8 +23,8 @@ export const PANNED_MS = 400;
 /** A double-click this soon after a tool made an item is that click's second press. */
 export const MADE_MS = 500;
 
-/** Where a press landed: the bare stage, a drawn item's click shape over a board, or anything else (a board, a handle, chrome). */
-export type PressTarget = "stage" | "drawn" | "other";
+/** Where a press landed: the bare canvas, a drawn item's click shape over a card, or anything else (a card, a handle, chrome). */
+export type PressTarget = "canvas" | "drawn" | "other";
 
 /** What the page knows about a press as it lands. */
 export type PressFacts = {
@@ -34,7 +34,7 @@ export type PressFacts = {
 	target: PressTarget;
 	/** Whether the drawing can be edited here at all (`CanvasView`'s `onPenEdit`). */
 	editable: boolean;
-	/** The draw tool is out: ink has the stage. */
+	/** The draw tool is out: ink has the canvas. */
 	drawing: boolean;
 	tool: PenTool;
 	/** Space is held: a drag pans. */
@@ -43,7 +43,7 @@ export type PressFacts = {
 	fingers: number;
 	/** Whether something drawn is under the press (`pick.ts`, `pickAt`). Asked only when it decides. */
 	onItem: () => boolean;
-	/** The board whose picture, with no node of its own, is under the press. Asked only when it decides. */
+	/** The card whose picture, with no node of its own, is under the press. Asked only when it decides. */
 	picture: () => string | undefined;
 };
 
@@ -66,10 +66,10 @@ export type PressAction =
 	/** Not the stage's: a board's own press. */
 	| { do: "nothing" };
 
-/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
-const onCanvas = (target: PressTarget) => target === "stage" || target === "drawn";
+/** Bare canvas or something drawn on it: either way not a card, and the canvas's to handle. */
+const onCanvas = (target: PressTarget) => target === "canvas" || target === "drawn";
 
-/** What a press on the stage starts. */
+/** What a press on the canvas starts. */
 export function decidePress(facts: PressFacts): PressAction {
 	const { target, tool } = facts;
 	/*
@@ -80,25 +80,25 @@ export function decidePress(facts: PressFacts): PressAction {
 		// The drawing's, for the first finger only: a second is a pinch.
 		const pen = facts.editable && !facts.drawing && facts.fingers === 0 && onCanvas(target);
 		if (pen && tool !== "select") return { do: "make" };
-		const onDrawn = () => target === "drawn" || (target === "stage" && facts.onItem());
-		// A finger on a board's picture picks the board, and may still pan or pinch, as on its node.
-		const picture = target === "stage" && facts.fingers === 0 && !(pen && onDrawn()) ? facts.picture() : undefined;
+		const onDrawn = () => target === "drawn" || (target === "canvas" && facts.onItem());
+		// A finger on a card's picture picks the card, and may still pan or pinch, as on its node.
+		const picture = target === "canvas" && facts.fingers === 0 && !(pen && onDrawn()) ? facts.picture() : undefined;
 		if (picture) return { do: "touch", picture };
 		if (pen && onDrawn()) return { do: "touch", then: "drawing" };
 		if (pen) return { do: "touch", then: "deselect" };
 		return { do: "touch" };
 	}
 	/*
-	 * A press on a board's picture, where the board has no node (below the live zoom): picked up and
+	 * A press on a card's picture, where the card has no node (below the live zoom): picked up and
 	 * moved as a press on its node does, unless a tool is armed or something drawn is over it.
 	 */
-	if (facts.button === 0 && target === "stage" && !facts.space && !facts.drawing && (!facts.editable || tool === "select") && !facts.onItem()) {
+	if (facts.button === 0 && target === "canvas" && !facts.space && !facts.drawing && (!facts.editable || tool === "select") && !facts.onItem()) {
 		const picture = facts.picture();
 		if (picture) return { do: "picture", path: picture, carry: facts.editable };
 	}
 	if (facts.editable && !facts.drawing && facts.button === 0 && onCanvas(target) && !facts.space) return tool !== "select" ? { do: "make" } : { do: "press" };
 	const middle = facts.button === 1;
-	// A press on a drawn item while browsing is a press on the canvas: it pans, and a board lets go.
+	// A press on a drawn item while browsing is a press on the canvas: it pans, and a card lets go.
 	const empty = facts.button === 0 && onCanvas(target);
 	if (!middle && !empty && !(facts.space && facts.button === 0)) return { do: "nothing" };
 	return { do: "pan", deselect: empty, middle };
@@ -106,7 +106,7 @@ export function decidePress(facts: PressFacts): PressAction {
 
 /**
  * Whether a press is the hand's: with the hand tool (or Space held), a press with the main button
- * pans the camera wherever it lands on the stage, whatever is selected: on an item, its bar or edge,
+ * pans the camera wherever it lands on the canvas, whatever is selected: on an item, its bar or edge,
  * a handle, a block's grip or an anchor, which would otherwise move, size or join it. A control
  * (`control`: a button, a field, the words being typed) keeps its press, and a finger pans on its
  * own (`touch`). Asked before anything under the press hears it.
@@ -115,7 +115,7 @@ export function handPans(facts: { hand: boolean; pointer: PointerKind; button: n
 	return facts.hand && facts.pointer !== "touch" && facts.button === 0 && !facts.control;
 }
 
-/** What the page knows about a pointer moving over the stage with nothing in hand. */
+/** What the page knows about a pointer moving over the canvas with nothing in hand. */
 export type HoverFacts = {
 	pointer: PointerKind;
 	editable: boolean;
@@ -136,7 +136,7 @@ export type HoverFacts = {
 };
 
 /**
- * What a hover does: nothing (a finger, a stage that cannot be edited, the pen out, or a grip,
+ * What a hover does: nothing (a finger, a canvas that cannot be edited, the pen out, or a grip,
  * which keeps itself and its block), clear what is lit (a button held, a tool armed, off the
  * canvas; the grip's block too when no button is held), or follow the pointer, once a frame:
  * for what it lights (`outlines`, edit mode) or, browsing, only for a link's hand and a card block's grip.

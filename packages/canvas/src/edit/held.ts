@@ -3,8 +3,8 @@
  * cross, that the button is up.
  *
  * The release alone is not enough, and every way a wheel-press pan kept following a mouse with no
- * button held came from trusting it. A board's page moves under the pointer as the pan lands, so the
- * release can happen over the app while only the board was listening; a window that loses focus
+ * button held came from trusting it. A card's page moves under the pointer as the pan lands, so the
+ * release can happen over the app while only the card was listening; a window that loses focus
  * mid-drag never hears it; a lost capture sends it to some other element; and a Chrome on Windows
  * that starts its own autoscroll on the middle button takes the release for itself. So the drag also
  * ends on a move with its button no longer in `buttons`, on a release or a cancel anywhere in these
@@ -13,7 +13,7 @@
  * Returns the function that stops listening, which `end` also does, once.
  */
 export function untilReleased(options: {
-	/** The documents the pointer may be over while the drag lasts: the app's, and a board's when it started there. */
+	/** The documents the pointer may be over while the drag lasts: the app's, and a card's when it started there. */
 	docs: readonly Document[];
 	/** `buttons` bits that hold this drag: 4 for the middle button, 1 for the primary one. */
 	held: number;
@@ -44,7 +44,7 @@ export function untilReleased(options: {
 		if (event.isTrusted && event.pointerType === "mouse" && (event.buttons & options.held) === 0) finish();
 	};
 	/*
-	 * Focus moving into a board's page blurs the app's window too, and that is not the window losing
+	 * Focus moving into a card's page blurs the app's window too, and that is not the window losing
 	 * focus: only a blur that leaves no document of the app focused ends the drag. Asked a moment later,
 	 * once the focus has landed.
 	 */

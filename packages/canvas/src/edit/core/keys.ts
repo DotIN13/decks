@@ -21,12 +21,12 @@ export type KeyPress = { key: string; meta?: boolean; ctrl?: boolean; alt?: bool
 export type KeyContext = {
 	/** The selected items, in the order they were picked. */
 	selection: readonly string[];
-	/** The selected boards (the drawing's own picks, moved by the arrows with the items). */
-	boards: readonly string[];
+	/** The selected cards (the drawing's own picks, moved by the arrows with the items). */
+	cards: readonly string[];
 	tool: PenTool;
-	/** Whether a board is selected as the page's own selection: its letters are the board's, not tools. */
+	/** Whether a card is selected as the page's own selection: its letters are the card's, not tools. */
 	pageSelected: boolean;
-	/** That board, which the arrows move with the rest of what is selected. */
+	/** That card, which the arrows move with the rest of what is selected. */
 	selectedPage?: string | undefined;
 	/** Whether the page can step through edits (undo, redo). */
 	canStep: boolean;
@@ -43,10 +43,10 @@ export type KeyAct =
 	| { handled: true; do: "delete"; ops: Op[]; select: [] }
 	/** A tool in hand is put down; with none, the selection is let go. */
 	| { handled: true; do: "escape"; tool: "select" }
-	| { handled: true; do: "escape"; select: []; boards: [] }
+	| { handled: true; do: "escape"; select: []; cards: [] }
 	/** Copies of the selection, selected in its place once they arrive. */
 	| { handled: true; do: "duplicate"; ops: Op[]; select: string[] }
-	| { handled: true; do: "nudge"; ops: Op[]; boards: PageMove[] }
+	| { handled: true; do: "nudge"; ops: Op[]; cards: PageMove[] }
 	/** Another selection: the parents of what is selected (⇧Enter), or its children (Enter). */
 	| { handled: true; do: "select"; select: string[] }
 	| { handled: true; do: "arm"; tool: PenTool };
@@ -56,13 +56,13 @@ const NUDGES: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRigh
 const NUDGE_SHIFT = 10;
 
 export function penKey(press: KeyPress, context: KeyContext): KeyAct {
-	const { selection, boards, tool } = context;
+	const { selection, cards, tool } = context;
 	const command = !!(press.meta || press.ctrl);
 	const alt = !!press.alt;
 	const key = press.key;
 	if (command && !alt && key.toLowerCase() === "z" && context.canStep) return { handled: true, do: "step", step: press.shift ? "redo" : "undo" };
 	if (selection.length && (key === "Delete" || key === "Backspace")) return { handled: true, do: "delete", ops: deleteOps(selection, context.scene), select: [] };
-	if (key === "Escape" && (selection.length || boards.length || tool !== "select")) return tool !== "select" ? { handled: true, do: "escape", tool: "select" } : { handled: true, do: "escape", select: [], boards: [] };
+	if (key === "Escape" && (selection.length || cards.length || tool !== "select")) return tool !== "select" ? { handled: true, do: "escape", tool: "select" } : { handled: true, do: "escape", select: [], cards: [] };
 	if (selection.length && command && !alt && key.toLowerCase() === "d") {
 		const { ops, made } = duplicateOps(context.scene, selection, context.nextId);
 		return { handled: true, do: "duplicate", ops, select: made };
@@ -78,20 +78,20 @@ export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 		return { handled: false };
 	}
 	const nudge = NUDGES[key];
-	// The boards picked with the drawing, and the board selected on its own (a press on it).
-	const moving = context.selectedPage && !boards.includes(context.selectedPage) ? [...boards, context.selectedPage] : boards;
+	// The cards picked with the drawing, and the card selected on its own (a press on it).
+	const moving = context.selectedPage && !cards.includes(context.selectedPage) ? [...cards, context.selectedPage] : cards;
 	if ((selection.length || moving.length) && nudge && !command && !alt) {
 		const step = press.shift ? NUDGE_SHIFT : 1;
 		const dx = nudge[0] * step;
 		const dy = nudge[1] * step;
-		return { handled: true, do: "nudge", ops: moveOps(context.scene, selection, dx, dy), boards: pageMoves(context.scene.boards(), moving, dx, dy) };
+		return { handled: true, do: "nudge", ops: moveOps(context.scene, selection, dx, dy), cards: pageMoves(context.scene.cards(), moving, dx, dy) };
 	}
 	/*
 	 * The letters that arm a tool: from the app's own document only — never forwarded from a
-	 * board's (`shortcut`) — and only while no board is selected. Words typed over a board with
-	 * nothing editable under them fall through to the stage, and an armed tool takes the boards'
+	 * card's (`shortcut`) — and only while no card is selected. Words typed over a card with
+	 * nothing editable under them fall through to the canvas, and an armed tool takes the cards'
 	 * pointer away: "Zoo" typed there armed the ellipse, and the next click drew one instead of
-	 * selecting what was under it. With a board selected the keys are the board's; a press on
+	 * selecting what was under it. With a card selected the keys are the card's; a press on
 	 * bare canvas lets it go, and then they are the drawing's.
 	 */
 	const armed = !command && !alt && !context.pageSelected ? PEN_TOOL_KEYS[key] : undefined;

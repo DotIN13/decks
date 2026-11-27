@@ -1,9 +1,9 @@
 /**
  * Snapping, the way a design tool does it: a box being moved lines its edges and its middle up
  * with the edges and middles of what is around it, and settles into the gap its neighbours
- * already keep between themselves. The stage draws a guide wherever it snapped.
+ * already keep between themselves. The canvas draws a guide wherever it snapped.
  *
- * Pure arithmetic on stage boxes, so it can be tested without a canvas. `threshold` is in stage
+ * Pure arithmetic on canvas boxes, so it can be tested without a canvas. `threshold` is in canvas
  * units, which the caller works out from a number of screen pixels and the zoom.
  */
 
@@ -17,7 +17,7 @@ export interface Box {
 /**
  * A line to draw: an alignment (`kind: "line"`) or one measured gap between two boxes (`"gap"`).
  * An alignment carries the points on it that line up (`points`), each marked with a ✕; a gap that
- * is the reading gap between two boards says its size (`label`).
+ * is the reading gap between two cards says its size (`label`).
  */
 export interface Guide {
 	kind: "line" | "gap";
@@ -29,7 +29,7 @@ export interface Guide {
 	label?: string;
 }
 
-/** The gap a board keeps from the next one, beside it or above or below it, for reading them in order. */
+/** The gap a card keeps from the next one, beside it or above or below it, for reading them in order. */
 export const READING_GAP = 160;
 
 const lines = (b: Box, axis: "x" | "y") => (axis === "x" ? [b.x, b.x + b.w / 2, b.x + b.w] : [b.y, b.y + b.h / 2, b.y + b.h]);
@@ -47,10 +47,10 @@ function bestShift(moving: Box, targets: readonly Box[], axis: "x" | "y", thresh
 	const offer = (shift: number) => {
 		if (Math.abs(shift) <= threshold && (best === undefined || Math.abs(shift) < Math.abs(best))) best = shift;
 	};
-	// The reading gap: a board settles `READING_GAP` beside, above or below another.
-	for (const board of reading) {
-		offer(end(board, axis) + READING_GAP - start(moving, axis));
-		offer(start(board, axis) - READING_GAP - end(moving, axis));
+	// The reading gap: a card settles `READING_GAP` beside, above or below another.
+	for (const card of reading) {
+		offer(end(card, axis) + READING_GAP - start(moving, axis));
+		offer(start(card, axis) - READING_GAP - end(moving, axis));
 	}
 	const mine = lines(moving, axis);
 	for (const target of targets) for (const t of lines(target, axis)) for (const m of mine) offer(t - m);
@@ -127,21 +127,21 @@ function pointsOn(at: number, boxes: readonly Box[], axis: "x" | "y"): { x: numb
 }
 
 /**
- * The reading gaps a board in place keeps: `READING_GAP` from another board beside it, above it or
+ * The reading gaps a card in place keeps: `READING_GAP` from another card beside it, above it or
  * below it, drawn across the gap with its size. Level with the middle of what the two share, or
- * with the moving board's middle when they share nothing.
+ * with the moving card's middle when they share nothing.
  */
-function readingGuides(moving: Box, boards: readonly Box[]): Guide[] {
+function readingGuides(moving: Box, cards: readonly Box[]): Guide[] {
 	const out: Guide[] = [];
-	for (const board of boards) {
+	for (const card of cards) {
 		for (const axis of ["x", "y"] as const) {
 			const other = cross(axis);
-			const after = Math.abs(start(moving, axis) - end(board, axis) - READING_GAP) < EPS;
-			const before = Math.abs(start(board, axis) - end(moving, axis) - READING_GAP) < EPS;
+			const after = Math.abs(start(moving, axis) - end(card, axis) - READING_GAP) < EPS;
+			const before = Math.abs(start(card, axis) - end(moving, axis) - READING_GAP) < EPS;
 			if (!after && !before) continue;
-			const [from, to] = after ? [end(board, axis), start(moving, axis)] : [end(moving, axis), start(board, axis)];
-			const shared = overlaps(moving, board, axis);
-			const mid = shared ? (Math.max(start(moving, other), start(board, other)) + Math.min(end(moving, other), end(board, other))) / 2 : start(moving, other) + size(moving, other) / 2;
+			const [from, to] = after ? [end(card, axis), start(moving, axis)] : [end(moving, axis), start(card, axis)];
+			const shared = overlaps(moving, card, axis);
+			const mid = shared ? (Math.max(start(moving, other), start(card, other)) + Math.min(end(moving, other), end(card, other))) / 2 : start(moving, other) + size(moving, other) / 2;
 			out.push(axis === "x" ? { kind: "gap", x1: from, y1: mid, x2: to, y2: mid, label: String(READING_GAP) } : { kind: "gap", x1: mid, y1: from, x2: mid, y2: to, label: String(READING_GAP) });
 		}
 	}
@@ -150,7 +150,7 @@ function readingGuides(moving: Box, boards: readonly Box[]): Guide[] {
 
 /**
  * Snap a moved box: the correction to add to the move, and the guides to draw where it lands.
- * `reading` are boards the box keeps the reading gap from (a board being dragged: the other boards).
+ * `reading` are cards the box keeps the reading gap from (a card being dragged: the other cards).
  */
 export function snapMove(moving: Box, targets: readonly Box[], threshold: number, reading: readonly Box[] = []): { dx: number; dy: number; guides: Guide[] } {
 	const dx = bestShift(moving, targets, "x", threshold, reading) ?? 0;

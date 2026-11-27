@@ -1,5 +1,5 @@
 /**
- * Typing on the stage: a drawn item's words, a shape's, or a card's markdown, typed in an editor
+ * Typing on the canvas: a drawn item's words, a shape's, or a card's markdown, typed in an editor
  * laid over the item (`TextEditor`, the `.pen-text`), set exactly as the canvas sets them so the
  * words do not move when it opens or closes (`core/text.ts`, `textLook`).
  *
@@ -30,10 +30,10 @@ import { createTextOpen } from "./text-open.ts";
 export type TextHost = {
 	scene: SceneQuery;
 	engine: EngineSeam;
-	/** The stage's drawing and the folder its files are read against. */
+	/** The canvas's drawing and the folder its files are read against. */
 	pen: () => { doc: PenDocument; base: string } | undefined;
 	scheme: () => "light" | "dark";
-	/** The stage's world: the editor is in it, and its still copy goes beside it. */
+	/** The canvas's world: the editor is in it, and its still copy goes beside it. */
 	world: () => HTMLElement | undefined;
 	/** Counted up each time the engine lays the drawing out: where a made item is, once it is placed. */
 	redrawn: () => number;
@@ -139,7 +139,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 export type TextEditing = ReturnType<typeof createTextEditing>;
 
 /**
- * The editor laid over the item whose words are typed, in the world, in stage units: a card is
+ * The editor laid over the item whose words are typed, in the world, in canvas units: a card is
  * typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words, in a textarea.
  */
 export function TextEditor(props: { text: TextEditing; zoom: number }) {
@@ -226,7 +226,7 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 						onKeyDown={(event) => {
 							/*
 							 * Home and End move the caret to the line's start and end. On a Mac they scroll the
-							 * nearest scroll area instead, which is now the stage (`camera/scroll-area.ts`), so a
+							 * nearest scroll area instead, which is now the canvas (`camera/scroll-area.ts`), so a
 							 * note's words were left selected and the next key typed over them.
 							 */
 							if ((event.key === "Home" || event.key === "End") && !event.metaKey && !event.ctrlKey && !event.altKey) {

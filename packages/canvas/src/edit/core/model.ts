@@ -8,17 +8,17 @@ import type { Gesture } from "./gesture.ts";
 import type { TextSession } from "./text.ts";
 
 export type Pt = { x: number; y: number };
-/** A box on the stage, in stage pixels. */
+/** A box on the canvas, in canvas pixels. */
 export type Rect = Frame;
 /**
- * A board as the stage places it. `least` is the height a
- * board that reads top to bottom needs for its content: what it is drawn at, at least, and what a
+ * A card as the canvas places it. `least` is the height a
+ * card that reads top to bottom needs for its content: what it is drawn at, at least, and what a
  * drag of its height cannot go under, since its height is a floor its content raises.
  */
-/** A card, board, document or app on the stage; `corners` its item's own (`Page.corners`), the canvas's 12 when absent. */
+/** A card, board, document or app on the canvas; `corners` its item's own (`Page.corners`), the canvas's 12 when absent. */
 export type PageBox = { path: string; x: number; y: number; w: number; h: number; least?: number; corners?: readonly number[] };
 /**
- * What a press on the stage's drawing does: `select` picks up, every other tool makes one item and
+ * What a press on the canvas's drawing does: `select` picks up, every other tool makes one item and
  * hands back to `select`. The page keeps the armed one (`state/pen-tools.ts`).
  */
 export type PenTool = "select" | "note" | "card" | "text" | "rectangle" | "ellipse" | "frame" | "arrow" | "shape" | "icon";
@@ -26,7 +26,7 @@ export type PenTool = "select" | "note" | "card" | "text" | "rectangle" | "ellip
 export type MakingTool = Exclude<PenTool, "select" | "arrow">;
 /**
  * The key that arms each tool. `v` is select, handled with the camera's keys. `s` still makes a
- * note, because it made a sticky when the tools inserted into boards.
+ * note, because it made a sticky when the tools inserted into cards.
  */
 export const PEN_TOOL_KEYS: Record<string, PenTool> = { n: "note", s: "note", c: "card", t: "text", r: "rectangle", o: "ellipse", f: "frame", a: "arrow" };
 
@@ -40,8 +40,8 @@ export type Offset = { dx: number; dy: number };
 export type Corners = { x1: number; y1: number; x2: number; y2: number };
 /** An item being resized: its box now, and where its given box starts (a path drawn inside its viewBox differs). */
 export type ResizeBox = Rect & { id: string; given?: Pt };
-/** A board being resized by its handles; once let go, the revision the write will pass and when the box is let go of anyway. */
-/** A board drag let go: where each board was asked to go, and when it is let go of anyway. */
+/** A card being resized by its handles; once let go, the revision the write will pass and when the box is let go of anyway. */
+/** A card drag let go: where each card was asked to go, and when it is let go of anyway. */
 type PageDragLanding = { to: readonly { path: string; x: number; y: number }[]; until: number };
 type PageResizeBox = Rect & { path: string; released?: { rev: number; until: number } };
 /** A shape being drawn with a tool, corner to corner. */
@@ -60,24 +60,24 @@ export type EditorState = {
 	mode: "browse" | "edit";
 	tool: PenTool;
 	/**
-	 * The drawn items selected, in the order picked, and the boards picked up with them (a marquee,
-	 * Shift and a press on a board). `awaited` are items just made or copied, selected before the
+	 * The drawn items selected, in the order picked, and the cards picked up with them (a marquee,
+	 * Shift and a press on a card). `awaited` are items just made or copied, selected before the
 	 * drawing has them, and not let go for being missing until it does.
 	 */
-	selection: { items: readonly string[]; boards: readonly string[]; awaited: readonly string[] };
-	/** The item under the pointer, the board, a board's picture with no node, a card's block, a link; and whether Alt is held, for the distances. */
-	hover: { item?: string | undefined; board?: string | undefined; picture?: string | undefined; block?: string | undefined; link: boolean; alt?: boolean | undefined };
+	selection: { items: readonly string[]; cards: readonly string[]; awaited: readonly string[] };
+	/** The item under the pointer, the card, a card's picture with no node, a card's block, a link; and whether Alt is held, for the distances. */
+	hover: { item?: string | undefined; card?: string | undefined; picture?: string | undefined; block?: string | undefined; link: boolean; alt?: boolean | undefined };
 	/** The press in hand (`core/gesture.ts`). */
 	gesture?: Gesture | undefined;
 	/** The selection's move, held after the lift until the drawing that answers it is drawn. */
 	drag: Offset;
 	/**
-	 * The boards a drag carries. Once let go (`released`), held where they were dropped until the
-	 * boards are at the places the move asked for (`landPageDrag`), or `until` passes: the move goes
-	 * to the server, and until its answer the boards would otherwise be drawn back where they were.
+	 * The cards a drag carries. Once let go (`released`), held where they were dropped until the
+	 * cards are at the places the move asked for (`landPageDrag`), or `until` passes: the move goes
+	 * to the server, and until its answer the cards would otherwise be drawn back where they were.
 	 */
 	pageDrag?: { paths: readonly string[]; dx: number; dy: number; released?: PageDragLanding } | undefined;
-	/** A board moving itself, by a finger on its edge (`PageFrame`'s own drag). */
+	/** A card moving itself, by a finger on its edge (`PageFrame`'s own drag). */
 	ownDrag?: { path: string; x: number; y: number } | undefined;
 	/** An item being resized as the pointer has it, and as the sheet has drawn it (a frame behind). */
 	resize?: ResizeBox | undefined;
@@ -88,7 +88,7 @@ export type EditorState = {
 	marquee?: Corners | undefined;
 	guides: readonly Guide[];
 	/**
-	 * The frame a drag would drop into (`null` the stage) and the slot among its children; and the
+	 * The frame a drag would drop into (`null` the canvas) and the slot among its children; and the
 	 * other places it could drop near the pointer, drawn dashed (`drop.ts`, `nearDrops`).
 	 */
 	drop: { into?: string | null | undefined; slot?: { index: number; line: Rect } | undefined; near?: { slots: readonly Rect[]; frames: readonly Rect[] } | undefined };

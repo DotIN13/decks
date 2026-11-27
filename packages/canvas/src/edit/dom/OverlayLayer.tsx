@@ -1,6 +1,6 @@
 /**
  * What the editor draws over the canvas (`core/overlay.ts`, `Overlay`), as elements in the world:
- * outlines, handles, hints, guides and drafts, in stage pixels, with every screen size divided by
+ * outlines, handles, hints, guides and drafts, in canvas pixels, with every screen size divided by
  * the zoom so a handle is as big at 5% as at 400%. Children of `.world` (a fragment, no wrapper):
  * the stylesheet places them as `.world > .pen-…`.
  *
@@ -37,7 +37,7 @@ export function OverlayLayer(
 	props: OverlayHandlers & {
 		overlay: Accessor<Overlay>;
 		zoom: number;
-		/** Whether a board is growing to its content, which its outline says. */
+		/** Whether a card is growing to its content, which its outline says. */
 		sizing: (path: string) => boolean;
 		/** Drawn between the item's handles and the radius handle: the one media player, laid over its item. */
 		children?: JSX.Element;
@@ -150,7 +150,7 @@ export function OverlayLayer(
 				{(box) => (
 					<div
 						class="pen-hover"
-						data-page={box().board ? "true" : undefined}
+						data-page={box().card ? "true" : undefined}
 						data-round={box().round ? "true" : undefined}
 						style={{
 							left: `${box().x}px`,

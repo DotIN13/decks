@@ -22,7 +22,7 @@ export function createHover(d: HoverNeeds) {
 	 * what a press there would select, and a card block's grip. The outline is edit mode's
 	 * (`decideHover`): browsing selects and edits the drawing all the same, and before a press only
 	 * the hand over a link and a card block's grip answer the pointer. A mouse or a pen with no button down, over the drawing; a
-	 * board says when it is under the pointer (`PageFrame`), and anything else clears the item's.
+	 * card says when it is under the pointer (`PageFrame`), and anything else clears the item's.
 	 * Once per frame at most.
 	 */
 	let hoverFrame: number | undefined;
@@ -80,7 +80,7 @@ export function createHover(d: HoverNeeds) {
 			}
 			d.editor.hover({ link: !!href && d.host.mode() === "browse", block: hoverAt ? d.blockUnder(hoverAt) : undefined });
 			const hit = hoverAt ? d.pickAtHere(hoverAt) : undefined;
-			// A board with no node says nothing when the pointer is over it, so the stage asks.
+			// A card with no node says nothing when the pointer is over it, so the canvas asks.
 			d.editor.hover({ item: hit && !d.editor.items().includes(hit.id) ? hit.id : undefined, picture: (!hit && hoverAt && hoverPoint ? d.pictureUnder(hoverPoint) : undefined) ?? hoverNode });
 		});
 	};

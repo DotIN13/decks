@@ -105,7 +105,7 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 	const hoverBox = createMemo(() => {
 		d.penDrawn();
 		return hoverBoxOf(
-			{ editing: d.props.mode === "edit", item: d.editor.hoverItem(), typing: d.editor.typing(), card: d.editor.hoverPage() ?? d.editor.hoverPicture(), selected: d.props.selected, busy: !!d.editor.pageDrag() || d.panning(), cards: d.scene.boards(), glide: d.editor.glide() },
+			{ editing: d.props.mode === "edit", item: d.editor.hoverItem(), typing: d.editor.typing(), card: d.editor.hoverPage() ?? d.editor.hoverPicture(), selected: d.props.selected, busy: !!d.editor.pageDrag() || d.panning(), cards: d.scene.cards(), glide: d.editor.glide() },
 			d.scene,
 		);
 	});
@@ -127,7 +127,7 @@ export function createOverlayModel(d: OverlayModelNeeds) {
 		const over = hoverBox();
 		// A card picked up with the selection is part of it, not something to measure to.
 		const path = d.editor.hoverPage() ?? d.editor.hoverPicture();
-		const picked = !!over?.board && !!path && d.editor.pagePicks().includes(path);
+		const picked = !!over?.card && !!path && d.editor.pagePicks().includes(path);
 		return distancesOf({ editing: d.props.mode === "edit", alt: d.editor.altHeld(), busy: !!d.editor.gesture() || !!d.editor.pageDrag() || d.panning(), selection: penFrame(), over: picked ? undefined : over });
 	});
 

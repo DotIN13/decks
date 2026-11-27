@@ -19,7 +19,7 @@ const SLIDE_PX = 18;
 const JOIN_SNAP_PX = 8;
 
 export type Which = "from" | "to";
-/** What an end would join at a point: an item or a board, its box to light up, and the side it is near. */
+/** What an end would join at a point: an item or a card, its box to light up, and the side it is near. */
 export type Join = { name: string; box: Rect; side?: ArrowSide };
 /** An end as the arrow's metadata writes it: an item, an item and a side (and where along it), or a point. */
 type ArrowEnd = string | { item: string; side: ArrowSide; at?: number } | [number, number];
@@ -34,17 +34,17 @@ type Metadata = Record<string, unknown>;
 
 const copy = (box: Rect): Rect => ({ x: box.x, y: box.y, w: box.w, h: box.h });
 
-/** The board under a stage point, the last on top: an arrow may start or end on it. */
+/** The card under a canvas point, the last on top: an arrow may start or end on it. */
 export function pageAt(scene: SceneQuery, point: Pt): string | undefined {
-	return scene.boards().findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
+	return scene.cards().findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
 }
 
-/** Where an end's item or board is placed: an item's box first, then a board's. */
+/** Where an end's item or card is placed: an item's box first, then a card's. */
 function endBox(scene: SceneQuery, name: string): Rect | undefined {
 	const box = scene.item(name)?.box;
 	if (box) return box;
-	const board = scene.boards().find((one) => one.path === name);
-	return board ? copy(board) : undefined;
+	const card = scene.cards().find((one) => one.path === name);
+	return card ? copy(card) : undefined;
 }
 
 /** The line an arrow's metadata describes through where its ends are now (`@decks/pen`'s router). */
@@ -74,7 +74,7 @@ export function onSide(box: Rect, point: Pt): ArrowSide {
 }
 
 /**
- * What an arrow's end joins at a point: the item a press picks there, or else the board, with the
+ * What an arrow's end joins at a point: the item a press picks there, or else the card, with the
  * side it is near. Never an arrow (one line does not join another) and never `not`, the arrow
  * whose end it is.
  */
@@ -85,8 +85,8 @@ export function joinAt(scene: SceneQuery, point: Pt, options: { zoom: number; no
 		? { name: hit.id, box: hit.box }
 		: (() => {
 				const path = pageAt(scene, point);
-				const board = path ? scene.boards().find((candidate) => candidate.path === path) : undefined;
-				return board ? { name: board.path, box: copy(board) } : undefined;
+				const card = path ? scene.cards().find((candidate) => candidate.path === path) : undefined;
+				return card ? { name: card.path, box: copy(card) } : undefined;
 			})();
 	if (!found) return undefined;
 	const side = sideNear(found.box, point, options.zoom);
@@ -138,7 +138,7 @@ export function arrowHandles(scene: SceneQuery, id: string, drag: { dx: number; 
 }
 
 /**
- * An arrow's line as it is drawn, on the stage: the points of its geometry's first subpath (a curve's
+ * An arrow's line as it is drawn, on the canvas: the points of its geometry's first subpath (a curve's
  * start, two controls and end; a line's corners), through its box and `viewBox`. Undefined when it has
  * no geometry or the subpath is neither.
  */

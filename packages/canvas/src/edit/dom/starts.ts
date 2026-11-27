@@ -15,19 +15,19 @@ export interface StartsNeeds {
 
 export function createStarts(d: StartsNeeds) {
 	/**
-	 * A press on a board's title bar (`PageFrame`), with a mouse or a pen: the stage moves it, so it
-	 * moves with whatever else is selected and snaps like everything else. Shift adds the board to the
-	 * selection or takes it out. A finger's drag stays the board's own, where a pinch can take it back.
+	 * A press on a card's title bar (`PageFrame`), with a mouse or a pen: the canvas moves it, so it
+	 * moves with whatever else is selected and snaps like everything else. Shift adds the card to the
+	 * selection or takes it out. A finger's drag stays the card's own, where a pinch can take it back.
 	 */
 	const dragPage = (path: string, event: PointerEvent, on = event.currentTarget as HTMLElement): boolean => {
 		if (event.button !== 0) return false;
 		event.stopPropagation();
 		event.preventDefault();
-		if (d.editor.input({ type: "press-board", path, ...pointerInput(event, d.worldAt(event)) })) d.followEditor(event, on);
+		if (d.editor.input({ type: "press-card", path, ...pointerInput(event, d.worldAt(event)) })) d.followEditor(event, on);
 		return true;
 	};
 
-	/** A board selected by a press on it, as `PageFrame`'s own `onSelect` does: alone, unless it is part of the selection already. */
+	/** A card selected by a press on it, as `PageFrame`'s own `onSelect` does: alone, unless it is part of the selection already. */
 	const selectPage = (path: string) => {
 		if (!untrack(d.editor.pagePicks).includes(path) && (untrack(d.editor.pagePicks).length || untrack(d.editor.items).length)) {
 			d.editor.pickPages([]);
@@ -64,10 +64,10 @@ export function createStarts(d: StartsNeeds) {
 	};
 
 	/**
-	 * A board's handles, as an item's: every edge and corner, snapping to what is around, ⌘ or Ctrl
-	 * to not snap, Shift to keep the shape. The board is drawn at the new box at once; letting go
+	 * A card's handles, as an item's: every edge and corner, snapping to what is around, ⌘ or Ctrl
+	 * to not snap, Shift to keep the shape. The card is drawn at the new box at once; letting go
 	 * moves it if a left or top edge was dragged, and writes the size to its file, and the box is held
-	 * until the board is at it (`editor/core/gesture.ts`, `landPageResize`).
+	 * until the card is at it (`editor/core/gesture.ts`, `landPageResize`).
 	 */
 	const resizePage = (event: PointerEvent, handle: Handle) => {
 		const box = d.host.handles.card();
@@ -75,11 +75,11 @@ export function createStarts(d: StartsNeeds) {
 		event.preventDefault();
 		event.stopPropagation();
 		d.fingerIn(event);
-		if (d.editor.input({ type: "press-board-handle", handle, box, ...pointerInput(event, d.worldAt(event)) })) d.followEditor(event);
+		if (d.editor.input({ type: "press-card-handle", handle, box, ...pointerInput(event, d.worldAt(event)) })) d.followEditor(event);
 	};
 
 	/**
-	 * An arrow's end, picked up and put down somewhere else: on an item or a board it joins it, and
+	 * An arrow's end, picked up and put down somewhere else: on an item or a card it joins it, and
 	 * follows it from then on; on bare canvas it stays at that point. Along the side it joins, the
 	 * drag slides the join. What it would join lights up while it is carried, as it does while the
 	 * arrow is drawn. A double-click on a joined end puts the join back in the middle of its side.
