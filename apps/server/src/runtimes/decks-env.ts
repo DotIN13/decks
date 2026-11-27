@@ -1,5 +1,6 @@
 import { delimiter, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { skillsDir } from "@decks/runtime";
 
 /**
  * What an agent's shell needs to call Decks: the `decks` command on its PATH, where Decks is, and the
@@ -24,6 +25,8 @@ export function decksServerEnv(port: number, path = process.env.PATH ?? ""): Rec
 		DECKS_URL: `http://127.0.0.1:${port}`,
 		DECKS_NODE: process.execPath,
 		DECKS_SDK: SDK_FILE,
+		// The skills' own folder, for a file a skill offers to copy (card-authoring/progress-example).
+		DECKS_SKILLS: skillsDir(),
 		PATH: path.split(delimiter).includes(SDK_BIN) ? path : `${SDK_BIN}${delimiter}${path}`,
 	};
 }

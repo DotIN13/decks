@@ -1,6 +1,6 @@
 ---
 name: card-authoring
-description: How to write a card. One format: a one-screen piece of HTML you design, in a folder of its own (cards/<name>/index.html), whose content flows top to bottom inside one `.doc` and whose scripts are modules handed the card. Covers the tokens, scripts and libraries, diagrams, files and links. Read before building anything beyond a title, a visual and a few words.
+description: How to write a card. One format: a one-screen piece of HTML you design, in a folder of its own (cards/<name>/index.html), whose content flows top to bottom inside one `.doc` and whose scripts are modules handed the card. Covers the tokens, scripts and libraries, diagrams, files and links, and the progress card an agent keeps while it works. Read before building anything beyond a title, a visual and a few words.
 ---
 
 # Card authoring
@@ -74,6 +74,14 @@ Everything that used to be a board is a card. A board file left in a deck from b
   `--below`, `--at.x1 --at.y1`) puts it on the canvas you name, and `decks canvas fit <path>` sizes it. `fit` reports the
   height, the word count, the smallest type and any content wider than the card. Fix what it says is
   over; when it says "One screen", stop.
+
+**A progress card: your work while it runs**
+
+- Work of three steps or more, or a background run, gets a progress card in your row of Working,
+  made when the work starts. It is an ordinary card: each step written as hypothesis, method (what you
+  actually run, and how far it has got) and result, steps added as you go, questions as buttons.
+  Keep it current by editing its HTML, or by a JSON file its script reads every few seconds.
+  [progress.md](progress.md) says how, and [progress-example/](progress-example/) is one to copy.
 
 **Scripts: modules handed the card**
 

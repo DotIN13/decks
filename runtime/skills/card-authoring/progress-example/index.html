@@ -1,0 +1,113 @@
+<title>Dragging a group of cards jumps back: on step 4</title>
+<meta name="card" content='{"w":1000}' />
+<style>
+	.doc { padding: 28px 36px; font-size: 17px; line-height: 1.45; color: var(--b-fg); font-family: var(--b-font) }
+	h1 { font-size: 26px; line-height: 1.2; margin: 0 0 4px }
+	.sub { color: var(--b-muted); font-size: 15px; margin-bottom: 14px }
+	.sub .stale { color: var(--b-warn); font-weight: 600 }
+	.ask { border: 1px solid var(--b-accent); background: var(--b-accent-soft); border-radius: var(--b-radius); padding: 10px 14px; margin-bottom: 12px }
+	.ask p { margin: 0 0 8px; font-weight: 600 }
+	.ask button { font: 15px var(--b-font); min-height: 40px; padding: 6px 14px; margin: 0 8px 0 0; border-radius: 8px; border: 1px solid var(--b-border-strong); background: var(--b-bg); color: var(--b-fg); cursor: pointer }
+	.ask button[disabled] { opacity: .6; cursor: default }
+	.body { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 16px }
+	@container card (width < 640px) { .body { grid-template-columns: 1fr } }
+	.steps { display: flex; flex-direction: column; gap: 6px; height: 440px; overflow: auto }
+	.steps button { text-align: left; font: 16px var(--b-font); color: var(--b-fg); background: var(--b-bg-layer); border: 1px solid var(--b-border); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: grid; grid-template-columns: 26px 1fr auto; gap: 6px; align-items: center; min-height: 44px }
+	.steps button[aria-pressed="true"] { border-color: var(--b-accent); box-shadow: inset 3px 0 0 var(--b-accent) }
+	.n { color: var(--b-muted); font-weight: 600 }
+	.chip { font-size: 14px; font-weight: 600; white-space: nowrap }
+	.held, .done { color: var(--b-ok) } .notheld, .failed, .blocked { color: var(--b-danger) } .active, .running { color: var(--b-accent) } .todo, .waiting { color: var(--b-faint) }
+	.panel { height: 440px; overflow: auto; border: 1px solid var(--b-border); border-radius: var(--b-radius); padding: 14px 16px }
+	.hmr { display: grid; grid-template-columns: 104px 1fr; gap: 10px 14px }
+	.hmr > b { font-size: 14px; color: var(--b-muted); text-transform: uppercase; letter-spacing: .04em; padding-top: 3px }
+	.run { border: 1px solid var(--b-border); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; background: var(--b-bg-layer) }
+	.run .top { display: flex; justify-content: space-between; gap: 10px }
+	.run code { font-family: var(--b-mono); font-size: 14px; color: var(--b-muted); word-break: break-all }
+	.run .detail { font-size: 15px; color: var(--b-muted); margin-top: 4px }
+	.bar { height: 8px; border-radius: 4px; background: var(--b-border); margin-top: 6px; overflow: hidden }
+	.bar i { display: block; height: 100%; background: var(--b-accent) }
+	.muted { color: var(--b-muted) }
+</style>
+<div class="doc" data-id="doc">
+	<h1 id="task">Loading the progress…</h1>
+	<div class="sub" id="sub"></div>
+	<div id="asks"></div>
+	<div class="body">
+		<div class="steps" id="steps" data-id="steps"></div>
+		<div class="panel" id="panel" data-id="step"></div>
+	</div>
+</div>
+<script type="module">
+	// A progress card that reads progress.json beside it every few seconds. The agent (or a script it
+	// runs) rewrites that file in place; nothing else changes. Copy the folder and change what you like.
+	const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+	const VERDICT = { held: "held", "not held": "not held", blocked: "blocked", done: "done" };
+	const chipOf = (step) => {
+		const v = step.verdict ?? (step.status === "active" ? "active" : step.status === "done" ? "done" : "to do");
+		return `<span class="chip ${v.replace(/\s/g, "")}">${esc(VERDICT[v] ?? v)}</span>`;
+	};
+	const ago = (iso) => {
+		const min = Math.round((Date.now() - Date.parse(iso)) / 60000);
+		return Number.isFinite(min) ? (min < 1 ? "just now" : `${min} min ago`) : "";
+	};
+
+	export default function (card) {
+		const $ = (id) => card.root.getElementById(id);
+		let data = null, chosen = null, shown = "";
+
+		function runHtml(run) {
+			const st = run.status ?? "waiting";
+			const count = run.of ? `${run.done ?? 0} of ${run.of}` : st;
+			const bar = run.of ? `<div class="bar"><i style="width:${Math.min(100, (100 * (run.done ?? 0)) / run.of)}%"></i></div>` : "";
+			return `<div class="run"><div class="top"><span>${esc(run.what)}</span><span class="chip ${st}">${esc(count)}</span></div>${run.command ? `<code>${esc(run.command)}</code>` : ""}${run.detail ? `<div class="detail">${esc(run.detail)}</div>` : ""}${bar}</div>`;
+		}
+
+		function draw() {
+			if (!data) return;
+			const steps = Array.isArray(data.steps) ? data.steps : [];
+			const done = steps.filter((s) => s.status === "done").length;
+			const active = steps.findIndex((s) => s.status === "active");
+			$("task").textContent = data.task ?? "Progress";
+			const where = data.status === "done" ? `finished, ${steps.length} steps` : active >= 0 ? `${done} steps done, on step ${active + 1}` : `${done} steps done`;
+			const stale = data.status === "working" && Date.now() - Date.parse(data.updated) > 10 * 60000;
+			$("sub").innerHTML = `${esc(where)}${data.agent ? ` · ${esc(data.agent)}` : ""}${data.updated ? ` · updated ${esc(ago(data.updated))}` : ""}${stale ? ` · <span class="stale">no update for a while</span>` : ""}${data.note ? ` · ${esc(data.note)}` : ""}`;
+
+			const asks = (data.questions ?? []).filter((q) => !q.answer);
+			const asksHtml = asks.map((q, i) => `<div class="ask" data-id="ask-${i}"><p>${esc(q.ask)}</p>${(q.options ?? []).map((o) => `<button data-q="${i}">${esc(o)}</button>`).join("")}</div>`).join("");
+			if ($("asks").dataset.html !== asksHtml) {
+				$("asks").innerHTML = asksHtml;
+				$("asks").dataset.html = asksHtml;
+				for (const b of $("asks").querySelectorAll("button")) b.addEventListener("click", async () => {
+					const q = asks[Number(b.dataset.q)];
+					for (const o of b.parentElement.querySelectorAll("button")) o.disabled = true;
+					await card.decks.agent.send(q.agent ?? data.agent, { task: `${q.ask} ${b.textContent}`, cards: [card.path] });
+				}, { signal: card.signal });
+			}
+
+			if (chosen === null || chosen >= steps.length) chosen = active >= 0 ? active : Math.max(0, steps.length - 1);
+			$("steps").innerHTML = steps.map((s, i) => `<button data-i="${i}" aria-pressed="${i === chosen}"><span class="n">${i + 1}</span><span>${esc(s.title)}</span>${chipOf(s)}</button>`).join("");
+			const s = steps[chosen];
+			const panel = s ? `<div class="hmr"><b>Hypothesis</b><div>${esc(s.hypothesis)}</div><b>Method</b><div>${esc(s.method ?? "")}${(s.runs ?? []).map(runHtml).join("")}</div><b>Result</b><div class="${s.result ? "" : "muted"}">${esc(s.result ?? (s.status === "todo" ? "Not started" : "Comes when the runs finish"))}</div></div>` : `<p class="muted">No steps yet.</p>`;
+			if (panel !== shown) { $("panel").innerHTML = panel; shown = panel; }
+		}
+
+		card.root.getElementById("steps").addEventListener("click", (e) => {
+			const b = e.target.closest("button[data-i]");
+			if (b) { chosen = Number(b.dataset.i); draw(); }
+		}, { signal: card.signal });
+
+		async function load() {
+			try {
+				const res = await fetch(card.file("progress.json"), { cache: "no-store", signal: card.signal });
+				data = await res.json();
+			} catch (error) {
+				if (error.name === "AbortError") return;
+				// Half-written or not valid JSON: keep showing the last good version.
+			}
+			try { draw(); } catch (error) { $("sub").textContent = `progress.json could not be drawn: ${error.message}`; }
+		}
+		load();
+		const timer = setInterval(load, 4000);
+		return () => clearInterval(timer);
+	}
+</script>

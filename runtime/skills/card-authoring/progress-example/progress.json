@@ -1,0 +1,48 @@
+{
+	"task": "Dragging a group of cards jumps back",
+	"agent": "Ada",
+	"status": "working",
+	"updated": "2026-11-26T10:12:00-08:00",
+	"note": "",
+	"steps": [
+		{
+			"title": "Reproduce",
+			"status": "done",
+			"hypothesis": "The jump happens with any two selected cards",
+			"method": "Select two cards and drag them in a browser check",
+			"runs": [{ "what": "Drag two selected cards, ten times", "command": "node checks/group-drag.mjs --repeat 10", "status": "done", "done": 10, "of": 10 }],
+			"result": "Held: the group jumps back every time",
+			"verdict": "held"
+		},
+		{
+			"title": "Narrow it down",
+			"status": "done",
+			"hypothesis": "The press loses the selection",
+			"method": "Log which cards the press picks up",
+			"runs": [{ "what": "Log the picked cards on press", "command": "node checks/group-drag.mjs --log picks", "status": "done", "detail": "picks: [] on every press" }],
+			"result": "Held: the press starts with no cards picked",
+			"verdict": "held"
+		},
+		{
+			"title": "Find the cause",
+			"status": "done",
+			"hypothesis": "The press handler ignores the page's selection",
+			"method": "Read the press handler and what it is given",
+			"runs": [{ "what": "Read the press handler", "command": "packages/canvas/src/edit/core/gesture.ts", "status": "done" }],
+			"result": "Held: it starts from an empty list, never the selection",
+			"verdict": "held"
+		},
+		{
+			"title": "Fix",
+			"status": "active",
+			"hypothesis": "Starting the press from the selection keeps the group together",
+			"method": "Change the handler, then run step 1's check again",
+			"runs": [
+				{ "what": "Start the press from the page's selection", "command": "gesture.ts, +6 lines", "status": "done" },
+				{ "what": "Drag two selected cards, twenty times", "command": "node checks/group-drag.mjs --repeat 20", "status": "running", "done": 14, "of": 20 },
+				{ "what": "Unit tests: a press keeps what was selected", "command": "npm test -- gesture", "status": "waiting" }
+			]
+		}
+	],
+	"questions": []
+}
