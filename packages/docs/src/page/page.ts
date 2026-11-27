@@ -1,4 +1,4 @@
-import type { DocClientMessage, DocRemoteStatus, GitStatus, DocServerMessage, DocVersion, Splice } from "../index.ts";
+import type { DocClientMessage, DocRemoteStatus, DocServerMessage, DocVersion, Splice } from "../index.ts";
 import { DocSync } from "../client.ts";
 import { spliceDiff } from "../merge.ts";
 import type { DocSync as Sync } from "../client.ts";
@@ -8,9 +8,10 @@ import { LiveEditor } from "./live.ts";
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
 import type { DocsRequest } from "../gdoc/types.ts";
-import { formatList, getLocale, m } from "@decks/i18n";
+import { getLocale, m } from "@decks/i18n";
 import { pageDom, type PageContext, type PageHooks, type View } from "./context.ts";
 import { addStyle } from "./style.ts";
+import { mountGit } from "./git.ts";
 import { mountPdf } from "./pdf.ts";
 import { mountSource } from "./source.ts";
 import { mountTools } from "./tools.ts";
@@ -69,10 +70,7 @@ interface GComment {
 export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPage {
 	addStyle();
 	const dom = pageDom(host, options.path);
-	const { name, status, changesButton, commentsButton, gitBox, googleBox, pdfButton, sourceButton, historyButton, tools, main, scroll, text, panel, banner, old, pill } = dom;
-	const gitButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_git_title() });
-	const gitMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
-	gitBox.append(gitButton, gitMenu);
+	const { name, status, changesButton, commentsButton, googleBox, pdfButton, sourceButton, historyButton, tools, main, scroll, text, panel, banner, old, pill } = dom;
 	const googleButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_google_title() });
 	const googleMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
 	googleBox.append(googleButton, googleMenu);
@@ -167,7 +165,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	scroll.append(live.root, reading.root, gview.root, old);
 	reading.root.hidden = true;
 	gview.root.hidden = true;
-	const cleanups = [mountTools(ctx), mountSource(ctx), mountPdf(ctx)];
+	const cleanups = [mountTools(ctx), mountSource(ctx), mountPdf(ctx), mountGit(ctx)];
 	/**
 	 * Styles for Google, each with the text the page had when it was made, sent in order once the
 	 * typing before it has reached the server: the server brings the Doc to that text, applies the
@@ -593,81 +591,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		}
 	}
 
-	// --- git ------------------------------------------------------------------------------------
-
-	let repo: GitStatus | undefined;
-	let gitBusy: "pull" | "push" | undefined;
-	let gitSaid: { ok: boolean; message: string } | undefined;
-
-	function drawGit(): void {
-		gitBox.hidden = !repo;
-		if (!repo) return;
-		const name = repo.label ?? "Git";
-		gitButton.innerHTML = `${svg("branch")}<span>${gitBusy ? (gitBusy === "pull" ? m.docs_git_pulling() : m.docs_git_pushing()) : name}</span>${repo.ahead && !gitBusy ? `<span class="dp-ahead" title="${m.docs_git_not_pushed()}">↑${repo.ahead}</span>` : ""}`;
-		gitButton.title = m.docs_git_button_title({ branch: `${repo.branch}${repo.upstream ? ` ↔ ${repo.upstream}` : ""}` });
-		if (gitMenu.hidden) return;
-		const where = el("div", { class: "g-where" });
-		where.innerHTML = svg("branch");
-		where.append(repo.branch, ...(repo.upstream ? [el("span", { style: "font-weight:400;color:var(--b-muted,#666)" }, `↔ ${repo.upstream}`)] : []));
-		const parts: string[] = [];
-		if (repo.changed) parts.push(m.docs_git_changed({ count: repo.changed }));
-		if (repo.ahead) parts.push(m.docs_git_ahead({ count: repo.ahead }));
-		if (repo.behind) parts.push(m.docs_git_behind({ count: repo.behind }));
-		const state = el("div", { class: "g-state" }, repo.upstream ? (parts.length ? m.docs_git_state({ parts: formatList(parts) }) : m.docs_git_in_step({ name })) : m.docs_git_no_remote());
-		const pull = el("button", { type: "button", class: "dp-btn dp-outline" });
-		pull.innerHTML = `${svg("pull")}<span>${gitBusy === "pull" ? m.docs_git_pulling() : m.docs_git_pull()}</span>`;
-		const push = el("button", { type: "button", class: "dp-btn dp-primary" });
-		push.innerHTML = `${svg("push")}<span>${gitBusy === "push" ? m.docs_git_pushing() : m.docs_git_push()}</span>`;
-		pull.disabled = push.disabled = !!gitBusy || !repo.upstream;
-		pull.title = m.docs_git_pull_title({ name });
-		push.title = m.docs_git_push_title({ name });
-		pull.onclick = () => runGit("pull");
-		push.onclick = () => runGit("push");
-		const acts = el("div", { class: "g-acts" });
-		acts.append(pull, push);
-		const said = el("div", { class: "g-said", "data-ok": String(gitSaid?.ok ?? true) }, gitSaid?.message ?? "");
-		said.hidden = !gitSaid;
-		const note = el("div", { class: "g-note" }, m.docs_git_note());
-		gitMenu.replaceChildren(where, ...(repo.remote ? [el("div", { class: "g-remote", title: repo.remote }, repo.remote)] : []), state, acts, said, note);
-	}
-
-	function runGit(action: "pull" | "push"): void {
-		if (gitBusy) return;
-		gitBusy = action;
-		gitSaid = undefined;
-		drawGit();
-		sync.git(action);
-	}
-
-	function repoAnswered(message: Extract<DocServerMessage, { type: "doc.repo" }>): void {
-		if (message.action === "status") repo = message.status;
-		else {
-			gitBusy = undefined;
-			if (message.status) repo = message.status;
-			gitSaid = { ok: message.ok, message: message.message ?? (message.ok ? m.docs_git_done() : m.docs_git_stopped()) };
-			// The PDF follows what the pull brought in.
-			if (message.ok) ctx.hooks.compileSoon();
-		}
-		drawGit();
-	}
-
-	const closeGit = () => {
-		gitMenu.hidden = true;
-		gitButton.setAttribute("aria-pressed", "false");
-	};
-	gitButton.onclick = () => {
-		const open = gitMenu.hidden;
-		gitMenu.hidden = !open;
-		gitButton.setAttribute("aria-pressed", String(open));
-		if (open) {
-			if (!gitBusy) sync.git("status");
-			drawGit();
-		}
-	};
-	document.addEventListener("mousedown", (event) => {
-		if (!gitBox.contains(event.target as Node)) closeGit();
-	});
-
 	// --- a Google Doc --------------------------------------------------------------------------
 
 	let remoteStatus: DocRemoteStatus | undefined;
@@ -749,7 +672,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		versions = message.versions;
 		if (ctx.view === "history") drawHistory();
 	});
-	ctx.on("doc.repo", (message) => repoAnswered(message));
 	ctx.on("doc.gdoc", (message) => {
 		gview.load(message.document as never, message.text);
 		gview.setComments(comments);

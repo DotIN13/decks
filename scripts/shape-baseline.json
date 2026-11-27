@@ -55,7 +55,7 @@
 		"packages/canvas/src/view/CanvasView.tsx: CanvasView": 357,
 		"packages/docs/src/gdoc/fake.ts: one": 162,
 		"packages/docs/src/page/live.ts: inlineMd": 154,
-		"packages/docs/src/page/page.ts: mountDocPage": 758,
+		"packages/docs/src/page/page.ts: mountDocPage": 679,
 		"packages/pen/src/layout.ts: layout": 212,
 		"packages/ui/src/Popover.tsx: Popover": 268,
 		"packages/ui/src/float/float.ts: makeFloat": 493,
