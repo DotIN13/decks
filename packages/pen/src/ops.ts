@@ -131,12 +131,35 @@ function canonicalFills(node: PenNode): void {
 	}
 }
 
+/*
+ * The ids a document's items take, kept for the length of one `apply`: an insert needs them to pick a
+ * fresh id, and walking the whole drawing for each insert made a batch of 200 cost 200 walks, about
+ * 5 ms an op at 2,000 items. Made once from the copy `apply` works on, and kept in step as items come
+ * (`withIds`, `freshIds` add to it) and go (`forget`).
+ */
+const takenIds = new WeakMap<PenDocument, Set<string>>();
+function takenOf(doc: PenDocument): Set<string> {
+	let taken = takenIds.get(doc);
+	if (!taken) takenIds.set(doc, (taken = ids(doc)));
+	return taken;
+}
+/** An item and what is under it leave the document: their ids are free again. */
+function forget(doc: PenDocument, node: PenNode): void {
+	const taken = takenIds.get(doc);
+	if (!taken) return;
+	const visit = (item: PenNode) => {
+		taken.delete(item.id);
+		for (const child of item.children ?? []) visit(child);
+	};
+	visit(node);
+}
+
 function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 	if (!op || typeof op !== "object" || typeof (op as { op?: unknown }).op !== "string") throw new PenError('each edit is an object with an "op": insert, update, replace, delete, move, copy or variables.');
 	switch (op.op) {
 		case "insert": {
 			if (!op.node || typeof op.node !== "object" || typeof op.node.type !== "string") throw new PenError('insert needs a node with a type, as in { op: "insert", node: { type: "note", content: "…" } }.');
-			const node = withIds(clone(op.node) as PenNode, ids(doc));
+			const node = withIds(clone(op.node) as PenNode, takenOf(doc));
 			canonicalFills(node);
 			const siblings = childrenOf(doc, op.parent);
 			const at = clampIndex(op.index, siblings.length);
@@ -170,8 +193,8 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 		case "replace": {
 			if (!op.node || typeof op.node.type !== "string") throw new PenError("replace needs a node with a type.");
 			const found = located(doc, op.id);
-			const taken = ids(doc);
-			taken.delete(op.id);
+			const taken = takenOf(doc);
+			forget(doc, found.node);
 			const node = clone(op.node) as PenNode;
 			node.id = typeof node.id === "string" && node.id ? node.id : op.id;
 			canonicalFills(node);
@@ -182,6 +205,7 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 		case "delete": {
 			const found = located(doc, op.id);
 			found.siblings.splice(found.index, 1);
+			forget(doc, found.node);
 			return { op: "delete", id: op.id };
 		}
 		case "move": {
@@ -200,7 +224,7 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 		}
 		case "copy": {
 			const found = located(doc, op.id);
-			const taken = ids(doc);
+			const taken = takenOf(doc);
 			if (op.as !== undefined && (typeof op.as !== "string" || !op.as || op.as.includes("/") || taken.has(op.as))) throw new PenError(`"${String(op.as)}" cannot be the copy's id: it is taken, empty or contains "/".`);
 			const copy = freshIds(clone(found.node), taken, op.as);
 			const siblings = op.parent === undefined ? found.siblings : childrenOf(doc, op.parent);
