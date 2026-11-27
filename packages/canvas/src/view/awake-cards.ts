@@ -1,6 +1,6 @@
 import { probes } from "../base/debug.ts";
 import type { Page } from "@decks/protocol";
-import { createEffect, createMemo, createSelector, createSignal, untrack, type Accessor } from "solid-js";
+import { createEffect, createMemo, createSelector, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { LIVE_ZOOM, toWorld, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import { chooseAwake, NO_AWAKE, sameAwake, type Awake, type AwakeItem } from "../items/awake.ts";
@@ -113,6 +113,16 @@ export function createAwakeCards(d: AwakeCardsNeeds) {
 		});
 	});
 
+	// One timer for the card that leaves soonest, not one more for every pass that let none go.
+	let expiry: ReturnType<typeof setTimeout> | undefined;
+	const expire = () => {
+		expiry = undefined;
+		const was = untrack(leaving);
+		const next = new Map([...was].filter(([, since]) => performance.now() - since < 1000));
+		if (next.size !== was.size) setLeaving(next);
+		else if (was.size) expiry = setTimeout(expire, 50);
+	};
+	onCleanup(() => clearTimeout(expiry));
 	createEffect(() => {
 		const drawn = d.picturedNow();
 		const left = leaving();
@@ -120,7 +130,7 @@ export function createAwakeCards(d: AwakeCardsNeeds) {
 		const at = performance.now();
 		const next = new Map([...left].filter(([path, since]) => !drawn.has(path) && at - since < 1000));
 		if (next.size !== left.size) setLeaving(next);
-		else if (next.size) setTimeout(() => setLeaving((was) => new Map([...was].filter(([, since]) => performance.now() - since < 1000))), 1000);
+		else if (expiry === undefined) expiry = setTimeout(expire, Math.max(0, Math.min(...left.values()) + 1000 - at));
 	});
 
 	const leavingPaths = createMemo<ReadonlySet<string>>(() => new Set(leaving().keys()), new Set(), {
