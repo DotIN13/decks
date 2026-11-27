@@ -1,14 +1,14 @@
 import { estimateText, isMarkdown, isMarkdownText, type MeasureText, type TextStyle } from "@decks/pen";
 
 /**
- * Words measured as the server measures them (`apps/server/src/canvas/text.ts`): with the stage
+ * Words measured as the server measures them (`apps/server/src/canvas/text.ts`): with the canvas
  * engine's own fonts and markdown reader (`PageEngine.measure`, the server's `TextMeasure`), and by
  * the estimate while the engine is not up or a font the words need has not landed, as the server
  * does then. A person's edit is laid out with this on the page ahead of the server's drawing
  * (`drawing.ts`), so a card sized by its words is the size the server will find, and an arrow joined
  * to it is routed where the server will route it.
  *
- * The stage's engine (`engine.ts`) gives its words here while it runs: one at a time, the last started.
+ * The canvas's engine (`engine.ts`) gives its words here while it runs: one at a time, the last started.
  */
 export type Words = (text: string, style: TextStyle, maxWidth: number, markdown: boolean, align: string) => { w: number; h: number } | undefined;
 

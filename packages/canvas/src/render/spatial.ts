@@ -1,15 +1,15 @@
 /**
- * A packed R-tree over boxes: which of a stage's boards or drawn items touch a rectangle.
+ * A packed R-tree over boxes: which of a canvas's cards or drawn items touch a rectangle.
  *
- * Built once per change of the things indexed — a board moved, the drawing laid out again — and
+ * Built once per change of the things indexed — a card moved, the drawing laid out again — and
  * asked every frame, so building is `O(n log n)` and asking is `O(log n + found)`. Packed the way
  * Flatbush packs one (sort-tile-recursive): the items sorted into vertical slices by their middles,
  * each slice by height, cut into nodes of `NODE` boxes, and the same again one level up until one
- * node holds everything. Static on purpose: the stage never needs to move one item and ask again in
+ * node holds everything. Static on purpose: the canvas never needs to move one item and ask again in
  * the same frame, and a static tree is a few flat arrays with nothing to balance.
  *
  * What it answers is indices into the array it was built from, in ascending order, so a caller that
- * cares about order — the boards are drawn in the order the stage lists them — keeps it for free.
+ * cares about order — the cards are drawn in the order the canvas lists them — keeps it for free.
  */
 
 export interface Rect {
@@ -69,7 +69,7 @@ export class BoxIndex {
 			nodes.push({ box, first: at, count: end - at, leaf: true });
 		}
 		// Up a level at a time: the nodes of this level are already in the order they were made, which
-		// is slice by slice, so grouping neighbours keeps them near each other on the stage.
+		// is slice by slice, so grouping neighbours keeps them near each other on the canvas.
 		while (level.length > 1) {
 			const next: number[] = [];
 			for (let at = 0; at < level.length; at += NODE) {

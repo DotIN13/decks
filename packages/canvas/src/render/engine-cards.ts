@@ -100,10 +100,10 @@ export class EngineCards {
 	carriedBy = { dx: 0, dy: 0 };
 
 	/**
-	 * The boards a drag carries, and how far. An arrow with an end on one bends with it: the gesture's
-	 * preview is sent again with the boards where they are now, or, when only boards are dragged, a
+	 * The cards a drag carries, and how far. An arrow with an end on one bends with it: the gesture's
+	 * preview is sent again with the cards where they are now, or, when only cards are dragged, a
 	 * preview of nothing but them. Such a drag's arrows stay as last routed when it is let go, until
-	 * the server's drawing comes back routed to where the boards landed (`setDoc`), or two seconds pass.
+	 * the server's drawing comes back routed to where the cards landed (`setDoc`), or two seconds pass.
 	 */
 	carry(paths: readonly string[], offset: { dx: number; dy: number }): void {
 		this.carriedBy = { dx: offset.dx, dy: offset.dy };
@@ -120,7 +120,7 @@ export class EngineCards {
 				clearTimeout(this.cardsLanding);
 			}
 			this.lift(this.of.page.setPreview(this.shown ?? "[]"));
-			// A card that frames itself (its own outline or shadow, painted with the drawing) is left out of the tiles while it is carried, once: the stage draws its frame round its picture where the drag has it (`engine.rs`, `carried_frame`), and it goes back with the rest when the drag lands.
+			// A card that frames itself (its own outline or shadow, painted with the drawing) is left out of the tiles while it is carried, once: the canvas draws its frame round its picture where the drag has it (`engine.rs`, `carried_frame`), and it goes back with the rest when the drag lands.
 			const framed = paths
 				.map((path) => this.placedCards.find((card) => card.path === path)?.id)
 				.filter((id): id is string => !!id && !this.lifted.has(id) && framesItself(this.of.doc, id));
@@ -128,7 +128,7 @@ export class EngineCards {
 			this.of.layout.laidOut(this.shown === undefined || this.of.previews.moveOnly);
 		} else if (this.cardsOnly && this.shown === undefined) {
 			clearTimeout(this.cardsLanding);
-			// The drawing that answers the drop came while the boards were held where they were dropped (`editor/core/gesture.ts`, `holdPages`): its arrows are routed already.
+			// The drawing that answers the drop came while the cards were held where they were dropped (`editor/core/gesture.ts`, `holdPages`): its arrows are routed already.
 			if (this.cardsAnswered) this.landCards();
 			else this.cardsLanding = setTimeout(() => this.landCards(), 2000);
 		}
@@ -140,13 +140,13 @@ export class EngineCards {
 
 	carriedCount = 0;
 
-	/** The boards the last `carry` names (`probes.engine.carried`). */
+	/** The cards the last `carry` names (`probes.engine.carried`). */
 	carriedPaths: string[] = [];
 
-	/** A drag of boards alone is showing its arrows, or has let go and waits for the drawing. */
+	/** A drag of cards alone is showing its arrows, or has let go and waits for the drawing. */
 	cardsOnly = false;
 
-	/** A drawing came since the boards were last carried a step: the one that answers their drop, if they are let go of now. */
+	/** A drawing came since the cards were last carried a step: the one that answers their drop, if they are let go of now. */
 	cardsAnswered = false;
 
 	private cardsLanding: ReturnType<typeof setTimeout> | undefined;
@@ -175,7 +175,7 @@ export class EngineCards {
 
 	/**
 	 * A picture of what a drag carries, for the ghost a drag over a card shows (`CanvasView.tsx`): the lifted
-	 * items drawn alone for one frame and copied off the canvas in the same task, then the stage drawn
+	 * items drawn alone for one frame and copied off the canvas in the same task, then the canvas drawn
 	 * whole again. `rect` is where they lay on screen before the drag; they are now the drag's offset on.
 	 */
 	cutFromCarried(rect: { left: number; top: number; width: number; height: number }): HTMLCanvasElement | undefined {

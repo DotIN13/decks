@@ -1,8 +1,8 @@
 /**
  * The render worker: the Rust worker engine (`@decks/stage`), holding the same drawing as the page
- * by the same edits, painting the stage as 512-pixel tiles on its own device (the page's backend,
+ * by the same edits, painting the canvas as 512-pixel tiles on its own device (the page's backend,
  * from the same build: `backends/detect.ts`) and handing each to the page as a picture. It never shows anything itself: the page lays the tiles in the
- * same frame as the board pages, so the two cannot drift (`engine.ts`).
+ * same frame as the card pages, so the two cannot drift (`engine.ts`).
  */
 import type { WorkerEngine } from "@decks/stage";
 import { backendNamed } from "./backends/detect.ts";
@@ -26,7 +26,7 @@ let soon: ReturnType<typeof setTimeout> | undefined;
 /**
  * The page is fetching the drawing's fonts (`fontsDue`), or has no drawing yet (`docDue`), and the
  * first view is not painted yet: the worker waits for them, up to `WAIT_MS` from when it could
- * first paint (`waitBy`), since tiles painted in a stand-in font, or of an empty stage, are all
+ * first paint (`waitBy`), since tiles painted in a stand-in font, or of an empty canvas, are all
  * painted again when they come.
  */
 let fontsWaited = false;
@@ -357,7 +357,7 @@ function take(message: ToWorker): void {
 			for (const [s, x, y] of message.keys) engine.dropped(s, x, y);
 			break;
 		case "camera":
-			// The first camera, the stage opening, is not a move: its tiles come twelve a batch.
+			// The first camera, the canvas opening, is not a move: its tiles come twelve a batch.
 			if (camera && (camera.x !== message.x || camera.y !== message.y || camera.zoom !== message.zoom)) movedAt = performance.now();
 			camera = message;
 			break;

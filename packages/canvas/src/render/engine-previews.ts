@@ -26,7 +26,7 @@ export class EnginePreviews {
 
 	showPreview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		if (!this.of.page) return;
-		// Only moved: nothing the stage reads of the layout changes but the arrows bent, so it is told at the end.
+		// Only moved: nothing the canvas reads of the layout changes but the arrows bent, so it is told at the end.
 		// A fade in (`opacity` alone) changes no layout either.
 		this.moveOnly = !!moving?.size && [...moving.values()].every((one) => one.w === undefined && one.h === undefined && one.radius === undefined && (!one.set || Object.keys(one.set).every((key) => key === "opacity")));
 		if (moving?.size) {

@@ -2,7 +2,7 @@
  * A WebGL 2 context can be lost (the GPU process restarting, too many contexts, a phone reclaiming
  * memory) and given back. The engine prevents the lost event's default, which is what asks the
  * browser to give it back (`crates/gpu/src/targets/webgl.rs`); everything on the context is gone by
- * then, so when it is restored the stage starts its engine again on the same canvas.
+ * then, so when it is restored the canvas starts its engine again on the same canvas.
  *
  * The page's canvas is an `HTMLCanvasElement`, the worker's an `OffscreenCanvas`: both are event
  * targets for these two events.

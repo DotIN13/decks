@@ -1,7 +1,7 @@
 /**
  * WebGPU's device can be lost (a driver reset, the GPU process restarting, a laptop switching
  * cards). wgpu hears it and the engine says so (`PageEngine.lost()`, `WorkerEngine.lost()`), but
- * no event reaches the page, so the stage asks: a lost device is started again on the same canvas,
+ * no event reaches the page, so the canvas asks: a lost device is started again on the same canvas,
  * which keeps its WebGPU context and can be configured anew.
  */
 

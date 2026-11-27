@@ -1,11 +1,11 @@
 /**
- * What the stage says when it cannot draw: shown over it, in place of a stage with nothing on it
+ * What the canvas says when it cannot draw: shown over it, in place of a canvas with nothing on it
  * and a line in the console nobody reads.
  */
 import { m } from "@decks/i18n";
 import { NoBackend } from "./detect.ts";
 
-/** The words for a stage engine that did not start: the notice when no backend is to be had, else why. */
+/** The words for a canvas engine that did not start: the notice when no backend is to be had, else why. */
 export function noticeFor(error: unknown): string {
 	if (error instanceof NoBackend || (error as Error)?.name === "NoBackend") return m.canvas_stage_no_backend();
 	const why = String((error as Error)?.message ?? error);

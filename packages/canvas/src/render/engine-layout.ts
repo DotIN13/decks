@@ -47,8 +47,8 @@ export class EngineLayout {
 	 * drag's step (the arrows it bends) and an edit (what it reached) cost what they changed, not the
 	 * canvas. `placed` stays in paint order.
 	 *
-	 * `quiet` (a drag's step that only moves things, `showPreview`): the click shapes over boards and
-	 * the stage's readers of the layout (`drawn`) wait for the gesture's end, since nothing they read
+	 * `quiet` (a drag's step that only moves things, `showPreview`): the click shapes over cards and
+	 * the canvas's readers of the layout (`drawn`) wait for the gesture's end, since nothing they read
 	 * changed but the arrows the drag bends.
 	 */
 	laidOut(quiet = false): void {
@@ -181,10 +181,10 @@ export class EngineLayout {
 	}
 
 	/**
-	 * The cards as the stage places them. Sent whole only when something but liveness changed (a place, a
+	 * The cards as the canvas places them. Sent whole only when something but liveness changed (a place, a
 	 * picture, a title, the news): a change of which are live alone, which every start and end of a camera
 	 * move is for the apps and documents it covers, sends the live paths and nothing else (`setLive`). The
-	 * stage's own index over the cards (`index`, in the same order) is taken when given, so none is built here.
+	 * canvas's own index over the cards (`index`, in the same order) is taken when given, so none is built here.
 	 */
 	/** An item's box as laid out, with the item it is inside: what a mark over an agent's edit is drawn at. */
 	boxOf(id: string): { x: number; y: number; w: number; h: number; parent?: string | undefined } | undefined {

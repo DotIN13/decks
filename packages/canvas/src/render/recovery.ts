@@ -1,10 +1,10 @@
 /**
- * Whether the stage starts its engines again after an error, or stops and says so.
+ * Whether the canvas starts its engines again after an error, or stops and says so.
  *
  * An error out of the engine (a Rust panic, or the bindings refusing a call after one) leaves that
  * engine unusable: every later frame fails, and the canvas looks frozen. Starting both engines
  * again, as a lost GPU does (`engine.ts`, `restart`), draws again from the drawing held here. A
- * fault that comes straight back would loop, so after `limit` restarts within `windowMs` the stage
+ * fault that comes straight back would loop, so after `limit` restarts within `windowMs` the canvas
  * stops and asks for a reload instead.
  */
 export class Recovery {

@@ -55,7 +55,7 @@ export class EngineFaces {
 			});
 	}
 
-	/** Fetch the font files the stage's words need (`font-files.ts`), and hand each to both engines in the chain's order. */
+	/** Fetch the font files the canvas's words need (`font-files.ts`), and hand each to both engines in the chain's order. */
 	needFonts(): void {
 		if (!this.of.page) return;
 		// The words of what was laid out again since the last time: a change brings only its own.
@@ -110,7 +110,7 @@ export class EngineFaces {
 
 	/**
 	 * Fonts to the page's engine, in the order the chain lists them (so fallbacks are tried in the
-	 * app's order), laid out once for all of them; `show` lays the stage out for the stage and draws.
+	 * app's order), laid out once for all of them; `show` lays the canvas out and draws.
 	 */
 	giveFonts(fonts: readonly Font[], show: boolean): void {
 		if (!this.of.page || !fonts.length) return;
