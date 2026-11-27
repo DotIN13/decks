@@ -142,7 +142,7 @@ test("a pinch past the zoom limit still pans, and comes back the moment it can",
  * A finger that never lifted.
  *
  * The pool is fed by several documents and none of them can promise to report the end of
- * a gesture: writing a board navigates its iframe mid-drag, a background tab loses its
+ * a gesture: writing a card navigates its iframe mid-drag, a background tab loses its
  * touches, a sandboxed embed can be reloaded between two of its own events. Every one
  * leaves a finger in the pool that is not on the glass — and one is enough to read every
  * later touch as a pinch, which is the bug these cover.
@@ -152,7 +152,7 @@ test("a finger left behind by a dead document does not make the next touch a pin
 	let clock = 1_000;
 	const touches = createTouches({ now: () => clock });
 
-	// A finger on a board. The board is then written by somebody else, its iframe is
+	// A finger on a card. The card is then written by somebody else, its iframe is
 	// navigated, and the `pointerup` is delivered to a document that no longer exists.
 	touches.down({ id: 1, x: 300, y: 300 });
 	touches.move({ id: 1, x: 320, y: 300 });

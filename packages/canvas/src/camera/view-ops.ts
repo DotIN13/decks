@@ -8,11 +8,11 @@ import { boxOf, fit } from "./camera.ts";
  *
  * These are the operations only the browser can carry out — the camera, the
  * highlight, the pointer. Everything an agent can be told from the server (which
- * boards exist, what one says) never gets here.
+ * cards exist, what one says) never gets here.
  *
- * Highlighting reaches into the board's own document and sets `data-selected` on the
+ * Highlighting reaches into the card's own document and sets `data-selected` on the
  * component, which `card.css` already styles. That is the same-origin decision
- * (DESIGN §4) doing real work: no message protocol, no cooperation from the board,
+ * (DESIGN §4) doing real work: no message protocol, no cooperation from the card,
  * three lines.
  */
 
@@ -24,7 +24,7 @@ export interface ViewOpsHost {
 	/** The canvas on this screen, by folder name. */
 	canvasOnScreen?(): string | undefined;
 	/** Offer a button that moves that conversation to the canvas, and the screen with it (`view.goto` while the person is using the canvas). */
-	offerGoto?(agentId: string, stage: string): void;
+	offerGoto?(agentId: string, canvas: string): void;
 	/**
 	 * Move the view, and *arrive* at it when the caller asked for that.
 	 *
@@ -57,7 +57,7 @@ export interface ViewOpsHost {
  * The canvas is per conversation — it draws the focused agent's in-play set and nothing else
  * — and the camera has to follow the same rule or it is the one part of the view an agent
  * you are not watching can reach into. It could, and did: an agent working in another corner
- * of the deck flew your camera to a board that was not drawn on your canvas at all, which is
+ * of the deck flew your camera to a card that was not drawn on your canvas at all, which is
  * an empty view arriving while you sit still.
  *
  * So the fit is *remembered against that agent* rather than applied, and `viewOnSwitch` hands
@@ -68,7 +68,7 @@ function defer(call: StageCall, host: ViewOpsHost, camera: Camera, selected?: st
 	/*
 	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
 	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
-	 * this is their conversation already; the board is on the stage where it was put.
+	 * this is their conversation already; the card is on the canvas where it was put.
 	 */
 	if (call.agentId && call.agentId === host.focused() && host.handsOn?.()) {
 		host.offerView?.(call.agentId, camera, selected, what);
@@ -89,29 +89,29 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 				return { shown: [], deferred: "the person's screen shows another canvas; decks view goto brings it to this one first" };
 			}
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
-			const boards = host.boards().filter((board) => paths.includes(board.path));
+			const cards = host.boards().filter((card) => paths.includes(card.path));
 			/*
-			 * Drawn items arrive as boxes the server measured off the stage's layout, because an
+			 * Drawn items arrive as boxes the server measured off the canvas's layout, because an
 			 * item's id means nothing to this file: the drawing is painted on a canvas, not
-			 * mounted, so there is no node to look up. They frame like a board and are not
-			 * selected — selection here means a *board*, and an item has its own on the stage.
+			 * mounted, so there is no node to look up. They frame like a card and are not
+			 * selected — selection here means a *card*, and an item has its own on the canvas.
 			 */
 			const items = (Array.isArray(args.items) ? args.items : []).filter(
 				(item): item is { id: string; box: { x: number; y: number; w: number; h: number } } =>
 					Boolean(item) && typeof (item as { id?: unknown }).id === "string" && typeof (item as { box?: { w?: unknown } }).box?.w === "number",
 			);
-			if (boards.length === 0 && items.length === 0) return { error: "none of those cards are on the canvas" };
+			if (cards.length === 0 && items.length === 0) return { error: "none of those cards are on the canvas" };
 
-			const shown = [...boards.map((board) => board.path), ...items.map((item) => item.id)];
-			const boxes = [...boards.map(boxOf), ...items.map((item) => item.box)];
+			const shown = [...cards.map((card) => card.path), ...items.map((item) => item.id)];
+			const boxes = [...cards.map(boxOf), ...items.map((item) => item.box)];
 			const fitAll = args.fit === "all" || boxes.length > 1;
 			const wanted = fit(fitAll ? boxes : [boxes[0]!], host.viewport());
-			const waiting = defer(call, host, wanted, boards[0]?.path, "card");
+			const waiting = defer(call, host, wanted, cards[0]?.path, "card");
 			if (waiting) return { shown, ...waiting };
 			host.setCamera(wanted, { animate: args.animate === true });
-			if (boards[0]) host.select(boards[0].path);
+			if (cards[0]) host.select(cards[0].path);
 
-			if (typeof args.highlight === "string" && boards[0]) highlight(boards[0].path, args.highlight);
+			if (typeof args.highlight === "string" && cards[0]) highlight(cards[0].path, args.highlight);
 			return { shown };
 		}
 
@@ -130,10 +130,10 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 
 		case "reload": {
 			if (typeof args.path !== "string") return { error: "reload needs a path" };
-			// Counted (`view.reload`): this page reloads the board only if its canvas shows it.
+			// Counted (`view.reload`): this page reloads the card only if its canvas shows it.
 			if (args.count === true) {
 				if (typeof args.stage === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.stage) return { pages: 0 };
-				if (!host.boards().some((board) => board.path === args.path)) return { pages: 0 };
+				if (!host.boards().some((card) => card.path === args.path)) return { pages: 0 };
 				host.reload(args.path);
 				return { reloaded: args.path, pages: 1 };
 			}
@@ -148,13 +148,13 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 		 * (`onScreen`), unless the person is using the canvas, who is offered a button instead.
 		 */
 		case "goto": {
-			const stage = args.stage;
-			if (typeof stage !== "string" || !stage) return { error: "goto needs a canvas" };
+			const canvas = args.stage;
+			if (typeof canvas !== "string" || !canvas) return { error: "goto needs a canvas" };
 			if (!call.agentId || call.agentId !== host.focused()) return { apply: true };
 			// The person moving it themselves (a call with their own token): nobody to ask.
 			if (args.person === true) return { apply: true, onScreen: true };
-			if (host.canvasOnScreen?.() !== stage && host.handsOn?.()) {
-				host.offerGoto?.(call.agentId, stage);
+			if (host.canvasOnScreen?.() !== canvas && host.handsOn?.()) {
+				host.offerGoto?.(call.agentId, canvas);
 				return { offered: "the person is using the canvas, so they were offered a button to go to that one" };
 			}
 			return { apply: true, onScreen: true };
@@ -184,7 +184,7 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 	}
 }
 
-/** Outline one component inside a board, and take it off again on its own. */
+/** Outline one component inside a card, and take it off again on its own. */
 let clearLast: { run: () => void } | undefined;
 
 export function highlight(path: string, id: string): void {

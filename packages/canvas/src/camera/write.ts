@@ -23,7 +23,7 @@ export function createCameraWrite(d: CameraWriteNeeds) {
 	 *
 	 * A glide is **not a second way to move the camera**. It is a loop that calls this, which is why
 	 * an arrival gets everything a finger already had for free: the scale settle (a zooming glide
-	 * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp,
+	 * sets it for its duration, so the cards are redrawn once, at the end), the `lastMoved` stamp,
 	 * and the camera signal going up once per frame, so the zoom readout
 	 * ticks and `camera()` is never a lie about where the view is going.
 	 */
@@ -53,7 +53,7 @@ export function createCameraWrite(d: CameraWriteNeeds) {
 	};
 
 	/**
-	 * The browser scrolled the stage (a trackpad, a wheel, a finger), and the world is already where
+	 * The browser scrolled the canvas (a trackpad, a wheel, a finger), and the world is already where
 	 * this camera puts it: the camera follows, the drawing is told, and the camera is published once
 	 * a frame, as for any other step, with no transform written. A hand on the canvas wins over a
 	 * glide, as it does for every gesture.

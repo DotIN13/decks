@@ -10,16 +10,16 @@ import { middleOf, type Viewport } from "./camera.ts";
  * Three answers, in order:
  *
  * 1. **The view this device last left under the key**, exactly, whatever is under it now. It was
- *    checked against the boards alone before, so a view of a note or a sketch was thrown away for a
- *    fit of the boards, and a canvas with no boards kept whatever camera was on screen.
- * 2. **The middle of everything on the canvas**, boards and drawing alike, at the arrival zoom
+ *    checked against the cards alone before, so a view of a note or a sketch was thrown away for a
+ *    fit of the cards, and a canvas with no cards kept whatever camera was on screen.
+ * 2. **The middle of everything on the canvas**, cards and drawing alike, at the arrival zoom
  *    (`middleOf`: the median of the items, which one stray item cannot move).
  * 3. **The canvas's origin**, for an empty canvas. Never the camera of the key being left: that
  *    was the camera another agent had, saved a moment later as this one's own.
  */
 export function landingCamera(input: {
 	view: AgentView | undefined;
-	/** Everything on the arriving canvas, in canvas units: its boards and its drawn items. */
+	/** Everything on the arriving canvas, in canvas units: its cards and its drawn items. */
 	boxes: Array<{ x: number; y: number; w: number; h: number }>;
 	viewport: Viewport;
 	/** The part of the window the canvas has, without the panels standing over it. */

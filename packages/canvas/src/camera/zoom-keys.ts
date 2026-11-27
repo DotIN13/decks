@@ -14,7 +14,7 @@
  * handler matching `"+"` never fires. Shift makes it `"+"`. The numpad sends `"+"` and `"-"`
  * with no shift at all. So this reads **both** `key` and `code`, and the union is the whole
  * point of the function existing rather than being a condition inlined at two call sites:
- * getting it right once beats getting it right in the stage and wrong in a board frame.
+ * getting it right once beats getting it right in the canvas and wrong in a card frame.
  *
  * `code` is a physical position, which is not the same question on every layout — an AZERTY
  * `Minus` is somewhere else — so it is the fallback for the numpad rather than the primary

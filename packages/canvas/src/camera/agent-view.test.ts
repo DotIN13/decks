@@ -5,11 +5,11 @@ import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./agent-view.ts";
 
 /*
  * The cases here are the ones that were found by switching agents and being 3000px from
- * anything: a camera that did not move, a remembered view of boards that no longer exist,
- * and a selection restored around a board that had been hidden since.
+ * anything: a camera that did not move, a remembered view of cards that no longer exist,
+ * and a selection restored around a card that had been hidden since.
  */
 
-const board = (path: string, x: number, y: number): Page => ({
+const card = (path: string, x: number, y: number): Page => ({
 	path,
 	title: path,
 	x,
@@ -21,10 +21,10 @@ const board = (path: string, x: number, y: number): Page => ({
 });
 
 // The example deck's own geometry, which is where the bug was measured: 3009px apart.
-const boards = [board("boards/plan.html", 0, 0), board("boards/risks.html", 1760, 0), board("boards/deep.html", 0, 2440)];
+const boards = [card("boards/plan.html", 0, 0), card("boards/risks.html", 1760, 0), card("boards/deep.html", 0, 2440)];
 const viewport = { width: 1500, height: 1000 };
-/* The canvas's own box: the window minus the boards panel on the left, which is what the
-   app's Fit button frames into. A fit that centres a board behind the panel is not a fit. */
+/* The canvas's own box: the window minus the cards panel on the left, which is what the
+   app's Fit button frames into. A fit that centres a card behind the panel is not a fit. */
 const region = { x: 276, y: 0, width: 1224, height: 1000 };
 const at = (over: Record<string, unknown>) => ({ boards, viewport, region, ...over }) as Parameters<typeof viewOnSwitch>[0];
 const somewhere = { x: 612, y: 2964, zoom: 0.735 };
@@ -47,13 +47,13 @@ test("a remembered view comes back exactly, not as a fresh fit of the same board
 });
 
 /*
- * The third case, and the one that only shows up after a while: the boards are still there
+ * The third case, and the one that only shows up after a while: the cards are still there
  * and the camera is still remembered, but they have moved apart in the meantime. Handing the
  * saved view back regardless is the empty-canvas bug from the other end — a view of nothing
  * that looks like a view of something.
  */
 test("a remembered view that has stopped showing anything is refitted, not restored", () => {
-	const moved = [board("boards/plan.html", 0, 0), board("boards/deep.html", 40000, 40000)];
+	const moved = [card("boards/plan.html", 0, 0), card("boards/deep.html", 40000, 40000)];
 	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), boards: moved });
 
 	assert.notDeepEqual(next, somewhere, "the saved camera is 40000px from the only board it has");
@@ -63,8 +63,8 @@ test("a remembered view that has stopped showing anything is refitted, not resto
 });
 
 test("…while a view that still has its board on screen is left exactly alone", () => {
-	// The board moved, but not out of shot: this is still the view you left.
-	const nudged = [board("boards/plan.html", 0, 0), board("boards/deep.html", 700, 2900)];
+	// The card moved, but not out of shot: this is still the view you left.
+	const nudged = [card("boards/plan.html", 0, 0), card("boards/deep.html", 700, 2900)];
 	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), boards: nudged });
 	assert.deepEqual(next, somewhere);
 });
@@ -72,15 +72,15 @@ test("…while a view that still has its board on screen is left exactly alone",
 test("no memory at all is a fit of what it holds", () => {
 	const fresh = viewOnSwitch(at({ view: undefined, playing: ["boards/risks.html"] }));
 	assert.ok(fresh, "there is something to look at, so the camera moves");
-	// Centred on the board it holds, which is at 1760,0 and 1200x800.
+	// Centred on the card it holds, which is at 1760,0 and 1200x800.
 	/*
-	 * Centred on the board, and *offset* for the panel: `fitInto` shifts the camera so the
-	 * board lands in the canvas's own box rather than in the middle of the window, so the x
-	 * is not simply the board's centre.
+	 * Centred on the card, and *offset* for the panel: `fitInto` shifts the camera so the
+	 * card lands in the canvas's own box rather than in the middle of the window, so the x
+	 * is not simply the card's centre.
 	 */
 	assert.ok(fresh.y > 300 && fresh.y < 500, `y ${fresh.y}`);
 	assert.ok(fresh.x < 1760 + 600, `x ${fresh.x} — shifted left of centre to clear the panel`);
-	/* A board smaller than the canvas is zoomed slightly *in*, which is what `fit` has always
+	/* A card smaller than the canvas is zoomed slightly *in*, which is what `fit` has always
 	   done; the cap is `clampZoom`, not 1. */
 	assert.ok(fresh.zoom > 0.5, `zoom ${fresh.zoom}`);
 });
@@ -98,7 +98,7 @@ test("…and it frames all of them, not the first", () => {
 test("the two agents from the measurement no longer share a view", () => {
 	/*
 	 * This is the reported bug, as a test. Ada showed `deep` and Bo showed `risks`; switching
-	 * left the camera byte-identical, 2200 screen pixels from Bo's only board.
+	 * left the camera byte-identical, 2200 screen pixels from Bo's only card.
 	 */
 	const ada = viewOnSwitch(at({ view: undefined, playing: ["boards/deep.html"] }));
 	const bo = viewOnSwitch(at({ view: undefined, playing: ["boards/risks.html"] }));

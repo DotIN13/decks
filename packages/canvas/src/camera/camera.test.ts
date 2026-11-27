@@ -50,24 +50,24 @@ test("panning moves the camera the other way, scaled by zoom", () => {
 });
 
 test("fitting one board centres it and leaves a margin", () => {
-	const board = { x: 100, y: 100, w: 1600, h: 1000 };
-	const camera = fit([board], view);
+	const card = { x: 100, y: 100, w: 1600, h: 1000 };
+	const camera = fit([card], view);
 	assert.deepEqual({ x: camera.x, y: camera.y }, { x: 900, y: 600 }, "the centre of the board");
 	// It fits, with the padding respected on the tighter axis.
-	assert.ok(board.w * camera.zoom <= view.width - 100, `${board.w * camera.zoom} fits in ${view.width}`);
-	assert.ok(board.h * camera.zoom <= view.height - 100);
+	assert.ok(card.w * camera.zoom <= view.width - 100, `${card.w * camera.zoom} fits in ${view.width}`);
+	assert.ok(card.h * camera.zoom <= view.height - 100);
 });
 
 test("fitting several boards frames all of them", () => {
-	const boards = [
+	const cards = [
 		{ x: 0, y: 0, w: 1600, h: 1000 },
 		{ x: 1760, y: 0, w: 1400, h: 900 },
 		{ x: 0, y: 1160, w: 1600, h: 1120 },
 	];
-	const camera = fit(boards, view);
-	for (const board of boards) {
-		const topLeft = toScreen(camera, view, { x: board.x, y: board.y });
-		const bottomRight = toScreen(camera, view, { x: board.x + board.w, y: board.y + board.h });
+	const camera = fit(cards, view);
+	for (const card of cards) {
+		const topLeft = toScreen(camera, view, { x: card.x, y: card.y });
+		const bottomRight = toScreen(camera, view, { x: card.x + card.w, y: card.y + card.h });
 		assert.ok(topLeft.x >= -1 && topLeft.y >= -1, `${JSON.stringify(topLeft)} is on screen`);
 		assert.ok(bottomRight.x <= view.width + 1 && bottomRight.y <= view.height + 1, `${JSON.stringify(bottomRight)} is on screen`);
 	}
@@ -135,7 +135,7 @@ test("a box too big for the room left is aligned to its top left, where reading 
  * `fitInto` — fitting into the canvas column rather than into the window.
  *
  * The regression these guard is the one `EDGE_FLOOR` is named for: padding counted on top
- * of the panels, so a flown-to board landed under the live zoom and could not be clicked.
+ * of the panels, so a flown-to card landed under the live zoom and could not be clicked.
  */
 test("fitInto with no chrome is fit", () => {
 	const view = { width: 1400, height: 900 };
@@ -152,7 +152,7 @@ test("fitInto zooms to the region, not the window", () => {
 	const box = { x: 0, y: 0, w: 1000, h: 500 };
 	const region = { x: 276, y: 52, width: 800, height: 800 };
 	const camera = fitInto([box], view, region);
-	// 800 wide minus a 24px floor each side, over 1000 of board.
+	// 800 wide minus a 24px floor each side, over 1000 of card.
 	assert.equal(camera.zoom, (800 - EDGE_FLOOR * 2) / 1000);
 });
 
@@ -170,7 +170,7 @@ test("fitInto puts the content in the middle of the region, not of the window", 
 
 test("a board flown to inside the chrome stays above the live zoom", () => {
 	// The actual failure: 1400x900 window, 264px panel and a 320px inspector, one 1600px
-	// board. With `breathingRoom` added on top of the panels this came out at 0.42.
+	// card. With `breathingRoom` added on top of the panels this came out at 0.42.
 	const view = { width: 1400, height: 900 };
 	const region = { x: 288, y: 52, width: 1400 - 288 - 344, height: 900 - 52 - 12 };
 	const camera = fitInto([{ x: 0, y: 0, w: 1600, h: 1000 }], view, region);
@@ -215,11 +215,11 @@ test("a glide never overshoots and never goes backwards", () => {
 });
 
 /*
- * Landing on a stage from the manager: the middle of its work, not a fit of everything it holds.
+ * Landing on a canvas from the manager: the middle of its work, not a fit of everything it holds.
  *
- * The case that decides the rule is the stray board — one board parked a long way from the rest.
- * A fit has to include it, so it takes the whole stage down to a zoom where nothing reads; the
- * weighted middle barely notices it, which is the right answer, because a board nobody has
+ * The case that decides the rule is the stray card — one card parked a long way from the rest.
+ * A fit has to include it, so it takes the whole canvas down to a zoom where nothing reads; the
+ * weighted middle barely notices it, which is the right answer, because a card nobody has
  * looked at in a month is not what you came to see.
  */
 const REGION = { x: 0, y: 0, width: 1200, height: 800 };
@@ -233,7 +233,7 @@ test("landing frames the middle of the work, and a stray board does not drag it"
 	const near = middleOf(cluster, REGION, VIEW);
 	const strayed = middleOf([...cluster, { x: 40000, y: 30000, w: 300, h: 200 }], REGION, VIEW);
 	assert.ok(Math.abs(near.x - 1020) < 1, `the middle of the pair: ${near.x}`);
-	// The median lands on a board of the cluster, and the stray one 39,000px away cannot move it off.
+	// The median lands on a card of the cluster, and the stray one 39,000px away cannot move it off.
 	assert.ok(strayed.x >= 0 && strayed.x <= 2040, `landed at ${Math.round(strayed.x)}, which should be inside the cluster`);
 	assert.ok(fit([...cluster, { x: 40000, y: 30000, w: 300, h: 200 }], VIEW).zoom < 0.1, "where a fit of the same boards is unreadable");
 });
@@ -241,8 +241,8 @@ test("landing frames the middle of the work, and a stray board does not drag it"
 /*
  * Arriving is a looking scale, the same one every time.
  *
- * Deliberately below the line where a board takes pointer events: what an arrival answers is
- * "what is on this stage", which is several boards at once. A zoom worked out from the boards
+ * Deliberately below the line where a card takes pointer events: what an arrival answers is
+ * "what is on this canvas", which is several cards at once. A zoom worked out from the cards
  * would make every arrival a different size, and the gesture would never become a habit.
  */
 test("every landing is at the same zoom, whatever the stage holds", () => {

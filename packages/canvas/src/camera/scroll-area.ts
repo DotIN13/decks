@@ -2,9 +2,9 @@ import type { Camera } from "@decks/protocol";
 import type { Viewport } from "./camera.ts";
 
 /**
- * The stage as a scroll area: the camera's position is the stage's scroll position.
+ * The canvas as a scroll area: the camera's position is the canvas's scroll position.
  *
- * A pan is the browser scrolling the stage, on its compositor, with nothing of ours in the frame:
+ * A pan is the browser scrolling the canvas, on its compositor, with nothing of ours in the frame:
  * the pages, the drawing's sheet and everything else in the world move because the world sits in
  * the scrolled content. Our code hears of it afterwards, from the scroll event, and reads the
  * camera back from the scroll (`CanvasView.tsx`, `camera/controller.ts`, `scrolled`).

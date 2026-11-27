@@ -10,22 +10,22 @@ import { createMotion } from "./motion.ts";
 import { createCameraWrite } from "./write.ts";
 
 /**
- * The camera of one stage: where it is, whether it is moving, and the one place that moves it.
+ * The camera of one canvas: where it is, whether it is moving, and the one place that moves it.
  *
  * Everything that moves the camera comes here: a wheel or a trackpad's pinch (`wheel`), a finger or
  * a drag (`push`), a flick's coast (`coast`), a glide the app asked for (`glideTo`, and the host's
  * camera followed by the effect below). Each step is written to the page at once, by the host's
  * `place` (the world's one transform and the drawing's camera), and published to the host's camera
- * signal once a frame. What the step is never does is reach anything else in the stage: whatever
+ * signal once a frame. What the step is never does is reach anything else in the canvas: whatever
  * reads the camera reads it from here.
  *
- * Moved out of `CanvasView.tsx` whole, its comments with it, so the stage keeps the drawing and the
- * boards and asks this for the camera.
+ * Moved out of `CanvasView.tsx` whole, its comments with it, so the canvas keeps the drawing and the
+ * cards and asks this for the camera.
  */
 export interface CameraHost {
-	/** The stage's size on screen. */
+	/** The canvas's size on screen. */
 	view: Accessor<Viewport>;
-	/** Put the world and the drawing at this camera: the one write to the page a camera step makes (for the stage, its scroll). */
+	/** Put the world and the drawing at this camera: the one write to the page a camera step makes (for the canvas, its scroll). */
 	place(camera: Camera): void;
 	/** The browser has scrolled the world to this camera already: tell the drawing, and nothing else. */
 	follow(camera: Camera): void;
@@ -61,9 +61,9 @@ export function createCameraController(host: CameraHost) {
 	/**
 	 * A glide the app has asked for and this file has not started yet.
 	 *
-	 * The camera signal and the glide request arrive in the same batch, and the boards are
+	 * The camera signal and the glide request arrive in the same batch, and the cards are
 	 * rendered from that batch **before** the effect below gets to start the loop — so for one
-	 * pass "the camera has moved" is true and "the camera is moving" is not yet, and a board
+	 * pass "the camera has moved" is true and "the camera is moving" is not yet, and a card
 	 * that the new camera brings into view would begin parsing its document exactly then, at
 	 * the top of the flight. This closes that window: the request itself counts as movement.
 	 */

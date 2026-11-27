@@ -3,8 +3,8 @@
  *
  * There were nine of these written by hand across four files, and four of the bugs recorded
  * in this codebase's comments came from them: a pinch that walked the canvas 90 px sideways
- * and down (the stage's offset subtracted twice), a 60 px drag that moved the camera 30
- * (board pixels used where screen pixels were meant), a title bar 88 px tall at 27% zoom
+ * and down (the canvas's offset subtracted twice), a 60 px drag that moved the camera 30
+ * (card pixels used where screen pixels were meant), a title bar 88 px tall at 27% zoom
  * (`24 / zoom` where only part of the value scales), and a forced layout on every event of a
  * gesture (a conversion that measured the DOM instead of asking the camera).
  *
@@ -15,11 +15,11 @@
  *
  * ### The spaces
  *
- * - **stage** — pixels from the top-left of the stage element. The camera works in these,
- *   and because the stage *is* the viewport (`viewPoint`), they are also client pixels.
- * - **board** — pixels inside a board's own document. A board's iframe knows nothing of the
- *   camera, so these are the board's own layout coordinates, unscaled.
- * - **world** — what the boards are laid out in. `camera.ts` owns the trip to and from here.
+ * - **canvas** — pixels from the top-left of the canvas element. The camera works in these,
+ *   and because the canvas *is* the viewport (`viewPoint`), they are also client pixels.
+ * - **card** — pixels inside a card's own document. A card's iframe knows nothing of the
+ *   camera, so these are the card's own layout coordinates, unscaled.
+ * - **world** — what the cards are laid out in. `camera.ts` owns the trip to and from here.
  *
  * ### Why a point converts and a delta converts differently
  *
@@ -36,12 +36,12 @@ export type Point<S extends string> = { x: number; y: number } & In<S>;
 export type Delta<S extends string> = { dx: number; dy: number } & In<S>;
 
 /**
- * A pointer event's position, in stage pixels — **which is the event's own `clientX`.**
+ * A pointer event's position, in canvas pixels — **which is the event's own `clientX`.**
  *
- * The stage element is the viewport, and that is a property of the stylesheet rather than a
+ * The canvas element is the viewport, and that is a property of the stylesheet rather than a
  * hope: `#root` has `margin: 0`, `.app` is `position: relative`, and `.work` and `.stage` are
  * both `position: absolute; inset: 0`, with no transform on any ancestor (the only transforms
- * in the app are on `.dock`, `.side` and a palette button, none of them above the stage).
+ * in the app are on `.dock`, `.side` and a palette button, none of them above the canvas).
  *
  * So the conversion across this boundary has always been adding zero — at the cost of a
  * cached `getBoundingClientRect`, and three places to get the sign wrong. `checkCanvasOrigin`
@@ -53,15 +53,15 @@ export const viewPoint = (event: { clientX: number; clientY: number }): Point<"v
 });
 
 /**
- * Warn, once, if the stage is not where `viewPoint` assumes.
+ * Warn, once, if the canvas is not where `viewPoint` assumes.
  *
- * Called from the stage's own mount. The day someone insets the stage — a title bar returns,
+ * Called from the canvas's own mount. The day someone insets the canvas — a title bar returns,
  * a border appears — every gesture would be off by that much, and silently: nothing throws,
  * the canvas simply drifts under the cursor. A measurement at mount costs one layout read and
  * turns that into a sentence in the console.
  */
-export function checkCanvasOrigin(stage: Element): void {
-	const rect = stage.getBoundingClientRect();
+export function checkCanvasOrigin(canvas: Element): void {
+	const rect = canvas.getBoundingClientRect();
 	if (Math.abs(rect.left) < 0.5 && Math.abs(rect.top) < 0.5) return;
 	console.warn(
 		`The stage is at (${Math.round(rect.left)}, ${Math.round(rect.top)}), not the viewport's origin. ` +

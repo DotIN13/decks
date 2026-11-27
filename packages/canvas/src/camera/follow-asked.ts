@@ -44,7 +44,7 @@ export function followAsked(d: FollowAskedNeeds) {
 			/*
 			 * A move the app made (the opening camera, a fit, an agent's focus) is a step like a finger's:
 			 * the scale and the motion settle as after a gesture. Without this a zoom that came this way
-			 * never counted as scaling, so the stage never heard it rest: a zoom it had held still (the
+			 * never counted as scaling, so the canvas never heard it rest: a zoom it had held still (the
 			 * world and the drawing's canvas left where they were, the drawing drawn at the camera into
 			 * them) stayed held for good. Every pan after that moved the canvas with the scroll and the
 			 * drawing was drawn again at the new camera into the moved canvas, so it drifted from the

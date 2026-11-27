@@ -4,18 +4,18 @@ import type { Page, Camera, StageCall } from "@decks/protocol";
 import { runViewCall, type ViewOpsHost } from "./view-ops.ts";
 
 /*
- * Whose view a stage call is allowed to move.
+ * Whose view a canvas call is allowed to move.
  *
  * The canvas is per conversation, and the camera has to follow the same rule or it is the one
  * part of the view an agent you are not watching can reach into. It could: a call carried no
  * agent id, so the browser could not tell whose `decks.view.focus` it was carrying out, and an agent
- * working in another corner of the deck flew the camera to a board that was not on screen.
+ * working in another corner of the deck flew the camera to a card that was not on screen.
  *
  * The DOM is never touched by these two operations — `highlight` is the only one that reaches
- * into a board's document, and nothing here asks for one — so this runs as a plain unit test.
+ * into a card's document, and nothing here asks for one — so this runs as a plain unit test.
  */
 
-const board = (path: string, x: number, y: number): Page => ({ path, title: path, x, y, w: 800, h: 600, rev: 1, inContext: [] });
+const card = (path: string, x: number, y: number): Page => ({ path, title: path, x, y, w: 800, h: 600, rev: 1, inContext: [] });
 
 function host(focused: string | undefined, hands = false) {
 	const moved: Camera[] = [];
@@ -25,7 +25,7 @@ function host(focused: string | undefined, hands = false) {
 	const selected: Array<string | undefined> = [];
 	const offered: Array<{ agentId: string; camera: Camera; selected?: string; what: string }> = [];
 	const api: ViewOpsHost = {
-		boards: () => [board("boards/plan.html", 0, 0), board("boards/risks.html", 6000, 0)],
+		boards: () => [card("boards/plan.html", 0, 0), card("boards/risks.html", 6000, 0)],
 		viewport: () => ({ width: 1200, height: 800 }),
 		focused: () => focused,
 		setCamera: (camera, options) => {
@@ -144,9 +144,9 @@ test("a remembered view is not animated, whatever it asked for", () => {
 });
 
 /*
- * Showing a **drawn item**: a note or a frame on the stage, named by its id.
+ * Showing a **drawn item**: a note or a frame on the canvas, named by its id.
  *
- * The item's box is measured by the server off the stage's layout and travels with the call,
+ * The item's box is measured by the server off the canvas's layout and travels with the call,
  * because the drawing is painted on a canvas rather than mounted — there is no node here to
  * look an id up in. So the whole of this half is: frame the box, select nothing.
  */
@@ -201,7 +201,7 @@ test("while the person is using the canvas, the agent on screen is offered a but
  * agent's conversation brought on screen in its place.
  */
 function gotoHost(focused: string | undefined, hands: boolean) {
-	const offers: Array<{ agentId: string; stage: string }> = [];
+	const offers: Array<{ agentId: string; canvas: string }> = [];
 	const api: ViewOpsHost = {
 		boards: () => [],
 		viewport: () => ({ width: 1200, height: 800 }),
@@ -213,11 +213,11 @@ function gotoHost(focused: string | undefined, hands: boolean) {
 		reload: () => {},
 		cursor: () => true,
 		handsOn: () => hands,
-		offerGoto: (agentId, stage) => offers.push({ agentId, stage }),
+		offerGoto: (agentId, canvas) => offers.push({ agentId, canvas }),
 	};
 	return { api, offers };
 }
-const goto = (agentId: string, stage: string, extra: Record<string, unknown> = {}): StageCall => ({ id: "g", op: "goto", agentId, args: { stage, ...extra } });
+const goto = (agentId: string, canvas: string, extra: Record<string, unknown> = {}): StageCall => ({ id: "g", op: "goto", agentId, args: { stage: canvas, ...extra } });
 
 test("an agent in the background just moves to another canvas: nothing on screen changes and nobody is asked", () => {
 	const { api, offers } = gotoHost("A", true);
@@ -236,7 +236,7 @@ test("while the person is using the canvas, the agent on screen asks: a button i
 	const answer = runViewCall(goto("A", "promo"), api) as { offered?: string; apply?: boolean };
 	assert.match(answer.offered ?? "", /using the canvas/);
 	assert.equal(answer.apply, undefined);
-	assert.deepEqual(offers, [{ agentId: "A", stage: "promo" }]);
+	assert.deepEqual(offers, [{ agentId: "A", canvas: "promo" }]);
 });
 
 test("the canvas already on screen, or the person's own call, is never asked about", () => {
