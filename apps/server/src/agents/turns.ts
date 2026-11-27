@@ -1,6 +1,7 @@
 import type { AgentKind, AgentState, MessagePart, ServerMessage } from "@decks/protocol";
 import type { LookingAt } from "./looking-at.ts";
 import type { QueuedWork } from "./work.ts";
+import { runtimeOf } from "../runtimes/registry.ts";
 
 /**
  * An agent's turns: what it is asked to do, and in what order.
@@ -32,16 +33,6 @@ function quietMs(): number {
  * against a chat is already more than anybody watching can follow, and the ninth is a sign
  * that the sender should have done the work or spawned somebody to.
  */
-/**
- * Which runtimes take a message in the middle of a turn. Pi and opencode 2 steer it
- * (`streamingBehavior: "steer"`, `delivery: "steer"`). Claude's message stream and opencode 1's
- * `prompt_async` take it at the turn's next step: opencode 1 saves the message and joins the
- * session's running loop (`SessionPrompt.loop` -> `ensureRunning`), which reads the newest user
- * message before every step and does not stop until it has answered it. Antigravity's print mode
- * reads one prompt line per turn, so a message sent mid-turn waits for the turn to end.
- */
-const STEERS: Record<AgentKind, boolean> = { pi: true, opencode2: true, claude: true, opencode: true, antigravity: false, outside: false };
-
 const QUEUE_LIMIT = 8;
 
 /** The first line of a task, for a notice that has to fit on one. */
@@ -183,7 +174,7 @@ export class Turns {
 	 * Work handed over to be read now (`agent.send`), not after the turn running.
 	 *
 	 * Idle (or dormant), it starts a turn of its own. Mid-turn, it goes into that turn where the
-	 * runtime can take a message there (`STEERS`): Pi and opencode 2 steer the turn, and Claude's
+	 * runtime can take a message there (`capabilities.steers`): Pi and opencode 2 steer the turn, and Claude's
 	 * stream and opencode 1's running loop take the message at the turn's next step. Antigravity has
 	 * no way in mid-turn, so the work is queued, as `agent.queue` would, and the answer says so.
 	 */
@@ -200,10 +191,12 @@ export class Turns {
 			void this.of.prompt(sent);
 			return { delivered: true, turn: "new" };
 		}
-		if (STEERS[this.of.kind]) {
+		// Whether the runtime takes a message mid-turn, and when, is the runtime's to say (`capabilities.steers`).
+		const steers = runtimeOf(this.of.kind).capabilities.steers;
+		if (steers) {
 			if (!item.person) this.of.notice("info", `${item.fromName} sent you work, into this turn: ${firstLine(item.task)}`);
 			void this.of.prompt(sent);
-			return { delivered: true, turn: "running", ...(this.of.kind === "claude" || this.of.kind === "opencode" ? { note: `${this.of.kind === "claude" ? "Claude" : "opencode"} takes a message mid-turn at its next step, after the model call or tool call it is in.` } : {}) };
+			return { delivered: true, turn: "running", ...(steers === "next-step" ? { note: `${this.of.kind} takes a message mid-turn at its next step, after the model call or tool call it is in.` } : {}) };
 		}
 		const position = this.enqueue(item);
 		return { delivered: false, turn: "queued", position, note: `${this.of.kind} cannot take a message in the middle of a turn, so it waits in ${this.of.name()}'s queue (position ${position}) and runs when this turn ends.` };

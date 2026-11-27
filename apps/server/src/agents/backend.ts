@@ -254,8 +254,15 @@ export interface AgentBackend {
 	 * can do from memory.
 	 */
 	syncEntryIds(): Promise<void>;
-	/** Which revision each board was at, at that point in the conversation. */
-	revisionsAt(entryId: string): Record<string, string>;
+	/**
+	 * Which revision each board was at, at that point in the conversation.
+	 *
+	 * Only pi has this: it writes a `board-rev` entry per write, which names the exact revision
+	 * a board was at. The others have no entry Decks can write into, and leave this out;
+	 * `App.boardsAt` then falls back to the revision store's own times, which is the same answer
+	 * except where two writes share a second.
+	 */
+	revisionsAt?(entryId: string): Record<string, string>;
 	/** Move the conversation back to just before that message. */
 	rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }>;
 	/** A handle a new chat can open, holding everything up to that point. */

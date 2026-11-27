@@ -177,7 +177,7 @@ test("a dormant row still reports what its runtime can do", () => {
 	// the row at all: the browser reads them off the runtime the row names. What the row has
 	// to get right is the runtime.
 	assert.equal(rowFor(registry, id)?.kind, "pi");
-	assert.deepEqual(runtimeOf("pi").capabilities, { modes: [] }, "and pi has no modes to draw a control for");
+	assert.deepEqual(runtimeOf("pi").capabilities.modes, [], "and pi has no modes to draw a control for");
 	cleanup();
 });
 

@@ -1,4 +1,3 @@
-import { sentAs } from "../../agents/sent-as.ts";
 import { gdocsCaller } from "../../google/agent-tools.ts";
 import { existsSync } from "node:fs";
 import {
@@ -13,7 +12,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { nearestLevel, THINKING_LEVELS, type AgentCapabilities, type AgentModel, type AgentUsage, type ModelOption, type SlashCommand, type ThinkingLevel, type UsageReport } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
-import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
+import { deckSlash, mergeCommands, parseSlash } from "../../agents/slash.ts";
+import { pairUserEntries } from "../../agents/entries.ts";
 import { decksStage } from "./extension.ts";
 import { decksEnv } from "../decks-env.ts";
 import { skillsDir } from "@decks/runtime";
@@ -53,7 +53,8 @@ export function levelFor(model: { thinkingLevelMap?: Record<string, unknown> | u
 	return nearestLevel(wanted, levels);
 }
 
-export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
+/** No modes (permissions are an extension's business); a message mid-turn steers it (`streamingBehavior: "steer"`). */
+export const PI_CAPABILITIES: AgentCapabilities = { modes: [], steers: "now" };
 
 /**
  * The `/` commands Decks interprets for a pi agent.
@@ -246,10 +247,6 @@ export class PiBackend implements AgentBackend {
 				);
 				return;
 			}
-			case "cost":
-				// The panel, not a paragraph — see `claude/backend.ts` for the same line.
-				this.context.showUsage?.();
-				return;
 			case "name": {
 				if (!args.trim()) {
 					notice("warn", "Usage: /name <name> to rename this agent.");
@@ -259,10 +256,9 @@ export class PiBackend implements AgentBackend {
 				notice("info", `Renamed to ${args.trim()}.`);
 				return;
 			}
-			case "help":
-				notice("info", helpText(this.commands()));
-				return;
 			default: {
+				// `/cost` and `/help` are the deck's, answered as on every runtime (`agents/slash.ts`).
+				if (await deckSlash(name, this.context, { runtime: "pi", commands: () => this.commands() })) return;
 				/*
 				 * Handed through untouched, which is what the doc comment on `prompt()` has
 				 * always claimed and what this branch did not do: it answered "Unknown
@@ -399,32 +395,17 @@ export class PiBackend implements AgentBackend {
 	 * Pi does not announce this — `entry_appended` fires only for entries an *extension*
 	 * appended, never for ordinary messages. What it does offer is the branch, and the
 	 * user messages on it are the same sequence, in the same order, as the user items in
-	 * the transcript.
-	 *
-	 * Walked from the end: the transcript in memory is a capped tail
-	 * (`KEEP` in `agents/translator.ts`), so the two sequences share a *suffix*, not a
-	 * prefix — pairing from the start would line the oldest entry up against a message
-	 * from the middle of the conversation. Checked as it goes, and stopping at the first
-	 * disagreement: a missing id costs one message its rewind affordance, which is the
-	 * right way to be wrong. (The algorithm is Picone's, at
-	 * `picone/apps/server/src/pi/backend.ts:503`.)
+	 * the transcript, paired from the end as on every runtime (`agents/entries.ts`).
 	 */
 	async syncEntryIds(): Promise<void> {
 		const entries = (this.session?.sessionManager.getBranch() ?? []).filter(
 			(entry): entry is typeof entry & { message: { role: string; content: unknown } } =>
 				entry.type === "message" && (entry as { message?: { role?: string } }).message?.role === "user",
 		);
-		const items = this.context.translator.userMessages();
-
-		for (let offset = 1; offset <= Math.min(entries.length, items.length); offset++) {
-			const entry = entries[entries.length - offset];
-			const item = items[items.length - offset];
-			if (!entry || !item) break;
-			if (item.entryId === entry.id) continue;
-			// The entry holds the model-facing text: reminders before it, more after (`sent-as.ts`).
-			if (!sentAs(entry.message.content, item.text)) break;
-			this.context.translator.tagUser(item.id, entry.id);
-		}
+		pairUserEntries(
+			this.context.translator,
+			entries.map((entry) => ({ id: entry.id, content: entry.message.content })),
+		);
 	}
 
 	/**

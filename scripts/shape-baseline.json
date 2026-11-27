@@ -1,8 +1,8 @@
 {
 	"counts": {
-		"files over 1,000 lines": 5,
-		"functions over 150 lines": 40,
-		"classes over 30 methods": 9,
+		"files over 1,000 lines": 4,
+		"functions over 150 lines": 39,
+		"classes over 30 methods": 7,
 		"server folder pairs that import each other": 10,
 		"imports across packages by relative path": 0,
 		"\"one release\" notes": 0,
@@ -12,7 +12,6 @@
 	},
 	"sizes": {
 		"apps/server/src/runtimes/claude/accounts.ts": 1156,
-		"apps/server/src/runtimes/claude/backend.ts": 1479,
 		"apps/web/src/panel/LeftPanel.tsx": 1049,
 		"packages/docs/src/page/gview.ts": 2091,
 		"packages/docs/src/page/live.ts": 2054,
@@ -24,7 +23,6 @@
 		"apps/server/src/connections/routes/files.ts: register": 178,
 		"apps/server/src/connections/routes/pictures.ts: register": 315,
 		"apps/server/src/connections/routes/v1.ts: verbRoutes": 159,
-		"apps/server/src/runtimes/claude/backend.ts: startQuery": 188,
 		"apps/web/src/agents/AgentEdit.tsx: AgentEdit": 233,
 		"apps/web/src/agents/AgentHoverCard.tsx: AgentHoverCard": 176,
 		"apps/web/src/agents/AgentPill.tsx: AgentMenu": 372,
@@ -60,9 +58,7 @@
 		"apps/server/src/apps/service.ts: Apps": 38,
 		"apps/server/src/pictures/service.ts: PictureService": 36,
 		"apps/server/src/runtimes/claude/accounts.ts: ClaudeAccounts": 47,
-		"apps/server/src/runtimes/claude/backend.ts: ClaudeBackend": 44,
-		"apps/server/src/runtimes/opencode/backend.ts: OpencodeBackend": 32,
-		"apps/server/src/runtimes/opencode2/backend.ts: Opencode2Backend": 38,
+		"apps/server/src/runtimes/claude/backend.ts: ClaudeBackend": 41,
 		"packages/docs/src/page/gview.ts: GoogleView": 73,
 		"packages/docs/src/page/live.ts: LiveEditor": 47
 	},

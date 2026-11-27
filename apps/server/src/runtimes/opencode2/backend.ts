@@ -1,16 +1,15 @@
 import { skillsDir, opencode2PluginDir } from "@decks/runtime";
-import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentMode, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import { DEFAULT_THINKING } from "@decks/protocol";
-import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
+import type { AgentBackendContext } from "../../agents/backend.ts";
 import { agentBriefing } from "../../agents/context.ts";
-import { sentAs } from "../../agents/sent-as.ts";
-import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 // The level vocabulary is Decks' own and the same for both opencodes, so it is read from there
 // rather than copied: it maps Decks' scale onto whatever variant names a model declares.
-import { rankedVariants, variantFor } from "../opencode/variants.ts";
+import { rankedVariants } from "../opencode/variants.ts";
 import { connect, offerKeys, type Opencode2Client } from "./client.ts";
 import { Opencode2Stream } from "./events.ts";
-import { opencode2Manager, type Opencode2ServerHandle } from "./manager.ts";
+import { opencode2Manager } from "./manager.ts";
+import { DEFAULT_MODE, SharedServerBackend, type PermissionTable, type SessionCalls } from "../shared-server-backend.ts";
 
 /**
  * OpenCode 2 behind one Decks agent.
@@ -34,8 +33,11 @@ import { opencode2Manager, type Opencode2ServerHandle } from "./manager.ts";
  *   mode set here is the one that applies.
  */
 
-/** OpenCode 2 asks before writes and commands, so three of Decks' four modes mean something. */
-export const OPENCODE2_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"] };
+/**
+ * OpenCode 2 asks before writes and commands, so three of Decks' four modes mean something. A
+ * message mid-turn steers it (`delivery: "steer"`).
+ */
+export const OPENCODE2_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"], steers: "now" };
 
 /** The `/` commands Decks interprets for an OpenCode 2 agent; the server's own are merged under these. */
 export const OPENCODE2_COMMANDS: SlashCommand[] = [
@@ -52,7 +54,7 @@ export const OPENCODE2_COMMANDS: SlashCommand[] = [
  * `external_directory` is ruled on in every mode for the reason it is in opencode 1's table: a
  * request nobody answers is a turn that hangs, and with no rule OpenCode answers `ask`.
  */
-const PERMISSIONS: Record<string, Record<string, "ask" | "allow">> = {
+const PERMISSIONS: PermissionTable = {
 	manual: { edit: "ask", shell: "ask", webfetch: "ask", external_directory: "ask" },
 	acceptEdits: { edit: "allow", shell: "ask", webfetch: "allow", external_directory: "allow" },
 	auto: { edit: "allow", shell: "allow", webfetch: "allow", external_directory: "allow" },
@@ -62,39 +64,108 @@ function rulesOf(mode: AgentMode): Array<{ action: string; resource: string; eff
 	return Object.entries(PERMISSIONS[mode] ?? PERMISSIONS.acceptEdits!).map(([action, effect]) => ({ action, resource: "*", effect }));
 }
 
-const DEFAULT_MODE: AgentMode = "acceptEdits";
-
 /** The key of this agent's session instruction. */
 const BRIEFING = "decks";
 
-export class Opencode2Backend implements AgentBackend {
+export class Opencode2Backend extends SharedServerBackend {
 	readonly capabilities = OPENCODE2_CAPABILITIES;
+	protected readonly runtimeName = "OpenCode 2";
+	protected readonly deckCommands = OPENCODE2_COMMANDS;
+	protected readonly permissions = PERMISSIONS;
+	protected readonly server = opencode2Manager;
+	protected readonly noModels = "No models. Sign a provider in with `opencode2 auth`, then start a new chat.";
+	protected readonly signIn = "opencode2 auth";
 
-	private url = "";
-	private handle: Opencode2ServerHandle | undefined;
 	private client!: Opencode2Client;
 	private stream!: Opencode2Stream;
-	private sessionId: string | undefined;
-	private unwatchDeath: (() => void) | undefined;
 	private events: AbortController | undefined;
-	/** Detached from the server: disposed, or the server died under it. */
-	private closed = false;
-	private streamingNow = false;
-
-	private currentModel: AgentModel | undefined;
-	private currentMode: AgentMode = DEFAULT_MODE;
-	private currentThinking: ThinkingLevel | undefined;
 	/** The model and variant the session was last switched to, so a switch is sent only when it changes. */
 	private applied = "";
-	private available: ModelOption[] = [];
-	/** Per `provider/model`: the levels its variants offer, and its context window. */
-	private variants = new Map<string, readonly ThinkingLevel[]>();
+	/** Per `provider/model`: its context window. */
 	private windows = new Map<string, number>();
-	private commandList: SlashCommand[] = OPENCODE2_COMMANDS;
-	private storedName: string | undefined;
-	private lastUsage: AgentUsage | null = null;
 
-	private constructor(private readonly context: AgentBackendContext) {}
+	/** How this server is asked (`SharedServerBackend`): its own calls, and its own turns. */
+	protected readonly calls: SessionCalls = {
+		subscribe: async () => {
+			this.events = new AbortController();
+			return this.client.event.subscribe({ signal: this.events.signal } as never) as AsyncIterable<unknown>;
+		},
+		onEvent: (event) => this.stream.handle(event),
+		say: (text) => this.send(text),
+		runOwnCommand: async (name, args) => {
+			// OpenCode 2's own command, run as one: a prompt starting with `/` is not parsed
+			// into a command by the v2 server.
+			if (!this.sessionId) return;
+			await this.applyModel();
+			this.streamingNow = true;
+			this.context.translator.setState("thinking");
+			await this.client.session.command({ sessionID: this.sessionId, name, text: args } as never).catch((error: Error) => {
+				this.streamingNow = false;
+				this.context.translator.setState("idle");
+				this.context.notice("warn", `OpenCode 2 would not run /${name}: ${error.message}`);
+			});
+		},
+		replyPermission: (sessionId, requestId, allowed) => this.client.permission.reply({ sessionID: sessionId, requestID: requestId, decision: allowed ? "once" : "reject" } as never),
+		interrupt: (sessionId) => this.client.session.interrupt({ sessionID: sessionId } as never),
+		compact: (sessionId) => this.client.session.compact({ sessionID: sessionId } as never),
+		listCommands: async () => {
+			const answered = (await this.client.command.list(this.location as never)) as unknown as { data?: Array<{ name: string; description?: string }> };
+			return answered.data ?? [];
+		},
+		listModels: async () => {
+			const answered = (await this.client.model.list(this.location as never)) as unknown as {
+				data?: Array<{ id: string; providerID: string; name?: string; enabled?: boolean; variants?: Array<{ id: string }>; limit?: { context?: number } }>;
+			};
+			const models = (answered.data ?? []).filter((model) => model.enabled !== false);
+			return models.map((model) => {
+				const key = `${model.providerID}/${model.id}`;
+				// A level is offered only when the model's variants include one on Decks' scale;
+				// OpenCode 2 no longer says "reasoning" on a model, so the variants are the answer.
+				const levels = rankedVariants((model.variants ?? []).map((variant) => variant.id));
+				this.variants.set(key, levels);
+				if (model.limit?.context) this.windows.set(key, model.limit.context);
+				return { provider: model.providerID, model: model.id, label: model.name ?? model.id, reasoning: levels.length > 0 };
+			});
+		},
+		afterModelsListed: () => {
+			// A chat restored onto a model that no longer exists starts on the first one there is,
+			// and says so, rather than failing its first prompt.
+			const wanted = this.currentModel;
+			if (wanted && !this.available.some((option) => option.provider === wanted.provider && option.model === wanted.model)) {
+				if (this.available.length > 0) this.context.notice("warn", `${wanted.provider}/${wanted.model} is not available in OpenCode 2, so this chat uses another model.`);
+				this.currentModel = undefined;
+			}
+		},
+		updatePermissions: (sessionId, mode) => this.client.session.update({ sessionID: sessionId, permissions: rulesOf(mode) } as never),
+		rename: (sessionId, name) => this.client.session.update({ sessionID: sessionId, title: name } as never),
+		userEntries: async (sessionId) => {
+			// The newest 200, which is OpenCode 2's ceiling for one page (it refuses more) and more
+			// than the transcript's tail holds; asked newest first and turned round, since the walk
+			// below needs the end of the list and not its start.
+			const answered = (await this.client.message.list({ sessionID: sessionId, type: "user", order: "desc", limit: 200 } as never)) as unknown as {
+				data?: Array<{ id: string; payload?: { text?: string }; text?: string }>;
+			};
+			return (answered.data ?? []).map((message) => ({ id: message.id, text: message.payload?.text ?? message.text ?? "" })).reverse();
+		},
+		/**
+		 * OpenCode 2 reverts a session to a message in two steps, staged and then committed, and the
+		 * session keeps its id. Files are left alone (`files: false`): Decks restores the boards from
+		 * its own revisions, and OpenCode undoing the same files from its snapshots would be a second
+		 * writer racing the first.
+		 */
+		revert: async (sessionId, entryId) => {
+			await this.client.session.revert.stage({ sessionID: sessionId, messageID: entryId, files: false } as never);
+			await this.client.session.revert.commit({ sessionID: sessionId } as never);
+		},
+		fork: async (sessionId, entryId) => {
+			const forked = (await this.client.session.fork({ sessionID: sessionId, before: entryId } as never)) as { id?: string } | undefined;
+			return forked?.id;
+		},
+	};
+
+	private constructor(context: AgentBackendContext) {
+		super(context);
+	}
 
 	static async create(context: AgentBackendContext): Promise<Opencode2Backend> {
 		const backend = new Opencode2Backend(context);
@@ -122,11 +193,9 @@ export class Opencode2Backend implements AgentBackend {
 			decksPort: this.context.port,
 			config: { plugins: [opencode2PluginDir()], skills: [skillsDir()] },
 		});
-		this.handle = handle;
-		this.url = handle.url;
+		this.hold(handle);
 		// The bridge learns the server's token before any tool call can arrive.
 		this.context.stageBridge?.setServerToken(handle.secret, "opencode2");
-		this.unwatchDeath = opencode2Manager.onExit(() => this.serverDied());
 		this.client = connect(this.url, handle.secret);
 
 		// Keys first, so the model list below already has them on a first start.
@@ -198,59 +267,9 @@ export class Opencode2Backend implements AgentBackend {
 			.catch((error: Error) => this.context.notice("warn", `OpenCode 2 would not take the deck's instructions: ${error.message}`));
 	}
 
-	private serverDied(): void {
-		if (this.closed) return;
-		this.closed = true;
-		this.streamingNow = false;
-		this.context.stageBridge?.unregisterSession(this.sessionId);
-		this.sessionId = undefined;
-		this.context.translator.setState("idle");
-		this.context.notice("error", "OpenCode 2 exited. This chat needs restarting.");
-	}
-
-	private async pump(): Promise<void> {
-		this.events = new AbortController();
-		try {
-			for await (const event of this.client.event.subscribe({ signal: this.events.signal } as never)) {
-				if (this.closed) return;
-				this.stream.handle(event);
-			}
-		} catch (error) {
-			if (this.closed) return;
-			this.streamingNow = false;
-			this.context.translator.setState("idle");
-			if (opencode2Manager.alive()) this.context.notice("error", `OpenCode 2's event stream stopped: ${(error as Error).message}`);
-		}
-	}
-
 	// --- the conversation ---------------------------------------------------------------
 
-	/**
-	 * Answer a permission request with this agent's mode: allowed once, or refused and said.
-	 * Never `always`: in OpenCode 2 a saved answer is the project's, so it would reach every
-	 * other agent on the deck.
-	 */
-	private async answerPermission(id: string, action: string, message: string | undefined): Promise<void> {
-		if (!this.sessionId) return;
-		const allowed = PERMISSIONS[this.currentMode]?.[action] === "allow";
-		await this.client.permission
-			.reply({ sessionID: this.sessionId, requestID: id, decision: allowed ? "once" : "reject" } as never)
-			.catch(() => undefined);
-		if (!allowed) this.context.notice("info", `Refused to ${message ?? action}: ${this.currentMode} mode asks first, and there is no one to ask.`);
-	}
-
-	get isStreaming(): boolean {
-		return this.streamingNow;
-	}
-
-	async prompt(text: string): Promise<void> {
-		const command = parseSlash(text);
-		if (command) {
-			await this.runSlash(command.name, command.args);
-			return;
-		}
-		await this.send(text);
-	}
+	/** Allowed once or refused (`SharedServerBackend.answerPermission`); in OpenCode 2 a saved answer is the project's. */
 
 	private async send(text: string): Promise<void> {
 		if (!this.sessionId) throw new Error("This OpenCode 2 chat is not connected any more. Start it again.");
@@ -281,153 +300,15 @@ export class Opencode2Backend implements AgentBackend {
 		this.applied = keyOf(model);
 	}
 
-	private currentVariant(): ThinkingLevel | undefined {
-		if (this.currentThinking === undefined || !this.currentModel) return undefined;
-		return variantFor(this.currentThinking, this.variants.get(`${this.currentModel.provider}/${this.currentModel.model}`));
-	}
-
-	async abort(): Promise<void> {
-		this.streamingNow = false;
-		if (this.sessionId) await this.client.session.interrupt({ sessionID: this.sessionId } as never).catch(() => undefined);
-		this.context.translator.setState("idle");
-	}
-
-	commands(): SlashCommand[] {
-		return this.commandList;
-	}
-
-	private async refreshCommands(): Promise<void> {
-		try {
-			const answered = (await this.client.command.list(this.location as never)) as unknown as { data?: Array<{ name: string; description?: string }> };
-			const runtime: SlashCommand[] = (answered.data ?? []).map((command) => ({
-				name: command.name,
-				...(command.description ? { hint: command.description } : {}),
-				source: "runtime" as const,
-			}));
-			this.commandList = mergeCommands(OPENCODE2_COMMANDS, runtime);
-			this.context.commandsChanged?.();
-		} catch {
-			/* a shorter menu, not a broken agent */
-		}
-	}
-
-	private async runSlash(name: string, args: string): Promise<void> {
-		const { notice } = this.context;
-		switch (name) {
-			case "cost":
-				this.context.showUsage?.();
-				return;
-			case "models":
-				notice(
-					"info",
-					this.available.length === 0
-						? "No models. Sign a provider in with `opencode2 auth`, then start a new chat."
-						: this.available.map((option) => `${option.provider}/${option.model}: ${option.label}`).join("\n"),
-				);
-				return;
-			case "status": {
-				const variant = this.currentVariant();
-				notice(
-					"info",
-					`OpenCode 2, model ${this.currentModel ? `${this.currentModel.provider}/${this.currentModel.model}` : "default"}, mode ${this.currentMode}${variant ? `, level ${variant}` : ""}, ${this.url}, session ${this.sessionId ?? "none"}`,
-				);
-				return;
-			}
-			case "compact":
-				if (!this.sessionId) return;
-				this.streamingNow = true;
-				await this.client.session.compact({ sessionID: this.sessionId } as never).catch((error: Error) => {
-					this.streamingNow = false;
-					notice("warn", `Could not summarise: ${error.message}`);
-				});
-				return;
-			case "help":
-				notice("info", helpText(this.commands()));
-				return;
-			default:
-				// OpenCode 2's own command, run as one: a prompt starting with `/` is not parsed
-				// into a command by the v2 server.
-				if (!this.sessionId) return;
-				await this.applyModel();
-				this.streamingNow = true;
-				this.context.translator.setState("thinking");
-				await this.client.session.command({ sessionID: this.sessionId, name, text: args } as never).catch((error: Error) => {
-					this.streamingNow = false;
-					this.context.translator.setState("idle");
-					notice("warn", `OpenCode 2 would not run /${name}: ${error.message}`);
-				});
-		}
-	}
-
 	// --- models and modes ---------------------------------------------------------------
 
-	model(): AgentModel | undefined {
-		return this.currentModel;
-	}
-
-	async models(): Promise<ModelOption[]> {
-		if (this.available.length === 0) await this.refreshModels();
-		return this.available;
-	}
-
-	private async refreshModels(): Promise<void> {
-		try {
-			const answered = (await this.client.model.list(this.location as never)) as unknown as {
-				data?: Array<{ id: string; providerID: string; name?: string; enabled?: boolean; variants?: Array<{ id: string }>; limit?: { context?: number } }>;
-			};
-			const models = (answered.data ?? []).filter((model) => model.enabled !== false);
-			this.available = models.map((model) => {
-				const key = `${model.providerID}/${model.id}`;
-				// A level is offered only when the model's variants include one on Decks' scale;
-				// OpenCode 2 no longer says "reasoning" on a model, so the variants are the answer.
-				const levels = rankedVariants((model.variants ?? []).map((variant) => variant.id));
-				this.variants.set(key, levels);
-				if (model.limit?.context) this.windows.set(key, model.limit.context);
-				return { provider: model.providerID, model: model.id, label: model.name ?? model.id, reasoning: levels.length > 0 };
-			});
-			// A chat restored onto a model that no longer exists starts on the first one there is,
-			// and says so, rather than failing its first prompt.
-			const wanted = this.currentModel;
-			if (wanted && !this.available.some((option) => option.provider === wanted.provider && option.model === wanted.model)) {
-				if (this.available.length > 0) this.context.notice("warn", `${wanted.provider}/${wanted.model} is not available in OpenCode 2, so this chat uses another model.`);
-				this.currentModel = undefined;
-			}
-			if (!this.currentModel && this.available[0]) {
-				this.currentModel = { provider: this.available[0].provider, model: this.available[0].model, thinking: DEFAULT_THINKING };
-			}
-			if (this.available.length === 0) {
-				this.context.notice("warn", "OpenCode 2 has no models available. Sign a provider in with `opencode2 auth`, then start a new chat.");
-			}
-		} catch (error) {
-			this.context.notice("warn", `Could not list OpenCode 2's models: ${(error as Error).message}`);
-		}
-	}
-
-	async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
-		this.currentThinking = thinking ?? this.currentThinking;
-		this.currentModel = { provider, model, thinking: this.currentThinking ?? DEFAULT_THINKING };
+	override async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
+		await super.setModel(provider, model, thinking);
 		// Sent now rather than with the next prompt, so the picker and the session agree at once.
 		if (!this.streamingNow) await this.applyModel().catch((error: Error) => this.context.notice("warn", `OpenCode 2 would not switch model: ${error.message}`));
 	}
 
-	setThinking(level: ThinkingLevel): void {
-		this.currentThinking = level;
-		if (this.currentModel) this.currentModel = { ...this.currentModel, thinking: level };
-	}
-
-	mode(): AgentMode | undefined {
-		return this.currentMode;
-	}
-
-	async setMode(mode: AgentMode): Promise<void> {
-		this.currentMode = mode;
-		// On this session only: a saved or server-wide rule would change every agent's posture.
-		if (this.sessionId) {
-			await this.client.session
-				.update({ sessionID: this.sessionId, permissions: rulesOf(mode) } as never)
-				.catch(() => this.context.notice("warn", "OpenCode 2 would not change its permissions, so this chat keeps the mode it had."));
-		}
-	}
+	/** On this session only: a saved or server-wide rule would change every agent's posture. */
 
 	private read(reading: { context?: number | null; cost?: number }): void {
 		const model = this.currentModel;
@@ -440,115 +321,11 @@ export class Opencode2Backend implements AgentBackend {
 		};
 	}
 
-	usage(): AgentUsage | null {
-		return this.lastUsage;
-	}
-
 	// --- identity and the session tree ----------------------------------------
 
-	name(): string | undefined {
-		return this.storedName;
-	}
-
-	setName(name: string): void {
-		this.storedName = name;
-		if (this.sessionId) void this.client.session.update({ sessionID: this.sessionId, title: name } as never).catch(() => undefined);
-	}
-
-	sessionRef(): string | undefined {
-		return this.sessionId;
-	}
-
-	/**
-	 * Tag each user message in the transcript with the OpenCode 2 message it became.
-	 *
-	 * The same walk as pi's and Claude's: from the end, because the transcript in memory is a
-	 * capped tail and the two lists share a suffix, and stopping at the first message whose text
-	 * disagrees, which costs one message its rewind and is the right way to be wrong.
-	 */
-	async syncEntryIds(): Promise<void> {
-		if (!this.sessionId) return;
-		let entries: Array<{ id: string; text: string }>;
-		try {
-			// The newest 200, which is OpenCode 2's ceiling for one page (it refuses more) and more
-			// than the transcript's tail holds; asked newest first and turned round, since the walk
-			// below needs the end of the list and not its start.
-			const answered = (await this.client.message.list({ sessionID: this.sessionId, type: "user", order: "desc", limit: 200 } as never)) as unknown as {
-				data?: Array<{ id: string; payload?: { text?: string }; text?: string }>;
-			};
-			entries = (answered.data ?? []).map((message) => ({ id: message.id, text: message.payload?.text ?? message.text ?? "" })).reverse();
-		} catch {
-			return;
-		}
-		const items = this.context.translator.userMessages();
-		for (let offset = 1; offset <= Math.min(entries.length, items.length); offset += 1) {
-			const entry = entries[entries.length - offset];
-			const item = items[items.length - offset];
-			if (!entry || !item) break;
-			if (item.entryId === entry.id) continue;
-			if (!sentAs(entry.text, item.text)) break;
-			this.context.translator.tagUser(item.id, entry.id);
-		}
-	}
-
-	/** The points worth returning to: the user's messages that `syncEntryIds` paired. */
-	timeline(): ConversationPoint[] {
-		return this.context.translator
-			.userMessages()
-			.filter((item) => item.entryId)
-			.map((item) => ({ id: item.entryId as string, at: item.at }));
-	}
-
-	/**
-	 * Nothing recorded, as for Claude: OpenCode 2 has no entry Decks can write a board revision
-	 * into, and `App.boardsAt` falls back to the revision store's own times, which is how an
-	 * empty map asks for it.
-	 */
-	revisionsAt(): Record<string, string> {
-		return {};
-	}
-
-	/**
-	 * Go back to just before a message, in place.
-	 *
-	 * OpenCode 2 reverts a session to a message in two steps, staged and then committed, and the
-	 * session keeps its id. Files are left alone (`files: false`): Decks restores the boards from
-	 * its own revisions, and OpenCode undoing the same files from its snapshots would be a second
-	 * writer racing the first.
-	 */
-	async rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }> {
-		if (!this.sessionId) return { cancelled: true };
-		if (this.streamingNow) throw new Error("Stop OpenCode 2 before rewinding.");
-		const text = this.context.translator.userMessages().find((item) => item.entryId === entryId)?.text;
-		try {
-			await this.client.session.revert.stage({ sessionID: this.sessionId, messageID: entryId, files: false } as never);
-			await this.client.session.revert.commit({ sessionID: this.sessionId } as never);
-		} catch (error) {
-			this.context.notice("warn", `OpenCode 2 would not rewind: ${(error as Error).message}`);
-			return { cancelled: true };
-		}
-		return { cancelled: false, ...(text ? { editorText: text } : {}) };
-	}
-
-	/**
-	 * Everything before a message, as a session of its own for a new chat to open. Before it, so
-	 * the new chat opens with that message still unasked, as on pi and Claude.
-	 */
-	async forkFrom(entryId: string): Promise<string | undefined> {
-		if (!this.sessionId) return undefined;
-		const forked = (await this.client.session.fork({ sessionID: this.sessionId, before: entryId } as never).catch(() => undefined)) as { id?: string } | undefined;
-		return forked?.id;
-	}
-
-	dispose(): void {
-		this.closed = true;
+	override dispose(): void {
+		super.dispose();
 		this.events?.abort();
-		this.unwatchDeath?.();
-		this.unwatchDeath = undefined;
-		this.context.stageBridge?.unregisterSession(this.sessionId);
-		const handle = this.handle;
-		this.handle = undefined;
-		handle?.release();
 	}
 }
 

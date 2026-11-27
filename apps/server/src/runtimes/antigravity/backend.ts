@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
 import { agentBriefing } from "../../agents/context.ts";
-import { helpText, parseSlash } from "../../agents/slash.ts";
+import { deckSlash, parseSlash, type DeckSlashFacts } from "../../agents/slash.ts";
 import { agyExecutable, agyModels, antigravityHomeDir, antigravityAvailability, prepareAntigravityHome } from "./install.ts";
 import { AntigravityStream, type AntigravityResult, type AntigravityStep } from "./events.ts";
 import { decksEnv } from "../decks-env.ts";
@@ -38,7 +38,11 @@ import { decksEnv } from "../decks-env.ts";
  */
 
 /** The CLI's execution modes: accept-edits, auto and plan (`agy --mode`). `manual` would be a lie: headless agy cannot ask. */
-export const ANTIGRAVITY_CAPABILITIES: AgentCapabilities = { modes: ["acceptEdits", "auto", "plan"] };
+export const ANTIGRAVITY_CAPABILITIES: AgentCapabilities = {
+	modes: ["acceptEdits", "auto", "plan"],
+	// Print mode reads one prompt line per turn, so a message sent mid-turn waits for the turn to end.
+	steers: false,
+};
 
 export const ANTIGRAVITY_COMMANDS: SlashCommand[] = [
 	{ name: "cost", hint: "Open the usage panel: spend, tokens, context", source: "deck" },
@@ -212,7 +216,8 @@ export class AntigravityBackend implements AgentBackend {
 	async prompt(text: string): Promise<void> {
 		const command = parseSlash(text);
 		if (command && ANTIGRAVITY_COMMANDS.some((known) => known.name === command.name)) {
-			this.runSlash(command.name);
+			// All four are the deck's, answered as on every runtime (`agents/slash.ts`).
+			await deckSlash(command.name, this.context, this.slashFacts());
 			return;
 		}
 		this.streamingNow = true;
@@ -254,24 +259,14 @@ export class AntigravityBackend implements AgentBackend {
 		return ANTIGRAVITY_COMMANDS;
 	}
 
-	private runSlash(name: string): void {
-		const { notice } = this.context;
-		switch (name) {
-			case "cost":
-				this.context.showUsage?.();
-				return;
-			case "status":
-				notice(
-					"info",
-					`antigravity · model ${this.currentModel?.model ?? "default"} · mode ${this.currentMode} · conversation ${this.conversationId ?? "none"}`,
-				);
-				return;
-			case "models":
-				notice("info", agyModels().map((model) => `${model.model}: ${model.label}`).join("\n"));
-				return;
-			default:
-				notice("info", helpText(ANTIGRAVITY_COMMANDS));
-		}
+	/** What `/status`, `/models` and `/help` say for antigravity. */
+	private slashFacts(): DeckSlashFacts {
+		return {
+			runtime: "antigravity",
+			commands: () => ANTIGRAVITY_COMMANDS,
+			status: () => [`model ${this.currentModel?.model ?? "default"}`, `mode ${this.currentMode}`, `conversation ${this.conversationId ?? "none"}`],
+			models: () => agyModels().map((model) => `${model.model}: ${model.label}`).join("\n"),
+		};
 	}
 
 	// --- models and modes -------------------------------------------------------------
@@ -339,10 +334,6 @@ export class AntigravityBackend implements AgentBackend {
 	}
 
 	async syncEntryIds(): Promise<void> {}
-
-	revisionsAt(): Record<string, string> {
-		return {};
-	}
 
 	async rewindTo(): Promise<{ cancelled: boolean }> {
 		return { cancelled: true };

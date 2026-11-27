@@ -26,7 +26,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { accountEnvironment } from "./accounts.ts";
 import { claudeBundledExecutable, claudeExecutable } from "./available.ts";
-import { claudeAuthStatus, claudeIdentity } from "./backend.ts";
+import { claudeAuthStatus, claudeIdentity } from "./auth-command.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 
 export type LoginMethod = "subscription" | "api";

@@ -126,9 +126,9 @@ export function agentTable(host: AgentTableHost): PersonVerbs {
 		"agent.settings": async ([id, options]) => {
 			const agent = need(id);
 			if ((options as { limits?: unknown } | undefined)?.limits) void host.accountList.refreshLimits();
-			let accounts: { accounts?: unknown[]; active?: string } = {};
-			if (agent.kind === "claude") await host.accountList.publish((frame) => frame.type === "account.list" && (accounts = frame));
 			const runtime = host.runtimes().find((one) => one.kind === agent.kind);
+			let accounts: { accounts?: unknown[]; active?: string } = {};
+			if (runtime?.capabilities.accounts) await host.accountList.publish((frame) => frame.type === "account.list" && (accounts = frame));
 			return {
 				id: agent.id,
 				kind: agent.kind,

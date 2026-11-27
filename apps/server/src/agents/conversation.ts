@@ -667,7 +667,7 @@ export class Conversation {
 	}
 
 	revisionsAt(entryId: string): Record<string, string> {
-		return this.backend?.revisionsAt(entryId) ?? {};
+		return this.backend?.revisionsAt?.(entryId) ?? {};
 	}
 
 	/** When a message was sent, so a fork can inherit the canvas as it was then. */

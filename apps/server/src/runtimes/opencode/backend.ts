@@ -1,15 +1,14 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
-import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
-import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
+import type { AgentCapabilities, AgentMode, SlashCommand } from "@decks/protocol";
+import type { AgentBackendContext } from "../../agents/backend.ts";
 import { agentBriefing } from "../../agents/context.ts";
-import { sentAs } from "../../agents/sent-as.ts";
-import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { DEFAULT_THINKING } from "@decks/protocol";
 import { OpencodeStream } from "./events.ts";
-import { rankedVariants, variantFor } from "./variants.ts";
-import { opencodeManager, type OpencodeServerHandle } from "./manager.ts";
+import { rankedVariants } from "./variants.ts";
+import { opencodeManager } from "./manager.ts";
+import { DEFAULT_MODE, SharedServerBackend, type PermissionTable, type SessionCalls } from "../shared-server-backend.ts";
 
 /**
  * opencode behind one Decks agent (DESIGN §6.1).
@@ -45,8 +44,14 @@ import { opencodeManager, type OpencodeServerHandle } from "./manager.ts";
  * SDK's type catching up with a server that grew a field its generator never saw.
  */
 
-/** opencode asks before writes and commands, so three of Decks' four modes mean something. */
-export const OPENCODE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"] };
+/**
+ * opencode asks before writes and commands, so three of Decks' four modes mean something.
+ *
+ * A message mid-turn is taken at the turn's next step: `prompt_async` saves the message and joins
+ * the session's running loop (`SessionPrompt.loop` -> `ensureRunning`), which reads the newest
+ * user message before every step and does not stop until it has answered it.
+ */
+export const OPENCODE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "auto"], steers: "next-step" };
 
 /**
  * The `/` commands Decks interprets for an opencode agent.
@@ -72,7 +77,7 @@ export const OPENCODE_COMMANDS: SlashCommand[] = [
  * permission, and offering a word for something that behaves differently is worse than not
  * offering it.
  */
-const PERMISSIONS: Record<string, Record<string, "ask" | "allow">> = {
+const PERMISSIONS: PermissionTable = {
 	manual: { edit: "ask", bash: "ask", webfetch: "ask", external_directory: "ask" },
 	acceptEdits: { edit: "allow", bash: "ask", webfetch: "allow", external_directory: "allow" },
 	auto: { edit: "allow", bash: "allow", webfetch: "allow", external_directory: "allow" },
@@ -89,38 +94,145 @@ function rulesetOf(mode: AgentMode): Array<{ permission: string; pattern: string
 	return Object.entries(PERMISSIONS[mode] ?? PERMISSIONS.acceptEdits!).map(([permission, action]) => ({ permission, pattern: "*", action }));
 }
 
-const DEFAULT_MODE: AgentMode = "acceptEdits";
-
-export class OpencodeBackend implements AgentBackend {
+export class OpencodeBackend extends SharedServerBackend {
 	readonly capabilities = OPENCODE_CAPABILITIES;
+	protected readonly runtimeName = "opencode";
+	protected readonly deckCommands = OPENCODE_COMMANDS;
+	protected readonly permissions = PERMISSIONS;
+	protected readonly server = opencodeManager;
+	protected readonly noModels = "No models. Sign a provider in with `opencode auth login` in a terminal, then start a new chat.";
+	protected readonly signIn = "opencode auth login";
 
-	/** Where the shared server is, once it is up — the same URL for every agent. */
-	private url = "";
-	/** This agent's claim on the shared server; released when the agent goes. */
-	private handle: OpencodeServerHandle | undefined;
 	private client!: OpencodeClient;
 	private stream!: OpencodeStream;
-	private sessionId: string | undefined;
-	/** The manager's death listener for this agent; removed on dispose. */
-	private unwatchDeath: (() => void) | undefined;
-	/**
-	 * The backend has detached from the shared server: disposed, or the server died under
-	 * it. Either way no tool call or prompt should pretend the conversation is alive.
-	 */
-	private closed = false;
-	private streamingNow = false;
 
-	private currentModel: AgentModel | undefined;
-	private currentMode: AgentMode = DEFAULT_MODE;
-	private currentThinking: ThinkingLevel | undefined;
-	private available: ModelOption[] = [];
-	/** The level-variants each model declared, keyed `provider/model` — see `refreshModels`. */
-	private variants = new Map<string, readonly ThinkingLevel[]>();
-	private commandList: SlashCommand[] = OPENCODE_COMMANDS;
-	private storedName: string | undefined;
-	private lastUsage: AgentUsage | null = null;
+	/** How this server is asked (`SharedServerBackend`): its own calls, and its own turns. */
+	protected readonly calls: SessionCalls = {
+		subscribe: async () => {
+			const events = await this.client.event.subscribe();
+			return events.stream as AsyncIterable<unknown>;
+		},
+		onEvent: (event) => this.stream.handle(event),
+		say: async (text) => {
+			this.streamingNow = true;
+			this.context.translator.setState("thinking");
+			await this.send(text);
+		},
+		runOwnCommand: async (name, args) => {
+			// opencode's own. Handed over as a prompt, which is how its core parses a
+			// command out of one — the same bargain the pi backend makes.
+			this.streamingNow = true;
+			this.context.translator.setState("thinking");
+			await this.send(`/${name}${args ? ` ${args}` : ""}`);
+		},
+		/*
+		 * Answered with the chat's mode (`SharedServerBackend.answerPermission`). `external_directory`
+		 * is a rule in `PERMISSIONS` because with no rule it falls through to opencode's `ask` in
+		 * every mode, and a request nobody answers is a turn that hangs.
+		 */
+		replyPermission: (sessionId, requestId, allowed) => {
+			return this.client.postSessionIdPermissionsPermissionId({
+				path: { id: sessionId, permissionID: requestId },
+				body: { response: allowed ? "once" : "reject" },
+			});
+		},
+		interrupt: (sessionId) => this.client.session.abort({ path: { id: sessionId } }),
+		compact: (sessionId) => this.client.session.summarize({ path: { id: sessionId }, body: {} as never }),
+		listCommands: async () => {
+			const answered = await this.client.command.list();
+			return (answered.data ?? []) as Array<{ name: string; description?: string }>;
+		},
+		listModels: async () => {
+			const answered = await this.client.config.providers();
+			// The typed fields stop at the catalogue's old shape; the wire carries more —
+			// notably `capabilities.reasoning` and the model's declared `variants` — and
+			// both are read here rather than guessed. opencode resolves a reasoning level
+			// as a **variant** the model declares (`variants.ts`), so a model whose list
+			// has nothing on Decks' scale offers no level, whatever its capabilities say.
+			const providers = (answered.data?.providers ?? []) as Array<{
+				id: string;
+				models: Record<string, { id: string; name?: string; capabilities?: { reasoning?: boolean }; variants?: Record<string, unknown> }>;
+			}>;
+			return providers.flatMap((provider) =>
+				Object.values(provider.models).map((model) => {
+					const variants = rankedVariants(Object.keys(model.variants ?? {}));
+					this.variants.set(`${provider.id}/${model.id}`, variants);
+					return {
+						provider: provider.id,
+						model: model.id,
+						label: model.name ?? model.id,
+						// The control is worth offering only when there is something to
+						// choose: a model that reasons but declares no variant that is a
+						// level (a custom "fast" preset, or none at all) has no answer
+						// to "how hard".
+						reasoning: model.capabilities?.reasoning === true && variants.length > 0,
+						...(model.capabilities?.reasoning === true && variants.length > 0 ? { levels: variants } : {}),
+					};
+				}),
+			);
+		},
+		updatePermissions: (sessionId, mode) => {
+			/*
+			 * Written onto *this session*, not the server — which is exactly what the shared
+			 * process changed. `config.update` with a permission was the per-process answer,
+			 * and on one shared server it would change every opencode agent's posture at once,
+			 * so it is gone. `PATCH /session/{id}` accepts the same ruleset and stores it on
+			 * the session, where it is evaluated after the config's and wins; the session the
+			 * chat is already holding keeps it, so nothing has to restart.
+			 *
+			 * The SDK's generated type for the update body only knows `title` — the field was
+			 * read from opencode's own source and verified against a live 1.18.29 server, and
+			 * the cast is that gap.
+			 */
+			return this.client.session.update({ path: { id: sessionId }, body: { permission: rulesetOf(mode) } as never });
+		},
+		rename: (sessionId, name) => this.client.session.update({ path: { id: sessionId }, body: { title: name } }),
+		/**
+		 * The session's user messages. One thing is opencode's own: a revert is pending until the next
+		 * prompt, and the reverted messages are still listed until then, so everything from the revert
+		 * point on is left out, or the walk would stop on the first of them and pair nothing.
+		 */
+		userEntries: async (sessionId) => {
+			const [session, listed] = await Promise.all([
+				this.client.session.get({ path: { id: sessionId } }),
+				this.client.session.messages({ path: { id: sessionId } }),
+			]);
+			const reverted = session.data?.revert?.messageID;
+			const entries: Array<{ id: string; text: string }> = [];
+			for (const message of listed.data ?? []) {
+				if (reverted && message.info.id === reverted) break;
+				if (message.info.role !== "user") continue;
+				const text = message.parts
+					.filter((part) => part.type === "text" && !(part as { synthetic?: boolean }).synthetic)
+					.map((part) => (part as { text: string }).text)
+					.join("");
+				entries.push({ id: message.info.id, text });
+			}
+			return entries;
+		},
+		/**
+		 * opencode's revert marks the session and drops the marked messages when the next prompt
+		 * arrives, so the session keeps its id and the chat its place on the shared server. It also
+		 * undoes file edits from its own snapshots, but only in a git project: a deck is not one, so
+		 * the boards are left to Decks' own revisions, as on every other runtime.
+		 */
+		revert: async (sessionId, entryId) => {
+			const answered = await this.client.session.revert({ path: { id: sessionId }, body: { messageID: entryId } });
+			if (answered.error) throw new Error(JSON.stringify(answered.error).slice(0, 200));
+		},
+		/**
+		 * opencode's fork copies the messages before the one named, so the new chat opens with that message
+		 * still unasked, as on the other runtimes.
+		 */
+		fork: async (sessionId, entryId) => {
+			const forked = await this.client.session.fork({ path: { id: sessionId }, body: { messageID: entryId } });
+			return forked?.data?.id;
+		},
+	};
 
-	private constructor(private readonly context: AgentBackendContext) {}
+	private constructor(context: AgentBackendContext) {
+		super(context);
+	}
 
 	static async create(context: AgentBackendContext): Promise<OpencodeBackend> {
 		const backend = new OpencodeBackend(context);
@@ -145,16 +257,12 @@ export class OpencodeBackend implements AgentBackend {
 			decksPort: this.context.port,
 			config: { instructions: [this.briefingFile()] },
 		});
-		this.handle = handle;
-		this.url = handle.url;
+		this.hold(handle);
 		const { token } = handle;
 		// The server's token, told to the bridge before any tool call can arrive: a call
 		// from this process is trusted because it carries the token the process holds, and
 		// the bridge has to recognise it to trust it.
 		this.context.stageBridge?.setServerToken(token);
-		// A server that dies is every agent's problem at once. This agent gets told the
-		// moment the process exits, rather than whenever its own stream happens to notice.
-		this.unwatchDeath = opencodeManager.onExit(() => this.serverDied());
 
 		this.client = createOpencodeClient({ baseUrl: this.url, directory: deck.path });
 
@@ -237,86 +345,7 @@ export class OpencodeBackend implements AgentBackend {
 		return path;
 	}
 
-	/**
-	 * The shared server died under this agent.
-	 *
-	 * The manager told every agent at once — that is the point of the listener — and this
-	 * agent's reaction is the same as it would have been to its own process dying: the
-	 * session is unregistered so a stale id is refused, the chat stops pretending it is
-	 * live, and the reason is said where the person is looking. Restarting the server
-	 * does not revive this conversation — the chat needs restarting, exactly as the notice
-	 * says.
-	 */
-	private serverDied(): void {
-		if (this.closed) return;
-		this.closed = true;
-		this.streamingNow = false;
-		this.context.stageBridge?.unregisterSession(this.sessionId);
-		this.sessionId = undefined;
-		this.context.translator.setState("idle");
-		this.context.notice("error", "opencode exited. This chat needs restarting.");
-	}
-
-	private async pump(): Promise<void> {
-		try {
-			const events = await this.client.event.subscribe();
-			for await (const event of events.stream as AsyncIterable<unknown>) {
-				if (this.closed) return;
-				this.stream.handle(event);
-			}
-		} catch (error) {
-			if (this.closed) return;
-			this.streamingNow = false;
-			this.context.translator.setState("idle");
-			// The stream stops for two reasons, and one of them already has a speaker: a
-			// server that died is announced by `serverDied`, so this notice is only for the
-			// stream that broke while the server is standing.
-			if (opencodeManager.alive()) this.context.notice("error", `opencode's event stream stopped: ${(error as Error).message}`);
-		}
-	}
-
 	// --- the conversation -------------------------------------------------------------
-
-	/**
-	 * Answer an opencode permission request with this agent's mode.
-	 *
-	 * opencode holds the tool call until somebody replies, so a request that is only
-	 * noticed is a request that hangs: an agent told to look at a screenshot it had written
-	 * to `/tmp` sat on `external_directory` until the request was answered by hand. There
-	 * is no dialog here, so the mode is the answer — what the mode allows is allowed once,
-	 * and what the mode leaves to the person is refused, and said out loud rather than left
-	 * as a silence that reads like a stall. (`external_directory` is a rule in `PERMISSIONS`
-	 * for the same reason: with no rule it falls through to opencode's `ask` in every mode,
-	 * which is exactly how that hang began.)
-	 */
-	private async answerPermission(id: string, asked: string, title: string | undefined): Promise<void> {
-		if (!this.sessionId) return;
-		const allowed = PERMISSIONS[this.currentMode]?.[asked] === "allow";
-		await this.client
-			.postSessionIdPermissionsPermissionId({
-				path: { id: this.sessionId, permissionID: id },
-				body: { response: allowed ? "once" : "reject" },
-			})
-			.catch(() => undefined);
-		if (!allowed) {
-			this.context.notice("info", `Refused to ${title ?? asked}: ${this.currentMode} mode asks first, and there is no one to ask.`);
-		}
-	}
-
-	get isStreaming(): boolean {
-		return this.streamingNow;
-	}
-
-	async prompt(text: string): Promise<void> {
-		const command = parseSlash(text);
-		if (command) {
-			await this.runSlash(command.name, command.args);
-			return;
-		}
-		this.streamingNow = true;
-		this.context.translator.setState("thinking");
-		await this.send(text);
-	}
 
 	private async send(text: string): Promise<void> {
 		const model = this.currentModel;
@@ -335,297 +364,8 @@ export class OpencodeBackend implements AgentBackend {
 		});
 	}
 
-	/**
-	 * The variant the current level maps onto for the current model, or nothing.
-	 *
-	 * Undefined before a level has been chosen, and undefined for a model whose variants
-	 * offer no level — see `variants.ts` for why those are the same answer.
-	 */
-	private currentVariant(): ThinkingLevel | undefined {
-		if (this.currentThinking === undefined || !this.currentModel) return undefined;
-		return variantFor(this.currentThinking, this.variants.get(`${this.currentModel.provider}/${this.currentModel.model}`));
-	}
-
-	async abort(): Promise<void> {
-		this.streamingNow = false;
-		if (this.sessionId) await this.client.session.abort({ path: { id: this.sessionId } }).catch(() => undefined);
-		this.context.translator.setState("idle");
-	}
-
-	commands(): SlashCommand[] {
-		return this.commandList;
-	}
-
-	private async refreshCommands(): Promise<void> {
-		try {
-			const answered = await this.client.command.list();
-			const declared = (answered.data ?? []) as Array<{ name: string; description?: string }>;
-			const runtime: SlashCommand[] = declared.map((command) => ({
-				name: command.name,
-				...(command.description ? { hint: command.description } : {}),
-				source: "runtime" as const,
-			}));
-			this.commandList = mergeCommands(OPENCODE_COMMANDS, runtime);
-			this.context.commandsChanged?.();
-		} catch {
-			/* a server too old to list commands is a shorter menu, not a broken agent */
-		}
-	}
-
-	private async runSlash(name: string, args: string): Promise<void> {
-		const { notice } = this.context;
-		switch (name) {
-			case "cost":
-				this.context.showUsage?.();
-				return;
-			case "models":
-				notice(
-					"info",
-					this.available.length === 0
-						? "No models. Sign a provider in with `opencode auth login` in a terminal, then start a new chat."
-						: this.available.map((option) => `${option.provider}/${option.model}: ${option.label}`).join("\n"),
-				);
-				return;
-			case "status":
-				notice(
-					"info",
-					`opencode · model ${this.currentModel ? `${this.currentModel.provider}/${this.currentModel.model}` : "default"} · mode ${this.currentMode} · ${this.currentVariant() ? `variant ${this.currentVariant()} · ` : ""}${this.url} · session ${this.sessionId ?? "none"}`,
-				);
-				return;
-			case "compact":
-				// As opencode2 does: no session, nothing to summarise; a failed summary must not leave the chat busy.
-				if (!this.sessionId) return;
-				this.streamingNow = true;
-				await this.client.session.summarize({ path: { id: this.sessionId }, body: {} as never }).catch((error: Error) => {
-					this.streamingNow = false;
-					notice("warn", `Could not summarise: ${error.message}`);
-				});
-				return;
-			case "help":
-				notice("info", helpText(this.commands()));
-				return;
-			default:
-				// opencode's own. Handed over as a prompt, which is how its core parses a
-				// command out of one — the same bargain the pi backend makes.
-				this.streamingNow = true;
-				this.context.translator.setState("thinking");
-				await this.send(`/${name}${args ? ` ${args}` : ""}`);
-		}
-	}
-
 	// --- models and modes -------------------------------------------------------------
-
-	model(): AgentModel | undefined {
-		return this.currentModel;
-	}
-
-	async models(): Promise<ModelOption[]> {
-		if (this.available.length === 0) await this.refreshModels();
-		return this.available;
-	}
-
-	private async refreshModels(): Promise<void> {
-		try {
-			const answered = await this.client.config.providers();
-			// The typed fields stop at the catalogue's old shape; the wire carries more —
-			// notably `capabilities.reasoning` and the model's declared `variants` — and
-			// both are read here rather than guessed. opencode resolves a reasoning level
-			// as a **variant** the model declares (`variants.ts`), so a model whose list
-			// has nothing on Decks' scale offers no level, whatever its capabilities say.
-			const providers = (answered.data?.providers ?? []) as Array<{
-				id: string;
-				models: Record<string, { id: string; name?: string; capabilities?: { reasoning?: boolean }; variants?: Record<string, unknown> }>;
-			}>;
-			this.available = providers.flatMap((provider) =>
-				Object.values(provider.models).map((model) => {
-					const variants = rankedVariants(Object.keys(model.variants ?? {}));
-					this.variants.set(`${provider.id}/${model.id}`, variants);
-					return {
-						provider: provider.id,
-						model: model.id,
-						label: model.name ?? model.id,
-						// The control is worth offering only when there is something to
-						// choose: a model that reasons but declares no variant that is a
-						// level (a custom "fast" preset, or none at all) has no answer
-						// to "how hard".
-						reasoning: model.capabilities?.reasoning === true && variants.length > 0,
-						...(model.capabilities?.reasoning === true && variants.length > 0 ? { levels: variants } : {}),
-					};
-				}),
-			);
-			if (!this.currentModel && this.available[0]) {
-				this.currentModel = { provider: this.available[0].provider, model: this.available[0].model, thinking: DEFAULT_THINKING };
-			}
-			if (this.available.length === 0) {
-				this.context.notice("warn", "opencode has no models available. Sign a provider in with `opencode auth login`, then start a new chat.");
-			}
-		} catch (error) {
-			this.context.notice("warn", `Could not list opencode's models: ${(error as Error).message}`);
-		}
-	}
-
-	async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
-		this.currentThinking = thinking ?? this.currentThinking;
-		this.currentModel = { provider, model, thinking: this.currentThinking ?? DEFAULT_THINKING };
-	}
-
-	setThinking(level: ThinkingLevel): void {
-		this.currentThinking = level;
-		if (this.currentModel) this.currentModel = { ...this.currentModel, thinking: level };
-	}
-
-	mode(): AgentMode | undefined {
-		return this.currentMode;
-	}
-
-	async setMode(mode: AgentMode): Promise<void> {
-		this.currentMode = mode;
-		/*
-		 * Written onto *this session*, not the server — which is exactly what the shared
-		 * process changed. `config.update` with a permission was the per-process answer,
-		 * and on one shared server it would change every opencode agent's posture at once,
-		 * so it is gone. `PATCH /session/{id}` accepts the same ruleset and stores it on
-		 * the session, where it is evaluated after the config's and wins; the session the
-		 * chat is already holding keeps it, so nothing has to restart.
-		 *
-		 * The SDK's generated type for the update body only knows `title` — the field was
-		 * read from opencode's own source and verified against a live 1.18.29 server, and
-		 * the cast is that gap. A server that refuses says so once: the chat keeps
-		 * answering, on the posture it already had, which is safer than pretending.
-		 */
-		if (this.sessionId) {
-			await this.client.session
-				.update({
-					path: { id: this.sessionId },
-					body: { permission: rulesetOf(mode) } as never,
-				})
-				.catch(() => this.context.notice("warn", "opencode would not change its permissions, so this chat keeps the mode it had."));
-		}
-	}
-
-	usage(): AgentUsage | null {
-		return this.lastUsage;
-	}
 
 	// --- identity and the session tree --------------------------------------------------
 
-	name(): string | undefined {
-		return this.storedName;
-	}
-
-	setName(name: string): void {
-		this.storedName = name;
-		if (this.sessionId) void this.client.session.update({ path: { id: this.sessionId }, body: { title: name } }).catch(() => undefined);
-	}
-
-	sessionRef(): string | undefined {
-		return this.sessionId;
-	}
-
-	/**
-	 * Tag each user message in the transcript with the opencode message it became.
-	 *
-	 * The same walk as the other runtimes': from the end, because the transcript in memory is a
-	 * capped tail and the two lists share a suffix, stopping at the first message whose text
-	 * disagrees. One thing is opencode's own: a revert is pending until the next prompt, and
-	 * the reverted messages are still listed until then, so everything from the revert point on
-	 * is left out, or the walk would stop on the first of them and pair nothing.
-	 */
-	async syncEntryIds(): Promise<void> {
-		if (!this.sessionId) return;
-		let entries: Array<{ id: string; text: string }>;
-		try {
-			const [session, listed] = await Promise.all([
-				this.client.session.get({ path: { id: this.sessionId } }),
-				this.client.session.messages({ path: { id: this.sessionId } }),
-			]);
-			const reverted = session.data?.revert?.messageID;
-			entries = [];
-			for (const message of listed.data ?? []) {
-				if (reverted && message.info.id === reverted) break;
-				if (message.info.role !== "user") continue;
-				const text = message.parts
-					.filter((part) => part.type === "text" && !(part as { synthetic?: boolean }).synthetic)
-					.map((part) => (part as { text: string }).text)
-					.join("");
-				entries.push({ id: message.info.id, text });
-			}
-		} catch {
-			return;
-		}
-		const items = this.context.translator.userMessages();
-		for (let offset = 1; offset <= Math.min(entries.length, items.length); offset += 1) {
-			const entry = entries[entries.length - offset];
-			const item = items[items.length - offset];
-			if (!entry || !item) break;
-			if (item.entryId === entry.id) continue;
-			if (!sentAs(entry.text, item.text)) break;
-			this.context.translator.tagUser(item.id, entry.id);
-		}
-	}
-
-	/** The points worth returning to: the user's messages that `syncEntryIds` paired. */
-	timeline(): ConversationPoint[] {
-		return this.context.translator
-			.userMessages()
-			.filter((item) => item.entryId)
-			.map((item) => ({ id: item.entryId as string, at: item.at }));
-	}
-
-	/**
-	 * Nothing recorded, as for Claude and OpenCode 2: opencode has no entry Decks can write a
-	 * board revision into, and `App.boardsAt` falls back to the revision store's own times,
-	 * which is how an empty map asks for it.
-	 */
-	revisionsAt(): Record<string, string> {
-		return {};
-	}
-
-	/**
-	 * Go back to just before a message, in place.
-	 *
-	 * opencode's revert marks the session and drops the marked messages when the next prompt
-	 * arrives, so the session keeps its id and the chat its place on the shared server. It also
-	 * undoes file edits from its own snapshots, but only in a git project: a deck is not one, so
-	 * the boards are left to Decks' own revisions, as on every other runtime.
-	 */
-	async rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }> {
-		if (!this.sessionId) return { cancelled: true };
-		if (this.streamingNow) throw new Error("Stop opencode before rewinding.");
-		const text = this.context.translator.userMessages().find((item) => item.entryId === entryId)?.text;
-		try {
-			const answered = await this.client.session.revert({ path: { id: this.sessionId }, body: { messageID: entryId } });
-			if (answered.error) throw new Error(JSON.stringify(answered.error).slice(0, 200));
-		} catch (error) {
-			this.context.notice("warn", `opencode would not rewind: ${(error as Error).message}`);
-			return { cancelled: true };
-		}
-		return { cancelled: false, ...(text ? { editorText: text } : {}) };
-	}
-
-	/**
-	 * Everything before a message, as a session of its own for a new chat to open. opencode's
-	 * fork copies the messages before the one named, so the new chat opens with that message
-	 * still unasked, as on the other runtimes.
-	 */
-	async forkFrom(entryId: string): Promise<string | undefined> {
-		if (!this.sessionId) return undefined;
-		const forked = await this.client.session.fork({ path: { id: this.sessionId }, body: { messageID: entryId } }).catch(() => undefined);
-		return forked?.data?.id;
-	}
-
-	dispose(): void {
-		this.closed = true;
-		this.unwatchDeath?.();
-		this.unwatchDeath = undefined;
-		// The session stops answering the moment the agent goes: a tool call that arrives
-		// on its tail is refused rather than run against a chat that is being torn down.
-		this.context.stageBridge?.unregisterSession(this.sessionId);
-		// The server itself is not this agent's to kill: the manager counts and the last
-		// one out stops it. Released even when the server already died under this agent —
-		// a claim against a dead server is a no-op by the time it surfaces.
-		const handle = this.handle;
-		this.handle = undefined;
-		handle?.release();
-	}
 }

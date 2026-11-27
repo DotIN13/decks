@@ -1,7 +1,8 @@
 import type { ServerMessage } from "@decks/protocol";
 import { mapSeries } from "../../lib/series.ts";
 import { DEFAULT_ACCOUNT, type ClaudeAccounts } from "./accounts.ts";
-import { claudeIdentity, fiveHourOf, probeUsage } from "./backend.ts";
+import { claudeIdentity } from "./auth-command.ts";
+import { fiveHourOf, probeUsage } from "./usage-reader.ts";
 
 /**
  * The Claude subscriptions as the page is told of them: who each one is signed in as, how much of
