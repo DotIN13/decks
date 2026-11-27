@@ -724,6 +724,7 @@
 /** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_DialInputs */
 /** @typedef {{}} Composer_Context_LabelInputs */
 /** @typedef {{}} Composer_Context_SessionInputs */
+/** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_ShortInputs */
 /** @typedef {{}} Composer_Context_UsageInputs */
 /** @typedef {{}} Composer_Context_UsedInputs */
 /** @typedef {{}} Composer_Context_WindowInputs */
@@ -4501,6 +4502,10 @@ export const composer_context_label = /** @type {(inputs: Composer_Context_Label
 
 export const composer_context_session = /** @type {(inputs: Composer_Context_SessionInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`This session`)
+};
+
+export const composer_context_short = /** @type {(inputs: Composer_Context_ShortInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.percent} context`)
 };
 
 export const composer_context_usage = /** @type {(inputs: Composer_Context_UsageInputs) => LocalizedString} */ () => {

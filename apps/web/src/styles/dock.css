@@ -589,6 +589,21 @@
 		--dial: var(--color-accent);
 	}
 
+	.dial-bar {
+		display: block;
+		width: 18px;
+		height: 4px;
+		border-radius: 2px;
+		background: var(--line-strong);
+		overflow: hidden;
+	}
+
+	.dial-bar > i {
+		display: block;
+		height: 100%;
+		background: var(--dial);
+	}
+
 	.dial:hover,
 	.dial[aria-expanded="true"] {
 		background: var(--line);

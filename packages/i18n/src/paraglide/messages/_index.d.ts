@@ -5083,6 +5083,13 @@ export const composer_context_session: ((inputs?: Composer_Context_SessionInputs
 /**
 * | output |
 * | --- |
+* | "{percent} context" |
+*
+*/
+export const composer_context_short: ((inputs: Composer_Context_ShortInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Composer_Context_ShortInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Usage and limits" |
 *
 */
@@ -11712,6 +11719,7 @@ export type Composer_AttachInputs = {};
 export type Composer_Context_DialInputs = { percent: NonNullable<unknown> };
 export type Composer_Context_LabelInputs = {};
 export type Composer_Context_SessionInputs = {};
+export type Composer_Context_ShortInputs = { percent: NonNullable<unknown> };
 export type Composer_Context_UsageInputs = {};
 export type Composer_Context_UsedInputs = {};
 export type Composer_Context_WindowInputs = {};

@@ -124,5 +124,6 @@
 	"composer_pill_yours_in": "你的评论，#{component}",
 	"composer_pill_file": "文件，在卡组中的路径为 {path}",
 	"composer_pill_item": "画布上的一个绘制项",
-	"composer_pill_card": "画布上的卡片：{path}"
+	"composer_pill_card": "画布上的卡片：{path}",
+	"composer_context_short": "上下文 {percent}"
 }

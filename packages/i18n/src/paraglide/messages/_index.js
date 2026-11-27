@@ -726,6 +726,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_DialInputs */
 /** @typedef {{}} Composer_Context_LabelInputs */
 /** @typedef {{}} Composer_Context_SessionInputs */
+/** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_ShortInputs */
 /** @typedef {{}} Composer_Context_UsageInputs */
 /** @typedef {{}} Composer_Context_UsedInputs */
 /** @typedef {{}} Composer_Context_WindowInputs */
@@ -11717,6 +11718,20 @@ export const composer_context_session = /** @type {((inputs?: Composer_Context_S
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.composer_context_session(inputs)
 	return __en.composer_context_session(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{percent} context" |
+*
+* @param {Composer_Context_ShortInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const composer_context_short = /** @type {((inputs: Composer_Context_ShortInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Composer_Context_ShortInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.composer_context_short(inputs)
+	return __en.composer_context_short(inputs)
 });
 /**
 * | output |
