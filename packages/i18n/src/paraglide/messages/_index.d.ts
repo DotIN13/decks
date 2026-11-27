@@ -10814,6 +10814,13 @@ export const tabs_find: ((inputs?: Tabs_FindInputs, options?: { locale?: "en" | 
 /**
 * | output |
 * | --- |
+* | "Follow" |
+*
+*/
+export const tabs_follow: ((inputs?: Tabs_FollowInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Tabs_FollowInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "This link's target is not in the deck any more: {target}." |
 *
 */
@@ -10867,6 +10874,13 @@ export const tabs_link_to: ((inputs?: Tabs_Link_ToInputs, options?: { locale?: "
 *
 */
 export const tabs_link_to_find: ((inputs?: Tabs_Link_To_FindInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Tabs_Link_To_FindInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "This chat's view went to {canvas} from another window." |
+*
+*/
+export const tabs_moved_elsewhere: ((inputs: Tabs_Moved_ElsewhereInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Tabs_Moved_ElsewhereInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
 * | --- |
@@ -12493,6 +12507,7 @@ export type Tabs_Document_GoneInputs = {};
 export type Tabs_Document_No_CanvasInputs = {};
 export type Tabs_DocumentsInputs = {};
 export type Tabs_FindInputs = {};
+export type Tabs_FollowInputs = {};
 export type Tabs_Link_GoneInputs = { target: NonNullable<unknown> };
 export type Tabs_Link_Gone_AppInputs = { target: NonNullable<unknown> };
 export type Tabs_Link_Gone_CanvasInputs = { target: NonNullable<unknown> };
@@ -12501,6 +12516,7 @@ export type Tabs_Link_Gone_DocumentInputs = { target: NonNullable<unknown> };
 export type Tabs_Link_NothingInputs = { address: NonNullable<unknown> };
 export type Tabs_Link_ToInputs = {};
 export type Tabs_Link_To_FindInputs = {};
+export type Tabs_Moved_ElsewhereInputs = { canvas: NonNullable<unknown> };
 export type Tabs_No_CanvasInputs = {};
 export type Tabs_Not_On_CanvasInputs = { canvas: NonNullable<unknown> };
 export type Tabs_On_CanvasInputs = {};

@@ -1,6 +1,8 @@
+import { m } from "@decks/i18n";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { storageKey } from "../connections/connection.ts";
 import { state } from "../state/deck.ts";
+import { offer } from "../state/notices.ts";
 import type { Tab } from "./kind.ts";
 import { kindAt, kindOf } from "./kinds.ts";
 import { stageOf, stages } from "../state/canvases.ts";
@@ -121,6 +123,24 @@ export function rememberTabs(): void {
 	 * Not at the first sight of where each one is, which is no move; and not a move this page made,
 	 * which said what is in front when it made it (`movedHere`).
 	 */
+	/*
+	 * When this window was last used. A move made elsewhere does not take a canvas from under someone
+	 * working here: the chat's camera is shared by every window and device, and the canvas switched four
+	 * times under one person, once with Settings open. In a window used in the last half minute the move
+	 * is offered (Follow); an idle window follows, as before. A move during the agent's own turn is the
+	 * agent showing what it was asked to (`view goto`), and is followed.
+	 */
+	let usedAt = 0;
+	const used = () => (usedAt = Date.now());
+	for (const type of ["pointerdown", "keydown", "wheel"] as const) addEventListener(type, used, { capture: true, passive: true });
+	onCleanup(() => {
+		for (const type of ["pointerdown", "keydown", "wheel"] as const) removeEventListener(type, used, { capture: true });
+	});
+	const moved = (agent: string, canvas: string) => {
+		const working = state.chats.find((chat) => chat.id === agent)?.state !== "idle";
+		if (agent !== state.focused || working || Date.now() - usedAt > 30_000) return aimCanvas(agent);
+		offer(m.tabs_moved_elsewhere({ canvas }), { label: m.tabs_follow(), run: () => aimCanvas(agent) }, `moved:${agent}`);
+	};
 	createEffect(() => {
 		for (const stage of stages()) {
 			for (const agent of stage.agents) {
@@ -132,7 +152,7 @@ export function rememberTabs(): void {
 				const now = stageOf(agent.id)?.name ?? stage.name;
 				const was = seen.get(agent.id);
 				seen.set(agent.id, now);
-				if (was !== undefined && was !== now) aimCanvas(agent.id);
+				if (was !== undefined && was !== now) moved(agent.id, stages().find((one) => one.name === now)?.title ?? now);
 			}
 		}
 	});

@@ -1540,6 +1540,7 @@
 /** @typedef {{}} Tabs_Document_No_CanvasInputs */
 /** @typedef {{}} Tabs_DocumentsInputs */
 /** @typedef {{}} Tabs_FindInputs */
+/** @typedef {{}} Tabs_FollowInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_GoneInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_Gone_AppInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_Gone_CanvasInputs */
@@ -1548,6 +1549,7 @@
 /** @typedef {{ address: NonNullable<unknown> }} Tabs_Link_NothingInputs */
 /** @typedef {{}} Tabs_Link_ToInputs */
 /** @typedef {{}} Tabs_Link_To_FindInputs */
+/** @typedef {{ canvas: NonNullable<unknown> }} Tabs_Moved_ElsewhereInputs */
 /** @typedef {{}} Tabs_No_CanvasInputs */
 /** @typedef {{ canvas: NonNullable<unknown> }} Tabs_Not_On_CanvasInputs */
 /** @typedef {{}} Tabs_On_CanvasInputs */
@@ -7819,6 +7821,10 @@ export const tabs_find = /** @type {(inputs: Tabs_FindInputs) => LocalizedString
 	return /** @type {LocalizedString} */ (`Find a canvas, an app, a card or a document`)
 };
 
+export const tabs_follow = /** @type {(inputs: Tabs_FollowInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Follow`)
+};
+
 export const tabs_link_gone = /** @type {(inputs: Tabs_Link_GoneInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`This link's target is not in the deck any more: ${i?.target}.`)
 };
@@ -7849,6 +7855,10 @@ export const tabs_link_to = /** @type {(inputs: Tabs_Link_ToInputs) => Localized
 
 export const tabs_link_to_find = /** @type {(inputs: Tabs_Link_To_FindInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Link to a canvas, an app, a card or a document`)
+};
+
+export const tabs_moved_elsewhere = /** @type {(inputs: Tabs_Moved_ElsewhereInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`This chat's view went to ${i?.canvas} from another window.`)
 };
 
 export const tabs_no_canvas = /** @type {(inputs: Tabs_No_CanvasInputs) => LocalizedString} */ () => {

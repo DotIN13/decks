@@ -1540,6 +1540,7 @@
 /** @typedef {{}} Tabs_Document_No_CanvasInputs */
 /** @typedef {{}} Tabs_DocumentsInputs */
 /** @typedef {{}} Tabs_FindInputs */
+/** @typedef {{}} Tabs_FollowInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_GoneInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_Gone_AppInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_Gone_CanvasInputs */
@@ -1548,6 +1549,7 @@
 /** @typedef {{ address: NonNullable<unknown> }} Tabs_Link_NothingInputs */
 /** @typedef {{}} Tabs_Link_ToInputs */
 /** @typedef {{}} Tabs_Link_To_FindInputs */
+/** @typedef {{ canvas: NonNullable<unknown> }} Tabs_Moved_ElsewhereInputs */
 /** @typedef {{}} Tabs_No_CanvasInputs */
 /** @typedef {{ canvas: NonNullable<unknown> }} Tabs_Not_On_CanvasInputs */
 /** @typedef {{}} Tabs_On_CanvasInputs */
@@ -7722,6 +7724,10 @@ export const tabs_find = /** @type {(inputs: Tabs_FindInputs) => LocalizedString
 	return /** @type {LocalizedString} */ (`查找画布、应用、卡片或文档`)
 };
 
+export const tabs_follow = /** @type {(inputs: Tabs_FollowInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`跟随`)
+};
+
 export const tabs_link_gone = /** @type {(inputs: Tabs_Link_GoneInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`此链接的目标已不在卡组中：${i?.target}。`)
 };
@@ -7752,6 +7758,10 @@ export const tabs_link_to = /** @type {(inputs: Tabs_Link_ToInputs) => Localized
 
 export const tabs_link_to_find = /** @type {(inputs: Tabs_Link_To_FindInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`链接到画布、应用、卡片或文档`)
+};
+
+export const tabs_moved_elsewhere = /** @type {(inputs: Tabs_Moved_ElsewhereInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`此对话的视图已在另一个窗口中切换到 ${i?.canvas}。`)
 };
 
 export const tabs_no_canvas = /** @type {(inputs: Tabs_No_CanvasInputs) => LocalizedString} */ () => {

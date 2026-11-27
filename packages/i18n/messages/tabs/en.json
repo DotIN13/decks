@@ -45,5 +45,7 @@
 	"tabs_link_gone": "This link's target is not in the deck any more: {target}.",
 	"tabs_document_no_canvas": "This document is kept in the deck's own docs, on no canvas.",
 	"tabs_on_no_canvas": "This is on no canvas.",
-	"tabs_not_on_canvas": "It is not on {canvas} any more."
+	"tabs_not_on_canvas": "It is not on {canvas} any more.",
+	"tabs_moved_elsewhere": "This chat's view went to {canvas} from another window.",
+	"tabs_follow": "Follow"
 }

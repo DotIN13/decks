@@ -31,5 +31,7 @@
 	"tabs_link_gone": "此链接的目标已不在卡组中：{target}。",
 	"tabs_document_no_canvas": "此文档保存在卡组自己的文档中，不在任何画布上。",
 	"tabs_on_no_canvas": "它不在任何画布上。",
-	"tabs_not_on_canvas": "它已不在 {canvas} 上。"
+	"tabs_not_on_canvas": "它已不在 {canvas} 上。",
+	"tabs_moved_elsewhere": "此对话的视图已在另一个窗口中切换到 {canvas}。",
+	"tabs_follow": "跟随"
 }

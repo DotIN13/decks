@@ -1542,6 +1542,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Tabs_Document_No_CanvasInputs */
 /** @typedef {{}} Tabs_DocumentsInputs */
 /** @typedef {{}} Tabs_FindInputs */
+/** @typedef {{}} Tabs_FollowInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_GoneInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_Gone_AppInputs */
 /** @typedef {{ target: NonNullable<unknown> }} Tabs_Link_Gone_CanvasInputs */
@@ -1550,6 +1551,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ address: NonNullable<unknown> }} Tabs_Link_NothingInputs */
 /** @typedef {{}} Tabs_Link_ToInputs */
 /** @typedef {{}} Tabs_Link_To_FindInputs */
+/** @typedef {{ canvas: NonNullable<unknown> }} Tabs_Moved_ElsewhereInputs */
 /** @typedef {{}} Tabs_No_CanvasInputs */
 /** @typedef {{ canvas: NonNullable<unknown> }} Tabs_Not_On_CanvasInputs */
 /** @typedef {{}} Tabs_On_CanvasInputs */
@@ -23159,6 +23161,20 @@ export const tabs_find = /** @type {((inputs?: Tabs_FindInputs, options?: { loca
 /**
 * | output |
 * | --- |
+* | "Follow" |
+*
+* @param {Tabs_FollowInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const tabs_follow = /** @type {((inputs?: Tabs_FollowInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Tabs_FollowInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.tabs_follow(inputs)
+	return __en.tabs_follow(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "This link's target is not in the deck any more: {target}." |
 *
 * @param {Tabs_Link_GoneInputs} inputs
@@ -23267,6 +23283,20 @@ export const tabs_link_to_find = /** @type {((inputs?: Tabs_Link_To_FindInputs, 
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.tabs_link_to_find(inputs)
 	return __en.tabs_link_to_find(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This chat's view went to {canvas} from another window." |
+*
+* @param {Tabs_Moved_ElsewhereInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const tabs_moved_elsewhere = /** @type {((inputs: Tabs_Moved_ElsewhereInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Tabs_Moved_ElsewhereInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.tabs_moved_elsewhere(inputs)
+	return __en.tabs_moved_elsewhere(inputs)
 });
 /**
 * | output |
