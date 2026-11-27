@@ -1,110 +1,220 @@
-<title>Dragging a group of cards jumps back: on step 4</title>
-<meta name="card" content='{"w":1000}' />
+<title>Word counter: on step 4</title>
+<meta name="card" content='{"w":1100}' />
 <style>
-	.doc { padding: 28px 36px; font-size: 17px; line-height: 1.45; color: var(--b-fg); font-family: var(--b-font) }
-	h1 { font-size: 26px; line-height: 1.2; margin: 0 0 4px }
-	.sub { color: var(--b-muted); font-size: 15px; margin-bottom: 14px }
-	.sub .stale { color: var(--b-warn); font-weight: 600 }
-	.ask { border: 1px solid var(--b-accent); background: var(--b-accent-soft); border-radius: var(--b-radius); padding: 10px 14px; margin-bottom: 12px }
+	.doc { --ok-soft: color-mix(in srgb, var(--b-ok) 14%, transparent); --bad-soft: color-mix(in srgb, var(--b-danger) 12%, transparent);
+		padding: 0; font-size: 17px; line-height: 1.4; color: var(--b-fg); font-family: var(--b-font) }
+
+	.head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 16px; padding: 18px 22px 14px; border-bottom: 1px solid var(--b-border) }
+	.head h1 { margin: 0; font-size: 22px; line-height: 1.25; letter-spacing: -0.01em }
+	.who { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--b-muted) }
+	.who b { color: var(--b-fg); font-weight: 600 }
+	.who .stale { color: var(--b-warn); font-weight: 600 }
+	.face { display: grid; width: 30px; height: 30px }
+	.face > * { grid-area: 1 / 1 }
+	.face img { width: 30px; height: 30px; border-radius: 8px; display: block; object-fit: cover }
+	.face .dot { justify-self: end; align-self: end; margin: 0 -3px -3px 0; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--b-bg); background: var(--b-faint) }
+	.face .dot.on { background: var(--b-ok); animation: pulse 1.8s infinite }
+	@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--b-ok) 60%, transparent) } 100% { box-shadow: 0 0 0 7px transparent } }
+	.segs { grid-column: 1 / -1; display: flex; gap: 4px }
+	.segs i { flex: 1; height: 5px; border-radius: 3px; background: var(--b-border) }
+	.segs i.done { background: var(--b-ok) } .segs i.blocked, .segs i.not { background: var(--b-danger) }
+	.segs i.active { background: linear-gradient(90deg, var(--b-accent) 40%, var(--b-border) 40%) }
+
+	.cols { display: grid; grid-template-columns: 430px 1fr; height: 470px }
+	@container card (width < 760px) { .cols { grid-template-columns: 1fr; height: auto } .steps, .log { height: 300px } }
+	.steps { overflow: auto; padding: 10px; border-right: 1px solid var(--b-border); background: var(--b-bg-layer); display: flex; flex-direction: column; gap: 7px }
+	.step { display: grid; grid-template-columns: 24px 1fr; column-gap: 10px; text-align: left; font: inherit; color: var(--b-fg); background: var(--b-bg); border: 1px solid var(--b-border); border-radius: 10px; padding: 9px 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s }
+	.step:hover { border-color: var(--b-border-strong) }
+	.step[aria-pressed="true"] { border-color: var(--b-accent); box-shadow: 0 0 0 3px var(--b-accent-soft) }
+	.step > :not(.num) { grid-column: 2 }
+	.num { grid-row: 1 / span 4; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 700; background: var(--b-bg-deep); color: var(--b-muted) }
+	.step.done .num { background: var(--ok-soft); color: var(--b-ok) }
+	.step.active .num { background: var(--b-accent); color: #fff }
+	.step.blocked .num, .step.not .num { background: var(--bad-soft); color: var(--b-danger) }
+	.t { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 650; font-size: 16px; line-height: 1.3 }
+	.row { margin-top: 4px; font-size: 14px; line-height: 1.4; color: var(--b-muted) }
+	.row b { font-weight: 600; color: var(--b-fg); margin-right: 5px }
+	.pill { font-size: 14px; font-weight: 600; padding: 1px 9px; border-radius: 999px; white-space: nowrap }
+	.pill.done { background: var(--ok-soft); color: var(--b-ok) }
+	.pill.active { background: var(--b-accent-soft); color: var(--b-accent) }
+	.pill.blocked, .pill.not { background: var(--bad-soft); color: var(--b-danger) }
+	.pill.todo { background: var(--b-bg-deep); color: var(--b-muted) }
+
+	.log { overflow: auto; padding: 0 18px 14px }
+	.sep { position: sticky; top: 0; z-index: 1; background: var(--b-bg); padding: 12px 0 6px; font-size: 14px; font-weight: 700; color: var(--b-muted); letter-spacing: .04em; text-transform: uppercase; display: flex; gap: 8px; align-items: center }
+	.sep::after { content: ""; flex: 1; height: 1px; background: var(--b-border) }
+	.e { display: grid; grid-template-columns: 46px 20px 1fr; gap: 8px; align-items: start; padding: 5px 6px; border-radius: 8px; font-size: 15px; line-height: 1.4 }
+	.e.lit { background: var(--b-accent-soft) }
+	.e.lit .ic { box-shadow: 0 0 0 2px var(--b-bg) }
+	.at { color: var(--b-faint); font-family: var(--b-mono); font-size: 14px; padding-top: 2px }
+	.ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; line-height: 1; margin-top: 1px }
+	.run .ic { background: var(--b-bg-deep); color: var(--b-muted); border: 1px solid var(--b-border) }
+	.run.running .ic { background: var(--b-accent); color: #fff; border: 0 }
+	.result .ic { background: var(--ok-soft); color: var(--b-ok) }
+	.fail .ic { background: var(--bad-soft); color: var(--b-danger) }
+	.finding .ic, .note .ic { background: var(--b-accent-soft); color: var(--b-accent) }
+	.term { font-family: var(--b-mono); font-size: 14px; background: var(--b-bg-deep); border: 1px solid var(--b-border); border-radius: 7px; padding: 6px 10px; word-break: break-all; display: inline-block }
+	.term::before { content: "$ "; color: var(--b-faint) }
+	.why { display: block; font-size: 14px; color: var(--b-muted); margin-top: 3px }
+	.result .x { font-weight: 600; color: var(--b-ok) }
+	.fail .x { color: var(--b-danger) }
+	.finding .x { border-left: 3px solid var(--b-accent); padding-left: 10px; font-weight: 550 }
+	.finding .x small { display: block; font-size: 14px; font-weight: 600; color: var(--b-accent); letter-spacing: .03em; text-transform: uppercase }
+	.prog { display: flex; align-items: center; gap: 10px; margin-top: 7px; font-size: 14px; color: var(--b-muted) }
+	.bar { flex: 1; height: 6px; border-radius: 3px; background: var(--b-border); overflow: hidden }
+	.bar i { display: block; height: 100%; border-radius: 3px; transition: width .5s ease; background: var(--b-accent) }
+	.running .bar i { background: repeating-linear-gradient(-45deg, var(--b-accent) 0 8px, color-mix(in srgb, var(--b-accent) 75%, white) 8px 16px); background-size: 22px 22px; animation: stripes 1s linear infinite }
+	@keyframes stripes { to { background-position: 22px 0 } }
+
+	.ask { margin: 12px 22px 0; border: 1px solid var(--b-accent); background: var(--b-accent-soft); border-radius: 10px; padding: 10px 14px }
 	.ask p { margin: 0 0 8px; font-weight: 600 }
 	.ask button { font: 15px var(--b-font); min-height: 40px; padding: 6px 14px; margin: 0 8px 0 0; border-radius: 8px; border: 1px solid var(--b-border-strong); background: var(--b-bg); color: var(--b-fg); cursor: pointer }
 	.ask button[disabled] { opacity: .6; cursor: default }
-	.body { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 16px }
-	@container card (width < 640px) { .body { grid-template-columns: 1fr } }
-	.steps { display: flex; flex-direction: column; gap: 6px; height: 440px; overflow: auto }
-	.steps button { text-align: left; font: 16px var(--b-font); color: var(--b-fg); background: var(--b-bg-layer); border: 1px solid var(--b-border); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: grid; grid-template-columns: 26px 1fr auto; gap: 6px; align-items: center; min-height: 44px }
-	.steps button[aria-pressed="true"] { border-color: var(--b-accent); box-shadow: inset 3px 0 0 var(--b-accent) }
-	.n { color: var(--b-muted); font-weight: 600 }
-	.chip { font-size: 14px; font-weight: 600; white-space: nowrap }
-	.held, .done { color: var(--b-ok) } .notheld, .failed, .blocked { color: var(--b-danger) } .active, .running { color: var(--b-accent) } .todo, .waiting { color: var(--b-faint) }
-	.panel { height: 440px; overflow: auto; border: 1px solid var(--b-border); border-radius: var(--b-radius); padding: 14px 16px }
-	.hmr { display: grid; grid-template-columns: 104px 1fr; gap: 10px 14px }
-	.hmr > b { font-size: 14px; color: var(--b-muted); text-transform: uppercase; letter-spacing: .04em; padding-top: 3px }
-	.run { border: 1px solid var(--b-border); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; background: var(--b-bg-layer) }
-	.run .top { display: flex; justify-content: space-between; gap: 10px }
-	.run code { font-family: var(--b-mono); font-size: 14px; color: var(--b-muted); word-break: break-all }
-	.run .detail { font-size: 15px; color: var(--b-muted); margin-top: 4px }
-	.bar { height: 8px; border-radius: 4px; background: var(--b-border); margin-top: 6px; overflow: hidden }
-	.bar i { display: block; height: 100%; background: var(--b-accent) }
-	.muted { color: var(--b-muted) }
+	.empty { color: var(--b-muted); padding: 14px 0 }
 </style>
 <div class="doc" data-id="doc">
-	<h1 id="task">Loading the progress…</h1>
-	<div class="sub" id="sub"></div>
+	<div class="head">
+		<h1 id="task">Loading the progress…</h1>
+		<span class="who" id="who"></span>
+		<div class="segs" id="segs"></div>
+	</div>
 	<div id="asks"></div>
-	<div class="body">
+	<div class="cols">
 		<div class="steps" id="steps" data-id="steps"></div>
-		<div class="panel" id="panel" data-id="step"></div>
+		<div class="log" id="log" data-id="log"></div>
 	</div>
 </div>
 <script type="module">
-	// A progress card that reads progress.json beside it every few seconds. The agent (or a script it
-	// runs) rewrites that file in place; nothing else changes. Copy the folder and change what you like.
+	// A progress card. Left: the steps, each a goal or hypothesis, a method and what is expected. Right:
+	// a log of what actually happened (commands, failures, findings, results) under each step, newest at
+	// the foot. It reads progress.json beside it every 4 seconds; the agent, or a script it runs, rewrites
+	// that file in place. Copy the folder and change anything: the JSON's shape is this card's own.
 	const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-	const VERDICT = { held: "held", "not held": "not held", blocked: "blocked", done: "done" };
-	const chipOf = (step) => {
-		const v = step.verdict ?? (step.status === "active" ? "active" : step.status === "done" ? "done" : "to do");
-		return `<span class="chip ${v.replace(/\s/g, "")}">${esc(VERDICT[v] ?? v)}</span>`;
-	};
-	const ago = (iso) => {
-		const min = Math.round((Date.now() - Date.parse(iso)) / 60000);
-		return Number.isFinite(min) ? (min < 1 ? "just now" : `${min} min ago`) : "";
-	};
+	const VERDICT = { held: "done", "not held": "not", blocked: "blocked" };
+	const stateOf = (step) => (step.verdict && VERDICT[step.verdict]) || (step.status === "active" ? "active" : step.status === "done" ? "done" : step.status === "blocked" ? "blocked" : "todo");
+	const pillOf = (step) => step.badge ?? step.verdict ?? ({ active: "running", done: "done", blocked: "blocked", todo: "to do" })[stateOf(step)];
+	const ICON = { run: "›", result: "✓", fail: "✕", finding: "!", note: "·" };
+	const minutesSince = (iso) => (Date.now() - Date.parse(iso)) / 60000;
 
 	export default function (card) {
 		const $ = (id) => card.root.getElementById(id);
-		let data = null, chosen = null, shown = "";
+		let text = "", data = null, chosen = null, follow = true, face = { name: "", src: "" };
 
-		function runHtml(run) {
-			const st = run.status ?? "waiting";
-			const count = run.of ? `${run.done ?? 0} of ${run.of}` : st;
-			const bar = run.of ? `<div class="bar"><i style="width:${Math.min(100, (100 * (run.done ?? 0)) / run.of)}%"></i></div>` : "";
-			return `<div class="run"><div class="top"><span>${esc(run.what)}</span><span class="chip ${st}">${esc(count)}</span></div>${run.command ? `<code>${esc(run.command)}</code>` : ""}${run.detail ? `<div class="detail">${esc(run.detail)}</div>` : ""}${bar}</div>`;
+		async function faceOf(name) {
+			if (!name || face.name === name) return;
+			face = { name, src: "" };
+			try {
+				const agent = await card.decks.agent.get(name);
+				face.src = agent?.avatar ?? "";
+			} catch {}
+			drawHead();
+		}
+
+		function drawHead() {
+			const steps = data.steps ?? [];
+			const active = steps.findIndex((s) => s.status === "active");
+			const done = steps.filter((s) => s.status === "done").length;
+			const where = data.status === "done" ? `done in ${steps.length} steps` : active >= 0 ? `on step ${active + 1}` : `${done} steps done`;
+			$("task").textContent = `${data.task ?? "Progress"}: ${where}`;
+			const age = data.updated ? minutesSince(data.updated) : NaN;
+			const working = data.status !== "done" && data.status !== "waiting";
+			const stale = working && age > 10;
+			const when = Number.isFinite(age) ? (age < 1 ? "updated just now" : `updated ${Math.round(age)} min ago`) : "";
+			$("who").innerHTML = `<span class="face">${face.src ? `<img src="${esc(face.src)}" alt="" />` : ""}<span class="dot${working && !stale ? " on" : ""}"></span></span><b>${esc(data.agent ?? "")}</b>${when ? ` · ${stale ? `<span class="stale">no update for ${Math.round(age)} min</span>` : esc(when)}` : ""}${data.status === "waiting" ? " · waiting on you" : ""}`;
+			$("segs").innerHTML = steps.map((s) => `<i class="${stateOf(s)}"></i>`).join("");
+		}
+
+		function drawAsks() {
+			const asks = (data.questions ?? []).filter((q) => !q.answer);
+			$("asks").innerHTML = asks.map((q, i) => `<div class="ask" data-id="ask-${i}"><p>${esc(q.ask)}</p>${(q.options ?? []).map((o) => `<button data-q="${i}">${esc(o)}</button>`).join("")}</div>`).join("");
+			for (const b of $("asks").querySelectorAll("button")) b.addEventListener("click", async () => {
+				const q = asks[Number(b.dataset.q)];
+				for (const o of b.parentElement.querySelectorAll("button")) o.disabled = true;
+				await card.decks.agent.send(q.agent ?? data.agent, { task: `${q.ask} ${b.textContent}`, cards: [card.path] });
+			}, { signal: card.signal });
+		}
+
+		function drawSteps() {
+			const steps = data.steps ?? [];
+			$("steps").innerHTML = steps.map((s, i) => {
+				const n = s.id ?? i + 1;
+				const lead = s.hypothesis ? ["Hypothesis", s.hypothesis] : s.goal ? ["Goal", s.goal] : null;
+				return `<button class="step ${stateOf(s)}" data-s="${esc(n)}" aria-pressed="${String(n) === String(chosen)}"><span class="num">${esc(n)}</span><div class="t">${esc(s.title)}<span class="pill ${stateOf(s)}">${esc(pillOf(s))}</span></div>${lead ? `<div class="row"><b>${lead[0]}</b>${esc(lead[1])}</div>` : ""}${s.method ? `<div class="row"><b>Method</b>${esc(s.method)}</div>` : ""}${s.expect ? `<div class="row"><b>Expect</b>${esc(s.expect)}</div>` : ""}</button>`;
+			}).join("");
+		}
+
+		function entry(e) {
+			const kind = ICON[e.kind] ? e.kind : "note";
+			const running = kind === "run" && e.status === "running";
+			let body;
+			if (kind === "run") {
+				const bar = e.of ? `<span class="prog"><span class="bar"><i style="width:${Math.min(100, (100 * (e.done ?? 0)) / e.of)}%"></i></span><span>${esc(e.done ?? 0)} of ${esc(e.of)}${e.unit ? ` ${esc(e.unit)}` : ""}</span></span>` : "";
+				body = `${e.command ? `<span class="term">${esc(e.command)}</span>` : ""}${e.why ? `<span class="why">${esc(e.why)}</span>` : ""}${e.text ? `<span class="why">${esc(e.text)}</span>` : ""}${bar}`;
+			} else if (kind === "finding") body = `<small>Finding</small>${esc(e.text)}`;
+			else body = esc(e.text);
+			return `<div class="e ${kind}${running ? " running" : ""}${String(e.step) === String(chosen) ? " lit" : ""}" data-s="${esc(e.step)}"><span class="at">${esc(e.at ?? "")}</span><span class="ic">${ICON[kind]}</span><span class="x">${body}</span></div>`;
+		}
+
+		function drawLog() {
+			const log = $("log");
+			const atFoot = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+			const groups = [];
+			for (const e of data.log ?? []) {
+				const last = groups[groups.length - 1];
+				if (last && String(last.step) === String(e.step)) last.items.push(e);
+				else groups.push({ step: e.step, items: [e] });
+			}
+			const title = (n) => (data.steps ?? []).find((s, i) => String(s.id ?? i + 1) === String(n))?.title;
+			log.innerHTML = groups.length ? groups.map((g) => `<div class="grp"><div class="sep" data-s="${esc(g.step)}">Step ${esc(g.step)}${title(g.step) ? `: ${esc(title(g.step))}` : ""}</div>${g.items.map(entry).join("")}</div>`).join("") : `<p class="empty">Nothing run yet.</p>`;
+			if (follow || atFoot) log.scrollTop = log.scrollHeight;
+		}
+
+		/** Keep the chosen step in view in the steps pane. */
+		function showChosen() {
+			const pane = $("steps"), b = pane.querySelector(`[data-s="${CSS.escape(String(chosen))}"]`);
+			if (!b) return;
+			const top = b.offsetTop - pane.offsetTop;
+			if (top < pane.scrollTop || top + b.offsetHeight > pane.scrollTop + pane.clientHeight) pane.scrollTop = top + b.offsetHeight - pane.clientHeight + 10;
 		}
 
 		function draw() {
-			if (!data) return;
-			const steps = Array.isArray(data.steps) ? data.steps : [];
-			const done = steps.filter((s) => s.status === "done").length;
-			const active = steps.findIndex((s) => s.status === "active");
-			$("task").textContent = data.task ?? "Progress";
-			const where = data.status === "done" ? `finished, ${steps.length} steps` : active >= 0 ? `${done} steps done, on step ${active + 1}` : `${done} steps done`;
-			const stale = data.status === "working" && Date.now() - Date.parse(data.updated) > 10 * 60000;
-			$("sub").innerHTML = `${esc(where)}${data.agent ? ` · ${esc(data.agent)}` : ""}${data.updated ? ` · updated ${esc(ago(data.updated))}` : ""}${stale ? ` · <span class="stale">no update for a while</span>` : ""}${data.note ? ` · ${esc(data.note)}` : ""}`;
-
-			const asks = (data.questions ?? []).filter((q) => !q.answer);
-			const asksHtml = asks.map((q, i) => `<div class="ask" data-id="ask-${i}"><p>${esc(q.ask)}</p>${(q.options ?? []).map((o) => `<button data-q="${i}">${esc(o)}</button>`).join("")}</div>`).join("");
-			if ($("asks").dataset.html !== asksHtml) {
-				$("asks").innerHTML = asksHtml;
-				$("asks").dataset.html = asksHtml;
-				for (const b of $("asks").querySelectorAll("button")) b.addEventListener("click", async () => {
-					const q = asks[Number(b.dataset.q)];
-					for (const o of b.parentElement.querySelectorAll("button")) o.disabled = true;
-					await card.decks.agent.send(q.agent ?? data.agent, { task: `${q.ask} ${b.textContent}`, cards: [card.path] });
-				}, { signal: card.signal });
+			const steps = data.steps ?? [];
+			const first = chosen === null;
+			if (chosen === null || follow) {
+				const active = steps.findIndex((s) => s.status === "active");
+				const i = active >= 0 ? active : steps.length - 1;
+				chosen = steps[i] ? (steps[i].id ?? i + 1) : null;
 			}
-
-			if (chosen === null || chosen >= steps.length) chosen = active >= 0 ? active : Math.max(0, steps.length - 1);
-			$("steps").innerHTML = steps.map((s, i) => `<button data-i="${i}" aria-pressed="${i === chosen}"><span class="n">${i + 1}</span><span>${esc(s.title)}</span>${chipOf(s)}</button>`).join("");
-			const s = steps[chosen];
-			const panel = s ? `<div class="hmr"><b>Hypothesis</b><div>${esc(s.hypothesis)}</div><b>Method</b><div>${esc(s.method ?? "")}${(s.runs ?? []).map(runHtml).join("")}</div><b>Result</b><div class="${s.result ? "" : "muted"}">${esc(s.result ?? (s.status === "todo" ? "Not started" : "Comes when the runs finish"))}</div></div>` : `<p class="muted">No steps yet.</p>`;
-			if (panel !== shown) { $("panel").innerHTML = panel; shown = panel; }
+			drawHead(); drawAsks(); drawSteps(); drawLog();
+			if (first || follow) { showChosen(); requestAnimationFrame(showChosen); }
+			faceOf(data.agent);
 		}
 
-		card.root.getElementById("steps").addEventListener("click", (e) => {
-			const b = e.target.closest("button[data-i]");
-			if (b) { chosen = Number(b.dataset.i); draw(); }
+		$("steps").addEventListener("click", (event) => {
+			const b = event.target.closest("button[data-s]");
+			if (!b) return;
+			chosen = b.dataset.s;
+			follow = false;
+			drawSteps(); drawLog();
+			const head = $("log").querySelector(`.sep[data-s="${CSS.escape(chosen)}"]`);
+			if (head) $("log").scrollTop = head.parentElement.offsetTop - $("log").offsetTop;
+		}, { signal: card.signal });
+		$("log").addEventListener("scroll", () => {
+			const log = $("log");
+			follow = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
 		}, { signal: card.signal });
 
 		async function load() {
 			try {
 				const res = await fetch(card.file("progress.json"), { cache: "no-store", signal: card.signal });
-				data = await res.json();
+				const next = await res.text();
+				if (next === text) { if (data) drawHead(); return; }
+				const parsed = JSON.parse(next); // half-written: keep the last good one
+				text = next; data = parsed;
 			} catch (error) {
-				if (error.name === "AbortError") return;
-				// Half-written or not valid JSON: keep showing the last good version.
+				if (error.name === "AbortError" || !data) return;
 			}
-			try { draw(); } catch (error) { $("sub").textContent = `progress.json could not be drawn: ${error.message}`; }
+			try { draw(); } catch (error) { $("task").textContent = `progress.json could not be drawn: ${error.message}`; }
 		}
 		load();
 		const timer = setInterval(load, 4000);
