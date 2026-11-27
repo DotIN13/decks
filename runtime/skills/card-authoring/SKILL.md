@@ -99,7 +99,8 @@ Everything that used to be a board is a card. A board file left in a deck from b
   [progress-example/](progress-example/): steps on the left (a plain title, a goal or hypothesis with
   why, a method, what you expect, whether it held), a log on the right of every command with what it
   is for and how far it has got, and each failure, finding and result, with screenshots, SVG diagrams and
-  short video demos wherever they help (always welcome). [progress.md](progress.md) says how.
+  short video demos wherever they help (always welcome), and links to the cards, drawings and
+  documents it made or relies on. [progress.md](progress.md) says how.
 
 **Scripts: modules handed the card**
 

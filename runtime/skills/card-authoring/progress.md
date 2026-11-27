@@ -52,6 +52,13 @@ sides scroll inside the card.
 
   The log follows the newest line until the reader scrolls up; pressing a step glides to its lines.
 
+- **Link out.** An entry's HTML is part of the card, so a link in it works like any link in a card:
+  `<a href="../race-rounds/index.html">every round, both ways</a>` opens that card beside this one,
+  `#item/<canvas>/<id>` flies to a drawing, `#doc/<path>` opens a document, an https address a
+  source. Link whenever there is something to go to, so the card is the way into the work: every result
+  card, detail card and drawing the work made gets a link from the entry that produced it. An entry
+  can carry a piece (`file`) and a line of HTML (`html`) together, the line often just the link.
+
 ## Steps are small, and grow as you go
 
 Each step is one goal or hypothesis, checked by one run or a few. "Write the counter and test it" is
@@ -120,7 +127,8 @@ table, a map, an SVG diagram drawn for this run. The rules for every piece:
             "why": "time both on the same words", "status": "running", "done": 2, "of": 7, "unit": "rounds",
             "file": "log/step5-trace.html" },
           { "step": 4, "at": "18:16", "kind": "finding", "text": "Each weighted draw rescans 50,000 words.",
-            "file": "log/step4-before-after.html" },
+            "file": "log/step4-before-after.html",
+            "html": "<p>How the text is made: <a href=\"#item/word-counter/corpus-diagram\">the generator, drawn</a>.</p>" },
           { "step": 2, "at": "18:09", "kind": "finding", "text": "Reads split words.",
             "html": "<code>\"don\" + \"t\"</code> → <code>\"don't\"</code>" }],
   "questions": [{ "ask": "Keep Counter?", "options": ["Yes", "No"] }]          // buttons that message you
@@ -156,7 +164,8 @@ write there wins.
 1. Set `status` to "done" and each step's verdict.
 2. Write the result as its own one-screen card and file it in its topic (`--beside` the topic's last
    item).
-3. Move the progress card beside the result, as the record of how it was done, and link it from the
-   result card; close the gap in your Working row.
+3. Move the progress card beside the result, as the record of how it was done: link the result card
+   from the entry that produced it, and the progress card from the result. Close the gap in your
+   Working row.
 4. Fade the to-do (`opacity: 0.5`) and point its link chip at the result.
 5. Chat: one or two sentences naming the result card and the number that matters. Leave your tags set.

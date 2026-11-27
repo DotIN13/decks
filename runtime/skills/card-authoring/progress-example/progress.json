@@ -108,7 +108,8 @@
 			"at": "18:10",
 			"kind": "result",
 			"text": "23 of 23 still pass, in 17 fewer lines",
-			"file": "log/step3-codebase.html"
+			"file": "log/step3-codebase.html",
+			"html": "<p>The parts and why: <a href=\"../counter-parts/index.html\">the counter, split in three</a>.</p>"
 		},
 		{
 			"step": 4,
@@ -130,7 +131,8 @@
 			"at": "18:16",
 			"kind": "finding",
 			"text": "Each weighted draw rescans 50,000 words. Draw in batches.",
-			"file": "log/step4-before-after.html"
+			"file": "log/step4-before-after.html",
+			"html": "<p>How the text is made: <a href=\"#item/word-counter/corpus-diagram\">the generator, drawn</a>.</p>"
 		},
 		{
 			"step": 4,
@@ -148,7 +150,8 @@
 			"done": 2,
 			"of": 7,
 			"unit": "rounds",
-			"file": "log/step5-trace.html"
+			"file": "log/step5-trace.html",
+			"html": "<p>Rounds so far, in full: <a href=\"../race-rounds/index.html\">every round, both ways</a>.</p>"
 		}
 	],
 	"questions": []

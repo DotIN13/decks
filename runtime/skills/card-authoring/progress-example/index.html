@@ -72,6 +72,7 @@
 	.ask button { font: 15px var(--b-font); min-height: 40px; padding: 6px 14px; margin: 0 8px 0 0; border-radius: 8px; border: 1px solid var(--b-border-strong); background: var(--b-bg); color: var(--b-fg); cursor: pointer }
 	.ask button[disabled] { opacity: .6; cursor: default }
 	.empty { color: var(--b-muted); padding: 14px 0 }
+	.log a { color: var(--b-accent); text-decoration: underline; text-underline-offset: 2px }
 	/* Edge to edge, in a 16:10 shape, its two panes scrolling inside. Decks's own styles sit in a layer
 	   beneath these, so this rule replaces its padding and display outright. */
 	.doc { display: flex; flex-direction: column; aspect-ratio: 16 / 10; overflow: hidden; padding: 0; font-size: 17px; line-height: 1.4 }
@@ -208,7 +209,8 @@
 			} else if (kind === "finding") body = `<small>Finding</small>${esc(e.text)}`;
 			else body = esc(e.text);
 			// A piece's relative addresses (files/demo.mp4) are the card's folder's, not the page's.
-			const own = (e.file ? pieces[e.file] : e.html)?.replace(/\b(src|href|poster)="(?![a-z][a-z0-9+.-]*:|\/|#)([^"]+)"/gi, (_m, at, path) => `${at}="${card.file(path)}"`);
+			// A piece from a file, then any inline HTML; links in either are the card's own, as anywhere in a card.
+			const own = [e.file ? pieces[e.file] : "", e.html ?? ""].join("").replace(/\b(src|poster)="(?![a-z][a-z0-9+.-]*:|\/|#)([^"]+)"/gi, (_m, at, path) => `${at}="${card.file(path)}"`);
 			if (own) body += `<div class="viz">${own}</div>`;
 			return `<div class="e ${kind}${running ? " running" : ""}${String(e.step) === String(chosen) ? " lit" : ""}" data-s="${esc(e.step)}"><span class="at">${esc(e.at ?? "")}</span><span class="ic">${ICON[kind]}</span><span class="x">${body}</span></div>`;
 		}
