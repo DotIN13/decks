@@ -21,7 +21,7 @@ const onCanvas = async () => {
 };
 /*
  * The side panel's Canvas tab, which lists what is drawn on the canvas on screen: its "Cards" rows
- * (`LeftPanel.tsx`, `.v3-item[data-kind="board"]`), each saying the card's title.
+ * (`panel/ObjectsTab.tsx`, `.v3-item[data-kind="board"]`), each saying the card's title.
  */
 const inPanel = () =>
 	page.evaluate(() => [...document.querySelectorAll('.panel-section[data-kind="canvas"] .v3-item[data-kind="board"] .v3-item-name')].map((n) => n.textContent.trim()).sort());

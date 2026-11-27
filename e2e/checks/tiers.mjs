@@ -21,7 +21,7 @@ const base = nameOf;
 const names = paths.map(base).sort();
 
 /*
- * The panel's Canvas tab: one row per board on this canvas (`panel/LeftPanel.tsx`, `itemRow`). It
+ * The panel's Canvas tab: one row per board on this canvas (`panel/ObjectsTab.tsx`, `itemRow`). It
  * says a board's title, not its file, so it is compared with the stage by count. The panel no
  * longer has the agent's "held" and "deck" headings; what the agent holds is read off the
  * server's `context.changed` instead (below).

@@ -151,7 +151,7 @@ export function AgentRow(props: {
 	 * Read off the **identity**, not off `row.tags`, and that is not a preference.
 	 *
 	 * The panel keeps its rows in a store and updates them with `reconcile`, so that a state
-	 * change writes a word on one row instead of rebuilding the list (`LeftPanel`). Reconciling
+	 * change writes a word on one row instead of rebuilding the list (`panel/agent-list.tsx`). Reconciling
 	 * an array of plain strings does not notify a reader of that array: measured, a tag arriving
 	 * reached `row.tags` — the panel's search matched it at once — and the row went on drawing
 	 * the last thing the agent said until something else redrew it. `identities[id]` is the
@@ -190,7 +190,7 @@ export function AgentRow(props: {
 			data-dormant={chat().dormant ? "true" : undefined}
 			/*
 			 * The row is the handle for moving this agent to another project: drag it onto a
-			 * heading (`LeftPanel`). Only when the move is allowed at all — without `onWorkspace`
+			 * heading (`panel/AgentsTab.tsx`). Only when the move is allowed at all — without `onWorkspace`
 			 * there is nothing a drop could do — and never while the edit window is open, where a
 			 * drag would take the text being selected in a field with it.
 			 */

@@ -10,7 +10,7 @@
  */
 import { canvasFrame, card, open, pressCardAction, say, selectCard, settle } from "../harness.mjs";
 
-// The panel opens on Canvas, where a board on the canvas has its row (`panel/LeftPanel.tsx`, `itemRow`).
+// The panel opens on Canvas, where a board on the canvas has its row (`panel/ObjectsTab.tsx`, `itemRow`).
 const { browser, page, errors } = await open({ width: 1440, height: 1000, panelTab: "canvas" });
 
 /* Its row in the panel's Canvas tab flies the camera to the board. */

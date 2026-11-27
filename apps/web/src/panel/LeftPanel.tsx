@@ -4,38 +4,28 @@ import { can } from "../connections/backend.ts";
 import type { Page, DeckPen } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import AppWindow from "lucide-solid/icons/app-window";
-import ChevronDown from "lucide-solid/icons/chevron-down";
-import ChevronRight from "lucide-solid/icons/chevron-right";
-import Circle from "lucide-solid/icons/circle";
 import Clock from "lucide-solid/icons/clock";
 import Sparkles from "lucide-solid/icons/sparkles";
-import FileText from "lucide-solid/icons/file-text";
-import MoveUpRight from "lucide-solid/icons/move-up-right";
-import PenLine from "lucide-solid/icons/pen-line";
-import Square from "lucide-solid/icons/square";
-import StickyNote from "lucide-solid/icons/sticky-note";
-import Type from "lucide-solid/icons/type";
 import Layers from "lucide-solid/icons/layers";
-import Folder from "lucide-solid/icons/folder";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
-import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import SettingsIcon from "lucide-solid/icons/settings";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "@decks/ui";
 import { m } from "@decks/i18n";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
-import { AgentRow } from "../agents/AgentRow.tsx";
-import { NewAgentButton } from "../agents/AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
-import { agentSections, recentAgents, type AgentRow as AgentListRow, type AgentSection } from "../agents/agent-sections.ts";
 import { DecksLineMark } from "./DecksLineMark.tsx";
-import { canvasItems, type CanvasItem, type ItemKind } from "@decks/canvas/tools";
-import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
+import type { CanvasItem } from "@decks/canvas/tools";
+import { holdHandle } from "../lib/hold-handle.ts";
+import { createAgentLists, createWorkspaceNames, type ListedAgents } from "./agent-list.tsx";
+import { AgentsTab } from "./AgentsTab.tsx";
+import { RecentTab } from "./RecentTab.tsx";
+import { ObjectsTab } from "./ObjectsTab.tsx";
+import { AppsTab } from "./AppsTab.tsx";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -52,8 +42,10 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * tabs were the same list with a line drawn through it, and finding a board began with
  * guessing which side of the line the app had put it on *this second*.
  *
- * The panel has four tabs now: Recent, Canvas (an outline of the canvas on screen), Agents, filed by
- * workspace (`agent-sections.ts`), and Apps.
+ * The panel has four tabs now, each a component of its own: Recent (`RecentTab.tsx`), Objects, an
+ * outline of the canvas on screen (`ObjectsTab.tsx`), Agents, filed by workspace (`AgentsTab.tsx`),
+ * and Apps (`AppsTab.tsx`). This file is what they share: the tab strip, the search, the scroller
+ * and its row budget, the width and `⌘\`.
  *
  * The first two sections are the **focused agent's**, all of them and nothing else — no
  * other agent's holdings appear anywhere, and a board somebody else is holding is simply in
@@ -95,12 +87,11 @@ export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
 const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, () => string> = { recent: () => m.panel_tab_recent(), canvas: () => m.panel_tab_canvas(), agents: () => m.panel_tab_agents(), apps: () => m.panel_tab_apps() };
-const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
 const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type { PanelApp } from "./AppRow.tsx";
-import { AppLogs, AppRow, type AppAction, type PanelApp } from "./AppRow.tsx";
+import type { AppAction, PanelApp } from "./AppRow.tsx";
 
 export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
@@ -196,45 +187,9 @@ export function LeftPanel(props: {
 	chat?: JSX.Element;
 }) {
 	const ids = createUniqueId();
-	/*
-	 * One line or two per agent. Remembered: it is how this person likes the
-	 * list, not a question about it. Two is what it opens on, because the second line is the
-	 * one fact worth reading at a glance: what each agent is doing.
-	 */
 	/* Two lines per agent, as v3 draws them: the name, kind and state, then the tags. */
 	const lines = (): 1 | 2 => 2;
-	/* The row under the pointer, for the one hover card the list shares, and only in the one-line view. */
-	const [hovered, setHovered] = createSignal<{ id: string; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>();
-	/*
-	 * The card the list shares, held after the pointer leaves so it is **mounted once**.
-	 *
-	 * `AgentHoverCard` is built to be mounted and then unhidden: it places itself on the frame
-	 * after its anchor changes, and until it has it draws nothing, so that it can never flash at
-	 * `0,0` on its way to a row. Drawn inside a `<Show when={hovered()}>` that promise is
-	 * inverted — every row entered built a new card, hid it for a frame and faded it in, and
-	 * every row left threw it away. Running down a dense list that reads as a strobe: one flash
-	 * per row, and the 160ms slide between rows never ran at all because there was never a card
-	 * old enough to slide.
-	 *
-	 * So the memo keeps the last agent while the card fades out, and `shown` alone says whether
-	 * it is up. Nothing is rebuilt between rows; the anchor changes and the card travels.
-	 */
-	const card = createMemo<{ chat: AgentChat; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>((previous) => {
-		const over = hovered();
-		if (!over) return previous;
-		const chat = (props.chats ?? []).find((one) => one.id === over.id);
-		return chat ? { chat, at: over.at } : previous;
-	});
-	const cardShown = () => (tab() === "agents" || tab() === "recent") && lines() === 1 && hovered() !== undefined;
-	/* Beside the panel and level with the row: the row's height, the panel's sides, so the card clears the panel's edge. */
-	const besideRow = (row: DOMRect, element: Element | null) => {
-		const side = element?.getBoundingClientRect() ?? row;
-		return { left: side.left, right: side.right, width: side.width, top: row.top, bottom: row.bottom, height: row.height };
-	};
 	const [query, setQuery] = createSignal("");
-	/** The app picked in the Apps tab, and the one whose logs are open. */
-	const [pickedApp, setPickedApp] = createSignal<string>();
-	const [logsOf, setLogsOf] = createSignal<PanelApp>();
 	/* Agents first, as v3 opens; the tab last shown is remembered on this device. */
 	const [tab, setTabRaw] = createSignal<PanelTab>(readTab());
 	const setTab = (next: PanelTab) => {
@@ -246,29 +201,22 @@ export function LeftPanel(props: {
 		}
 	};
 	createEffect(() => {
-		if (tab() === "apps" && props.open) props.onAppsOpen?.();
-	});
-	/* Workspace folders folded shut, remembered on this device. */
-	const [folded, setFolded] = createSignal<Set<string>>(readFolded());
-	const toggleFolder = (id: string) => {
-		const next = new Set(folded());
-		if (next.has(id)) next.delete(id);
-		else next.add(id);
-		setFolded(next);
-		try {
-			localStorage.setItem(FOLDED_KEY, JSON.stringify([...next]));
-		} catch {
-			// Kept for the session.
-		}
-	};
-	const apps = createMemo(() => {
-		const q = query().trim().toLowerCase();
-		return (props.apps ?? []).filter((app) => !q || app.title.toLowerCase().includes(q) || app.name.toLowerCase().includes(q));
-	});
-	createEffect(() => {
 		const ask = props.ask;
 		if (ask) setTab(ask.tab);
 	});
+	/*
+	 * Switching tabs clears the query.
+	 *
+	 * The one thing the old strip got right, and it was right for a reason that applies here
+	 * and did not apply there: the two lists differ, so a query left over from the other one
+	 * is a filter whose cause is off screen. Between Context and Deck it was the same list
+	 * either way, which is why the strip went.
+	 */
+	const goTab = (next: PanelTab) => {
+		if (next === tab()) return;
+		setTab(next);
+		setQuery("");
+	};
 
 	/*
 	 * The width is the person's to set, by the handle on the panel's right edge.
@@ -284,17 +232,13 @@ export function LeftPanel(props: {
 		window.addEventListener("resize", onResize);
 		onCleanup(() => window.removeEventListener("resize", onResize));
 	});
+	/* However the button comes up, here or anywhere, or a move with no button held: the drag ends (`lib/hold-handle.ts`). */
 	const onHandleDown = (event: PointerEvent) => {
 		if (event.button !== 0) return;
 		const handle = event.currentTarget as HTMLElement;
 		const from = width();
 		const start = event.clientX;
 		event.preventDefault();
-		try {
-			handle.setPointerCapture(event.pointerId);
-		} catch {
-			// The window listeners below still end the drag.
-		}
 		setResizing(true);
 		// The composer and the pill glide when the sidebar folds; following a drag, a glide
 		// is a lag. Said on the root so their own stylesheets can answer it.
@@ -303,36 +247,16 @@ export function LeftPanel(props: {
 		const shell = handle.closest<HTMLElement>(".panel-shell");
 		const beside = shell?.parentElement ? [...shell.parentElement.children].filter((one): one is HTMLElement => one !== shell && one instanceof HTMLElement) : [];
 		insetsOnly(() => beside);
-		/* However the button comes up, here or anywhere, or a move with no button held: the drag ends. */
-		let done = false;
-		const move = (moved: PointerEvent) => {
-			// A mouse moved with no button held has been let go of somewhere; a finger or a pen ends on its own pointerup.
-			if (moved.pointerType === "mouse" && moved.buttons === 0) return end();
-			resizeTo(from + moved.clientX - start);
-		};
-		const end = () => {
-			if (done) return;
-			done = true;
-			window.removeEventListener("pointermove", move, true);
-			window.removeEventListener("pointerup", end, true);
-			window.removeEventListener("pointercancel", end, true);
-			window.removeEventListener("blur", end);
-			handle.removeEventListener("lostpointercapture", end);
-			try {
-				handle.releasePointerCapture(event.pointerId);
-			} catch {
-				// Already gone.
-			}
-			setResizing(false);
-			delete document.documentElement.dataset.panelResizing;
-			insetsOnly(undefined);
-			savePanelWidth(width());
-		};
-		window.addEventListener("pointermove", move, true);
-		window.addEventListener("pointerup", end, true);
-		window.addEventListener("pointercancel", end, true);
-		window.addEventListener("blur", end);
-		handle.addEventListener("lostpointercapture", end);
+		holdHandle(
+			event,
+			(moved) => resizeTo(from + moved.clientX - start),
+			() => {
+				setResizing(false);
+				delete document.documentElement.dataset.panelResizing;
+				insetsOnly(undefined);
+				savePanelWidth(width());
+			},
+		);
 	};
 	const onHandleKey = (event: KeyboardEvent) => {
 		const step = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
@@ -344,118 +268,25 @@ export function LeftPanel(props: {
 	};
 
 	/*
-	 * Switching tabs clears the query.
+	 * `⌘\`, and the one guard it needs.
 	 *
-	 * The one thing the old strip got right, and it was right for a reason that applies here
-	 * and did not apply there: the two lists differ, so a query left over from the other one
-	 * is a filter whose cause is off screen. Between Context and Deck it was the same list
-	 * either way, which is why the strip went.
-	 */
-	const goTab = (next: PanelTab) => {
-		if (next === tab()) return;
-		setTab(next);
-		setQuery("");
-	};
-
-	/**
-	 * The workspaces in use, for the popup's suggestions.
-	 *
-	 * Read off the identities the panel is already holding rather than asked for: a workspace is
-	 * only a word somebody is using, so the set of them *is* this list, and a fetch for it would
-	 * be a second source of truth free to disagree.
-	 */
-	/** The section a dragged agent is over, by its id, so the heading it would land under says so. */
-	const [over, setOver] = createSignal<string | undefined>(undefined);
-	/*
-	 * However a drag ends — dropped here, dropped elsewhere, or abandoned with Escape — no
-	 * heading is under it any more. On the window because `dragend` fires on the row that was
-	 * picked up, which is not the section that marked itself.
+	 * Registered on the document rather than the panel, because the point of it is to work
+	 * from the canvas — and it fires whether the panel is open or shut, which is the half a
+	 * shortcut usually forgets. Not while a text field has focus: the dock's composer is a
+	 * textarea that people type into for whole paragraphs, and a chord that folds the chrome
+	 * on the way past a backslash is a chord that fires on a typo. `Escape` leaves this
+	 * panel's own search field, which is how you get the shortcut back without a mouse.
 	 */
 	onMount(() => {
-		const done = () => setOver(undefined);
-		window.addEventListener("dragend", done);
-		window.addEventListener("drop", done);
-		onCleanup(() => {
-			window.removeEventListener("dragend", done);
-			window.removeEventListener("drop", done);
-		});
+		const keys = (event: KeyboardEvent) => {
+			if (event.key !== "\\" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+			if (typing()) return;
+			event.preventDefault();
+			props.onOpenChange(!props.open);
+		};
+		document.addEventListener("keydown", keys);
+		onCleanup(() => document.removeEventListener("keydown", keys));
 	});
-
-	const workspaceNames = createMemo(() => {
-		const names = new Set<string>();
-		for (const identity of Object.values(props.identities ?? {})) if (identity.workspace) names.add(identity.workspace);
-		return [...names].sort();
-	});
-
-	/** Everything the list is derived from. One function, so the store below cannot be given a
-	 *  different question from the one the foot counts. */
-	const agentInput = () => ({
-		chats: props.chats ?? [],
-		identities: props.identities ?? {},
-		unread: props.unread ?? {},
-		focused: props.focused,
-		query: query(),
-	});
-
-	/**
-	 * The Agents tab's list, held in a store so that a state change *updates* a row instead of
-	 * re-drawing the list.
-	 *
-	 * This is the whole of the fix for a list that flickered while an agent worked.
-	 * `agentSections` builds fresh objects on every call and `<For>` keys by reference, so
-	 * deriving straight into the markup meant that *any* change at all — one agent moving from
-	 * `streaming` to `tool`, a tag arriving, a workspace being declared somewhere else — made
-	 * every section and every row a new object, and `For` had no choice but to throw the DOM away
-	 * and draw it again. Fourteen rows, their avatars, the pulse on a working face and any popup
-	 * somebody had open: gone and back, several times a minute, for as long as an agent was
-	 * running. `e2e/checks/panel-steady.mjs` is that, measured.
-	 *
-	 * `reconcile` is the other half. Given the list it drew last time and the list it has now, it
-	 * keeps the object it already had wherever it can and writes only the fields that moved,
-	 * joining old to new by `id` at every level. That is what `AgentSection.id` and `AgentRow.id`
-	 * are for, and why neither is optional. The store hands back the same proxy for the same
-	 * object, so `For` recognises the rows it already drew: it moves the ones that reordered, and
-	 * re-creates only the ones that are genuinely new. What a state change is left with is a word
-	 * and a colour on the row it was about.
-	 *
-	 * An **effect** rather than a memo, because `reconcile` is a setter and there has to be a
-	 * store for it to write into. It runs in the same task as the update that caused it, before
-	 * anything is painted, so the list is never a frame behind what the socket said.
-	 */
-	const [agentList, setAgentList] = createStore<AgentSection[]>(agentSections(agentInput()));
-	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
-	const [recentList, setRecentList] = createStore<AgentListRow[]>(recentAgents(agentInput()));
-	createEffect(() => setRecentList(reconcile(recentAgents(agentInput()), { key: "id" })));
-	/* The Canvas tab's rows: the drawing on screen, as Studio's editor lists its layers. */
-	// Listed without laying the drawing out (it ran on every change, whichever tab showed); the one picked is read again with its box, to fly to it.
-	const items = createMemo(() => canvasItems(props.canvasDoc, query(), { boxes: false }));
-	const selectedItems = createMemo(() => new Set(props.selectedItems ?? []));
-	const cardItems = () => items().items.filter((item) => item.board !== undefined);
-	const drawnItems = () => items().items.filter((item) => item.board === undefined);
-	const itemRow = (item: CanvasItem) => (
-		<button
-			type="button"
-			class="v3-item"
-			data-row
-			data-kind={item.kind}
-			data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
-			title={item.label}
-			onClick={() => props.onPickItem?.(canvasItems(props.canvasDoc, query()).items.find((one) => one.id === item.id) ?? item)}
-		>
-			<Icon of={ITEM_ICON[item.kind]} size={14} class="v3-item-icon" />
-			<span class="v3-item-name truncate">{item.label}</span>
-		</button>
-	);
-
-	/* Every name on the deck but the agent's own: what the edit window checks a new name against
-	   before the server does, so the refusal is a red line under the field rather than a notice. */
-	const nameTaken = (name: string, self: string) => {
-		const wanted = name.trim().toLowerCase();
-		return (props.chats ?? []).some((chat) => chat.id !== self && (props.identities?.[chat.id]?.name ?? chat.name).trim().toLowerCase() === wanted);
-	};
-
-	/** Every agent, unfiltered — what the placeholder and the empty state count. */
-	const agentCount = () => props.chats?.length ?? 0;
 
 	let list: HTMLDivElement | undefined;
 	let field: HTMLInputElement | undefined;
@@ -494,6 +325,44 @@ export function LeftPanel(props: {
 
 	const type = (next: string) => setQuery(next);
 
+	/* The Recent and Agents tabs' lists, and what their rows share (`agent-list.tsx`). */
+	const agentLists = createAgentLists(props, query);
+	/** Every agent, unfiltered — what the placeholder and the empty state count. */
+	const agentCount = () => props.chats?.length ?? 0;
+	/* The row under the pointer, for the one hover card the list shares, and only in the one-line view. */
+	const [hovered, setHovered] = createSignal<{ id: string; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>();
+	/* Beside the panel and level with the row: the row's height, the panel's sides, so the card clears the panel's edge. */
+	const besideRow = (row: DOMRect, element: Element | null) => {
+		const side = element?.getBoundingClientRect() ?? row;
+		return { left: side.left, right: side.right, width: side.width, top: row.top, bottom: row.bottom, height: row.height };
+	};
+	const listedAgents: ListedAgents = {
+		calls: props,
+		workspaces: createWorkspaceNames(props),
+		lines,
+		hover: (id, at) => setHovered((was) => (at ? { id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === id ? undefined : was)),
+	};
+	/*
+	 * The card the list shares, held after the pointer leaves so it is **mounted once**.
+	 *
+	 * `AgentHoverCard` is built to be mounted and then unhidden: it places itself on the frame
+	 * after its anchor changes, and until it has it draws nothing, so that it can never flash at
+	 * `0,0` on its way to a row. Drawn inside a `<Show when={hovered()}>` that promise is
+	 * inverted — every row entered built a new card, hid it for a frame and faded it in, and
+	 * every row left threw it away. Running down a dense list that reads as a strobe: one flash
+	 * per row, and the 160ms slide between rows never ran at all because there was never a card
+	 * old enough to slide.
+	 *
+	 * So the memo keeps the last agent while the card fades out, and `shown` alone says whether
+	 * it is up. Nothing is rebuilt between rows; the anchor changes and the card travels.
+	 */
+	const card = createMemo<{ chat: AgentChat; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>((previous) => {
+		const over = hovered();
+		if (!over) return previous;
+		const chat = (props.chats ?? []).find((one) => one.id === over.id);
+		return chat ? { chat, at: over.at } : previous;
+	});
+	const cardShown = () => (tab() === "agents" || tab() === "recent") && lines() === 1 && hovered() !== undefined;
 
 	/*
 	 * How many rows are drawn, across the sections in order.
@@ -539,7 +408,7 @@ export function LeftPanel(props: {
 		onCleanup(() => clearTimeout(timer));
 	});
 	/** The sections of the list that is showing — boards, or agents. */
-	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : tab() === "recent" ? [{ rows: recentList }] : []);
+	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentLists.sections : tab() === "recent" ? [{ rows: agentLists.recent }] : []);
 	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
 	const allowance = (index: number): number => {
@@ -566,27 +435,6 @@ export function LeftPanel(props: {
 		if (!(props.listMayGrow ?? true) || !list) return;
 		if (list.scrollHeight - list.scrollTop - list.clientHeight < LOAD_MORE_AT) grow();
 	};
-
-	/*
-	 * `⌘\`, and the one guard it needs.
-	 *
-	 * Registered on the document rather than the panel, because the point of it is to work
-	 * from the canvas — and it fires whether the panel is open or shut, which is the half a
-	 * shortcut usually forgets. Not while a text field has focus: the dock's composer is a
-	 * textarea that people type into for whole paragraphs, and a chord that folds the chrome
-	 * on the way past a backslash is a chord that fires on a typo. `Escape` leaves this
-	 * panel's own search field, which is how you get the shortcut back without a mouse.
-	 */
-	onMount(() => {
-		const keys = (event: KeyboardEvent) => {
-			if (event.key !== "\\" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
-			if (typing()) return;
-			event.preventDefault();
-			props.onOpenChange(!props.open);
-		};
-		document.addEventListener("keydown", keys);
-		onCleanup(() => document.removeEventListener("keydown", keys));
-	});
 
 	/** The rows, in document order, for the arrow keys to walk. */
 	const rows = () => [...(list?.querySelectorAll<HTMLElement>("[data-row]") ?? [])];
@@ -621,6 +469,7 @@ export function LeftPanel(props: {
 		else return;
 		event.preventDefault();
 	};
+
 
 	return (
 		<>
@@ -796,204 +645,11 @@ export function LeftPanel(props: {
 					onKeyDown={rove}
 					onScroll={growIfNearEnd}
 				>
-					<Show when={tab() === "agents"}>
-						<For each={agentList}>
-							{(section, index) => (
-								<div
-									class="panel-section"
-									data-kind={section.kind}
-									/*
-									 * A heading is where an agent is dropped to change the project it says it is
-									 * in (`agents/agent-drag.ts`). The whole section takes the drop, not the
-									 * heading's own line: the target you aim at is the group of rows, and a 20px
-									 * strip of text is a target you miss.
-									 *
-									 * `preventDefault` on `dragover` is what makes a drop possible at all, and
-									 * saying it only for our own type is what keeps a file dragged in from
-									 * landing here instead of on the canvas.
-									 */
-									data-drop={over() === section.id ? "true" : undefined}
-									onDragOver={(event) => {
-										if (!props.onAgentWorkspace || !carriesAgent(event.dataTransfer)) return;
-										event.preventDefault();
-										if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-										setOver(section.id);
-									}}
-									onDragLeave={(event) => {
-										/*
-										 * Only when the pointer left this section for somewhere we can name.
-										 * Crossing a row inside it fires this too — hence the containment test —
-										 * and a `dragleave` with no `relatedTarget` at all is the browser's way of
-										 * saying "somewhere else", which during a drag over our own list is
-										 * usually a frame boundary rather than a departure. Clearing on those left
-										 * the heading unmarked while the hand held still over it. The end of the
-										 * drag clears it whatever happens (below).
-										 */
-										const to = event.relatedTarget as Node | null;
-										if (!to || event.currentTarget.contains(to)) return;
-										setOver((was) => (was === section.id ? undefined : was));
-									}}
-									onDrop={(event) => {
-										const id = draggedAgent(event.dataTransfer);
-										setOver(undefined);
-										if (!id) return;
-										event.preventDefault();
-										props.onAgentWorkspace?.(id, section.kind === "workspace" ? section.label : null);
-									}}
-								>
-									<div class="v3-folder-head" data-folded={folded().has(section.id) ? "true" : undefined}>
-										<button type="button" class="v3-folder-toggle" aria-expanded={!folded().has(section.id)} title={folded().has(section.id) ? m.panel_folder_show({ name: section.label }) : m.panel_folder_fold({ name: section.label })} onClick={() => toggleFolder(section.id)}>
-											<Icon of={folded().has(section.id) ? ChevronRight : ChevronDown} size={13} class="v3-folder-chev" />
-											<Icon of={Folder} size={15} class="v3-folder-icon" />
-											<span class="v3-folder-name truncate">{section.label}</span>
-										</button>
-										<Show when={section.note}>{(note) => <span class="note">{note()}</span>}</Show>
-										<Show when={props.onNewAgent}>
-											<NewAgentButton
-												onNew={(kind) => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined, kind)}
-												label={section.kind === "workspace" ? m.panel_add_agent_in({ name: section.label }) : m.panel_add_agent_none()}
-												class="v3-folder-add"
-												size={14}
-											/>
-										</Show>
-									</div>
-									{/*
-										`.row-list` is the row vocabulary — the grid, the corner, the hover, the
-										current wash, `.row-act` and its ×, and the `.row-label`/`.row-note` type scale. The
-										agent row wants all of that and its own overrides (a 20px or 26px face column,
-										by `data-lines`), which `.agent-list` in `panel.css` supplies.
-
-										Re-implementing it instead is how two lists in one panel come to nearly
-										match: the board rows above are the same object.
-									*/}
-									{/* Folded by its height (`styles/v3.css`), so the rows slide shut rather than vanish. */}
-									<div class="v3-folder-body" data-open={folded().has(section.id) ? "false" : "true"} aria-hidden={folded().has(section.id)}>
-									<div class="row-list agent-list" data-lines={lines()}>
-									<For each={section.rows.slice(0, allowance(index()))}>
-										{(row) => (
-											<AgentRow
-												row={row}
-												identity={props.identities?.[row.chat.id]}
-												onFocus={() => props.onFocusAgent?.(row.chat.id)}
-												onClose={() => props.onCloseAgent?.(row.chat.id)}
-												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
-												workspaces={workspaceNames()}
-												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
-												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
-												taken={(name) => nameTaken(name, row.chat.id)}
-												{...(props.onAbortAgent ? { onAbort: () => props.onAbortAgent?.(row.chat.id) } : {})}
-												lines={lines()}
-												size={22}
-												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
-											/>
-										)}
-									</For>
-									</div>
-									</div>
-								</div>
-							)}
-						</For>
-						<Show when={props.onNewAgent}>
-							<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label={m.panel_new_agent()} class="v3-new-agent" size={15} text={m.panel_new_agent()} />
-						</Show>
-
-						{/* The same shape of empty state the boards list has, and the same reasoning:
-						    a panel that is blank for a good reason still looks broken without it. */}
-						<Show when={agentList.length === 0}>
-							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
-								{agentCount() === 0 ? m.panel_no_agents_start() : m.panel_no_agent_matches({ query: query().trim() })}
-							</p>
-						</Show>
-					</Show>
-
-					<Show when={tab() === "recent"}>
-						<div class="panel-section" data-kind="recent">
-							<Show when={recentList.length > 0}>
-								<div class="v3-sec">
-									<span>{m.panel_tab_recent()}</span>
-								</div>
-							</Show>
-							<div class="row-list agent-list" data-lines={lines()}>
-								<For each={recentList}>
-									{(row) => (
-											<AgentRow
-												row={row}
-												identity={props.identities?.[row.chat.id]}
-												onFocus={() => props.onFocusAgent?.(row.chat.id)}
-												onClose={() => props.onCloseAgent?.(row.chat.id)}
-												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
-												workspaces={workspaceNames()}
-												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
-												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
-												taken={(name) => nameTaken(name, row.chat.id)}
-												{...(props.onAbortAgent ? { onAbort: () => props.onAbortAgent?.(row.chat.id) } : {})}
-												lines={lines()}
-												size={26}
-												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
-											/>
-									)}
-								</For>
-							</div>
-						</div>
-						<Show when={recentList.length === 0}>
-							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{agentCount() === 0 ? m.panel_no_agents() : m.panel_no_agent_matches({ query: query().trim() })}</p>
-						</Show>
-					</Show>
-
-					<Show when={tab() === "canvas"}>
-						<div class="panel-section v3-items" data-kind="canvas">
-							<Show when={cardItems().length > 0}>
-								<div class="v3-sec">
-									<span>{m.panel_cards()}</span>
-									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{cardItems().length}</span>
-								</div>
-								<For each={cardItems()}>{(item) => itemRow(item)}</For>
-							</Show>
-							<Show when={drawnItems().length > 0 || items().arrows.length > 0}>
-								<div class="v3-sec">
-									<span>{m.panel_drawing()}</span>
-									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{drawnItems().length}</span>
-								</div>
-								<For each={drawnItems()}>{(item) => itemRow(item)}</For>
-								<Show when={items().arrows.length > 0}>
-									<button type="button" class="v3-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
-										<Icon of={MoveUpRight} size={14} class="v3-item-icon" />
-										<span class="v3-item-name truncate">{m.panel_arrows()}</span>
-										<span class="v3-item-n tabular-nums">{items().arrows.length}</span>
-									</button>
-								</Show>
-							</Show>
-							<Show when={items().items.length === 0 && items().arrows.length === 0}>
-								<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{query().trim() ? m.panel_canvas_no_match({ query: query().trim() }) : m.panel_canvas_empty()}</p>
-							</Show>
-						</div>
-					</Show>
-					<Show when={tab() === "apps"}>
-						{/* The "Apps tab redesigned" mockup: rows 12px in like the search, no heading (the head counts them). */}
-						<div class="panel-section v3-apps" data-kind="apps">
-							<For each={apps()}>
-								{(app) => (
-									<AppRow
-										app={app}
-										picked={pickedApp() === app.name}
-										onPick={() => setPickedApp(app.name)}
-										onAct={(action) => props.onApp?.(app, action)}
-										onLogs={() => setLogsOf(app)}
-									/>
-								)}
-							</For>
-							<Show when={apps().length === 0}>
-								<p class="m-0 px-2 py-2 text-ui leading-normal text-faint">
-									{props.apps === undefined ? m.panel_apps_looking() : query().trim() ? m.panel_app_no_match({ query: query().trim() }) : m.panel_apps_none()}
-								</p>
-							</Show>
-							<Show when={logsOf()}>
-								{(app) => <AppLogs title={app().title} read={() => props.onAppLogs?.(app()) ?? Promise.resolve(undefined)} onClose={() => setLogsOf(undefined)} />}
-							</Show>
-						</div>
-					</Show>
+					{/* Each tab is mounted once and draws only while it is the one showing. */}
+					<AgentsTab shown={tab() === "agents"} sections={agentLists.sections} agents={listedAgents} allowance={allowance} agentCount={agentCount()} query={query()} onNewAgent={props.onNewAgent} />
+					<RecentTab shown={tab() === "recent"} rows={agentLists.recent} agents={listedAgents} agentCount={agentCount()} query={query()} />
+					<ObjectsTab shown={tab() === "canvas"} query={query()} canvasDoc={props.canvasDoc} selectedItems={props.selectedItems} current={props.current} onPickItem={props.onPickItem} onPickArrows={props.onPickArrows} />
+					<AppsTab shown={tab() === "apps"} open={props.open} query={query()} apps={props.apps} onAppsOpen={props.onAppsOpen} onApp={props.onApp} onAppLogs={props.onAppLogs} />
 				</div>
 
 				{props.chat}
@@ -1016,8 +672,6 @@ export function LeftPanel(props: {
 	);
 }
 
-
-const FOLDED_KEY = "decks.foldedWorkspaces";
 const TAB_KEY = "decks.panelTab";
 
 /** The panel's tab when it was last left, or Agents. */
@@ -1027,16 +681,6 @@ function readTab(): PanelTab {
 		return saved === "recent" || saved === "canvas" || saved === "agents" || saved === "apps" ? saved : "recent";
 	} catch {
 		return "agents";
-	}
-}
-
-/** The workspace folders folded shut on this device. */
-function readFolded(): Set<string> {
-	try {
-		const raw = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
-		return new Set(Array.isArray(raw) ? raw.filter((one): one is string => typeof one === "string") : []);
-	} catch {
-		return new Set();
 	}
 }
 

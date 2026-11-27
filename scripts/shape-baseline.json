@@ -1,6 +1,6 @@
 {
 	"counts": {
-		"files over 1,000 lines": 4,
+		"files over 1,000 lines": 3,
 		"functions over 150 lines": 39,
 		"classes over 30 methods": 7,
 		"server folder pairs that import each other": 10,
@@ -12,7 +12,6 @@
 	},
 	"sizes": {
 		"apps/server/src/runtimes/claude/accounts.ts": 1156,
-		"apps/web/src/panel/LeftPanel.tsx": 1049,
 		"packages/docs/src/page/gview.ts": 2091,
 		"packages/docs/src/page/live.ts": 2054,
 		"apps/server/src/apps/starters.ts: files": 169,
@@ -37,9 +36,9 @@
 		"apps/web/src/composer/ModelPicker.tsx: ModelPicker": 316,
 		"apps/web/src/connections/Switcher.tsx: Switcher": 308,
 		"apps/web/src/frame/ToolColumn.tsx: ToolColumn": 337,
-		"apps/web/src/panel/LeftPanel.tsx: LeftPanel": 913,
+		"apps/web/src/panel/LeftPanel.tsx: LeftPanel": 578,
 		"apps/web/src/settings/UsageModal.tsx: UsageModal": 252,
-		"apps/web/src/shell/ChatSection.tsx: ChatSection": 265,
+		"apps/web/src/shell/ChatSection.tsx: ChatSection": 235,
 		"apps/web/src/state/ui.ts: createUi": 212,
 		"packages/agent-ui/src/chat/Stream.tsx: Stream": 628,
 		"packages/agent-ui/src/chat/TimeMachine.tsx: TimeMachine": 164,
