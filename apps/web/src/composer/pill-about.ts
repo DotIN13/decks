@@ -9,17 +9,17 @@ import type { WaitingComment } from "../state/comments.ts";
  * message keeps of its pills (`messageParts`), and a sent message read back into its pills.
  *
  * Pure, so the exact text a card shows is tested against what the message is built from: a comment's
- * is `commentItem`, the entry `commentBlock` lists it as, and a board's, an item's or a file's is
+ * is `commentItem`, the entry `commentBlock` lists it as, and a card's, an item's or a file's is
  * `mentionAddress`, the address `draftForAgent` writes.
  */
 
-/** A board's, a card's or a file's name from its path: `cards/sdk/index.html` is "sdk", `boards/plan.html` "plan". */
+/** A card's, a card's or a file's name from its path: `cards/sdk/index.html` is "sdk", `cards/plan/index.html` "plan". */
 export function pathName(path: string): string {
 	const parts = path.replace(/\/index\.html?$/, "").split("/");
 	return (parts.pop() || path).replace(/\.html?$/, "");
 }
 
-/** Looks a board's title up by its path; the app's boards know theirs. */
+/** Looks a card's title up by its path; the app's cards know theirs. */
 export type TitleOf = (path: string) => string | undefined;
 /** Looks a drawn item's name up by its id: its own name, or a few of its words (the layers list's label). */
 export type ItemName = (id: string) => string | undefined;
@@ -27,7 +27,7 @@ export type ItemName = (id: string) => string | undefined;
 const none = () => undefined;
 
 /**
- * What a comment is called: the title of the board or card it is on, or the drawn item it is on by its
+ * What a comment is called: the title of the card it is on, or the drawn item it is on by its
  * name (`3 items` for several). A comment kept with a sent message has its name as its `title`.
  */
 export function commentName(comment: WaitingComment, titleOf: TitleOf = none, itemName: ItemName = none): string {
@@ -54,7 +54,7 @@ export function commentPill(comment: WaitingComment, titleOf?: TitleOf, itemName
 	};
 }
 
-/** What comment `n` of a message is about: the board or card it is on, the quote, the note, and its entry in the message. */
+/** What comment `n` of a message is about: the card it is on, the quote, the note, and its entry in the message. */
 export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleOf = none, itemName: ItemName = none): PillAbout {
 	const drawn = !!comment.items?.length;
 	const name = commentName(comment, titleOf, itemName);
@@ -78,14 +78,14 @@ export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleO
 	};
 }
 
-/** What a board, an item or a file is called: its title, its name or words, its file's name. */
+/** What a card, an item or a file is called: its title, its name or words, its file's name. */
 function addressName(node: DraftMention, titleOf: TitleOf = none, itemName: ItemName = none): string {
 	if (node.kind === "file") return node.name ?? (node.id.split("/").pop() || node.id);
 	if (node.kind === "item") return itemName(node.id) ?? node.name ?? node.label;
 	return titleOf(node.id) ?? node.name ?? node.label;
 }
 
-/** What a board, an item or a file pill is about. */
+/** What a card, an item or a file pill is about. */
 export function aboutAddress(node: DraftMention, titleOf?: TitleOf, itemName?: ItemName): PillAbout {
 	const exact = mentionAddress(node);
 	const name = addressName(node, titleOf, itemName);
@@ -178,7 +178,7 @@ export function readParts(parts: readonly MessagePart[]): SentReading | undefine
 			draft.push(commentPill(comment));
 			continue;
 		}
-		// A message saved before cards says "board" for a card.
+		// A message saved before cards says "card" for a card.
 		const kind = (part.kind as string) === "board" ? "card" : part.kind;
 		draft.push({ type: "mention", kind, id: part.id, label: part.label || shortLabel(name), name });
 	}
@@ -232,7 +232,7 @@ interface SentReading {
 /**
  * A message as it was sent (`withComments` over `draftForAgent`), read back into the pills it was
  * written with: the comments listed in front come back to where their `[comment n]` sat, or in front
- * when the words did not place them, and each address in the words is a board's, an item's or a
+ * when the words did not place them, and each address in the words is a card's, an item's or a
  * file's pill again. Nothing to draw as a pill: `undefined`, and the bubble is the text.
  */
 export function readSent(text: string, titleOf: TitleOf = none): SentReading | undefined {
@@ -300,7 +300,7 @@ export function readSent(text: string, titleOf: TitleOf = none): SentReading | u
 
 /** What a pill in a sent message is about: as it was sent, by the name it had and the exact words it went as. */
 export function aboutSent(reading: SentReading, node: DraftMention, titleOf?: TitleOf): PillAbout | undefined {
-	// A board, an item or a file carries the name it was sent with (`readParts`), or its title now.
+	// A card, an item or a file carries the name it was sent with (`readParts`), or its title now.
 	if (node.kind !== "comment") return aboutAddress(node, titleOf);
 	const comment = reading.comments.get(node.id);
 	if (!comment) return undefined;

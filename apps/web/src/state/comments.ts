@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 import { adoptComments, commentsKey, loadComments, saveComments, type CardComment } from "../markup/comments.ts";
 
 /**
- * Comments on boards: whether the one being written has words in it, and the ones waiting for the next message.
+ * Comments on cards: whether the one being written has words in it, and the ones waiting for the next message.
  *
  * Waiting comments are kept per agent and canvas, because a comment is said *to* somebody about
  * something: it was made on that agent's canvas and goes with the next thing sent to that agent
@@ -12,7 +12,7 @@ import { adoptComments, commentsKey, loadComments, saveComments, type CardCommen
 
 /**
  * What a comment is about, as the popup needs it: what to quote, and where it is on screen, as a box
- * in window pixels to sit by. A comment on a whole board or card (the pill's Comment) has an empty quote.
+ * in window pixels to sit by. A comment on a whole card (the pill's Comment) has an empty quote.
  */
 export interface CommentTarget {
 	path: string;
@@ -20,7 +20,7 @@ export interface CommentTarget {
 	quote: string;
 	/** Where to sit, in window pixels. */
 	anchor?: () => { left: number; top: number; right: number; bottom: number } | undefined;
-	/** The board's title, to name a comment on the whole board. */
+	/** The card's title, to name a comment on the whole card. */
 	title?: string;
 	/** Open straight to the box: the press that made it already said "comment". */
 	open?: boolean;
@@ -28,7 +28,7 @@ export interface CommentTarget {
 	items?: string[];
 }
 
-/** Something has been typed into the popup, so a stray click on the board must not throw it away. */
+/** Something has been typed into the popup, so a stray click on the card must not throw it away. */
 const [commentDirty, setCommentDirty] = createSignal(false);
 export { commentDirty, setCommentDirty };
 

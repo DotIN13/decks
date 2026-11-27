@@ -3,7 +3,7 @@ import { draftIsEmpty, normalize, parseDraft, type Draft } from "@decks/agent-ui
 /**
  * What was being typed on each page, so that leaving a page never loses a message.
  *
- * **Keyed by the page.** Each agent's stage on one canvas is one page, and that is what a person
+ * **Keyed by the page.** Each agent's canvas on one canvas is one page, and that is what a person
  * means by "where I was typing": an agent moved to another canvas finds an empty bar there, and its
  * words again when it comes back. The device is the store's own: this browser's localStorage.
  *
@@ -17,7 +17,7 @@ export const DRAFTS_KEY = "decks.drafts";
 /** Pages remembered at once. An agent that was closed leaves its draft behind; this is what clears it out. */
 export const DRAFTS_LIMIT = 40;
 
-/** The page a bar is on: one agent's stage, on the canvas it is on (when it is known yet). */
+/** The page a bar is on: one agent's canvas, on the canvas it is on (when it is known yet). */
 export function pageKey(agentId: string | undefined, canvas?: string): string {
 	return `agent:${agentId ?? "none"}${canvas ? `@${canvas}` : ""}`;
 }

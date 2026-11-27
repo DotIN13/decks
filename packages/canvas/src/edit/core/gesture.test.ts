@@ -16,7 +16,7 @@ const items: FakeItem[] = [
 	{ id: "c2", parent: "col", box: { x: 18, y: 370, w: 264, h: 40 } },
 	{ id: "media", type: "rectangle", box: { x: 700, y: 700, w: 80, h: 60 }, extra: { metadata: { type: "decks.media", kind: "video", file: "films/one.mp4" } } },
 ];
-const cards = [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }];
+const cards = [{ path: "cards/one/index.html", x: 1000, y: 0, w: 400, h: 300 }];
 const scene = fakeScene(items, cards);
 
 const NONE: Mods = { shift: false, alt: false, meta: false, ctrl: false };
@@ -218,50 +218,50 @@ test("a marquee picks what is wholly inside it as it goes, and Shift adds that t
 	assert.equal(state.marquee, undefined);
 	assert.deepEqual(state.selection.items, ["c1", "a", "b"]);
 	// Without Shift the press lets go of what was selected first, cards too.
-	const fresh = step(withSelection(start, { cards: ["boards/one.html"] }), { type: "press-canvas", ...at(-50, -50) }, scene, ctx()).state;
+	const fresh = step(withSelection(start, { cards: ["cards/one/index.html"] }), { type: "press-canvas", ...at(-50, -50) }, scene, ctx()).state;
 	assert.deepEqual(fresh.selection, { items: [], cards: [], awaited: [] });
 	// A marquee round the card picks it up.
 	const round = run(initialState("edit"), [{ type: "press-canvas", ...at(950, -10) }, { type: "move", ...at(1450, 350) }]).state;
-	assert.deepEqual(round.selection.cards, ["boards/one.html"]);
+	assert.deepEqual(round.selection.cards, ["cards/one/index.html"]);
 });
 
 test("a board pressed is the app's selected board, and a drag carries it, moves it on the lift, and holds it there until it lands", () => {
 	const { state, steps } = run(withSelection(initialState("edit"), { items: ["a"] }), [
-		{ type: "press-card", path: "boards/one.html", ...at(1100, 100) },
+		{ type: "press-card", path: "cards/one/index.html", ...at(1100, 100) },
 		{ type: "move", ...at(1150, 160) },
 		{ type: "release", ...at(1150, 160) },
 	]);
 	assert.deepEqual(steps[0]!.state.selection, { items: [], cards: [], awaited: [] });
-	assert.deepEqual(steps[0]!.effects, [{ do: "select-card", path: "boards/one.html" }, { do: "ghost-take", ids: [] }]);
-	assert.deepEqual(steps[1]!.state.pageDrag, { paths: ["boards/one.html"], dx: 50, dy: 60 });
+	assert.deepEqual(steps[0]!.effects, [{ do: "select-card", path: "cards/one/index.html" }, { do: "ghost-take", ids: [] }]);
+	assert.deepEqual(steps[1]!.state.pageDrag, { paths: ["cards/one/index.html"], dx: 50, dy: 60 });
 	// Cards alone: the drawn items' offset and preview are not touched.
 	assert.deepEqual(steps[1]!.state.drag, { dx: 0, dy: 0 });
 	assert.equal(steps[1]!.preview, undefined);
-	assert.deepEqual(steps[2]!.effects.find((effect) => effect.do === "move-cards"), { do: "move-cards", moves: [{ path: "boards/one.html", x: 1050, y: 60 }] });
+	assert.deepEqual(steps[2]!.effects.find((effect) => effect.do === "move-cards"), { do: "move-cards", moves: [{ path: "cards/one/index.html", x: 1050, y: 60 }] });
 	assert.ok(!kinds(steps[2]!.effects).includes("settle"));
 	// Still carried where it was dropped until the cards have it there, or the hold runs out.
 	const until = steps[2]!.effects.find((effect) => effect.do === "wake");
-	assert.deepEqual(state.pageDrag, { paths: ["boards/one.html"], dx: 50, dy: 60, released: { to: [{ path: "boards/one.html", x: 1050, y: 60 }], until: (until as { at: number }).at } });
-	assert.equal(landPageDrag(state, [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }]).pageDrag, state.pageDrag);
-	assert.equal(landPageDrag(state, [{ path: "boards/one.html", x: 1050, y: 60, w: 400, h: 300 }]).pageDrag, undefined);
+	assert.deepEqual(state.pageDrag, { paths: ["cards/one/index.html"], dx: 50, dy: 60, released: { to: [{ path: "cards/one/index.html", x: 1050, y: 60 }], until: (until as { at: number }).at } });
+	assert.equal(landPageDrag(state, [{ path: "cards/one/index.html", x: 1000, y: 0, w: 400, h: 300 }]).pageDrag, state.pageDrag);
+	assert.equal(landPageDrag(state, [{ path: "cards/one/index.html", x: 1050, y: 60, w: 400, h: 300 }]).pageDrag, undefined);
 	assert.equal(landPageDrag(state, []).pageDrag, undefined);
 	assert.equal(step(state, { type: "tick", time: (until as { at: number }).at }, scene, ctx()).state.pageDrag, undefined);
 	// Shift takes the card into the picks, or out, and carries nothing.
-	const shift = step(initialState("edit"), { type: "press-card", path: "boards/one.html", ...at(1100, 100, { shift: true }) }, scene, ctx());
-	assert.deepEqual(shift.state.selection.cards, ["boards/one.html"]);
+	const shift = step(initialState("edit"), { type: "press-card", path: "cards/one/index.html", ...at(1100, 100, { shift: true }) }, scene, ctx());
+	assert.deepEqual(shift.state.selection.cards, ["cards/one/index.html"]);
 	assert.equal(shift.state.gesture, undefined);
 });
 
 test("a board selected by a press, then Shift and a press on another: both are picked, and a drag by either carries both", () => {
 	const two = fakeScene([], [
-		{ path: "boards/one.html", x: 0, y: 0, w: 400, h: 300 },
-		{ path: "boards/two.html", x: 900, y: 0, w: 400, h: 300 },
+		{ path: "cards/one/index.html", x: 0, y: 0, w: 400, h: 300 },
+		{ path: "cards/two/index.html", x: 900, y: 0, w: 400, h: 300 },
 	]);
 	// The page's own selection is the first card, from the plain press; the picks are still empty.
-	const selected = ctx({ ...WIDE, selectedPage: "boards/one.html" });
-	const picked = step(initialState("edit"), { type: "press-card", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, selected).state;
-	assert.deepEqual(picked.selection.cards, ["boards/one.html", "boards/two.html"]);
-	for (const [path, x] of [["boards/one.html", 100], ["boards/two.html", 1000]] as const) {
+	const selected = ctx({ ...WIDE, selectedPage: "cards/one/index.html" });
+	const picked = step(initialState("edit"), { type: "press-card", path: "cards/two/index.html", ...at(1000, 100, { shift: true }) }, two, selected).state;
+	assert.deepEqual(picked.selection.cards, ["cards/one/index.html", "cards/two/index.html"]);
+	for (const [path, x] of [["cards/one/index.html", 100], ["cards/two/index.html", 1000]] as const) {
 		let state = picked;
 		const go = (input: Input) => {
 			const result = step(state, input, two, ctx({ ...selected, selectedPage: path }));
@@ -271,17 +271,17 @@ test("a board selected by a press, then Shift and a press on another: both are p
 		go({ type: "press-card", path, ...at(x, 100) });
 		go({ type: "move", ...at(x + 37, 141, { meta: true }) });
 		const lift = go({ type: "release", ...at(x + 37, 141, { meta: true }) });
-		assert.deepEqual(lift.effects.find((effect) => effect.do === "move-cards"), { do: "move-cards", moves: [{ path: "boards/one.html", x: 37, y: 41 }, { path: "boards/two.html", x: 937, y: 41 }] }, path);
+		assert.deepEqual(lift.effects.find((effect) => effect.do === "move-cards"), { do: "move-cards", moves: [{ path: "cards/one/index.html", x: 37, y: 41 }, { path: "cards/two/index.html", x: 937, y: 41 }] }, path);
 	}
 	// A selected card that is not on the canvas any more starts nothing.
-	const gone = step(initialState("edit"), { type: "press-card", path: "boards/two.html", ...at(1000, 100, { shift: true }) }, two, ctx({ selectedPage: "boards/old.html" })).state;
-	assert.deepEqual(gone.selection.cards, ["boards/two.html"]);
+	const gone = step(initialState("edit"), { type: "press-card", path: "cards/two/index.html", ...at(1000, 100, { shift: true }) }, two, ctx({ selectedPage: "cards/old/index.html" })).state;
+	assert.deepEqual(gone.selection.cards, ["cards/two/index.html"]);
 });
 
 test("a board dragged near another settles 160 from it, the reading gap, and says so", () => {
 	const two = fakeScene([], [
-		{ path: "boards/one.html", x: 0, y: 0, w: 400, h: 300 },
-		{ path: "boards/two.html", x: 900, y: 0, w: 400, h: 300 },
+		{ path: "cards/one/index.html", x: 0, y: 0, w: 400, h: 300 },
+		{ path: "cards/two/index.html", x: 900, y: 0, w: 400, h: 300 },
 	]);
 	let state = initialState("edit");
 	const go = (input: Input) => {
@@ -289,27 +289,27 @@ test("a board dragged near another settles 160 from it, the reading gap, and say
 		state = result.state;
 		return result;
 	};
-	go({ type: "press-card", path: "boards/two.html", ...at(1000, 100) });
+	go({ type: "press-card", path: "cards/two/index.html", ...at(1000, 100) });
 	// Dragged 343 left puts its left edge at 557, 157 from the first card: it settles at 560.
 	const moved = go({ type: "move", ...at(657, 140) });
-	assert.deepEqual(moved.state.pageDrag, { paths: ["boards/two.html"], dx: -340, dy: 40 });
+	assert.deepEqual(moved.state.pageDrag, { paths: ["cards/two/index.html"], dx: -340, dy: 40 });
 	assert.deepEqual(moved.state.guides.find((guide) => guide.label), { kind: "gap", x1: 400, y1: 170, x2: 560, y2: 170, label: "160" });
 	// ⌘ lets it go anywhere.
-	assert.deepEqual(go({ type: "move", ...at(657, 140, { meta: true }) }).state.pageDrag, { paths: ["boards/two.html"], dx: -343, dy: 40 });
+	assert.deepEqual(go({ type: "move", ...at(657, 140, { meta: true }) }).state.pageDrag, { paths: ["cards/two/index.html"], dx: -343, dy: 40 });
 });
 
 test("a document's bottom handle writes the height dragged, a floor, and shows it no shorter than its content", () => {
-	const doc = fakeScene([], [{ path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642, least: 642 }]);
+	const doc = fakeScene([], [{ path: "cards/doc/index.html", x: 0, y: 0, w: 760, h: 642, least: 642 }]);
 	let state = initialState("edit");
 	const go = (input: Input) => {
 		const result = step(state, input, doc, ctx());
 		state = result.state;
 		return result;
 	};
-	go({ type: "press-card-handle", handle: "s", box: { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
-	assert.deepEqual(go({ type: "move", ...at(380, 342) }).state.pageResize, { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 });
+	go({ type: "press-card-handle", handle: "s", box: { path: "cards/doc/index.html", x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
+	assert.deepEqual(go({ type: "move", ...at(380, 342) }).state.pageResize, { path: "cards/doc/index.html", x: 0, y: 0, w: 760, h: 642 });
 	const lifted = go({ type: "release", ...at(380, 342, {}, 2000) });
-	assert.deepEqual(lifted.effects.find((one) => one.do === "card-size"), { do: "card-size", path: "boards/doc.html", size: { w: 760, h: 342 } });
+	assert.deepEqual(lifted.effects.find((one) => one.do === "card-size"), { do: "card-size", path: "cards/doc/index.html", size: { w: 760, h: 342 } });
 	assert.equal(lifted.state.pageResize?.h, 642);
 });
 
@@ -360,23 +360,23 @@ test("two presses on a frame's top handle hug it again; slower, or on another ha
 });
 
 test("a board's handle sizes it with Shift keeping its shape; the box is held until the board is at it", () => {
-	const box = { path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 };
+	const box = { path: "cards/one/index.html", x: 1000, y: 0, w: 400, h: 300 };
 	const { state, steps } = run(initialState("edit"), [
 		{ type: "press-card-handle", handle: "se", box, ...at(1400, 300) },
 		{ type: "move", ...at(1600, 310, { shift: true }) },
 		{ type: "release", ...at(1600, 310, { shift: true }, 5000) },
 	]);
-	assert.deepEqual(steps[1]!.state.pageResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450 });
+	assert.deepEqual(steps[1]!.state.pageResize, { path: "cards/one/index.html", x: 1000, y: 0, w: 600, h: 450 });
 	assert.deepEqual(steps[2]!.effects, [
-		{ do: "card-size", path: "boards/one.html", size: { w: 600, h: 450 } },
+		{ do: "card-size", path: "cards/one/index.html", size: { w: 600, h: 450 } },
 		{ do: "wake", at: 5000 + PAGE_HOLD_MS },
 	]);
-	assert.deepEqual(state.pageResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, released: { rev: 7, until: 5000 + PAGE_HOLD_MS } });
+	assert.deepEqual(state.pageResize, { path: "cards/one/index.html", x: 1000, y: 0, w: 600, h: 450, released: { rev: 7, until: 5000 + PAGE_HOLD_MS } });
 	// The write has not come back (same revision): held. It has, at the size: let go.
-	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300, rev: 7 }), state);
-	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, rev: 8 }).pageResize, undefined);
+	assert.equal(landPageResize(state, { path: "cards/one/index.html", x: 1000, y: 0, w: 400, h: 300, rev: 7 }), state);
+	assert.equal(landPageResize(state, { path: "cards/one/index.html", x: 1000, y: 0, w: 600, h: 450, rev: 8 }).pageResize, undefined);
 	// Its content made it taller than the box: that is the card at it too.
-	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 520, rev: 8 }).pageResize, undefined);
+	assert.equal(landPageResize(state, { path: "cards/one/index.html", x: 1000, y: 0, w: 600, h: 520, rev: 8 }).pageResize, undefined);
 	assert.equal(step(state, { type: "tick", time: 5000 + PAGE_HOLD_MS }, scene, ctx()).state.pageResize, undefined);
 });
 

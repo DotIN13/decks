@@ -149,7 +149,7 @@ export function TabStrip(props: { /** How many tabs the bar has room for beside 
 			</Show>
 			{/* The +: the canvases, to open one as a tab and keep the one the camera leaves, where the list a canvas tab in front opens only takes that tab to one; and after them what the other kinds offer (`OpenMore.tsx`). */}
 			<CanvasSwitcher
-				stages={stages()}
+				canvases={stages()}
 				here={canvasOnScreen()?.name}
 				scheme={scheme()}
 				onPick={(name) => openTab("canvas", name)}

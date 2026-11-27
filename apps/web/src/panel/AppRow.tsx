@@ -14,7 +14,7 @@ import { Portal } from "solid-js/web";
 import { Icon, Popover } from "@decks/ui";
 import { m } from "@decks/i18n";
 
-export type PanelApp = { name: string; title: string; status: string; board: string };
+export type PanelApp = { name: string; title: string; status: string; card: string };
 
 /** What the ⋯ menu and a double-click ask of an app (`App.tsx` carries them out). */
 export type AppAction = "show" | "run-show" | "start" | "stop" | "restart" | "reload" | "delete";

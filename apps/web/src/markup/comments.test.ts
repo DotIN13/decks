@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { commentBlock, COMMENTS_KEY, loadComments, popupPlace, QUOTE_LIMIT, quoteOf, saveComments, withComments, type CardComment } from "./comments.ts";
 
-const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", card: "boards/plan.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
+const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", card: "cards/plan/index.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
 
 test("a quotation is one line, and not the whole page", () => {
 	assert.equal(quoteOf("  Keep\n\tit   short. "), "Keep it short.");
@@ -15,11 +15,11 @@ test("the agent reads where, the words, and the comment, and the list says what 
 	assert.equal(commentBlock([]), "");
 	assert.equal(
 		commentBlock([comment()]),
-		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. cards/plan/index.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
 	);
 	const two = commentBlock([comment(), comment({ id: "c2", component: undefined, text: "Why?\nSay more." })]);
 	assert.match(two, /^2 comments on cards\./);
-	assert.match(two, /2\. boards\/plan\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
+	assert.match(two, /2\. cards\/plan\/index\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
 });
 
 test("waiting comments go in front of the next message, and either half may be missing", () => {
@@ -55,7 +55,7 @@ test("the popup sits under the selection, above it when there is no room, and ne
 test("a comment on the whole board has no quote, and says so", () => {
 	assert.equal(
 		commentBlock([comment({ quote: "", component: undefined })]),
-		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, the whole card\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. cards/plan/index.html, the whole card\n   Two sentences, please.",
 	);
 });
 

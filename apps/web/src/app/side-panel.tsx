@@ -17,7 +17,7 @@ import { canvasOnScreen } from "../tabs/tabs.ts";
  * the canvas (`chat-float.ts`), and on a phone it is a sheet of its own instead.
  */
 export function SidePanel(props: { parts: Parts }) {
-	const { layout, chatFloat, apps, pills, stagePen, stagePages, penSelected, setPenSelected, editorHandle, findAt, focusedChat, transcript, atTurn } = props.parts;
+	const { layout, chatFloat, apps, pills, canvasPen, canvasPages, penSelected, setPenSelected, editorHandle, findAt, focusedChat, transcript, atTurn } = props.parts;
 	const { phone, chatFolded, setChatFolded, chatOut, phoneChat, setPhoneChat, sheetFrom, sheetLeaving, chatShown, holdHistory } = layout;
 	return (
 		<>
@@ -43,8 +43,8 @@ export function SidePanel(props: { parts: Parts }) {
 			*/}
 			<LeftPanel
 				{...(panelAsk() ? { ask: panelAsk()! } : {})}
-				boards={state.pages}
-				{...(stagePen()?.doc ? { canvasDoc: stagePen()!.doc } : {})}
+				cards={state.pages}
+				{...(canvasPen()?.doc ? { canvasDoc: canvasPen()!.doc } : {})}
 				{...(canvasOnScreen() ? { canvasTitle: canvasOnScreen()!.title } : {})}
 				selectedItems={penSelected()}
 				onPickItem={pills.pickItem}
@@ -59,17 +59,17 @@ export function SidePanel(props: { parts: Parts }) {
 				}}
 				pens={state.deck?.pens ?? []}
 				onPlacePen={(pen) => {
-					// A pen file goes on the stage as a ref, its corner at the middle of the view, as an agent places one.
+					// A pen file goes on the canvas as a ref, its corner at the middle of the view, as an agent places one.
 					const agentId = state.focused;
 					const at = camera();
 					if (agentId) void editDrawing(agentId, [{ op: "insert", node: { type: "ref", ref: pen.ref }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }]);
 				}}
 				listMayGrow={pagesStarted()}
 				current={selected()}
-				/* `stagePages` is the same answer the stage draws from, so the panel's "on the
-				   stage" section and the boards on screen cannot disagree. */
-				inPlay={stagePages().map((board) => board.path)}
-				/* What the focused agent holds and has taken off its stage. */
+				/* `canvasPages` is the same answer the canvas draws from, so the panel's "on the
+				   canvas" section and the cards on screen cannot disagree. */
+				inPlay={canvasPages().map((card) => card.path)}
+				/* What the focused agent holds and has taken off its canvas. */
 				kept={state.focused ? (state.contexts[state.focused] ?? []) : []}
 				focused={state.focused}
 				open={panelOpen()}
@@ -79,7 +79,7 @@ export function SidePanel(props: { parts: Parts }) {
 				 * The Agents tab. The same three signals the corner and the dropdown already
 				 * take, so the panel is not a second source of truth about who exists — and
 				 * `focusAgent` rather than a bare `agent.focus`, because switching moves the
-				 * stage, the camera, the transcript and the draft together.
+				 * canvas, the camera, the transcript and the draft together.
 				 */
 				chats={state.chats}
 				identities={state.identities}

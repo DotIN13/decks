@@ -39,8 +39,8 @@ export function createBar(names: BarNames) {
 		const dest = destination(typed, barContext());
 		/*
 		 * The comments whose pills were in the field go in front of the words, whoever the words
-		 * are for, and stop waiting. They are kept under the agent whose stage they were made
-		 * on, which is the focused one: the only place a comment can be made is its stage.
+		 * are for, and stop waiting. They are kept under the agent whose canvas they were made
+		 * on, which is the focused one: the only place a comment can be made is its canvas.
 		 */
 		// In the order their pills sat in the text, which is the order `[comment n]` counts in.
 		const held = state.focused && commentIds.length > 0 ? takeComments(state.focused, canvasOnScreen()?.name) : [];
@@ -54,8 +54,8 @@ export function createBar(names: BarNames) {
 				 * change): each pill by name, who put it in, and what its card shows, so the conversation draws it
 				 * again after a reload and on another device. The `@name` that picked the agent is not part of it.
 				 */
-				const stage = canvasOnScreen()?.name;
-				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
+				const canvas = canvasOnScreen()?.name;
+				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(canvas ? { canvas: `canvases/${canvas}` } : {}) });
 				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : {};
 				/*
 				 * With the words goes the tab that was in front (`tabs/about.ts`): the harness tells the agent

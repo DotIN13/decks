@@ -28,11 +28,11 @@ export function TopBar(props: {
 	onNew: (kind: AgentKind) => void;
 	onClose: (id: string) => void;
 	onMoreAgents?: () => void;
-	stage?: string;
+	canvasChip?: string;
 	/** The mark before the name: a touch bar's chip names the tab in front, by its kind's own. Left out, the canvas's. */
 	mark?: () => JSX.Element;
-	onStages?: () => void;
-	stagesOpen?: boolean;
+	onCanvases?: () => void;
+	canvasesOpen?: boolean;
 	/** A touch bar's chip: whether a canvas is in front, and what a press does while a card, a document or an app is. With a canvas in front a press opens the canvas list. */
 	canvas?: { front: boolean; show: () => void };
 	/** The tabs and the + that opens one (`tabs/TabStrip.tsx`). */
@@ -106,14 +106,14 @@ export function TopBar(props: {
 					</button>
 				)}
 			/>
-			<Show when={props.onStages}>
+			<Show when={props.onCanvases}>
 				<span class="v3-sep" aria-hidden="true" data-phone-hide />
 				<Show when={props.phone}>
 					<span class="flex-1" />
 				</Show>
 				{/* A desktop's bar draws no chip of its own: the canvas is a tab in the row like the others (`tabs/TabStrip.tsx`). */}
 				<Show when={!props.row}>
-					<TouchChip stage={props.stage} mark={props.mark} canvas={props.canvas} stagesOpen={props.stagesOpen} onStages={props.onStages} canvasMenu={props.canvasMenu} />
+					<TouchChip canvasChip={props.canvasChip} mark={props.mark} canvas={props.canvas} canvasesOpen={props.canvasesOpen} onCanvases={props.onCanvases} canvasMenu={props.canvasMenu} />
 				</Show>
 				{/*
 				 * The tabs and the + that opens one (`tabs/TabStrip.tsx`). Read once: this bar's props are
@@ -142,24 +142,24 @@ type MenuTrigger = { open: boolean; toggle: () => void; ref: (el: HTMLElement) =
  * a press opens the canvas list (the switcher where it is given, the canvas manager otherwise); with
  * a card, a document or an app in front it does what `canvas.show` says, which opens the tabs.
  */
-function TouchChip(props: { stage: string | undefined; mark: (() => JSX.Element) | undefined; canvas: { front: boolean; show: () => void } | undefined; stagesOpen: boolean | undefined; onStages: (() => void) | undefined; canvasMenu: ((trigger: (api: MenuTrigger) => JSX.Element) => JSX.Element) | undefined }): JSX.Element {
+function TouchChip(props: { canvasChip: string | undefined; mark: (() => JSX.Element) | undefined; canvas: { front: boolean; show: () => void } | undefined; canvasesOpen: boolean | undefined; onCanvases: (() => void) | undefined; canvasMenu: ((trigger: (api: MenuTrigger) => JSX.Element) => JSX.Element) | undefined }): JSX.Element {
 	const chip = (popover?: MenuTrigger) => (
 		<button
 			type="button"
 			class="v3-canvas-chip"
 			ref={popover?.ref}
-			data-open={(popover ? popover.open : props.stagesOpen) ? "true" : undefined}
+			data-open={(popover ? popover.open : props.canvasesOpen) ? "true" : undefined}
 			aria-haspopup={popover ? "menu" : "dialog"}
-			aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
+			aria-expanded={popover ? popover.open : (props.canvasesOpen ?? false)}
 			data-tip={m.shell_canvases()}
-			aria-label={props.stage ? m.shell_canvases_current({ name: props.stage }) : m.shell_canvases_none()}
+			aria-label={props.canvasChip ? m.shell_canvases_current({ name: props.canvasChip }) : m.shell_canvases_none()}
 			data-front={props.canvas && !props.canvas.front ? undefined : "true"}
-			onClick={() => (props.canvas && !props.canvas.front ? props.canvas.show() : popover ? popover.toggle() : props.onStages?.())}
+			onClick={() => (props.canvas && !props.canvas.front ? props.canvas.show() : popover ? popover.toggle() : props.onCanvases?.())}
 		>
 			<Show when={props.mark} fallback={<Icon of={Layers} size={16} />}>
 				{props.mark!()}
 			</Show>
-			<span class="v3-canvas-name">{props.stage ?? m.shell_no_canvas()}</span>
+			<span class="v3-canvas-name">{props.canvasChip ?? m.shell_no_canvas()}</span>
 			<Icon of={ChevronDown} size={13} class="v3-chev" />
 		</button>
 	);

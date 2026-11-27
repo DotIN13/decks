@@ -5,7 +5,7 @@ import { connect } from "@decks/sdk";
 import { authHeaders } from "../lib/session.ts";
 import type { AppFramePass, CanvasPass } from "@decks/canvas/page";
 import { ask } from "../state/confirm.ts";
-import { deckAddress, stageOnScreen } from "../state/decks.ts";
+import { deckAddress, canvasNameOnScreen } from "../state/decks.ts";
 
 /**
  * A canvas pass for the one canvas the frame shows (`server/src/auth/passes.ts`), asked for with this
@@ -100,7 +100,7 @@ export async function cardAgentCall(call: { verb: string; args: unknown[]; card:
 		const yes = await ask({ title: m.canvases_ask_title(), body: asking(call.args, call.card), yes: m.canvases_ask_allow(), no: m.canvases_ask_deny() });
 		if (!yes) throw new Error(`You did not let ${call.card} ${call.verb === "agent.create" ? "start an agent" : "message an agent"}.`);
 	}
-	const answer = await connect({ url: deckAddress(), stage: () => stageOnScreen(), notes: () => {}, headers: authHeaders() }).call(call.verb, call.args);
+	const answer = await connect({ url: deckAddress(), stage: () => canvasNameOnScreen(), notes: () => {}, headers: authHeaders() }).call(call.verb, call.args);
 	return inlineAvatars(answer.value);
 }
 

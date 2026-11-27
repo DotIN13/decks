@@ -12,7 +12,7 @@ export type CanvasMenuTrigger = (api: { open: boolean; toggle: () => void; ref: 
 /** The canvas switcher around a trigger: the panel head's title, a canvas's tab in the top bar and a touch bar's chip use it. A pick moves the camera of the chat on screen there, so the one washed is where that camera is. */
 export const canvasMenu = (trigger: CanvasMenuTrigger, placement: "bottom-start" | "bottom-end" = "bottom-start") => (
 	<CanvasSwitcher
-		stages={stages()}
+		canvases={stages()}
 		here={canvasOnScreen()?.name}
 		scheme={scheme()}
 		placement={placement}

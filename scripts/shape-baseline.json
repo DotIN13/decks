@@ -31,7 +31,7 @@
 		"apps/web/src/app/files/FilePicker.tsx: FilePicker": 391,
 		"apps/web/src/app/files/drops.ts: createFileDrops": 390,
 		"apps/web/src/canvases/CanvasManager.tsx: CanvasManager": 270,
-		"apps/web/src/canvases/CanvasManager.tsx: StageCard": 158,
+		"apps/web/src/canvases/CanvasManager.tsx: CanvasCard": 158,
 		"apps/web/src/composer/Composer.tsx: Composer": 716,
 		"apps/web/src/composer/ModelPicker.tsx: ModelPicker": 316,
 		"apps/web/src/connections/Switcher.tsx: Switcher": 308,

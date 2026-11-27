@@ -12,7 +12,7 @@
 
 export interface CardComment {
 	id: string;
-	/** Deck-relative, as the agent knows it: `boards/plan.html`. */
+	/** Deck-relative, as the agent knows it: `cards/plan/index.html`. */
 	card: string;
 	/** The `data-id` of the component the selection was in, when it was in one. */
 	component?: string;

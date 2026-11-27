@@ -6,7 +6,7 @@ import { decideHover, decidePress, handPans, isBareSecondTap, isSecondTap, type 
 const base: PressFacts = { pointer: "mouse", button: 0, target: "canvas", editable: true, drawing: false, tool: "select", space: false, fingers: 0, onItem: () => false, picture: () => undefined };
 const press = (over: Partial<PressFacts>) => decidePress({ ...base, ...over });
 const ITEM = { onItem: () => true };
-const PICTURE = { picture: () => "boards/one.html" };
+const PICTURE = { picture: () => "cards/one/index.html" };
 
 /** Target × tool × mode × pointer, and what each press starts. */
 const presses: Array<[string, Partial<PressFacts>, PressAction]> = [
@@ -18,8 +18,8 @@ const presses: Array<[string, Partial<PressFacts>, PressAction]> = [
 	["a tool armed, on bare stage: it makes its item", { tool: "rectangle" }, { do: "make" }],
 	["a tool armed, over a board's picture: still makes", { tool: "note", ...PICTURE }, { do: "make" }],
 	["a tool armed on a board: not the stage's", { tool: "note", target: "other" }, { do: "nothing" }],
-	["a board's picture: carried with the selection", PICTURE, { do: "picture", path: "boards/one.html", carry: true }],
-	["a board's picture, read-only stage: only selected", { ...PICTURE, editable: false }, { do: "picture", path: "boards/one.html", carry: false }],
+	["a board's picture: carried with the selection", PICTURE, { do: "picture", path: "cards/one/index.html", carry: true }],
+	["a board's picture, read-only stage: only selected", { ...PICTURE, editable: false }, { do: "picture", path: "cards/one/index.html", carry: false }],
 	["a board's picture under a drawn item: the item", { ...PICTURE, ...ITEM }, { do: "press" }],
 	["a board's picture with Space held: a pan", { ...PICTURE, space: true }, { do: "pan", deselect: true, middle: false }],
 	["a board's picture with the pen out: a pan that lets the board go", { ...PICTURE, drawing: true }, { do: "pan", deselect: true, middle: false }],
@@ -38,11 +38,11 @@ const presses: Array<[string, Partial<PressFacts>, PressAction]> = [
 	["a finger on a drawn click shape", { pointer: "touch", target: "drawn" }, { do: "touch", then: "drawing" }],
 	["a finger with a tool armed: it makes", { pointer: "touch", tool: "card" }, { do: "make" }],
 	["a finger with a tool armed, as the second finger: a pinch, no item", { pointer: "touch", tool: "card", fingers: 1 }, { do: "touch" }],
-	["a finger on a board's picture: the board selected, then pooled", { pointer: "touch", ...PICTURE }, { do: "touch", picture: "boards/one.html" }],
+	["a finger on a board's picture: the board selected, then pooled", { pointer: "touch", ...PICTURE }, { do: "touch", picture: "cards/one/index.html" }],
 	["a finger on a picture under an item: the item", { pointer: "touch", ...PICTURE, ...ITEM }, { do: "touch", then: "drawing" }],
 	["a second finger on a picture: a pinch only", { pointer: "touch", ...PICTURE, fingers: 1 }, { do: "touch" }],
-	["a finger on a picture, read-only: the board", { pointer: "touch", ...PICTURE, editable: false }, { do: "touch", picture: "boards/one.html" }],
-	["a finger on a picture under an item, read-only: the board", { pointer: "touch", ...PICTURE, ...ITEM, editable: false }, { do: "touch", picture: "boards/one.html" }],
+	["a finger on a picture, read-only: the board", { pointer: "touch", ...PICTURE, editable: false }, { do: "touch", picture: "cards/one/index.html" }],
+	["a finger on a picture under an item, read-only: the board", { pointer: "touch", ...PICTURE, ...ITEM, editable: false }, { do: "touch", picture: "cards/one/index.html" }],
 	["a finger on an item, read-only: only pooled", { pointer: "touch", ...ITEM, editable: false }, { do: "touch" }],
 	["a finger with the pen out: only pooled", { pointer: "touch", drawing: true }, { do: "touch" }],
 	["a finger on a board: only pooled", { pointer: "touch", target: "other" }, { do: "touch" }],

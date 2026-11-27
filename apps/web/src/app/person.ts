@@ -1,7 +1,7 @@
 import { m } from "@decks/i18n";
 import { createSignal } from "solid-js";
 import type { PanelTab } from "../panel/LeftPanel.tsx";
-import { moveTo, stageOf, viewOnly } from "../state/canvases.ts";
+import { moveTo, canvasOf, viewOnly } from "../state/canvases.ts";
 import { setState, state } from "../state/deck.ts";
 import { ask } from "../state/confirm.ts";
 import { act } from "../state/decks.ts";
@@ -24,7 +24,7 @@ import { aimCanvas, canvasOnScreen, setCameraMover } from "../tabs/tabs.ts";
 /** The canvas the conversation on screen is on: with the agent, what its draft and its waiting comments are kept under. */
 export const focusedCanvas = () => canvasOnScreen()?.name;
 /** The canvas on screen, when it is a friend's shared with you to view (`state/canvases.ts`). */
-export const viewOnlyStage = () => viewOnly(canvasOnScreen()?.name);
+export const viewOnlyCanvas = () => viewOnly(canvasOnScreen()?.name);
 
 // ---- the panel ---------------------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ export const openAppsPanel = () => {
 // ---- agents ------------------------------------------------------------------------------------
 
 /**
- * Switch to an agent: its stage, its conversation, and the view this device left it in.
+ * Switch to an agent: its canvas, its conversation, and the view this device left it in.
  *
  * Named, because there are several ways in — the pill's dropdown, a face in the top-right
  * stack, a row in the panel — and several copies of these steps is several chances to
@@ -89,17 +89,17 @@ export const closeAgent = async (id: string) => {
 
 // ---- canvases ----------------------------------------------------------------------------------
 
-/** Whether the stage manager is up. One state, because there is one of it (`CanvasManager`). */
-const [stagesOpen, setStagesOpen] = createSignal(false);
-export { setStagesOpen, stagesOpen };
+/** Whether the canvas manager is up. One state, because there is one of it (`CanvasManager`). */
+const [canvasesOpen, setCanvasesOpen] = createSignal(false);
+export { setCanvasesOpen as setStagesOpen, canvasesOpen as stagesOpen };
 
 /**
- * Move a conversation's camera to a canvas, as the person: the stage manager's pick, the panel's Open and a canvas tab move the one on screen,
+ * Move a conversation's camera to a canvas, as the person: the canvas manager's pick, the panel's Open and a canvas tab move the one on screen,
  * and an agent's move the person said Go to (`view.goto` offered) moves that agent's. The camera follows when the server
  * says the agent is there (the landing, `app/landing.ts`).
  */
 export const moveConversation = (agentId: string | undefined, name: string, forward = true) => {
-	if (!agentId || stageOf(agentId)?.name === name) return;
+	if (!agentId || canvasOf(agentId)?.name === name) return;
 	// The canvas comes in front of a card, a document or an app that chat had over the one it leaves, unless the mover says otherwise (a canvas tab closed).
 	if (forward) aimCanvas(agentId);
 	movedHere(agentId, name);
@@ -128,7 +128,7 @@ export const copyShared = (name: string) => {
 	const agentId = state.focused;
 	void act<{ name: string; title: string }>("canvas.copyShared", [{ canvas: name }]).then((made) => {
 		if (!made) return;
-		setStagesOpen(false);
+		setCanvasesOpen(false);
 		notice("info", m.app_own_copy({ name: made.title }));
 		if (agentId) void act("agent.update", [{ canvas: made.name }], agentId);
 	});

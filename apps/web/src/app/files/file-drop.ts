@@ -20,8 +20,8 @@ export function carriesFiles(transfer: DataTransfer | null): boolean {
  *
  * The browser's default for a file dropped anywhere is to navigate to it, which
  * unloads the SPA — the socket, the camera, the transcript, all of it — to show a
- * PNG. That has to be refused globally rather than over the boards, because
- * "anywhere" includes the conversation, the rail and the gap between boards.
+ * PNG. That has to be refused globally rather than over the cards, because
+ * "anywhere" includes the conversation, the rail and the gap between cards.
  *
  * The composer takes its own. So this is where a file dropped on the canvas is answered, and `outside` gets the point
  * and the files, which is enough to put them on the canvas where they landed.

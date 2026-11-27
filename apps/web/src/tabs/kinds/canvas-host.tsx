@@ -25,7 +25,7 @@ import { openAt, openItem } from "../open.ts";
 
 /** What the canvas host needs of the page around it. */
 export interface CanvasHostInputs {
-	stagePen: NonNullable<FramedEditorOptions["state"]>["pen"];
+	canvasPen: NonNullable<FramedEditorOptions["state"]>["pen"];
 	personMoved: (next: Camera) => void;
 	setPenSelected: (ids: string[]) => void;
 	setEditorHandle: (handle: FramedHandle | undefined) => void;
@@ -43,15 +43,15 @@ export interface CanvasHostInputs {
 
 /** The canvas: made once, as a component, so nothing read while it is made makes it again. */
 export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
-	const { stagePen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, underSheet, openAppsPanel, files, frameWhenPlaced, moveConversation } = props.host;
+	const { canvasPen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, underSheet, openAppsPanel, files, frameWhenPlaced, moveConversation } = props.host;
 	/**
 	 * A file of any kind, chosen in the file picker and placed in the middle of the view by what it is:
 	 * the frame's tool column's "Add a file" (`frame/chrome.tsx`), which asks the page for its picker.
 	 */
 	const openFileAtMiddle = () => {
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage) return;
-		void files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
+		const canvas = document.querySelector(".stage, iframe.canvas-frame");
+		if (!canvas) return;
+		void files.fileAt({ x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 }, false).then((path) => {
 			if (!path) return;
 			setSelected(path);
 			frameWhenPlaced(path);
@@ -84,7 +84,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		pageKeys: TOOL_KEYS,
 		onSelection: (ids) => setPenSelected([...ids]),
 		state: {
-			pen: stagePen,
+			pen: canvasPen,
 			camera: [camera, personMoved],
 			glide,
 			selected: [selected, (path) => setSelected(path)],

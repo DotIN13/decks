@@ -70,13 +70,13 @@ function trackVisualViewport(): () => void {
  * before it stopped honouring the meta. Cancelling those is the only thing left that stops
  * a two-finger pinch scaling the app.
  *
- * It does not touch the canvas. The board pinch is built on pointer and touch events
+ * It does not touch the canvas. The card pinch is built on pointer and touch events
  * (`camera/touch.ts` in `@decks/canvas`) and Safari fires both streams for the same
- * fingers, so the gesture that zooms the boards is unaffected — which is the whole point of
+ * fingers, so the gesture that zooms the cards is unaffected — which is the whole point of
  * this: one pinch, one thing zoomed, and it is the thing under your fingers.
  *
  * Registered non-passive, because a passive listener cannot cancel anything, and on the
- * *document* rather than the app root: a gesture that begins over a board's frame is still
+ * *document* rather than the app root: a gesture that begins over a card's frame is still
  * Safari's page zoom, and the frame is a separate document with its own root.
  */
 export function blockPageZoom(): () => void {
@@ -121,7 +121,7 @@ export function installViewport(): void {
 	onMount(() => {
 		// The visual viewport, so the dock stays above the on-screen keyboard.
 		onCleanup(trackVisualViewport());
-		// And one pinch, zooming one thing: the boards, not the app around them.
+		// And one pinch, zooming one thing: the cards, not the app around them.
 		onCleanup(blockPageZoom());
 		// How tall the dock is, published for the stylesheet.
 		watchDock(document.querySelector(".dock"));

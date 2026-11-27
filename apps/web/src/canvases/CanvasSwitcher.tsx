@@ -6,7 +6,7 @@ import Search from "lucide-solid/icons/search";
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { Icon, Popover } from "@decks/ui";
-import { searchStages } from "../state/canvases.ts";
+import { searchCanvases } from "../state/canvases.ts";
 import { AuthedImg } from "../lib/authed.tsx";
 
 /** How many canvases the switcher lists before a search: the recent few. All canvases has the rest. */
@@ -24,15 +24,15 @@ const RECENT = 5;
  * not throw up the keyboard over it.
  */
 /** What the switcher lists: the canvases matching the words typed, or the latest, the one you are on first. */
-function listedStages(stages: StageRow[], here: string | undefined, typed: string): StageRow[] {
+function listedCanvases(canvases: StageRow[], here: string | undefined, typed: string): StageRow[] {
 	const q = typed.trim();
-	if (q) return searchStages(stages, q).filter((one) => one.hit).map((one) => one.stage).slice(0, 8);
+	if (q) return searchCanvases(canvases, q).filter((one) => one.hit).map((one) => one.canvas).slice(0, 8);
 	const at = (one: StageRow) => (one.name === here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
-	return [...stages].sort((a, b) => at(b) - at(a)).slice(0, RECENT);
+	return [...canvases].sort((a, b) => at(b) - at(a)).slice(0, RECENT);
 }
 
 export function CanvasSwitcher(props: {
-	stages: StageRow[];
+	canvases: StageRow[];
 	here: string | undefined;
 	scheme: "light" | "dark";
 	onPick: (name: string) => void;
@@ -56,7 +56,7 @@ export function CanvasSwitcher(props: {
 		dismiss?.();
 		run();
 	};
-	const listed = () => listedStages(props.stages, props.here, find());
+	const listed = () => listedCanvases(props.canvases, props.here, find());
 	return (
 		<Popover
 			placement={props.placement ?? "bottom-start"}
@@ -78,18 +78,18 @@ export function CanvasSwitcher(props: {
 			<div class="menu-label">{find().trim() ? m.canvases_canvases() : m.canvases_recent()}</div>
 			<Show when={listed().length > 0} fallback={<p class="m-0 px-2 py-2 text-note text-faint">{m.canvases_find_none()}</p>}>
 				<For each={listed()}>
-					{(stage) => (
-						<button type="button" role="menuitem" data-row data-flat="true" class="switcher-canvas" data-current={stage.name === props.here ? "true" : undefined} onClick={() => pick(() => props.onPick(stage.name))}>
+					{(canvas) => (
+						<button type="button" role="menuitem" data-row data-flat="true" class="switcher-canvas" data-current={canvas.name === props.here ? "true" : undefined} onClick={() => pick(() => props.onPick(canvas.name))}>
 							<span class="switcher-thumb" aria-hidden="true">
-								<Show when={stage.boards > 0}>
-									<AuthedImg alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(stage.name)}?v=${stage.shot ?? stage.rev}&scheme=${props.scheme}`)} />
+								<Show when={canvas.boards > 0}>
+									<AuthedImg alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(canvas.name)}?v=${canvas.shot ?? canvas.rev}&scheme=${props.scheme}`)} />
 								</Show>
 							</span>
-							<span class="row-label min-w-0 flex-1 truncate">{stage.title}</span>
+							<span class="row-label min-w-0 flex-1 truncate">{canvas.title}</span>
 							<span class="switcher-faces">
-								<For each={stage.agents.slice(0, 2)}>{(agent) => <span class="switcher-face" style={{ background: agent.color }} title={agent.name}>{agent.name.slice(0, 1).toUpperCase()}</span>}</For>
+								<For each={canvas.agents.slice(0, 2)}>{(agent) => <span class="switcher-face" style={{ background: agent.color }} title={agent.name}>{agent.name.slice(0, 1).toUpperCase()}</span>}</For>
 							</span>
-							<span class="menu-note">{ago(stage.changedAt)}</span>
+							<span class="menu-note">{ago(canvas.changedAt)}</span>
 						</button>
 					)}
 				</For>

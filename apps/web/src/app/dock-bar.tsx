@@ -133,7 +133,7 @@ export function DockBar(props: { parts: Parts }) {
 					onAttach={() => {
 						// Taken now: the picker can be open across a switch, and the mention is for
 						// the conversation it was attached to. A deck path, not one relative to the
-						// selected board — a message is not a board, and `@../assets/x.png` means
+						// selected card — a message is not a card, and `@../assets/x.png` means
 						// nothing to the agent reading it.
 						const agentId = state.focused;
 						void pickFile().then((path) => {

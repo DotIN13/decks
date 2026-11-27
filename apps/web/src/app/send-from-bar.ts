@@ -6,19 +6,19 @@ import { m } from "@decks/i18n";
  * module is the whole of the decision, so the label shown beside the bar and the send
  * itself cannot disagree: both ask `destination` and get the same answer.
  *
- * Precedence, highest first: a note target the person picked on a board; an `@Name` in the
- * text; then the focused agent, whose stage is on screen. Nobody focused is nowhere to send
+ * Precedence, highest first: a note target the person picked on a card; an `@Name` in the
+ * text; then the focused agent, whose canvas is on screen. Nobody focused is nowhere to send
  * to, and says so.
  */
 
 export interface BarContext {
 	focused?: { id: string; name: string };
 	agents: Array<{ id: string; name: string }>;
-	note?: { board: string; component: string };
+	note?: { card: string; component: string };
 }
 
 export type Destination =
-	| { kind: "note"; board: string; component: string }
+	| { kind: "note"; card: string; component: string }
 	/** `named` is true when an `@` in the text chose the agent, false when the stage did. */
 	| { kind: "prompt"; id: string; name: string; named: boolean }
 	| { kind: "nowhere" };
@@ -55,7 +55,7 @@ function findMention(text: string, names: readonly string[]): Mention | undefine
 }
 
 export function destination(text: string, context: BarContext): Destination {
-	if (context.note) return { kind: "note", board: context.note.board, component: context.note.component };
+	if (context.note) return { kind: "note", card: context.note.card, component: context.note.component };
 	const mention = findMention(text, context.agents.map((a) => a.name));
 	if (mention) {
 		const agent = context.agents.find((a) => a.name.toLowerCase() === mention.name.toLowerCase());
@@ -65,9 +65,11 @@ export function destination(text: string, context: BarContext): Destination {
 	return { kind: "nowhere" };
 }
 
-/** The board's own name: the last path segment without its `.html`. */
-function pageName(board: string): string {
-	const last = board.split("/").filter(Boolean).at(-1) ?? board;
+/** The card's own name: its folder (`cards/<name>/index.html`), else the last path segment without its `.html`. */
+function pageName(card: string): string {
+	const parts = card.split("/").filter(Boolean);
+	if (parts.at(-1) === "index.html" && parts.at(-3) === "cards") return parts.at(-2)!;
+	const last = parts.at(-1) ?? card;
 	return last.endsWith(".html") ? last.slice(0, -".html".length) : last;
 }
 
@@ -75,7 +77,7 @@ function pageName(board: string): string {
 export function destinationLabel(dest: Destination): string {
 	switch (dest.kind) {
 		case "note":
-			return m.app_dest_note({ card: pageName(dest.board) });
+			return m.app_dest_note({ card: pageName(dest.card) });
 		case "prompt":
 			return m.app_dest_to({ name: dest.name });
 		case "nowhere":

@@ -1,7 +1,7 @@
 /**
- * A comment on a board: the words a person selected while browsing, and what they said about them.
+ * A comment on a card: the words a person selected while browsing, and what they said about them.
  *
- * A comment is a message to the agent, not a mark in the file. It names the board, the
+ * A comment is a message to the agent, not a mark in the file. It names the card, the
  * component the words are in and the words themselves, which is what the agent needs to find
  * the place, and then carries what was typed. It goes one of two ways, and the person picks
  * at the moment of writing: **now**, as a message of its own, or **with the next message**,
@@ -16,8 +16,8 @@ import type { CardComment } from "@decks/canvas/comments";
 // --- kept between reloads ------------------------------------------------------------
 
 /**
- * Whose waiting comments these are: an agent on a canvas, the stage they were made on. A comment is
- * about a board on that canvas, so it waits there and not on the next canvas the agent is moved to.
+ * Whose waiting comments these are: an agent on a canvas, the canvas they were made on. A comment is
+ * about a card on that canvas, so it waits there and not on the next canvas the agent is moved to.
  */
 export function commentsKey(agentId: string, canvas: string | undefined): string {
 	return canvas ? `${agentId}@${canvas}` : agentId;

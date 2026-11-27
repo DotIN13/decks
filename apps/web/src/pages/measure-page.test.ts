@@ -31,7 +31,7 @@ test("a board that has not finished mounting is not measured", () => {
 
 test("a page is measured with its stated height released", async () => {
 	// The body's height is released for the read, or `card.js` would be answering with the
-	// number in the board's <meta> tag and the board could never shrink.
+	// number in the card's <meta> tag and the card could never shrink.
 	const style: { height: string } = { height: "590px" };
 	const asked: string[] = [];
 	const body = {
@@ -48,8 +48,8 @@ test("a page is measured with its stated height released", async () => {
 });
 
 test("a board with no stated height is measured without the frame's own height as its floor", async () => {
-	// `card.js` gives such a board `min-height: 100vh`, the frame it is drawn in; read with it in
-	// place, a new board could never come out shorter than the frame it started at.
+	// `card.js` gives such a card `min-height: 100vh`, the frame it is drawn in; read with it in
+	// place, a new card could never come out shorter than the frame it started at.
 	const style: { height: string; minHeight: string } = { height: "auto", minHeight: "100vh" };
 	const asked: string[] = [];
 	const body = {

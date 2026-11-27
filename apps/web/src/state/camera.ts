@@ -6,11 +6,11 @@ import { batch, createSignal } from "solid-js";
  *
  * The camera is the one piece of state that is **the browser's alone** — the server keeps a
  * reading of it so an agent can ask what the user can see, but nothing on the server ever
- * moves it, and no board file records it. It is also per conversation: a switch parks the
+ * moves it, and no card file records it. It is also per conversation: a switch parks the
  * view you are leaving and takes the one you are arriving at (`camera/agent-view.ts`).
  *
  * It lived in `App.tsx` until four modules were reaching back into the component for it —
- * `app/files/drops.ts` to turn a drop's stage pixels into world pixels, `app/camera-report.ts` to
+ * `app/files/drops.ts` to turn a drop's canvas pixels into world pixels, `app/camera-report.ts` to
  * read it and write it, and two fields of `FrameHooks`. That is what puts a value here
  * rather than in the component: not that it is state, but that modules have to reach it.
  *
@@ -40,7 +40,7 @@ export const GLIDE_MS = 500;
  * The glide the app has been asked for, or nothing.
  *
  * A **request**, not a schedule: `CanvasView` owns the pixels and the clock, so this carries a token
- * that tells one request from another plus the duration, and the stage does the rest. Two moves
+ * that tells one request from another plus the duration, and the canvas does the rest. Two moves
  * in a row give two tokens and the second wins — the loop interpolates from wherever the camera
  * *is*, so nothing travels backwards.
  */
@@ -55,7 +55,7 @@ export const reducedMotion = () => typeof matchMedia === "function" && matchMedi
 /**
  * Move the camera — and *glide* to it when it is something else that decided where to look.
  *
- * `animate` is on for the two gestures that move the camera **for** you, a board link and a row in
+ * `animate` is on for the two gestures that move the camera **for** you, a card link and a row in
  * the panel, and behind `decks.view.focus`/`decks.view.move`'s own `animate: true`. Everything you drive
  * yourself — a wheel, a pinch, a drag, the zoom menu — never comes through here at all, and must
  * not: smoothing input is lag, and the whole point of the pan work was to remove it.

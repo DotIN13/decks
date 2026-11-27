@@ -30,8 +30,8 @@ test("frameText cuts at the limit with an ellipsis", () => {
 
 test("cleanFrameComment cleans every text and drops what is not text", () => {
 	const long = "y".repeat(5000);
-	const out = cleanFrameComment({ path: "boards/a\u200B.html", title: "T\u202E", quote: "q\u200Duote", text: long, component: "\u200B", items: ["i\u200B1", "", 3 as unknown as string] });
-	assert.equal(out.path, "boards/a.html");
+	const out = cleanFrameComment({ path: "cards/a\u200B/index.html", title: "T\u202E", quote: "q\u200Duote", text: long, component: "\u200B", items: ["i\u200B1", "", 3 as unknown as string] });
+	assert.equal(out.path, "cards/a/index.html");
 	assert.equal(out.title, "T");
 	assert.equal(out.quote, "quote");
 	assert.equal(Array.from(out.text).length, FRAME_TEXT_LIMIT);

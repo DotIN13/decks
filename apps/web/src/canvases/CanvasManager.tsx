@@ -10,27 +10,27 @@ import LayoutDashboard from "lucide-solid/icons/layout-dashboard";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import type { StageRow } from "@decks/protocol";
 import { Icon } from "@decks/ui";
-import { searchStages } from "../state/canvases.ts";
+import { searchCanvases } from "../state/canvases.ts";
 import { AgentFace } from "../agents/AgentPill.tsx";
 import { AuthedImg } from "../lib/authed.tsx";
 
 /**
- * The stage manager: every stage in the deck, as cards, in a panel over the canvas.
+ * The canvas manager: every canvas in the deck, as cards, in a panel over the canvas.
  *
- * A stage is a folder of work — its boards and its drawing — and until this there was no way for
+ * A canvas is a folder of work — its cards and its drawing — and until this there was no way for
  * a person to see that more than one existed, let alone move between them. An agent could
  * (`decks.canvas.list`, `decks.view.goto`); the browser was never told.
  *
  * ### Why a panel and not the canvas itself
  *
- * It was drawn as a wall that the canvas zoomed out into, your own stage shrinking into its place
+ * It was drawn as a wall that the canvas zoomed out into, your own canvas shrinking into its place
  * among the others. That is the better picture and the worse build: it needs two bespoke
  * transitions, and a transition that has to be perfect to be understood at all is a liability. A
  * panel is a thing this app already has, and it states what is true — you are choosing, and the
  * work you are choosing from is still there behind it.
  *
- * So there is one 120ms fade, in and out, and nothing else. Opening a stage is a *click*: the panel closes and
- * the camera lands on the middle of that stage's work (`camera.middleOf`).
+ * So there is one 120ms fade, in and out, and nothing else. Opening a canvas is a *click*: the panel closes and
+ * the camera lands on the middle of that canvas's work (`camera.middleOf`).
  *
  * ### The layout
  *
@@ -43,7 +43,7 @@ import { AuthedImg } from "../lib/authed.tsx";
  *
  * A picture of the whole canvas, taken by the server once per revision (`/api/stage-thumb`), on the
  * canvas's own ground; an empty canvas says so instead of showing a blank tile. Under it the name
- * with the faces of whoever is on it, and a quieter line with how many boards and when it last
+ * with the faces of whoever is on it, and a quieter line with how many cards and when it last
  * changed. Rename and delete float on the picture's corner, shown on hover or focus, so a wall of
  * cards is a wall of pictures rather than of pencils and bins. The canvas you are on wears the
  * accent and says "Current".
@@ -64,19 +64,19 @@ const PULL_SHUT = 110;
 
 
 export function CanvasManager(props: {
-	stages: StageRow[];
-	/** The stage the conversation on screen is on, so its card is marked. */
+	canvases: StageRow[];
+	/** The canvas the conversation on screen is on, so its card is marked. */
 	here: string | undefined;
 	open: boolean;
 	onClose: () => void;
-	/** Put the agent you are talking to on this stage. */
+	/** Put the agent you are talking to on this canvas. */
 	onPick: (name: string) => void;
-	/** Make a stage from a name, and open it. */
+	/** Make a canvas from a name, and open it. */
 	onNew: (title: string) => void;
 	scheme: "light" | "dark";
-	/** Rename a stage; the server makes the name folder-safe and refuses one that is taken. */
+	/** Rename a canvas; the server makes the name folder-safe and refuses one that is taken. */
 	onRename: (name: string, to: string) => void;
-	/** Delete a stage, with its drawing and any boards kept in its own folder. */
+	/** Delete a canvas, with its drawing and any cards kept in its own folder. */
 	onDelete: (name: string) => void;
 	/** Make your own copy of a friend's canvas (`canvas.copyShared`), and go to it. */
 	onCopy?: (name: string) => void;
@@ -87,7 +87,7 @@ export function CanvasManager(props: {
 	let field: HTMLInputElement | undefined;
 
 	/* Opening is where the query is cleared and the field takes the keyboard: a manager that
-	   opened on last week's search would be a manager that lies about how many stages there are. */
+	   opened on last week's search would be a manager that lies about how many canvases there are. */
 	createEffect(() => {
 		if (!props.open) return;
 		setQuery("");
@@ -170,8 +170,8 @@ export function CanvasManager(props: {
 		head.addEventListener("pointercancel", end);
 	};
 
-	const offered = () => props.stages;
-	const rows = createMemo(() => searchStages(offered(), query()));
+	const offered = () => props.canvases;
+	const rows = createMemo(() => searchCanvases(offered(), query()));
 	const found = createMemo(() => rows().filter((one) => one.hit).length);
 	const searching = () => query().trim() !== "";
 
@@ -181,13 +181,13 @@ export function CanvasManager(props: {
 	};
 
 	/* The canvas you are on first, then the rest by when they last changed: the one you want is
-	   almost always one you were just in. A search leaves only what matches (`searchStages`). */
+	   almost always one you were just in. A search leaves only what matches (`searchCanvases`). */
 	const [sort, setSort] = createSignal<"recent" | "az">("recent");
 	const ordered = createMemo(() => {
 		const list = rows().filter((one) => one.hit);
-		if (sort() === "az") return list.sort((a, b) => a.stage.title.localeCompare(b.stage.title));
+		if (sort() === "az") return list.sort((a, b) => a.canvas.title.localeCompare(b.canvas.title));
 		const at = (one: StageRow) => (one.name === props.here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
-		return list.sort((a, b) => at(b.stage) - at(a.stage) || a.stage.title.localeCompare(b.stage.title));
+		return list.sort((a, b) => at(b.canvas) - at(a.canvas) || a.canvas.title.localeCompare(b.canvas.title));
 	});
 
 	/* A new canvas is named in place, in the heading: the browser's own prompt was the one piece of
@@ -290,7 +290,7 @@ export function CanvasManager(props: {
 									// The commonest search is two letters and the one answer: Enter opens it.
 									if (event.key !== "Enter") return;
 									const first = ordered().find((one) => one.hit);
-									if (first) open(first.stage.name);
+									if (first) open(first.canvas.name);
 								}}
 							/>
 							<Show when={searching() && found() > 0}>
@@ -311,7 +311,7 @@ export function CanvasManager(props: {
 					<div class="stage-wall">
 						<For each={ordered()}>
 							{(row) => (
-								<StageCard
+								<CanvasCard
 									row={row}
 									here={props.here}
 									searching={searching()}
@@ -341,12 +341,12 @@ function since(at: number | undefined, now = Date.now()): string | undefined {
 }
 
 /**
- * One stage in the manager: its picture, which opens it, and a line with its name, who is on it,
+ * One canvas in the manager: its picture, which opens it, and a line with its name, who is on it,
  * and two quiet controls — rename, which edits the name where it is drawn, and delete, which asks
  * once in its own place before it does anything.
  */
-function StageCard(props: {
-	row: { stage: StageRow; hit: boolean };
+function CanvasCard(props: {
+	row: { canvas: StageRow; hit: boolean };
 	here: string | undefined;
 	searching: boolean;
 	scheme: "light" | "dark";
@@ -357,7 +357,7 @@ function StageCard(props: {
 }) {
 	const [editing, setEditing] = createSignal(false);
 	const [confirming, setConfirming] = createSignal(false);
-	const stage = () => props.row.stage;
+	const canvas = () => props.row.canvas;
 	let input: HTMLInputElement | undefined;
 	/* An edit ends once: taking the field away can blur it, and that blur must not rename again. */
 	let settled = true;
@@ -370,28 +370,28 @@ function StageCard(props: {
 		settled = true;
 		const to = input?.value.trim() ?? "";
 		setEditing(false);
-		// The name only: the folder is the stage's id and stays (`CanvasPens.setTitle`).
-		if (to && to !== stage().title) props.onRename(stage().name, to);
+		// The name only: the folder is the canvas's id and stays (`CanvasPens.setTitle`).
+		if (to && to !== canvas().title) props.onRename(canvas().name, to);
 	};
 	const cancel = () => {
 		settled = true;
 		setEditing(false);
 	};
 
-	const here = () => stage().name === props.here;
-	const boards = () => stage().boards;
+	const here = () => canvas().name === props.here;
+	const cards = () => canvas().boards;
 	// A friend's canvas says whose it is, and whether you may change it (`shared/canvases/<owner>/<canvas>`).
-	const sharedBy = () => (stage().shared ? (stage().shared!.role === "view" ? m.canvases_shared_by_view({ owner: stage().shared!.owner }) : m.canvases_shared_by({ owner: stage().shared!.owner })) : undefined);
-	const meta = () => [sharedBy(), boards() === 0 ? m.canvases_meta_empty() : m.canvases_meta_cards({ count: boards(), shown: formatNumber(boards()) }), since(stage().changedAt)].filter(Boolean).join(" · ");
+	const sharedBy = () => (canvas().shared ? (canvas().shared!.role === "view" ? m.canvases_shared_by_view({ owner: canvas().shared!.owner }) : m.canvases_shared_by({ owner: canvas().shared!.owner })) : undefined);
+	const meta = () => [sharedBy(), cards() === 0 ? m.canvases_meta_empty() : m.canvases_meta_cards({ count: cards(), shown: formatNumber(cards()) }), since(canvas().changedAt)].filter(Boolean).join(" · ");
 	const [broken, setBroken] = createSignal(false);
 
 	return (
 		<div
 			class="stage-card"
-			data-name={stage().name}
+			data-name={canvas().name}
 			data-here={here() ? "true" : undefined}
-			title={here() ? m.canvases_card_title_here({ title: stage().title, meta: meta() }) : stage().agents.length === 0 ? m.canvases_card_title_nobody({ title: stage().title, meta: meta() }) : m.canvases_card_title({ title: stage().title, meta: meta() })}
-			onClick={() => !editing() && props.onOpen(stage().name)}
+			title={here() ? m.canvases_card_title_here({ title: canvas().title, meta: meta() }) : canvas().agents.length === 0 ? m.canvases_card_title_nobody({ title: canvas().title, meta: meta() }) : m.canvases_card_title({ title: canvas().title, meta: meta() })}
+			onClick={() => !editing() && props.onOpen(canvas().name)}
 			/* A mouse that leaves the card takes the question back. A finger leaves with every lift, which took it back under the press on its answer: under a finger, Keep it does that. */
 			onPointerLeave={(event) => event.pointerType === "mouse" && setConfirming(false)}
 		>
@@ -400,19 +400,19 @@ function StageCard(props: {
 				unchanged canvas is never redrawn, and a changed one cannot show yesterday. An empty canvas,
 				or one with no picture to be had, says what it is rather than showing a blank tile.
 			*/}
-			<button type="button" class="stage-open" aria-label={m.canvases_open({ title: stage().title })}>
+			<button type="button" class="stage-open" aria-label={m.canvases_open({ title: canvas().title })}>
 				<Show
-					when={boards() > 0 && !broken()}
+					when={cards() > 0 && !broken()}
 					fallback={
 						<span class="stage-empty">
 							<Icon of={LayoutDashboard} size={22} />
-							<span>{boards() > 0 ? m.canvases_no_picture() : m.canvases_empty()}</span>
+							<span>{cards() > 0 ? m.canvases_no_picture() : m.canvases_empty()}</span>
 						</span>
 					}
 				>
 					<AuthedImg
 						class="stage-shot"
-						src={api(`/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().shot ?? stage().rev}&scheme=${props.scheme}`)}
+						src={api(`/stage-thumb/${encodeURIComponent(canvas().name)}?v=${canvas().shot ?? canvas().rev}&scheme=${props.scheme}`)}
 						alt=""
 						loading="lazy"
 						onError={() => setBroken(true)}
@@ -429,17 +429,17 @@ function StageCard(props: {
 					fallback={
 						<>
 							{/* A friend's canvas: your own copy of it, which you can change (to view, the only way to). */}
-							<Show when={stage().shared && props.onCopy}>
-								<button type="button" class="stage-icon" title={m.canvases_copy()} aria-label={m.canvases_copy_label({ title: stage().title })} onClick={() => props.onCopy?.(stage().name)}>
+							<Show when={canvas().shared && props.onCopy}>
+								<button type="button" class="stage-icon" title={m.canvases_copy()} aria-label={m.canvases_copy_label({ title: canvas().title })} onClick={() => props.onCopy?.(canvas().name)}>
 									<Icon of={Copy} size={13} />
 								</button>
 							</Show>
-							<Show when={stage().shared?.role !== "view"}>
-								<button type="button" class="stage-icon" title={m.canvases_rename()} aria-label={m.canvases_rename_label({ title: stage().title })} onClick={startEditing}>
+							<Show when={canvas().shared?.role !== "view"}>
+								<button type="button" class="stage-icon" title={m.canvases_rename()} aria-label={m.canvases_rename_label({ title: canvas().title })} onClick={startEditing}>
 									<Icon of={Pencil} size={13} />
 								</button>
 							</Show>
-							<button type="button" class="stage-icon" title={m.canvases_delete()} aria-label={m.canvases_delete_label({ title: stage().title })} onClick={() => setConfirming(true)}>
+							<button type="button" class="stage-icon" title={m.canvases_delete()} aria-label={m.canvases_delete_label({ title: canvas().title })} onClick={() => setConfirming(true)}>
 								<Icon of={Trash} size={13} />
 							</button>
 						</>
@@ -454,7 +454,7 @@ function StageCard(props: {
 						title={m.canvases_delete_title()}
 						onClick={() => {
 							setConfirming(false);
-							props.onDelete(stage().name);
+							props.onDelete(canvas().name);
 						}}
 					>
 						{m.canvases_delete_canvas()}
@@ -463,7 +463,7 @@ function StageCard(props: {
 			</span>
 			<span class="stage-foot">
 				<span class="stage-name-row">
-					<Show when={editing()} fallback={<span class="row-label">{stage().title}</span>}>
+					<Show when={editing()} fallback={<span class="row-label">{canvas().title}</span>}>
 						<input
 							ref={(element) => {
 								input = element;
@@ -473,9 +473,9 @@ function StageCard(props: {
 								});
 							}}
 							class="stage-rename"
-							value={stage().title}
+							value={canvas().title}
 							spellcheck={false}
-							aria-label={m.canvases_new_name({ title: stage().title })}
+							aria-label={m.canvases_new_name({ title: canvas().title })}
 							onClick={(event) => event.stopPropagation()}
 							onKeyDown={(event) => {
 								// Handled here, so Escape cancels the rename rather than closing the manager.
@@ -492,7 +492,7 @@ function StageCard(props: {
 						/>
 					</Show>
 					<span class="stage-faces">
-						<For each={stage().agents}>
+						<For each={canvas().agents}>
 							{(agent) => <AgentFace chat={{ id: agent.id, name: agent.name, kind: "claude", state: "idle" } as never} identity={{ name: agent.name, color: agent.color }} size={18} ring={0} />}
 						</For>
 					</span>

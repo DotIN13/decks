@@ -28,7 +28,7 @@ export function ObjectsTab(props: {
 	canvasDoc?: PenDocument;
 	/** The drawn items selected on the canvas, by id. */
 	selectedItems?: string[];
-	/** The board the canvas is centred on. */
+	/** The card the canvas is centred on. */
 	current?: string;
 	/** A row pressed: select that item and bring it into view. */
 	onPickItem?: (item: CanvasItem) => void;

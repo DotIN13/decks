@@ -10,9 +10,9 @@ test("snap targets are the other top-level items and boards in view, never what 
 		{ id: "a", box: { x: 0, y: 0, w: 10, h: 10 } },
 		{ id: "b", box: { x: 50, y: 0, w: 10, h: 10 } },
 		{ id: "far", box: { x: 5000, y: 0, w: 10, h: 10 } },
-	], [{ path: "boards/x.html", x: 100, y: 100, w: 200, h: 100 }]);
+	], [{ path: "cards/x/index.html", x: 100, y: 100, w: 200, h: 100 }]);
 	assert.deepEqual(snapTargets(scene, ["a"], [], view), [{ x: 50, y: 0, w: 10, h: 10 }, { x: 100, y: 100, w: 200, h: 100 }]);
-	assert.equal(snapTargets(scene, ["a"], ["boards/x.html"], view).length, 1);
+	assert.equal(snapTargets(scene, ["a"], ["cards/x/index.html"], view).length, 1);
 });
 
 test("inside a frame, only siblings count; arrows and an instance's inside never do", () => {

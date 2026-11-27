@@ -186,8 +186,8 @@ function saidDown(up: boolean): void {
 /** The canvas on screen and the agent the person is talking to, named by App: what a call acts on unless it says otherwise (`X-Decks-Stage`, `X-Decks-Agent`). */
 let onScreen: () => string | undefined = () => undefined;
 let talkingTo: () => string | undefined = () => undefined;
-export function setOnScreen(stage: () => string | undefined, agent?: () => string | undefined): void {
-	onScreen = stage;
+export function setOnScreen(canvas: () => string | undefined, agent?: () => string | undefined): void {
+	onScreen = canvas;
 	if (agent) talkingTo = agent;
 }
 

@@ -21,15 +21,15 @@ function readingOf(doc: Document): { words: number; minFont?: number; overflowX?
  * out of the last block.
  *
  * `scrollHeight` answers this, with one catch that is the reason for the lines around it:
- * `card.js` gives the body the height in the board's `<meta>` tag, or when there is none a
+ * `card.js` gives the body the height in the card's `<meta>` tag, or when there is none a
  * `min-height` of the frame itself (`100vh`), so asking a body that is already that tall how
- * tall it is answers the tag or the frame rather than the content, and the board could then
- * never shrink. A new board starts at the frame's size, so every board an agent wrote came
+ * tall it is answers the tag or the frame rather than the content, and the card could then
+ * never shrink. A new card starts at the frame's size, so every card an agent wrote came
  * out at least that tall, and was squeezed and fitted back by hand. Releasing both for the
  * read is what makes it a measurement. It is synchronous — nothing paints in between — and
  * it happens once per revision, not once per frame.
  *
- * The height only. A board's width is the author's, stated in its `<meta>` tag, and is
+ * The height only. A card's width is the author's, stated in its `<meta>` tag, and is
  * never taken from a measurement.
  */
 export function documentHeight(doc: Document): number | undefined {
@@ -42,7 +42,7 @@ export function documentHeight(doc: Document): number | undefined {
 	body.style.minHeight = "0";
 	/*
 	 * A first or last block's margin collapses through a plain block body and lies outside it, where
-	 * `scrollHeight` does not count it: a board whose first row had a 48 px top margin was measured
+	 * `scrollHeight` does not count it: a card whose first row had a 48 px top margin was measured
 	 * 48 px short, and its page scrolled by that much under a wheel meant to pan the canvas. As its
 	 * own formatting context the body keeps those margins inside it, at the same total height.
 	 */
@@ -70,7 +70,7 @@ export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number;
 	const page = documentHeight(doc);
 	if (page === undefined) return undefined;
 	const h = Math.ceil(page);
-	// How wide the content reaches; a board's width is still the one its `<meta>` states.
+	// How wide the content reaches; a card's width is still the one its `<meta>` states.
 	const w = Math.ceil(Math.max(doc.documentElement.scrollWidth, doc.body?.scrollWidth ?? 0));
 	// The width it was laid out at: `decks.canvas.fit` takes a height only from a layout at the width it fits at.
 	const at = Math.round(doc.documentElement.clientWidth);

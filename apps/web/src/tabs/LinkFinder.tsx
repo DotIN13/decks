@@ -23,7 +23,7 @@ export const openLinkFinder = (beside: HTMLElement): void => void setTimeout(() 
 export function LinkFinder(): JSX.Element {
 	return (
 		<CanvasSwitcher
-			stages={stages()}
+			canvases={stages()}
 			here={canvasOnScreen()?.name}
 			scheme={scheme()}
 			placement="right-start"

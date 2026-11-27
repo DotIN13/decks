@@ -11,7 +11,7 @@ import { setOps, setSettings } from "../state/ui.ts";
  * context reading the composer's (a phone's ⋯ adds it back, `TopRight.tsx`).
  *
  * "Highlight on hover" is the canvas's mode: on (`edit`), what is under the pointer is outlined,
- * a flow board shows its blocks' grips, and Alt shows distances; off (`browse`), nothing lights
+ * a flow card shows its blocks' grips, and Alt shows distances; off (`browse`), nothing lights
  * up and everything still moves, sizes and snaps.
  */
 export const moreItems = () => [

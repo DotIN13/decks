@@ -17,7 +17,7 @@ import { m } from "@decks/i18n";
  *
  * Every URL the app builds for the backend goes through `api()`. For this server it is the path as
  * it always was; for any other it is under `/c/<id>/`, which is what the service worker answers.
- * A board's own relative references stay under that prefix, so they route too.
+ * A card's own relative references stay under that prefix, so they route too.
  */
 /**
  * `label` is what the backend calls itself: a server's deck name, a file's canvas title. `name` is
@@ -26,7 +26,7 @@ import { m } from "@decks/i18n";
 export type Connection =
 	| { id: "here"; kind: "here"; label: string; name?: string }
 	| { id: string; kind: "server"; label: string; name?: string; base: string; token: string; added: number }
-	| { id: string; kind: "bundle"; label: string; name?: string; from: string; added: number; boards: number };
+	| { id: string; kind: "bundle"; label: string; name?: string; from: string; added: number; cards: number };
 
 const LIST = "decks.connections";
 const LAST = "decks.connection.last";

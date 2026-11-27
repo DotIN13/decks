@@ -4,7 +4,7 @@ import { ARROW } from "@decks/pen";
 import { arrowHandles, arrowLine, arrowOp, bendAt, bendStart, pageAt, droppedEnd, endOf, joinAt, nearSide, newArrowEnds, onSide, pointEnd, resetBendOp, resetEndOp, routeDraft, sideNear, slideAt, slideJoin } from "./arrows.ts";
 import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";
 
-const card = { path: "boards/x.html", x: 0, y: 200, w: 400, h: 300 };
+const card = { path: "cards/x/index.html", x: 0, y: 200, w: 400, h: 300 };
 const box = { x: 0, y: 0, w: 100, h: 50 };
 /** Two boxes side by side, a card under them, and an arrow `ar` with the given metadata. */
 const scene = (meta: Record<string, unknown> = { from: "a", to: "b" }) => {
@@ -43,8 +43,8 @@ test("an end joins the item picked there, else the board, never an arrow or the 
 	assert.deepEqual(joinAt(s, { x: 40, y: 30 }, { zoom: 1 }), { name: "a", box });
 	// The arrow's own line is looked through, to the card under it and then nothing.
 	assert.deepEqual(joinAt(s, { x: 200, y: 25 }, { zoom: 1 }), undefined);
-	assert.deepEqual(joinAt(s, { x: 50, y: 300 }, { zoom: 1 }), { name: "boards/x.html", box: { x: 0, y: 200, w: 400, h: 300 } });
-	assert.deepEqual(joinAt(s, { x: 200, y: 200 }, { zoom: 1 }), { name: "boards/x.html", box: { x: 0, y: 200, w: 400, h: 300 }, side: "top" });
+	assert.deepEqual(joinAt(s, { x: 50, y: 300 }, { zoom: 1 }), { name: "cards/x/index.html", box: { x: 0, y: 200, w: 400, h: 300 } });
+	assert.deepEqual(joinAt(s, { x: 200, y: 200 }, { zoom: 1 }), { name: "cards/x/index.html", box: { x: 0, y: 200, w: 400, h: 300 }, side: "top" });
 	assert.equal(pageAt(s, { x: 50, y: 1000 }), undefined);
 });
 
@@ -76,7 +76,7 @@ test("a selected arrow's handles: its ends, their sides, its middle, moved by th
 	assert.equal(arrowHandles(scene(), "a"), undefined);
 	assert.equal(arrowHandles(scene({ from: "a", to: "gone" }), "ar"), undefined);
 	// A card end is found by its path.
-	assert.deepEqual(arrowLine(scene(), { from: "a", to: "boards/x.html" }), [[50, 50], [50, 200]]);
+	assert.deepEqual(arrowLine(scene(), { from: "a", to: "cards/x/index.html" }), [[50, 50], [50, 200]]);
 });
 
 test("a handle's dashed draft is the arrow's shape on the new route", () => {
@@ -115,7 +115,7 @@ test("the drag slides the join within 18 screen px of its side, past its ends to
 test("an end let go joins what is there, or is a point; never the thing the other end joins", () => {
 	const s = scene();
 	const meta = { type: ARROW, from: "a", to: "b" };
-	assert.deepEqual(droppedEnd(s, "ar", meta, "to", { x: 50, y: 300 }, 1), "boards/x.html");
+	assert.deepEqual(droppedEnd(s, "ar", meta, "to", { x: 50, y: 300 }, 1), "cards/x/index.html");
 	assert.deepEqual(droppedEnd(s, "ar", meta, "to", { x: 50, y: 1.54 }, 1), [50, 1.5]);
 	assert.deepEqual(droppedEnd(s, "ar", meta, "from", { x: 300, y: 25 }, 1), [300, 25]);
 	assert.deepEqual(droppedEnd(s, "ar", meta, "from", { x: 600.04, y: 25 }, 1), [600, 25]);

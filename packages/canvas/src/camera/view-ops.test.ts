@@ -25,7 +25,7 @@ function host(focused: string | undefined, hands = false) {
 	const selected: Array<string | undefined> = [];
 	const offered: Array<{ agentId: string; camera: Camera; selected?: string; what: string }> = [];
 	const api: ViewOpsHost = {
-		cards: () => [card("boards/plan.html", 0, 0), card("boards/risks.html", 6000, 0)],
+		cards: () => [card("cards/plan/index.html", 0, 0), card("cards/risks/index.html", 6000, 0)],
 		viewport: () => ({ width: 1200, height: 800 }),
 		focused: () => focused,
 		setCamera: (camera, options) => {
@@ -46,35 +46,35 @@ const call = (agentId: string, op: StageCall["op"], args: unknown): StageCall =>
 
 test("the conversation on screen moves the canvas, as it always did", () => {
 	const { api, moved, remembered, selected } = host("A");
-	const result = runViewCall(call("A", "show", { paths: ["boards/risks.html"] }), api) as { shown: string[]; deferred?: string };
+	const result = runViewCall(call("A", "show", { paths: ["cards/risks/index.html"] }), api) as { shown: string[]; deferred?: string };
 
-	assert.deepEqual(result.shown, ["boards/risks.html"]);
+	assert.deepEqual(result.shown, ["cards/risks/index.html"]);
 	assert.equal(result.deferred, undefined, "nothing is waiting: it happened");
 	assert.equal(moved.length, 1, "the camera moved");
-	assert.deepEqual(selected, ["boards/risks.html"], "and the board it framed is selected");
+	assert.deepEqual(selected, ["cards/risks/index.html"], "and the board it framed is selected");
 	assert.deepEqual(remembered, [], "nothing to remember");
 });
 
 test("an agent you are not reading does not move it", () => {
 	const { api, moved, selected } = host("A");
-	const result = runViewCall(call("B", "show", { paths: ["boards/risks.html"] }), api) as { shown: string[]; deferred?: string };
+	const result = runViewCall(call("B", "show", { paths: ["cards/risks/index.html"] }), api) as { shown: string[]; deferred?: string };
 
 	assert.equal(moved.length, 0, "your canvas stayed where it was");
 	assert.deepEqual(selected, [], "and so did your selection");
-	assert.deepEqual(result.shown, ["boards/risks.html"], "the boards are in play either way");
+	assert.deepEqual(result.shown, ["cards/risks/index.html"], "the boards are in play either way");
 	assert.ok(result.deferred, "and it is told, rather than left to assume it worked");
 });
 
 test("…and what it asked for is kept, framed as it asked", () => {
 	const { api, moved, remembered } = host("A");
-	runViewCall(call("B", "show", { paths: ["boards/risks.html"] }), api);
+	runViewCall(call("B", "show", { paths: ["cards/risks/index.html"] }), api);
 	const kept = remembered[0];
 	assert.equal(kept?.agentId, "B");
-	assert.equal(kept?.selected, "boards/risks.html", "including the selection, which is part of the view");
+	assert.equal(kept?.selected, "cards/risks/index.html", "including the selection, which is part of the view");
 
 	// The same call with B on screen produces the identical camera: remembered, not refitted.
 	const focused = host("B");
-	runViewCall(call("B", "show", { paths: ["boards/risks.html"] }), focused.api);
+	runViewCall(call("B", "show", { paths: ["cards/risks/index.html"] }), focused.api);
 	assert.deepEqual(kept?.camera, focused.moved[0]);
 	assert.equal(moved.length, 0);
 });
@@ -114,12 +114,12 @@ test("a call with no agent behind it still works, because the id is newer than t
  */
 test("an op that asked to arrive says so, and one that did not does not", () => {
 	const plain = host("A");
-	runViewCall(call("A", "show", { paths: ["boards/plan.html"] }), plain.api);
+	runViewCall(call("A", "show", { paths: ["cards/plan/index.html"] }), plain.api);
 	assert.equal(plain.moved.length, 1, "show moved the camera");
 	assert.equal(plain.animated.length, 0, "show without the flag moved it instantly");
 
 	const asked = host("A");
-	runViewCall(call("A", "show", { paths: ["boards/plan.html"], animate: true }), asked.api);
+	runViewCall(call("A", "show", { paths: ["cards/plan/index.html"], animate: true }), asked.api);
 	assert.deepEqual(asked.animated, [{ camera: asked.moved[0]! }]);
 
 	const place = host("A");
@@ -136,7 +136,7 @@ test("a remembered view is not animated, whatever it asked for", () => {
 	// Nothing moved on this screen, so there is nothing to glide: the view waits for the chat it
 	// belongs to and arrives framed the moment that chat is opened.
 	const { api, moved, animated, remembered } = host("A");
-	const result = runViewCall(call("B", "show", { paths: ["boards/plan.html"], animate: true }), api) as { deferred?: string };
+	const result = runViewCall(call("B", "show", { paths: ["cards/plan/index.html"], animate: true }), api) as { deferred?: string };
 	assert.ok(result.deferred, "expected a deferred result");
 	assert.equal(moved.length, 0);
 	assert.equal(animated.length, 0);
@@ -164,16 +164,16 @@ test("an item is framed by the box that came with it, and selects no board", () 
 
 test("an item named with a board frames both", () => {
 	const { api, moved } = host("A");
-	const result = runViewCall(call("A", "show", { paths: ["boards/plan.html"], items: [ITEM] }), api) as { shown: string[] };
+	const result = runViewCall(call("A", "show", { paths: ["cards/plan/index.html"], items: [ITEM] }), api) as { shown: string[] };
 
-	assert.deepEqual(result.shown, ["boards/plan.html", "plan-note"]);
+	assert.deepEqual(result.shown, ["cards/plan/index.html", "plan-note"]);
 	assert.equal(moved.length, 1);
 	assert.ok(moved[0]!.zoom < 1, "zoomed out to hold the pair");
 });
 
 test("a show of nothing this canvas has is an error, not a camera move", () => {
 	const { api, moved } = host("A");
-	const result = runViewCall(call("A", "show", { paths: ["boards/gone.html"], items: [] }), api) as { error?: string };
+	const result = runViewCall(call("A", "show", { paths: ["cards/gone/index.html"], items: [] }), api) as { error?: string };
 
 	assert.match(result.error ?? "", /none of those cards/);
 	assert.equal(moved.length, 0);
@@ -181,12 +181,12 @@ test("a show of nothing this canvas has is an error, not a camera move", () => {
 
 test("while the person is using the canvas, the agent on screen is offered a button instead of moving it", () => {
 	const { api, moved, selected, remembered, offered } = host("A", true);
-	const shown = runViewCall(call("A", "show", { paths: ["boards/risks.html"] }), api) as { shown: string[]; deferred?: string };
+	const shown = runViewCall(call("A", "show", { paths: ["cards/risks/index.html"] }), api) as { shown: string[]; deferred?: string };
 	assert.equal(moved.length, 0, "the view stayed where the person had it");
 	assert.deepEqual(selected, [], "and nothing was selected under them");
 	assert.deepEqual(remembered, [], "nothing parked: it is their conversation already");
 	assert.match(shown.deferred ?? "", /using the canvas/);
-	assert.deepEqual(offered.map((one) => [one.agentId, one.what, one.selected]), [["A", "card", "boards/risks.html"]]);
+	assert.deepEqual(offered.map((one) => [one.agentId, one.what, one.selected]), [["A", "card", "cards/risks/index.html"]]);
 
 	const camera = runViewCall(call("A", "camera", { x: 10, y: 20, zoom: 1 }), api) as { deferred?: string };
 	assert.equal(moved.length, 0, "a camera move waits the same way");

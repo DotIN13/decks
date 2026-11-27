@@ -25,7 +25,7 @@ const items: FakeItem[] = [
 	{ id: "md", type: "text", parent: "card", box: { x: 420, y: 220, w: 280, h: 24 }, extra: { metadata: { type: MARKDOWN } } },
 	{ id: "ar", type: "path", box: { x: 0, y: 0, w: 10, h: 20 }, extra: { metadata: { type: ARROW, from: [0, 0], to: "a" } } },
 ];
-const cards = [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }];
+const cards = [{ path: "cards/one/index.html", x: 1000, y: 0, w: 400, h: 300 }];
 const scene = fakeScene(items, cards);
 
 test("a nudge shifts each item's own x and y: 1 px, and 10 with Shift", () => {
@@ -108,7 +108,7 @@ test("delete is one op per item", () => {
 });
 
 test("boards move to their own rounded corners; a board not on the stage is left out", () => {
-	assert.deepEqual(pageMoves(cards, ["boards/one.html", "boards/gone.html"], 10.6, -1), [{ path: "boards/one.html", x: 1011, y: -1 }]);
+	assert.deepEqual(pageMoves(cards, ["cards/one/index.html", "cards/gone/index.html"], 10.6, -1), [{ path: "cards/one/index.html", x: 1011, y: -1 }]);
 });
 
 test("new ids are none of the taken ones and none of each other", () => {

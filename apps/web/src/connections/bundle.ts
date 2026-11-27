@@ -11,7 +11,7 @@ import { m } from "@decks/i18n";
  * finds its files (`public/sw.js`). The frames a server would send come from `BundleBackend` below,
  * built from the manifest, so the app reads a bundle with the same code it reads a server with.
  *
- * A bundle has no agents, but the app draws a stage as somebody's: the drawing and the boards on
+ * A bundle has no agents, but the app draws a canvas as somebody's: the drawing and the cards on
  * screen are an agent's (`state/pens.ts`). So the backend names one reader, `READER`, with the
  * canvas's title, and says in its greeting that it can neither run agents nor write, which is what
  * keeps the composer and the editing tools off the screen (`BackendInfo`).
@@ -20,9 +20,9 @@ export interface BundleManifest {
 	decks: number;
 	made: string;
 	from: string;
-	stage: { name: string; title: string; rev: number };
+	canvas: { name: string; title: string; rev: number };
 	pen: { doc: PenDocument; base: string };
-	boards: Page[];
+	cards: Page[];
 	pictures: Record<string, { light?: string; dark?: string }>;
 }
 
@@ -81,7 +81,7 @@ export async function openBundle(file: Blob): Promise<string> {
 		const bytes = await one.bytes();
 		await cache.put(`/c/${id}/${one.name}`, new Response(bytes as BodyInit, { headers: { "Content-Type": typeOf(one.name) } }));
 	}
-	const entry: Connection = { id, kind: "bundle", label: manifest.stage.title, from: manifest.from, added: Date.now(), boards: manifest.boards.length };
+	const entry: Connection = { id, kind: "bundle", label: manifest.canvas.title, from: manifest.from, added: Date.now(), cards: manifest.cards.length };
 	saveConnections([...connections(), entry]);
 	return id;
 }
@@ -101,11 +101,11 @@ async function manifestOf(id: string): Promise<BundleManifest> {
 
 /** The greeting a server would send, for a reader of this bundle. */
 export function greeting(id: string, manifest: BundleManifest): ServerMessage[] {
-	const paths = manifest.boards.map((board) => board.path);
-	const identity = { name: manifest.stage.title, color: "#7a7a7a" };
+	const paths = manifest.cards.map((card) => card.path);
+	const identity = { name: manifest.canvas.title, color: "#7a7a7a" };
 	const reader = {
 		id: READER,
-		name: manifest.stage.title,
+		name: manifest.canvas.title,
 		state: "idle",
 		unread: 0,
 		kind: "claude",
@@ -114,11 +114,11 @@ export function greeting(id: string, manifest: BundleManifest): ServerMessage[] 
 		inPlay: paths,
 	} as unknown as AgentChat;
 	return [
-		{ type: "harness.hello", backend: { name: manifest.stage.title, can: { agents: false, write: false, share: false } } },
+		{ type: "harness.hello", backend: { name: manifest.canvas.title, can: { agents: false, write: false, share: false } } },
 		{ type: "harness.runtimes", list: [] },
-		{ type: "deck.changed", deck: { path: `bundle:${id}`, name: manifest.from, boards: manifest.boards, roots: [] } },
+		{ type: "deck.changed", deck: { path: `bundle:${id}`, name: manifest.from, boards: manifest.cards, roots: [] } },
 		{ type: "agent.list", chats: [reader], focused: READER, defaultKind: "claude" },
-		{ type: "canvas.list", stages: [{ name: manifest.stage.name, title: manifest.stage.title, boards: manifest.boards.length, rev: manifest.stage.rev, agents: [], words: "" }] },
+		{ type: "canvas.list", stages: [{ name: manifest.canvas.name, title: manifest.canvas.title, boards: manifest.cards.length, rev: manifest.canvas.rev, agents: [], words: "" }] },
 		{ type: "harness.settings", settings: {}, machineZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
 		{ type: "harness.paired", paired: [] },
 	];
@@ -168,7 +168,7 @@ export class BundleBackend {
 			return;
 		}
 		if (message.type === "canvas.watch") {
-			this.deliver({ type: "canvas.changed", canvas: manifest.stage.name, rev: manifest.stage.rev, doc: manifest.pen.doc, base: api(`/f/${manifest.pen.base}`) });
+			this.deliver({ type: "canvas.changed", canvas: manifest.canvas.name, rev: manifest.canvas.rev, doc: manifest.pen.doc, base: api(`/f/${manifest.pen.base}`) });
 			return;
 		}
 		if (message.type === "line.call") {

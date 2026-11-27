@@ -1,8 +1,8 @@
 {
 	"counts": {
 		"server": 1347,
-		"web": 1494,
-		"canvas": 449,
+		"web": 720,
+		"canvas": 295,
 		"agent-ui": 0,
 		"card-host": 306,
 		"packages": 277,

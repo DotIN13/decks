@@ -54,38 +54,38 @@ export function createOnScreen() {
 	});
 
 	/** The drawing of the chat on screen, when it has one (`state/pens.ts`). */
-	const stagePen = createMemo(() => {
+	const canvasPen = createMemo(() => {
 		const name = canvasOnScreen()?.name;
 		const pen = name ? pens()[name] : undefined;
 		// Its placeholder frames are marked with the agent that last wrote it, as the canvas knows it.
 		const by = pen?.by ? state.identities[pen.by] : undefined;
 		const writer = by ? { name: by.name, color: by.color } : undefined;
-		return pen ? { doc: pen.doc, base: pen.base, scope: pen.stage, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}), ...(writer ? { writer } : {}) } : undefined;
+		return pen ? { doc: pen.doc, base: pen.base, scope: pen.canvas, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}), ...(writer ? { writer } : {}) } : undefined;
 	});
 
 	/**
-	 * The boards on the focused agent's stage, at the size the stage draws them: the focused agent's
-	 * in-play set, and nothing else. An agent holding nothing shows *no* boards.
+	 * The cards on the focused agent's canvas, at the size the canvas draws them: the focused agent's
+	 * in-play set, and nothing else. An agent holding nothing shows *no* cards.
 	 *
-	 * **A board is as tall as the stage file says, and no taller.** Its height is what a drag, a
+	 * **A card is as tall as the canvas file says, and no taller.** Its height is what a drag, a
 	 * `decks.canvas.fit` or `decks.canvas.update` gave it; what its page measures in this browser is
-	 * sent to the harness for `fit` to report (`card.extent`) and never grows the board by itself,
-	 * for a board and a card alike. A page taller than its board is cut at the board's foot.
+	 * sent to the harness for `fit` to report (`card.extent`) and never grows the card by itself,
+	 * for a card alike. A page taller than its card is cut at the card's foot.
 	 *
-	 * Kept in a store reconciled by path, so a board keeps its identity when its height is raised or
-	 * changes: what lists the boards by identity (the stage's board pages) keeps its page rather than
+	 * Kept in a store reconciled by path, so a card keeps its identity when its height is raised or
+	 * changes: what lists the cards by identity (the canvas's card pages) keeps its page rather than
 	 * loading it again.
 	 */
 	const [shownPages, setShownPages] = createStore<Page[]>([]);
 	createComputed(() => {
 		// A copy of its own: the merge below writes into this store's objects, never into the deck's.
-		const copy = (board: Page) => JSON.parse(JSON.stringify(board)) as Page;
+		const copy = (card: Page) => JSON.parse(JSON.stringify(card)) as Page;
 		// The canvas on screen is the conversation's, whichever tab its camera is on: its cards are the ones in play there.
 		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
-		const list = state.pages.filter((board) => playing.has(board.path)).map(copy);
+		const list = state.pages.filter((card) => playing.has(card.path)).map(copy);
 		setShownPages(reconcile(list, { key: "path", merge: true }));
 	});
-	const stagePages = (): Page[] => shownPages;
+	const canvasPages = (): Page[] => shownPages;
 
-	return { views, focusedChat, transcript, busy, stagePen, stagePages };
+	return { views, focusedChat, transcript, busy, canvasPen, canvasPages };
 }

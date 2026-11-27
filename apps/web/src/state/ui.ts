@@ -32,13 +32,13 @@ import { call } from "./socket.ts";
  */
 
 /**
- * Whether the boards panel starts open, from the width of the window.
+ * Whether the cards panel starts open, from the width of the window.
  *
  * **Open where it is a panel, closed where it is a sheet.** Above 1100px it stands beside the
  * canvas and costs 264px of a wide window, which is a fair trade for knowing what the agent is
  * holding. Below that it is a sheet *over* the canvas, and a canvas app that opens with
  * something covering the canvas is answering a question nobody asked — on a 393px screen the
- * sheet took the left two thirds, and a pinch aimed at a board landed on a list of filenames.
+ * sheet took the left two thirds, and a pinch aimed at a card landed on a list of filenames.
  */
 const panelOpensWith = (): boolean => {
 	try {
@@ -60,11 +60,11 @@ export interface ClaudeLoginOpen {
 export type ClaudeLoginHeard = { at: number } & ({ phase: "done"; email?: string } | { phase: "failed"; message: string });
 
 function createUi() {
-	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a board's embed. */
+	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a card's embed. */
 	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; google?: boolean; purpose?: "canvas" | "attach" | "embed" } | undefined>(undefined);
 
 	/**
-	 * Whether the boards panel is there. One signal where the module it came from had two, because
+	 * Whether the cards panel is there. One signal where the module it came from had two, because
 	 * there is one panel now — and a plain signal rather than that module's persisted pair,
 	 * since what it was mostly doing was closing one panel when the other opened.
 	 */
@@ -98,10 +98,10 @@ function createUi() {
 				/** A kept comment, by id: it arrives as a pill. */
 				comment?: string;
 				/**
-				 * Boards and drawn items dragged onto the bar, each already a pill.
+				 * Cards and drawn items dragged onto the bar, each already a pill.
 				 *
 				 * Whole mentions rather than ids, because what is dragged is the only thing that
-				 * knows what to call it — a board its title, an item its name on the stage — and a
+				 * knows what to call it — a card its title, an item its name on the canvas — and a
 				 * label worked out again at the other end would be a second answer to the same
 				 * question (`composer/draft.ts`).
 				 */

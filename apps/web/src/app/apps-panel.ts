@@ -8,18 +8,18 @@ import { setSelected } from "../state/selection.ts";
 import { flyToPages } from "./links.ts";
 
 /** The deck's apps, for the panel's Apps tab: asked for each time the tab opens. */
-export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path: string) => void) {
+export function createAppsPanel(canvasPages: () => Page[], frameWhenPlaced: (path: string) => void) {
 	const [apps, setApps] = createSignal<PanelApp[] | undefined>();
 	const loadApps = () =>
-		void act<Array<{ name: string; title?: string; status: string; board: string }>>("apps.list", []).then((list) => {
-			if (list) setApps(list.map((app) => ({ name: app.name, title: app.title || app.name, status: app.status, board: app.board })));
+		void act<Array<{ name: string; title?: string; status: string; card: string }>>("apps.list", []).then((list) => {
+			if (list) setApps(list.map((app) => ({ name: app.name, title: app.title || app.name, status: app.status, card: app.card })));
 		});
 	const onApp = async (app: PanelApp, action: AppAction) => {
 		const running = app.status === "running" || app.status === "asleep";
 		/*
 		 * The item that shows it: the one on the canvas already, or a new one where nothing else is, and
 		 * the camera flown to it, the item chosen. Asked of the canvas, since an app's item has no page in
-		 * the deck's list (`stagePages` holds only cards): looked for there, it was never found, so each
+		 * the deck's list (`canvasPages` holds only cards): looked for there, it was never found, so each
 		 * Show put another copy down, on top of whatever was beside the newest card, and flew nowhere.
 		 */
 		const show = async () => {
