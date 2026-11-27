@@ -12,12 +12,12 @@ import type { VerbContext } from "./context.ts";
 export async function fitOn(ctx: VerbContext, asked: string, named: string | undefined, margin?: number | null): Promise<{ board: { path: string; w: number; h: number }; content: { w: number; h: number; page?: number }; canvas: string; said: string }> {
 	const { service, agent, notes } = ctx;
 	const pens = service.pens;
-	const on = named ?? agent.stageName?.();
+	const on = named ?? agent.canvasName?.();
 	// A card from elsewhere is the canvas's own copy of it (`CanvasPens.copyOf`): that is what is fitted.
 	const path = on && pens ? pens.cards.copyOf(on, asked) : asked;
 	const held = on && pens ? pens.cards.cards(on).find((one) => one.path === path) : undefined;
 	if (!on || !held) throw new Error(`${path} is not on ${on ? `the canvas "${pens!.titleOf(on)}"` : "a canvas this call names"}, so there is no width to fit it at. Put it there first (${isCardPath(path) ? `decks canvas insert --type card --card ${path}` : `decks canvas insert '{"type":"board","board":"${path}"}'`}), or name a canvas that holds it with --canvas.`);
-	const own = on === agent.stageName?.();
+	const own = on === agent.canvasName?.();
 	const before = notes.length;
 	const { board: card, content, reading, views } = await service.fit(path, { ...(margin === undefined || margin === null ? {} : { margin }), w: held.w });
 	if (!own) pens!.cards.sizeCard(on, card.path, { w: card.w, h: card.h });

@@ -14,7 +14,7 @@ import { nearestLevel, THINKING_LEVELS, type AgentCapabilities, type AgentModel,
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
 import { deckSlash, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { pairUserEntries } from "../../agents/entries.ts";
-import { decksStage } from "./extension.ts";
+import { decksCanvas } from "./extension.ts";
 import { decksEnv } from "../decks-env.ts";
 import { skillsDir } from "@decks/runtime";
 import { agentBriefing } from "../../agents/context.ts";
@@ -110,7 +110,7 @@ export class PiBackend implements AgentBackend {
 			// come from here, and where they came from should not be a mystery.
 			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
 			// so an extension on disk could not reach the canvas (§6.3).
-			extensionFactories: [decksStage({ agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.agentToken), shell: { cwd, env: decksEnv(this.context.port, this.context.stageAgent.id, this.context.agentToken) } }), this.commandReader()],
+			extensionFactories: [decksCanvas({ agent: this.context.toolAgent, gdocs: gdocsCaller(this.context.port, this.context.agentToken), shell: { cwd, env: decksEnv(this.context.port, this.context.toolAgent.id, this.context.agentToken) } }), this.commandReader()],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of
@@ -412,7 +412,7 @@ export class PiBackend implements AgentBackend {
 	 * The user's messages on the current branch, oldest first.
 	 *
 	 * Only user messages, because those are what `navigateTree` accepts. Used to date a
-	 * point so `App.boardsAt` can ask the revision store what the boards looked like
+	 * point so `App.cardsAt` can ask the revision store what the cards looked like
 	 * then; nothing draws this any more.
 	 */
 	timeline(): ConversationPoint[] {
@@ -427,10 +427,10 @@ export class PiBackend implements AgentBackend {
 	}
 
 	/**
-	 * What each board looked like at that point, from the `board-rev` entries.
+	 * What each card looked like at that point, from the `board-rev` entries.
 	 *
-	 * Walks the branch forwards and keeps the last revision seen per board before the
-	 * given entry — so a board written three turns ago and untouched since resolves to
+	 * Walks the branch forwards and keeps the last revision seen per card before the
+	 * given entry — so a card written three turns ago and untouched since resolves to
 	 * that older version, which is the whole point.
 	 */
 	revisionsAt(entryId: string): Record<string, string> {

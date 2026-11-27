@@ -41,8 +41,8 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 	try {
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		one.seat.setInPlay([PATH], { place: true });
-		const mine = app.pens.cards.copyOf(one.seat.stageName()!, PATH);
-		assert.equal(mine, `canvases/${one.seat.stageName()}/cards/plan/index.html`, "the canvas places its own copy, as a card");
+		const mine = app.pens.cards.copyOf(one.seat.canvasFolder()!, PATH);
+		assert.equal(mine, `canvases/${one.seat.canvasFolder()}/cards/plan/index.html`, "the canvas places its own copy, as a card");
 		const shown = () => app.canvas.cards(one.id).find((card) => card.path === mine)!;
 		assert.deepEqual([shown().w, shown().h], [900, 400], "it joins at its file's size");
 
@@ -52,20 +52,20 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		one.seat.setSize(PATH, { h: 520 });
 		assert.equal(shown().h, 520);
 		await settle();
-		const item = app.pens.cards.cards(one.seat.stageName()!).find((card) => card.path === mine);
+		const item = app.pens.cards.cards(one.seat.canvasFolder()!).find((card) => card.path === mine);
 		assert.deepEqual([item?.w, item?.h], [900, 520], "and the stage file holds it");
 		assert.equal(app.deck.card(mine)?.h, 400, "while the board's own file is as its agent wrote it");
 
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
-		two.seat.newStage("Another canvas");
-		assert.notEqual(two.seat.stageName(), one.seat.stageName());
+		two.seat.newCanvas("Another canvas");
+		assert.notEqual(two.seat.canvasFolder(), one.seat.canvasFolder());
 		two.seat.setInPlay([PATH], { place: true });
-		const theirs = app.pens.cards.copyOf(two.seat.stageName()!, PATH);
+		const theirs = app.pens.cards.copyOf(two.seat.canvasFolder()!, PATH);
 		assert.notEqual(theirs, mine, "another canvas places a copy of its own");
 		assert.equal(app.canvas.cards(two.id).find((card) => card.path === theirs)?.h, 400, "another stage takes it at its file's size");
 		assert.equal(app.canvas.cards(one.id).find((card) => card.path === mine)?.h, 520, "and the first keeps its own");
 		one.seat.setInPlay([PATH], { place: true });
-		assert.deepEqual(app.pens.cards.cards(one.seat.stageName()!).map((card) => card.path), [mine], "asked for again, the canvas keeps the copy it has");
+		assert.deepEqual(app.pens.cards.cards(one.seat.canvasFolder()!).map((card) => card.path), [mine], "asked for again, the canvas keeps the copy it has");
 	} finally {
 		cleanup();
 	}
@@ -80,12 +80,12 @@ test("two agents on one stage: a save by one does not put back a size or a place
 		one.seat.setInPlay([PATH, "canvases/t/cards/notes/index.html"], { place: true });
 		await settle();
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
-		two.seat.openStage(one.seat.stageName()!);
+		two.seat.openCanvas(one.seat.canvasFolder()!);
 		await settle();
 		// One sizes and moves the plan, and Two moves the notes a moment later: Two's write is already
 		// waiting when One's lands, so Two never reads One's change before it writes its own copy.
-		const plan = app.pens.cards.copyOf(one.seat.stageName()!, PATH);
-		const notesOwn = app.pens.cards.copyOf(one.seat.stageName()!, "canvases/t/cards/notes/index.html");
+		const plan = app.pens.cards.copyOf(one.seat.canvasFolder()!, PATH);
+		const notesOwn = app.pens.cards.copyOf(one.seat.canvasFolder()!, "canvases/t/cards/notes/index.html");
 		const before = app.canvas.cards(one.id).find((card) => card.path === plan)!;
 		const notes = app.canvas.cards(two.id).find((card) => card.path === notesOwn)!;
 		one.seat.setSize(PATH, { h: 640 });
@@ -93,10 +93,10 @@ test("two agents on one stage: a save by one does not put back a size or a place
 		two.seat.setPosition("canvases/t/cards/notes/index.html", notes.x, notes.y + 900);
 		await settle();
 		await settle();
-		const item = app.pens.cards.cards(one.seat.stageName()!).find((card) => card.path === plan);
+		const item = app.pens.cards.cards(one.seat.canvasFolder()!).find((card) => card.path === plan);
 		assert.equal(item?.h, 640, "the plan keeps the height One gave it");
 		assert.equal(item?.x, before.x + 500, "and the place");
-		const moved = app.pens.cards.cards(one.seat.stageName()!).find((card) => card.path === notesOwn);
+		const moved = app.pens.cards.cards(one.seat.canvasFolder()!).find((card) => card.path === notesOwn);
 		assert.equal(moved?.y, notes.y + 900, "while Two's own move is written");
 	} finally {
 		cleanup();
@@ -108,11 +108,11 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 	try {
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		one.seat.setInPlay([PATH], { place: true });
-		const first = one.seat.stageName()!;
+		const first = one.seat.canvasFolder()!;
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
-		two.seat.newStage("Another canvas");
+		two.seat.newCanvas("Another canvas");
 		two.seat.setInPlay([PATH], { place: true });
-		const second = two.seat.stageName()!;
+		const second = two.seat.canvasFolder()!;
 		app.agents.focus(two.id);
 		const on = (name: string) => app.pens.cards.cards(name).find((card) => card.path === app.pens.cards.copyOf(name, PATH));
 		const before = on(second)!;
@@ -145,12 +145,12 @@ test("a person's drag to a shorter board sends only the new height, so the canva
 		await settle();
 		const heights: number[] = [];
 		const send = app.send.bind(app);
-		const shown = app.pens.cards.copyOf(one.seat.stageName()!, PATH);
+		const shown = app.pens.cards.copyOf(one.seat.canvasFolder()!, PATH);
 		app.send = (message) => {
 			if (message.type === "card.changed" && message.path === shown && message.card) heights.push(message.card.h);
 			send(message);
 		};
-		await person(app, one.seat.stageName()!, "card.resize", [shown, { h: 450 }]);
+		await person(app, one.seat.canvasFolder()!, "card.resize", [shown, { h: 450 }]);
 		await settle();
 		assert.ok(heights.length > 0, "the change is sent");
 		assert.deepEqual([...new Set(heights)], [450], "every card.changed carries the new height, none the old 600");

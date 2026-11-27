@@ -222,7 +222,7 @@ export class App {
 			 * positions so that the seeding `stageState` does happens on this path too.
 			 */
 			state: () => this.canvasState(),
-			removed: (path) => this.agents.boardRemoved(path),
+			removed: (path) => this.agents.cardRemoved(path),
 		});
 		this.canvas = new CanvasService(deck, {
 			/*
@@ -283,7 +283,7 @@ export class App {
 			stagesChanged: () => this.publishStages(),
 			wrote: (path, who) => this.cards.wrote(path, who),
 			retitle: (name, title) => titleCanvas({ deck: this.deck, pens: this.pens, agents: this.agents.all() }, name, title),
-			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.stageName()),
+			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.canvasFolder()),
 			agents: () => this.agents.summaries(),
 		});
 		/*
@@ -454,7 +454,7 @@ export class App {
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
 			identity: (agentId) => this.agents.get(agentId)?.who(),
-			boardPathOf: (file) => this.cards.cardPathOf(file),
+			cardPathOf: (file) => this.cards.cardPathOf(file),
 			read: (path) => {
 				try {
 					return this.canvas.read(path);
@@ -474,7 +474,7 @@ export class App {
 					this.acts.act(agentId, act);
 				},
 				defaultKind: config.backend,
-				camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.stageName()),
+				camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.canvasFolder()),
 				/*
 				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
 				 * board where the deck state says it is, so the state goes out here — before the
@@ -485,7 +485,7 @@ export class App {
 				publishRuntimes: () => this.send({ type: "harness.runtimes", list: this.runtimes() }),
 				recordRevision: (path) => this.cards.recordRevision(path),
 				wrote: (path, who) => this.cards.wrote(path, who),
-				boardPathOf: (file) => this.cards.cardPathOf(file),
+				cardPathOf: (file) => this.cards.cardPathOf(file),
 				accounts: this.claudeAccounts,
 				accountsChanged: () => void this.accountList.publish(),
 				// Ask the person to sign in (the page's modal), unless this agent's account is there to run on (`claude/login.ts`).
@@ -570,7 +570,7 @@ export class App {
 			state: () => this.canvasState(),
 			placed: (card) => this.placed(card),
 			landed: (path) => this.acts.landed(path, this.canvas.read(path)),
-			gone: (path) => this.agents.boardRemoved(path),
+			gone: (path) => this.agents.cardRemoved(path),
 		});
 		this.accountList.startLimits();
 	}
@@ -694,7 +694,7 @@ export class App {
 	 * hears the canvas is told once (`canvas.changed`).
 	 */
 	private publishPen(name: string, entry: PenEntry): void {
-		const on = (this.agents?.all() ?? []).filter((agent) => agent.seat.stageName() === name);
+		const on = (this.agents?.all() ?? []).filter((agent) => agent.seat.canvasFolder() === name);
 		for (const agent of on) agent.seat.penChanged();
 		// What changed, not the whole drawing: a client that missed a revision asks for it whole.
 		this.send(this.pens.log.changes(name));

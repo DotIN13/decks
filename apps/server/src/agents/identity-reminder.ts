@@ -8,7 +8,7 @@ import type { Identity } from "@decks/protocol";
  * instructions ask for all three once. Agents skip it: the deck filled with `Agent 3`s working
  * on nothing in particular. An instruction read at the start of a session is easy to pass over,
  * so the same request now travels at the two moments it is cheap to act on: at the head of each
- * message the person sends (`agents/session.ts`), and after each stage call (`calls/tool.ts`),
+ * message the person sends (`agents/session.ts`), and after each canvas call (`calls/tool.ts`),
  * until there is nothing left to ask for.
  */
 
@@ -42,7 +42,7 @@ const ASK: Record<Gap, string> = {
  * The request, or nothing when the agent has said everything.
  *
  * Tags are kept when an agent finishes: they are how the person sees what each agent last worked
- * on, so empty tags are asked for at the head of a message (`agents/session.ts`) and after a stage
+ * on, so empty tags are asked for at the head of a message (`agents/session.ts`) and after a canvas
  * call alike (`afterCall`), and the request says to leave them set.
  */
 export function identityReminder(identity: Pick<Identity, "name" | "avatar" | "tags" | "workspace">, _options: { afterCall?: boolean } = {}): string | undefined {

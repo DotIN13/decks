@@ -19,7 +19,7 @@ function fake(kind: AgentKind, state: AgentState) {
 		prompt: async (text) => void prompted.push(text),
 		run: async () => ({ report: "", boards: [] }),
 		notice: () => {},
-		brief: (task, boards) => `${task}${boards.length ? ` [${boards.join(", ")}]` : ""}`,
+		brief: (task, cards) => `${task}${cards.length ? ` [${cards.join(", ")}]` : ""}`,
 		report: () => {},
 		outside: () => undefined,
 		mailChanged: () => {},

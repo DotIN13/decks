@@ -46,9 +46,9 @@ export function canvasTable(host: CanvasTableHost): PersonVerbs {
 	const canvasFor = (asked: unknown, call: PersonCall): { name?: string; agent?: DeckAgent } => {
 		const canvas = typeof asked === "string" && pens()?.has(asked) ? asked : call.on.canvas && pens()?.has(call.on.canvas) ? call.on.canvas : undefined;
 		const target = host.target();
-		const name = canvas ?? target.seat.stageName(true);
+		const name = canvas ?? target.seat.canvasFolder(true);
 		if (!name) return {};
-		const agent = target.seat.stageName() === name ? target : agents.looking()?.seat.stageName() === name ? agents.looking() : agents.all().find((one) => one.seat.stageName() === name);
+		const agent = target.seat.canvasFolder() === name ? target : agents.looking()?.seat.canvasFolder() === name ? agents.looking() : agents.all().find((one) => one.seat.canvasFolder() === name);
 		return { name, ...(agent ? { agent } : {}) };
 	};
 	/** The canvas a card call acts on: the one its options name, else the one on screen. */

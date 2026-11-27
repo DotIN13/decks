@@ -11,7 +11,7 @@ import { inCall, verbContext } from "./context.ts";
 test("two calls at once keep their own canvas and their own notes", async () => {
 	const ctx = verbContext({
 		canvas: { pens: { has: () => true } } as never,
-		agent: { id: "person", person: true, stageName: () => "home" } as never,
+		agent: { id: "person", person: true, canvasName: () => "home" } as never,
 		port: 0,
 	});
 	const call = (canvas: string, wait: number) =>

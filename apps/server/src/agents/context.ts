@@ -9,12 +9,12 @@ import type { Deck } from "../deck/loader.ts";
  * Each backend injects it once and owns it from there — Pi with the rest of its AGENTS.md
  * discovery, Claude as an appended system prompt — so it is not re-sent per turn and must
  * not pretend to be live. So it holds the
- * things that do not change under the agent's feet (what a board is, how to write
+ * things that do not change under the agent's feet (what a card is, how to write
  * one, which roots exist) and points at `list`-style facts rather than embedding a
  * snapshot that will be wrong by the third turn.
  *
- * The board list is the one exception, and it is worth it: an agent that opens a
- * deck already knowing there are three boards called plan, risks and sources asks
+ * The card list is the one exception, and it is worth it: an agent that opens a
+ * deck already knowing there are three cards called plan, risks and sources asks
  * a better first question.
  *
  * **This file does not know where anything is.** `runtimeDir`, `decksCommands` and the rest were

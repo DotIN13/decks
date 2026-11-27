@@ -25,9 +25,9 @@ function open() {
 	const front = app.agents.create({ name: "Front", restored: { id: "front", context: [], inPlay: [], createdAt: 2 } });
 	const shows = app.agents.create({ name: "Shows", restored: { id: "shows", context: [], inPlay: [], createdAt: 1 } });
 	const pens = app.canvas.pens!;
-	front.seat.newStage("Front");
-	shows.seat.newStage("Shows");
-	pens.edit(shows.seat.stageName()!, [
+	front.seat.newCanvas("Front");
+	shows.seat.newCanvas("Shows");
+	pens.edit(shows.seat.canvasFolder()!, [
 		{ op: "insert", node: { type: "browser", id: "polls", name: "Polls", width: 600, height: 400, metadata: { type: "decks.app", name: "polls" } }, box: { x1: 0, y1: 0 } },
 		{ op: "insert", node: { type: "browser", id: "notes", name: "notes.md", width: 600, height: 400, metadata: { type: "decks.document", path: "docs/notes.md" } }, box: { x1: 800, y1: 0 } },
 	]);
@@ -37,12 +37,12 @@ function open() {
 test("a canvas shows an app or a document by an item of it on its drawing", () => {
 	const { front, shows, pens, cleanup } = open();
 	try {
-		assert.equal(canvasShowsApp(pens, shows.seat.stageName(), "polls"), true);
-		assert.equal(canvasShowsApp(pens, front.seat.stageName(), "polls"), false);
-		assert.equal(canvasShowsApp(pens, shows.seat.stageName(), "other"), false);
+		assert.equal(canvasShowsApp(pens, shows.seat.canvasFolder(), "polls"), true);
+		assert.equal(canvasShowsApp(pens, front.seat.canvasFolder(), "polls"), false);
+		assert.equal(canvasShowsApp(pens, shows.seat.canvasFolder(), "other"), false);
 		assert.equal(canvasShowsApp(pens, undefined, "polls"), false);
-		assert.equal(canvasShowsDocument(pens, shows.seat.stageName(), "docs/notes.md"), true);
-		assert.equal(canvasShowsDocument(pens, shows.seat.stageName(), "docs/other.md"), false);
+		assert.equal(canvasShowsDocument(pens, shows.seat.canvasFolder(), "docs/notes.md"), true);
+		assert.equal(canvasShowsDocument(pens, shows.seat.canvasFolder(), "docs/other.md"), false);
 	} finally {
 		cleanup();
 	}
@@ -58,11 +58,11 @@ test("an app acts for the conversation on a canvas showing it, whichever chat is
 		assert.equal(conversation.id, "shows");
 		const here = await tool.call("here", [], {});
 		assert.equal(here.ok, true, here.error);
-		assert.equal((here.value as { name: string }).name, shows.seat.stageName());
+		assert.equal((here.value as { name: string }).name, shows.seat.canvasFolder());
 		const note = await tool.call("canvas.insert", [{ type: "note", id: "from-app", content: "hello" }], {});
 		assert.equal(note.ok, true, note.error);
-		assert.ok(app.canvas.pens!.get(shows.seat.stageName()!).doc.children.some((one) => one.id === "from-app"), "the note is on the canvas showing the app");
-		assert.ok(!app.canvas.pens!.get(front.seat.stageName()!).doc.children.some((one) => one.id === "from-app"));
+		assert.ok(app.canvas.pens!.get(shows.seat.canvasFolder()!).doc.children.some((one) => one.id === "from-app"), "the note is on the canvas showing the app");
+		assert.ok(!app.canvas.pens!.get(front.seat.canvasFolder()!).doc.children.some((one) => one.id === "from-app"));
 	} finally {
 		cleanup();
 	}
@@ -82,7 +82,7 @@ test("an app's identity is its own: renaming itself touches nobody, and it has n
 		assert.deepEqual(app.agents.summaries().find((one) => one.id === "shows")?.tags, [], "and has no tags");
 		// What an app's own code may not do, each said in a sentence.
 		assert.match((await tool.call("ports", [{ open: 3000 }], {})).error ?? "", /An app's own code cannot open or close ports/);
-		assert.match((await tool.call("view.goto", [shows.seat.stageName()], {})).error ?? "", /agent/i);
+		assert.match((await tool.call("view.goto", [shows.seat.canvasFolder()], {})).error ?? "", /agent/i);
 	} finally {
 		cleanup();
 	}

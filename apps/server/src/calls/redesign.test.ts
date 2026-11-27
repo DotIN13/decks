@@ -43,7 +43,7 @@ async function open() {
 	type Answer = { ok: boolean; value?: any; error?: string; notes: string[] };
 	// The agent's own calls name the canvas it works on, the one its chat is on here (`names-canvas.test-helper.ts`); another caller's go as they are.
 	const call = async (verb: string, given: unknown[] = [], headers?: Record<string, string>): Promise<Answer> => {
-		const args = headers ? given : namingCanvas(verb, given, agent.seat.stageName(true));
+		const args = headers ? given : namingCanvas(verb, given, agent.seat.canvasFolder(true));
 		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...(headers ?? as(agent.id)) }, body: JSON.stringify({ args }) });
 		return (await response.json()) as Answer;
 	};
@@ -168,7 +168,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		const updated = (await must("agent.update", [{ canvas: other.name }])).value;
 		assert.equal(updated.canvas, other.name);
 		assert.equal((await must("here")).value.name, other.name);
-		assert.equal(agent.seat.stageName(), other.name);
+		assert.equal(agent.seat.canvasFolder(), other.name);
 		// The person's here is the canvas on screen they name.
 		const person = { authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id, "x-decks-stage": home };
 		assert.equal((await must("here", [], person)).value.name, home);

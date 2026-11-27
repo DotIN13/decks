@@ -94,7 +94,7 @@ export class ClaudeUsageReader {
 		 * the session's own cost still comes from the session.
 		 */
 		const moved = accounts && mine && this.startedOn() !== undefined && mine !== this.startedOn();
-		const windows = moved ? probeUsage(accounts.environmentFor(this.context.stageAgent.id, mine)).then((fresh) => fresh ?? plan) : plan;
+		const windows = moved ? probeUsage(accounts.environmentFor(this.context.toolAgent.id, mine)).then((fresh) => fresh ?? plan) : plan;
 		const [usage, identity] = await Promise.all([
 			windows,
 			accounts ? claudeIdentity(accounts.keychainDir(mine ?? accounts.active()?.id ?? "") || undefined) : Promise.resolve({} as Awaited<ReturnType<typeof claudeIdentity>>),

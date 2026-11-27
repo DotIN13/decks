@@ -44,7 +44,7 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 			report: () => {},
 			brief: (task: string) => task,
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);

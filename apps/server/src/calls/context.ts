@@ -104,7 +104,7 @@ export function verbContext(deps: { canvas: CanvasService; agent: AgentHooks; po
 	};
 	/** This agent's canvas folder, claimed the first time it draws. */
 	const needCanvas = () => {
-		const name = agent.stageName?.();
+		const name = agent.canvasName?.();
 		if (!name) throw new Error("This stage has no drawing: the server keeps no stage files.");
 		return name;
 	};
@@ -157,12 +157,12 @@ export function verbContext(deps: { canvas: CanvasService; agent: AgentHooks; po
 		if (callOn.canvas && pens?.has(callOn.canvas)) return callOn.canvas;
 		if (agent.here) return agent.here();
 		// The person acts where they are looking. An agent has no canvas of its own to fall back on: it names one.
-		return agent.person ? agent.stageName?.() : undefined;
+		return agent.person ? agent.canvasName?.() : undefined;
 	};
 	const cameraCanvas = (): string | undefined => {
 		const pens = service.pens;
 		if (callOn.canvas && pens?.has(callOn.canvas)) return callOn.canvas;
-		return agent.here?.() ?? agent.stageName?.();
+		return agent.here?.() ?? agent.canvasName?.();
 	};
 	const canvasOf = (asked?: unknown): string => {
 		const pens = needPens();
@@ -180,7 +180,7 @@ export function verbContext(deps: { canvas: CanvasService; agent: AgentHooks; po
 	};
 	const canvasRow = (name: string) => {
 		const pens = needPens();
-		const mine = agent.stageName?.();
+		const mine = agent.canvasName?.();
 		let cards = 0;
 		try {
 			cards = pens.cards.cards(name).length;

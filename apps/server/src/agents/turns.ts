@@ -55,7 +55,7 @@ export interface TurnsHost {
 	/** A line in the conversation that is nobody's message. */
 	notice(level: "info" | "warn" | "error", text: string): void;
 	/** The briefing a handed-over task is run with, composed when it runs (`Registry`). */
-	brief(task: string, boards: string[], person?: boolean): string;
+	brief(task: string, cards: string[], person?: boolean): string;
 	/** Deliver a finished item's report to the agent that asked for it, as a notice. */
 	report(agentId: string, text: string): void;
 	/** Set for an agent that works outside Decks: the app it runs in. */
@@ -69,10 +69,10 @@ export class Turns {
 	 * Work another agent handed over, waiting for this one to be quiet.
 	 *
 	 * Beside `pending` rather than in it, because they are different things arriving by
-	 * different routes. A nudge is a *fact* about a board that rides along with whatever the
+	 * different routes. A nudge is a *fact* about a card that rides along with whatever the
 	 * user says next and never wakes anybody; an item here is a *task*, and it runs a turn of
 	 * its own once nothing else is happening. Sharing one list would have meant either a task
-	 * that waits forever for a user who has gone to lunch, or a board edit that starts a turn
+	 * that waits forever for a user who has gone to lunch, or a card edit that starts a turn
 	 * nobody asked for.
 	 */
 	private work: QueuedWork[] = [];

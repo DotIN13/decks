@@ -48,7 +48,7 @@ test("a board an agent moved reads back moved, whoever the browser is looking at
 		// Both have the card up, so both have a place for it — as two agents on one project do.
 		for (const agent of [mover, elsewhere]) agent.seat.setInPlay(["canvases/t/cards/plan/index.html"], { place: true });
 		// Each canvas places its own copy of a library card (`deck/layout.ts`).
-		const plan = app.pens.cards.copyOf(mover.seat.stageName()!, "canvases/t/cards/plan/index.html");
+		const plan = app.pens.cards.copyOf(mover.seat.canvasFolder()!, "canvases/t/cards/plan/index.html");
 		const before = app.canvas.cards(mover.id).find((card) => card.path === plan)!;
 
 		// The person is reading the other conversation while this one works.
@@ -73,7 +73,7 @@ test("the other conversation's canvas is untouched, which is what made the stale
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		for (const agent of [mover, elsewhere]) agent.seat.setInPlay(["canvases/t/cards/risks/index.html"], { place: true });
-		const own = (agent: typeof mover) => app.pens.cards.copyOf(agent.seat.stageName()!, "canvases/t/cards/risks/index.html");
+		const own = (agent: typeof mover) => app.pens.cards.copyOf(agent.seat.canvasFolder()!, "canvases/t/cards/risks/index.html");
 		const before = app.canvas.cards(mover.id).find((card) => card.path === own(mover))!;
 
 		app.agents.look(elsewhere.id);

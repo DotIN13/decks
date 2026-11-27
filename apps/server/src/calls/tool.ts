@@ -1,7 +1,7 @@
 import { identityReminder } from "../agents/identity-reminder.ts";
 import { canvasNameReminder } from "../canvas/canvas-name.ts";
 import type { Verbs } from "@decks/sdk";
-import type { StageToolSpec } from "../agents/hooks.ts";
+import type { DecksToolSpec } from "../agents/hooks.ts";
 import type { CanvasSnapshot } from "../agents/work.ts";
 import { penWriter } from "../canvas/pens.ts";
 import { inCall, verbContext } from "./context.ts";
@@ -54,8 +54,8 @@ export interface CallResult {
 	images?: Array<{ data: string; mimeType: string }>;
 }
 
-export function createDecksTool(deps: StageToolSpec): DecksTool {
-	const { stage: service, agent, port } = deps;
+export function createDecksTool(deps: DecksToolSpec): DecksTool {
+	const { canvas: service, agent, port } = deps;
 	const ctx = verbContext({ canvas: service, agent, port });
 
 	/**
@@ -131,7 +131,7 @@ export function createDecksTool(deps: StageToolSpec): DecksTool {
 			if (!agent.person) {
 				const unsaid = identityReminder(agent.identity(), { afterCall: true });
 				if (unsaid) said.push(unsaid);
-				const unnamed = canvasNameReminder(service.pens, agent.stageName?.());
+				const unnamed = canvasNameReminder(service.pens, agent.canvasName?.());
 				if (unnamed) said.push(unnamed);
 			}
 			deps.persist?.(snapshot());

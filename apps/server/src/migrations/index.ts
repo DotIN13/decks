@@ -26,7 +26,7 @@ import { breakingPart, compareSemver, derivedVersion, holdsADeck, NONE, parseSem
  * | ------------------------------------------ | ------- | ------------------------------- |
  * | 2026-09-16, places in deck.json            | read where met | `deck/old-shapes.ts`, from `deck/schema.ts` |
  * | 2026-09-22, shared canvases to agents      | read where met | `agents/old-records.ts`, from `agents/registry.ts` |
- * | 2026-10-16, board lists into canvas files  | read where met | `agents/old-records.ts`, from `agents/session.ts` (adoptStage) |
+ * | 2026-10-16, board lists into canvas files  | read where met | `agents/old-records.ts`, from `agents/session.ts` (adoptCanvas) |
  * | 2026-10-16-stages-to-canvases.ts           | at open | `runAtOpen`, below              |
  * | 2026-10-20-standalone-canvases.ts          | at open | `runAtOpen`, below; once, after a backup, and recorded in `.decks/migrations.json` |
  * | 2026-10-21-isolation-removed.ts            | at open | `runAtOpen`, below; once, after a backup of what it changes, and recorded there too |

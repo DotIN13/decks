@@ -59,7 +59,7 @@ export function canvasShowsDocument(pens: Pens, canvas: string | undefined, file
 export function conversationForApp(host: { agents: Registry; canvas?: Pick<CanvasService, "pens"> }, name: string): DeckAgent {
 	const looking = host.agents.looking();
 	const all = looking ? [looking, ...host.agents.all().filter((one) => one !== looking)] : [...host.agents.all()];
-	return all.find((one) => canvasShowsApp(host.canvas?.pens, one.seat.stageName(), name)) ?? host.agents.focused();
+	return all.find((one) => canvasShowsApp(host.canvas?.pens, one.seat.canvasFolder(), name)) ?? host.agents.focused();
 }
 
 /** The tool an app's calls run through, and the conversation it acts for. */
@@ -85,7 +85,7 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "cards" | "
 		setInPlay: (paths, at) => conversation.seat.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
 		positions: () => conversation.seat.positions(),
 		setPosition: (path, x, y) => conversation.seat.setPosition(path, x, y),
-		camera: () => host.cameras.answer(conversation.id, conversation.seat.stageName?.()),
+		camera: () => host.cameras.answer(conversation.id, conversation.seat.canvasFolder?.()),
 		queue: () => conversation.turns.queue(),
 		agents: () => host.agents.summaries(),
 		// The sender is the conversation: a reply has to find somebody to land in, and an app has no inbox.
@@ -96,12 +96,12 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "cards" | "
 		create: (spec) => host.agents.createFor(conversation.id, spec),
 		// The app's canvas: the conversation's when it shows the app, else any that does.
 		here: () => {
-			if (canvasShowsApp(host.canvas.pens, conversation.seat.stageName?.(), name)) return conversation.seat.stageName?.();
+			if (canvasShowsApp(host.canvas.pens, conversation.seat.canvasFolder?.(), name)) return conversation.seat.canvasFolder?.();
 			const pens = host.canvas.pens;
-			return pens?.names().find((canvas) => canvasShowsApp(pens, canvas, name)) ?? conversation.seat.stageName?.();
+			return pens?.names().find((canvas) => canvasShowsApp(pens, canvas, name)) ?? conversation.seat.canvasFolder?.();
 		},
 		recordRevision: (path) => host.cards.recordRevision(path),
-		boardPathOf: (file) => host.cards.cardPathOf(file),
+		cardPathOf: (file) => host.cards.cardPathOf(file),
 	};
-	return { tool: createDecksTool({ stage: host.canvas, agent: actor, port: host.port }), conversation };
+	return { tool: createDecksTool({ canvas: host.canvas, agent: actor, port: host.port }), conversation };
 }

@@ -46,8 +46,8 @@ export function agentTable(host: AgentTableHost): PersonVerbs {
 			const workspace = given.workspace ?? (typeof given.near === "string" ? agents.get(given.near)?.workspace : undefined);
 			const latest = agents.latestCanvas(workspace, agent.id);
 			try {
-				if (latest) agent.seat.openStage(latest);
-				else agent.seat.newStage?.(agent.chat().name, { provisional: true });
+				if (latest) agent.seat.openCanvas(latest);
+				else agent.seat.newCanvas?.(agent.chat().name, { provisional: true });
 			} catch {
 				/* a name clash or a canvas gone meanwhile: the agent still works, on a canvas of its own once it needs one */
 			}
@@ -60,17 +60,17 @@ export function agentTable(host: AgentTableHost): PersonVerbs {
 			const { agent, made, token } = agents.attach({ key: String(given.key ?? ""), ...(given.client ? { client: given.client } : {}), ...(given.name ? { name: given.name } : {}), ...(given.workspace ? { workspace: given.workspace } : {}) });
 			if (!token) throw new Error("This harness hands out no agent tokens.");
 			// Its home canvas: the one asked for, else as a new agent's is found, the latest of its workspace or one of its own.
-			if (given.canvas || (made && !agent.seat.stageName())) {
+			if (given.canvas || (made && !agent.seat.canvasFolder())) {
 				try {
 					const latest = given.canvas ?? agents.latestCanvas(agent.workspace, agent.id);
-					if (latest) agent.seat.openStage(latest);
-					else agent.seat.newStage?.(agent.chat().name, { provisional: true });
+					if (latest) agent.seat.openCanvas(latest);
+					else agent.seat.newCanvas?.(agent.chat().name, { provisional: true });
 				} catch {
 					/* a canvas gone meanwhile: it has one once it draws */
 				}
 				host.publishStages();
 			}
-			const canvas = agent.seat.stageName();
+			const canvas = agent.seat.canvasFolder();
 			return { id: agent.id, name: agent.chat().name, token, made, ...(canvas ? { canvas } : {}) };
 		},
 		"agent.set": async ([id, patch], call) => {

@@ -26,7 +26,7 @@ const UNTITLED = "Untitled canvas";
 export interface SeatHost {
 	readonly id: string;
 	readonly deck: Deck;
-	readonly stage: CanvasService;
+	readonly canvas: CanvasService;
 	emit(message: ServerMessage): void;
 	/** Something the record keeps changed: write it shortly. */
 	save(): void;
@@ -46,12 +46,12 @@ export interface SeatStart {
 }
 
 /**
- * Where a stage put its boards, if the stored value is one.
+ * Where a canvas put its cards, if the stored value is one.
  *
  * The one validator for two readers — a restored record and a rewind's snapshot — because they are the
  * same map arriving by different roads and used to have a copy of this loop each. A pair of finite
  * numbers per path and nothing else: entries that are not that are dropped rather than the whole map,
- * so one hand-edit cannot cost a stage its whole arrangement.
+ * so one hand-edit cannot cost a canvas its whole arrangement.
  */
 export function cleanPlaces(raw: unknown): Record<string, { x: number; y: number }> | undefined {
 	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
@@ -67,33 +67,33 @@ export function cleanPlaces(raw: unknown): Record<string, { x: number; y: number
 
 export class Seat {
 	/**
-	 * The boards this agent is holding, most-recently-touched first.
+	 * The cards this agent is holding, most-recently-touched first.
 	 *
 	 * The order used to be insertion order, which is how `decks.agent.list()` ended up answering
 	 * "what is this agent working on" with everything it had ever held, oldest first. A held
-	 * board is a decision the agent made — attaching one is it saying *this is what I am
+	 * card is a decision the agent made — attaching one is it saying *this is what I am
 	 * working from* — so the recent end is the answer to the question, and the rest of the
-	 * list is history. The touch sites (`stage.attach`, a new board, a first `decks.canvas.insert`) put the
-	 * newest board at the front; `setContext` keeps whatever order it is given. Re-attaching a
-	 * board is a fresh touch, which is why `attach` moves it to the front rather than leaving
+	 * list is history. The touch sites (`stage.attach`, a new card, a first `decks.canvas.insert`) put the
+	 * newest card at the front; `setContext` keeps whatever order it is given. Re-attaching a
+	 * card is a fresh touch, which is why `attach` moves it to the front rather than leaving
 	 * it where it sat.
 	 */
 	private held: string[] = [];
 	/**
-	 * With no stage file to hold them (a host that keeps none), the boards this session was given to
-	 * show. With one, the stage's boards are the file's (`playing`).
+	 * With no canvas file to hold them (a host that keeps none), the cards this session was given to
+	 * show. With one, the canvas's cards are the file's (`playing`).
 	 */
 	private loosePlaying: string[] = [];
-	/** The boards a restored record had on its stage, written in once if the stage file has none (`adoptStage`). */
+	/** The cards a restored record had on its canvas, written in once if the canvas file has none (`adoptCanvas`). */
 	private restoredPlaying: string[] | undefined;
 	/**
-	 * Where this agent last had each board it took off its stage, by path, so showing it again puts it
-	 * back. The places of boards on the stage are the stage file's own.
+	 * Where this agent last had each card it took off its canvas, by path, so showing it again puts it
+	 * back. The places of cards on the canvas are the canvas file's own.
 	 */
 	private places: Record<string, { x: number; y: number }> = {};
 	/** Where a new agent's first canvas comes from (`options.firstCanvas`); asked once, then let go. */
 	private firstCanvas: ((self: string) => string | undefined) | undefined;
-	/** The folder its stage drawing lives in, once it has one (`canvas/pens.ts`). */
+	/** The folder its canvas drawing lives in, once it has one (`canvas/pens.ts`). */
 	private folder: string | undefined;
 
 	/*
@@ -140,14 +140,14 @@ export class Seat {
 	}
 
 	/**
-	 * The folder this agent's stage drawing lives in (`canvas/pens.ts`).
+	 * The folder this agent's canvas drawing lives in (`canvas/pens.ts`).
 	 *
 	 * Named the first time it is needed with `claim`, from the agent's name at that moment, and
 	 * kept on the record — a rename later leaves the folder where it is.
 	 */
-	stageName(claim = false): string | undefined {
+	canvasFolder(claim = false): string | undefined {
 		if (this.folder || !claim) return this.folder;
-		const pens = this.of.stage.pens;
+		const pens = this.of.canvas.pens;
 		if (!pens) return undefined;
 		// A new agent joins the latest canvas of its workspace; with none, it gets one of its own.
 		const joined = this.firstCanvas?.(this.of.id);
@@ -158,36 +158,36 @@ export class Seat {
 		return this.folder;
 	}
 
-	// --- the stage file (`canvas/pens.ts`) ----------------------------------------------------------
+	// --- the canvas file (`canvas/pens.ts`) ----------------------------------------------------------
 	/*
-	 * A stage is a `.pen` file, and its boards are pen `browser` items in it. The file is the one record
-	 * of which boards are on the stage, where, and how big: this session keeps no copy of them. It reads
-	 * the file when it needs the boards, and writes each change to it as one operation on one board, so
-	 * several agents on one stage, and a person on it, never put back each other's work.
+	 * A canvas is a `.pen` file, and its cards are pen `browser` items in it. The file is the one record
+	 * of which cards are on the canvas, where, and how big: this session keeps no copy of them. It reads
+	 * the file when it needs the cards, and writes each change to it as one operation on one card, so
+	 * several agents on one canvas, and a person on it, never put back each other's work.
 	 *
-	 * What it does keep is its own: the boards it holds (`held`), and where it last had a board it took
-	 * off the stage (`places`), so showing that board again puts it back where it was.
+	 * What it does keep is its own: the cards it holds (`held`), and where it last had a card it took
+	 * off the canvas (`places`), so showing that card again puts it back where it was.
 	 */
 
-	/** This agent's stage, when there is a file for it. */
+	/** This agent's canvas, when there is a file for it. */
 	canvasName(): string | undefined {
-		const pens = this.of.stage.pens;
+		const pens = this.of.canvas.pens;
 		const name = this.folder;
 		return pens && name && pens.has(name) ? name : undefined;
 	}
 
-	/** The deck's boards on this agent's stage, as the file has them. */
+	/** The deck's cards on this agent's canvas, as the file has them. */
 	private onCanvas(): OnCanvas[] {
 		const name = this.canvasName();
-		return name ? cardsOn(this.of.stage.pens!, this.of.deck, name) : [];
+		return name ? cardsOn(this.of.canvas.pens!, this.of.deck, name) : [];
 	}
 
-	/** The boards on the stage: the file's, or, with no stage file, the ones this session was given. */
+	/** The cards on the canvas: the file's, or, with no canvas file, the ones this session was given. */
 	private get playing(): string[] {
 		return this.canvasName() ? this.onCanvas().map((one) => one.path) : this.loosePlaying;
 	}
 
-	/** Where the stage has its boards, and where this agent last had the ones it took off. */
+	/** Where the canvas has its cards, and where this agent last had the ones it took off. */
 	positions(): Record<string, { x: number; y: number }> {
 		const out: Record<string, { x: number; y: number }> = { ...this.places };
 		for (const one of this.onCanvas()) out[one.path] = { x: one.x, y: one.y };
@@ -210,47 +210,47 @@ export class Seat {
 		const state = this.of.deck.state(this.positions(), (path, at) => seeded.push({ path, ...at }), this.inPlay);
 		if (!this.canvasName()) for (const { path, x, y } of seeded) this.setPosition(path, x, y);
 		// The size the canvas draws each card at is its item's in the canvas file; a card the seat does not hold keeps its file's size.
-		const sizes = this.boardSizes();
-		const boards = state.boards.map((board) => {
-			const size = sizes[board.path];
-			return size && (size.w !== board.w || size.h !== board.h) ? { ...board, w: size.w, h: size.h } : board;
+		const sizes = this.cardSizes();
+		const cards = state.boards.map((card) => {
+			const size = sizes[card.path];
+			return size && (size.w !== card.w || size.h !== card.h) ? { ...card, w: size.w, h: size.h } : card;
 		});
-		return { ...state, boards };
+		return { ...state, boards: cards };
 	}
 
-	/** How big the stage draws its boards: its file's sizes. */
-	private boardSizes(): Record<string, { w: number; h: number }> {
+	/** How big the canvas draws its cards: its file's sizes. */
+	private cardSizes(): Record<string, { w: number; h: number }> {
 		const out: Record<string, { w: number; h: number }> = {};
 		for (const one of this.onCanvas()) out[one.path] = { w: one.w, h: one.h };
 		return out;
 	}
 
 	/**
-	 * Size one board on this agent's stage, in its file. Nothing else sizes a board: a browser's
+	 * Size one card on this agent's canvas, in its file. Nothing else sizes a card: a browser's
 	 * measurement does not, and neither does a new revision of its file. `decks.canvas.fit` and `decks.canvas.update`
-	 * call this; a person's drag sizes the board on the stage on screen, by name (`calls/person-canvas.ts`).
+	 * call this; a person's drag sizes the card on the canvas on screen, by name (`calls/person-canvas.ts`).
 	 */
 	setSize(path: string, size: { w?: number; h?: number }): void {
 		const name = this.canvasName();
 		if (!name) return;
-		this.of.stage.pens!.cards.sizeCard(name, path, size);
+		this.of.canvas.pens!.cards.sizeCard(name, path, size);
 	}
 
 	/**
-	 * Move one board on this agent's stage, in its file; a board not on it is remembered at that place,
+	 * Move one card on this agent's canvas, in its file; a card not on it is remembered at that place,
 	 * for when it is shown.
 	 */
 	setPosition(path: string, x: number, y: number): void {
 		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 		const name = this.canvasName();
-		if (name && this.of.stage.pens!.cards.moveCard(name, path, x, y)) return;
+		if (name && this.of.canvas.pens!.cards.moveCard(name, path, x, y)) return;
 		this.places[path] = { x: Math.round(x), y: Math.round(y) };
 		this.of.save();
 	}
 
 	/**
-	 * The stage file changed, by anyone. Its boards are read from it whenever they are needed, so all
-	 * there is to do is take up a board that joined the stage and say that it changed.
+	 * The canvas file changed, by anyone. Its cards are read from it whenever they are needed, so all
+	 * there is to do is take up a card that joined the canvas and say that it changed.
 	 */
 	penChanged(): void {
 		if (!this.canvasName()) return;
@@ -262,14 +262,14 @@ export class Seat {
 	}
 
 	/**
-	 * After a restore. A stage file with boards in it is the truth. A chat whose boards are only in its
-	 * record (every chat from before boards moved into the file) writes them in, once.
+	 * After a restore. A canvas file with cards in it is the truth. A chat whose cards are only in its
+	 * record (every chat from before cards moved into the file) writes them in, once.
 	 */
-	adoptStage(): void {
-		if (!this.of.stage.pens) return;
+	adoptCanvas(): void {
+		if (!this.of.canvas.pens) return;
 		const restored = this.restoredPlaying;
 		this.restoredPlaying = undefined;
-		// A record's own list of boards, from before deck version 0.1.0: only in a deck old enough to hold one (`old-records.ts`).
+		// A record's own list of cards, from before deck version 0.1.0: only in a deck old enough to hold one (`old-records.ts`).
 		const adopt = this.of.deck.readsOldShapes ? recordedBoardsToAdopt(this.onCanvas().length, restored) : [];
 		if (adopt.length === 0) {
 			if (this.canvasName()) this.penChanged();
@@ -279,16 +279,16 @@ export class Seat {
 	}
 
 	/**
-	 * Put the chat's camera on another canvas: the browser is sent its drawing, and its boards are the ones this agent sees.
+	 * Put the chat's camera on another canvas: the browser is sent its drawing, and its cards are the ones this agent sees.
 	 *
 	 * The agent is told nothing of it. An agent has no home canvas and names the canvas in every call
 	 * (`calls/context.ts`), so a move changes nothing about where its work lands, and every message the
 	 * person writes says what they were looking at (`looking-at.ts`). It was told, in a note that called
 	 * the canvas its home and said calls would act there, once for every tab the person looked at
-	 * between two messages. Only a canvas deleted from under it is still said (`stageDeleted`).
+	 * between two messages. Only a canvas deleted from under it is still said (`canvasDeleted`).
 	 */
-	openStage(name: string): void {
-		const pens = this.of.stage.pens;
+	openCanvas(name: string): void {
+		const pens = this.of.canvas.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". decks canvas list lists them; decks canvas create <title> makes one.`);
 		if (name === this.folder) return;
@@ -300,10 +300,10 @@ export class Seat {
 	}
 
 	/**
-	 * A stage was renamed (`canvas/admin.ts`). If it is this agent's, it follows: the stage's
-	 * name, and the paths of boards kept in its folder, wherever this session holds them.
+	 * A canvas was renamed (`canvas/admin.ts`). If it is this agent's, it follows: the canvas's
+	 * name, and the paths of cards kept in its folder, wherever this session holds them.
 	 */
-	stageRenamed(from: string, to: string, repoint: (path: string) => string): void {
+	canvasRenamed(from: string, to: string, repoint: (path: string) => string): void {
 		if (this.folder !== from) return;
 		this.folder = to;
 		this.held = this.held.map(repoint);
@@ -320,7 +320,7 @@ export class Seat {
 	 * the cards it held there are gone with the canvas's folder. It is told so with its next message,
 	 * by the canvas's name, since a call that names that canvas would now be refused.
 	 */
-	stageDeleted(name: string): void {
+	canvasDeleted(name: string): void {
 		if (this.folder !== name) return;
 		const gone = (path: string) => !this.of.deck.card(path);
 		this.held = this.held.filter((path) => !gone(path));
@@ -328,25 +328,25 @@ export class Seat {
 		this.folder = undefined;
 		this.loosePlaying = [];
 		this.of.save();
-		const pens = this.of.stage.pens;
+		const pens = this.of.canvas.pens;
 		if (!pens) return void this.publishContext();
-		const fresh = this.newStage("");
+		const fresh = this.newCanvas("");
 		this.of.tell(`[The canvas "${name}" was deleted, with the cards on it. Your chat's camera is on a new, empty canvas now (--canvas ${fresh}).]`);
 	}
 
-	/** A new, empty stage, named from a title, and opened. Returns its folder name. */
-	newStage(title: string, options: { provisional?: boolean } = {}): string {
-		const pens = this.of.stage.pens;
+	/** A new, empty canvas, named from a title, and opened. Returns its folder name. */
+	newCanvas(title: string, options: { provisional?: boolean } = {}): string {
+		const pens = this.of.canvas.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		const name = pens.claim(title.trim() || UNTITLED, { provisional: options.provisional === true || !title.trim() });
-		this.openStage(name);
+		this.openCanvas(name);
 		return name;
 	}
 
 	/**
 	 * Set what the agent holds. `held` is most-recently-touched first, and the callers build the
-	 * argument that way. What it holds is its own; the stage is shared, so letting go of a board here
-	 * leaves it on the stage for whoever else is on it.
+	 * argument that way. What it holds is its own; the canvas is shared, so letting go of a card here
+	 * leaves it on the canvas for whoever else is on it.
 	 */
 	setContext(paths: string[]): void {
 		this.held = paths.filter((path, index) => paths.indexOf(path) === index);
@@ -354,33 +354,33 @@ export class Seat {
 	}
 
 	/**
-	 * Set what is on this agent's stage, in its file: boards not on it are put on it, and boards on it
+	 * Set what is on this agent's canvas, in its file: cards not on it are put on it, and cards on it
 	 * that are not wanted are taken off, their places remembered here for when they are shown again.
-	 * Anything shown is held, so showing is also taking it up. The callers build `paths` from the stage
-	 * as the file has it now (`inPlay`), so a board another agent put on the stage a moment ago stays.
+	 * Anything shown is held, so showing is also taking it up. The callers build `paths` from the canvas
+	 * as the file has it now (`inPlay`), so a card another agent put on the canvas a moment ago stays.
 	 *
-	 * `at` places the boards named in it; every other joining board gets a place by the stage's rule
-	 * (`placeJoining`). `place` is kept for the callers that pass it: every joining board is placed.
+	 * `at` places the cards named in it; every other joining card gets a place by the canvas's rule
+	 * (`placeJoining`). `place` is kept for the callers that pass it: every joining card is placed.
 	 */
 	setInPlay(paths: string[], options: { place?: boolean; at?: Record<string, { x: number; y: number }> } = {}): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
-		// A board shown for the first time is the most recent touch, so it leads the held list.
+		// A card shown for the first time is the most recent touch, so it leads the held list.
 		const hold = (list: string[]) => {
 			for (const path of [...list].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		};
-		const pens = this.of.stage.pens;
-		const name = pens ? this.stageName(true) : undefined;
+		const pens = this.of.canvas.pens;
+		const name = pens ? this.canvasFolder(true) : undefined;
 		if (!pens || !name || !pens.has(name)) {
 			hold(wanted);
-			// No stage file: the places are this session's own, by the same rule (`deck/place.ts`).
+			// No canvas file: the places are this session's own, by the same rule (`deck/place.ts`).
 			const spots = joinPlaces({
 				wanted,
 				...(options.at ? { at: options.at } : {}),
 				playing: this.loosePlaying.filter((path) => this.places[path]),
 				places: this.places,
 				size: (path) => {
-					const board = this.of.deck.card(path);
-					return board ? { w: board.w, h: board.h } : undefined;
+					const card = this.of.deck.card(path);
+					return card ? { w: card.w, h: card.h } : undefined;
 				},
 			});
 			Object.assign(this.places, spots);
@@ -390,7 +390,7 @@ export class Seat {
 			this.publishContext();
 			return;
 		}
-		// A board from elsewhere is the canvas's own copy of it (`deck/layout.ts`), made now if it has none.
+		// A card from elsewhere is the canvas's own copy of it (`deck/layout.ts`), made now if it has none.
 		const own = wanted.map((path) => pens.cards.ownPath(name, path));
 		/*
 		 * What is held is what is on the canvas: the copies, never the other canvas's cards they came
@@ -413,11 +413,11 @@ export class Seat {
 	}
 
 	/**
-	 * Forget a board that no longer exists.
+	 * Forget a card that no longer exists.
 	 *
-	 * A deleted board left in context is worse than it sounds: the rail resolves held
+	 * A deleted card left in context is worse than it sounds: the rail resolves held
 	 * paths against the deck and the canvas filters the deck by what is in play, so one
-	 * dead path is enough to make an agent that holds only that board show an empty rail
+	 * dead path is enough to make an agent that holds only that card show an empty rail
 	 * and an empty canvas — and because the context is not empty, the "holding nothing
 	 * shows the whole deck" fallback does not fire. It reads as the deck being gone.
 	 */
@@ -428,14 +428,14 @@ export class Seat {
 		this.loosePlaying = this.loosePlaying.filter((one) => one !== path);
 		delete this.places[path];
 		const name = this.canvasName();
-		if (playing && name) this.of.stage.pens!.cards.removeCards(name, [path]);
+		if (playing && name) this.of.canvas.pens!.cards.removeCards(name, [path]);
 		this.publishContext();
 		return true;
 	}
 
 	private publishContext(): void {
 		this.of.emit({ type: "agent.context", agentId: this.of.id, boards: [...this.held], inPlay: [...this.playing] });
-		// The boards are part of the record, and this is not a transcript change, so the
+		// The cards are part of the record, and this is not a transcript change, so the
 		// translator's hook does not cover it.
 		this.of.save();
 	}
@@ -448,7 +448,7 @@ export class Seat {
 	private seen = new Map<string, { rev: number; doc: PenDocument }>();
 	/** The notes `prompt()` puts first, and takes them: each call compares with the one before. */
 	canvasNotes(): string[] {
-		const pens = this.of.stage.pens;
+		const pens = this.of.canvas.pens;
 		if (!pens) return [];
 		const names = new Set([...(this.folder ? [this.folder] : []), ...pens.log.takeWritten(this.of.id), ...this.seen.keys()]);
 		const agents = this.of.agents();

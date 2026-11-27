@@ -2,7 +2,7 @@
  * Whether a message in a runtime's session is the one the transcript shows.
  *
  * The session holds what the model was sent, which is not always what was typed: the session
- * prefixes reminders (`identityReminder`, `canvasNameReminder`, a board the user moved),
+ * prefixes reminders (`identityReminder`, `canvasNameReminder`, a card the user moved),
  * followed by a blank line, and a runtime may append to the end. So the shown text is either
  * where the sent text starts or right after a blank line in it. Comparing the start alone
  * paired nothing after the first reminder, and those messages had no rewind, fork or preview.

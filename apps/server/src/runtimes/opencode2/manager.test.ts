@@ -32,7 +32,7 @@ function managerWith(home = "/home/someone") {
 	return { manager, spawned };
 }
 
-const SPEC = { cwd: "/deck", stageUrl: "http://127.0.0.1:4329/api/stage/eval", config: { plugins: ["/runtime/opencode2/plugin"], skills: ["/runtime/skills"] } };
+const SPEC = { cwd: "/deck", decksUrl: "http://127.0.0.1:4329/api/stage/eval", config: { plugins: ["/runtime/opencode2/plugin"], skills: ["/runtime/skills"] } };
 
 test("the server is started in its own folders, never opencode 1's", async () => {
 	const { manager, spawned } = managerWith("/home/someone");

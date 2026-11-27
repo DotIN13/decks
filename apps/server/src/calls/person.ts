@@ -15,10 +15,10 @@ export function personAgent(context: { agents: Registry; pens?: CanvasPens | und
 	const named = asked.agent ? context.agents.get(asked.agent) : undefined;
 	const fallback = named ?? context.agents.focused();
 	const canvas = asked.canvas && context.pens?.has(asked.canvas) ? asked.canvas : undefined;
-	if (!canvas || fallback.seat.stageName() === canvas) return fallback;
+	if (!canvas || fallback.seat.canvasFolder() === canvas) return fallback;
 	const looking = context.agents.looking();
-	if (looking?.seat.stageName() === canvas) return looking;
-	return context.agents.all().find((one) => one.seat.stageName() === canvas) ?? fallback;
+	if (looking?.seat.canvasFolder() === canvas) return looking;
+	return context.agents.all().find((one) => one.seat.canvasFolder() === canvas) ?? fallback;
 }
 
 /**

@@ -13,7 +13,7 @@ import type { CanvasSnapshot } from "./work.ts";
  *
  * **In memory, not on disk** — still, but not for the reason first given here. That reason
  * was "nothing recreates agents when the server restarts, so a snapshot has nothing to
- * survive *to*", and `agents/store.ts` made it false: a chat is now restored with the boards
+ * survive *to*", and `agents/store.ts` made it false: a chat is now restored with the cards
  * it was holding. The resolved sets live in that record, which is the thing that had to be
  * durable.
  *
@@ -25,7 +25,7 @@ import type { CanvasSnapshot } from "./work.ts";
  *
  * Kept as a series rather than one value per agent, because a rewind asks a question about
  * the past: *what was on the canvas at that point?* Resolved by time, the same way
- * `App.boardsAt` resolves which revision of a board to show — one idea, used twice.
+ * `App.cardsAt` resolves which revision of a card to show — one idea, used twice.
  */
 
 interface Recorded {
@@ -39,7 +39,7 @@ const KEEP = 200;
 export class AgentStateStore {
 	private readonly series = new Map<string, Recorded[]>();
 
-	/** Note what the stage looked like after a run. */
+	/** Note what the canvas looked like after a run. */
 	record(agentId: string, snapshot: CanvasSnapshot, at = Date.now()): void {
 		const kept = this.series.get(agentId) ?? [];
 		kept.push({ at, snapshot });
@@ -53,7 +53,7 @@ export class AgentStateStore {
 	}
 
 	/**
-	 * What the stage looked like at a moment — the newest snapshot taken at or before it.
+	 * What the canvas looked like at a moment — the newest snapshot taken at or before it.
 	 *
 	 * Scanned rather than indexed, and not assuming the series is sorted: `record` is
 	 * called from a tool run and a clock is not a guarantee of order.
@@ -71,7 +71,7 @@ export class AgentStateStore {
 	 * Give a forked agent its parent's history up to the fork point.
 	 *
 	 * A fork opens a conversation that already happened, so it should open with the canvas
-	 * that conversation had — not with an empty context that makes the boards look lost.
+	 * that conversation had — not with an empty context that makes the cards look lost.
 	 */
 	seed(fromAgentId: string, toAgentId: string, upTo: number): void {
 		const source = (this.series.get(fromAgentId) ?? []).filter((entry) => entry.at <= upTo);

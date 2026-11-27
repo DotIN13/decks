@@ -99,7 +99,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 
 	// The agent in these tests works on its canvas, "ada", and its calls name it (`names-canvas.test-helper.ts`).
 	const tool = onCanvas(createDecksTool({
-		stage: service,
+		canvas: service,
 		port: 4329,
 		agent: {
 			id: "a1",
@@ -134,8 +134,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			queue: () => waiting,
 			recordRevision: () => undefined,
 			worked: (path) => void worked.push(path),
-			boardPathOf: () => undefined,
-			stageName: () => "ada",
+			cardPathOf: () => undefined,
+			canvasName: () => "ada",
 		},
 	}), "ada");
 	/** The deck's canvases, which `card.create` and every canvas call need. */
@@ -736,7 +736,7 @@ test("a person's hide takes off only what it names", async () => {
 	let up: string[] = ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html", "canvases/t/cards/c/index.html"];
 	let held: string[] = [];
 	const tool = createDecksTool({
-		stage: service,
+		canvas: service,
 		port: 4329,
 		agent: {
 			id: "a1",
@@ -755,7 +755,7 @@ test("a person's hide takes off only what it names", async () => {
 			send: () => ({ queued: true, position: 1 }),
 			queue: () => [],
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 	});
 

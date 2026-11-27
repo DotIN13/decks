@@ -35,7 +35,7 @@ async function open() {
 	const bearer = (one: string) => ({ authorization: `Bearer ${one}` });
 	// The agent's own calls name the canvas it works on, the one its chat is on here (`names-canvas.test-helper.ts`); another caller's go as they are.
 	const call = async (verb: string, given: unknown[] = [], headers?: Record<string, string>) => {
-		const args = headers ? given : namingCanvas(verb, given, agent.seat.stageName(true));
+		const args = headers ? given : namingCanvas(verb, given, agent.seat.canvasFolder(true));
 		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...(headers ?? bearer(token)) }, body: JSON.stringify({ args }) });
 		// A refusal at the gate is a sentence, not the verbs' JSON.
 		const text = await response.text();
@@ -169,7 +169,7 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 		await assert.rejects(run("sh", ["-c", 'decks card create --title "From the shell"'], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /Name the canvas this call works on: --canvas/.test(error.stderr));
 		// `decks here` says which canvas the person has open beside its chat; the call that names it goes through.
 		const here = JSON.parse((await run("sh", ["-c", "decks here"], { env })).stdout) as { name: string };
-		assert.equal(here.name, agent.seat.stageName(true));
+		assert.equal(here.name, agent.seat.canvasFolder(true));
 		const made = await run("sh", ["-c", `decks card create --title "From the shell" --canvas ${here.name}`], { env });
 		assert.match(made.stdout, new RegExp(`canvases/${here.name}/cards/from-the-shell/`));
 		assert.ok(made.stderr.trim().length > 0, `the notes reach the shell on stderr: ${made.stderr}`);
@@ -187,7 +187,7 @@ test("an agent names the canvas in every canvas call; the person's acts where th
 			return (await response.json()) as { ok: boolean; value?: any; error?: string; notes?: string[] };
 		};
 		const asAgent = { authorization: `Bearer ${token}` };
-		const camera = agent.seat.stageName(true)!;
+		const camera = agent.seat.canvasFolder(true)!;
 		const other = app.pens.claim("Somewhere else");
 		// Every canvas call an agent makes with no canvas is refused, reading and writing alike, and nothing is written.
 		for (const [verb, args] of [["canvas.read", []], ["canvas.insert", [{ type: "note", content: "x" }]], ["canvas.batch", [[{ op: "insert", item: { type: "note", content: "x" } }]]], ["card.create", [{ title: "No canvas" }]], ["canvas.rename", ["A name"]], ["view.focus", ["some-item"]]] as Array<[string, unknown[]]>) {
@@ -200,7 +200,7 @@ test("an agent names the canvas in every canvas call; the person's acts where th
 		assert.ok(there.ok, there.error);
 		assert.deepEqual((app.pens.get(other).doc.children ?? []).map((one) => one.id), ["n-there"]);
 		// The camera moved by the person (their canvas switcher) changes nothing about where the agent's next call lands.
-		agent.seat.openStage(other);
+		agent.seat.openCanvas(other);
 		const still = await raw("canvas.insert", [{ type: "note", id: "n-first", content: "first" }, { canvas: camera }], asAgent);
 		assert.ok(still.ok, still.error);
 		assert.deepEqual((app.pens.get(camera).doc.children ?? []).map((one) => one.id), ["n-first"]);

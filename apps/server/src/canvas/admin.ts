@@ -24,7 +24,7 @@ interface Context {
 }
 
 function refuseIfBusy(context: Context, name: string, verb: string): void {
-	const busy = context.agents.find((agent) => agent.seat.stageName(false) === name && agent.conversation.running);
+	const busy = context.agents.find((agent) => agent.seat.canvasFolder(false) === name && agent.conversation.running);
 	if (busy) throw new Error(`${busy.name} is working on "${name}" right now; ${verb} it when that turn ends.`);
 }
 
@@ -50,7 +50,7 @@ function moveCanvas(context: Context, from: string, to: string): string {
 	context.deck.reload();
 	// The links to it on every canvas, and to what is kept in it, follow it to its new folder.
 	linksFollow(context.pens, { did: "moved", from, to });
-	for (const agent of context.agents) agent.seat.stageRenamed(from, to, repoint);
+	for (const agent of context.agents) agent.seat.canvasRenamed(from, to, repoint);
 	return to;
 }
 
@@ -70,7 +70,7 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 	if (!unchosen) return name;
 	if (slug(clean, 40) === name || !slug(clean, 40)) return name;
 	const keepsCards = existsSync(join(context.deck.path, canvasFolder(name), "cards"));
-	if (keepsCards && context.agents.some((agent) => agent.seat.stageName(false) === name && agent.conversation.running)) return name;
+	if (keepsCards && context.agents.some((agent) => agent.seat.canvasFolder(false) === name && agent.conversation.running)) return name;
 	return moveCanvas(context, name, context.pens.freshName(clean));
 }
 
@@ -83,6 +83,6 @@ export function deleteCanvas(context: Context, name: string): { boards: number }
 	context.deck.reload();
 	// A chip that pointed at it, or at something kept in it, stays where it is, dimmed.
 	linksFollow(context.pens, { did: "removed", canvas: name });
-	for (const agent of context.agents) agent.seat.stageDeleted(name);
+	for (const agent of context.agents) agent.seat.canvasDeleted(name);
 	return { boards: cards };
 }

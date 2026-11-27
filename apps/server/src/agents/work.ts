@@ -17,7 +17,7 @@ import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@dec
  */
 export interface SendSpec {
 	task: string;
-	/** Boards handed over: the receiver is given their source when the item runs. */
+	/** Cards handed over: the receiver is given their source when the item runs. */
 	boards?: string[];
 	/**
 	 * Tell the sender when the work is done.
@@ -87,10 +87,10 @@ export interface CanvasSnapshot {
 	/** What was on the canvas — a set, so a rewind restores the whole view. */
 	inPlay: string[];
 	/**
-	 * Where this stage had put its boards, so a rewind restores the arrangement too.
+	 * Where this canvas had put its cards, so a rewind restores the arrangement too.
 	 *
 	 * Optional, and the only member here that is: a snapshot written before this existed has no
-	 * `positions`, and restoring one must leave the stage to `arrange` rather than to nothing.
+	 * `positions`, and restoring one must leave the canvas to `arrange` rather than to nothing.
 	 */
 	positions?: Record<string, { x: number; y: number }>;
 	camera: Camera;

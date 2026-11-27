@@ -85,11 +85,11 @@ export function gestures(ctx: VerbContext): Gestures {
 		/** Put the conversation on another canvas, picked in the canvas manager (`agent.stage`): by its folder or its title. */
 		open: async (name: string) => {
 			if (typeof name !== "string" || !name.trim()) throw new Error("Name a canvas to open.");
-			if (!agent.openStage) throw new Error("This conversation cannot change canvases.");
+			if (!agent.openCanvas) throw new Error("This conversation cannot change canvases.");
 			const pens = service.pens;
 			const asked = name.trim();
 			const folder = pens && !pens.names().includes(asked) ? (pens.names().find((one) => pens.titleOf(one).toLowerCase() === asked.toLowerCase()) ?? asked) : asked;
-			agent.openStage(folder);
+			agent.openCanvas(folder);
 			service.stagesChanged();
 			return { stage: folder };
 		},
@@ -97,8 +97,8 @@ export function gestures(ctx: VerbContext): Gestures {
 		/** A new, empty canvas named from a title, opened for the conversation at once (`stage.new`). */
 		newStage: async (title: string) => {
 			if (typeof title !== "string" || !title.trim()) throw new Error("A new canvas needs a title.");
-			if (!agent.newStage) throw new Error("This conversation cannot make canvases.");
-			const made = agent.newStage(title.trim());
+			if (!agent.newCanvas) throw new Error("This conversation cannot make canvases.");
+			const made = agent.newCanvas(title.trim());
 			service.stagesChanged();
 			return { stage: made };
 		},

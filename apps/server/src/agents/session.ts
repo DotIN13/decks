@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Identity, MessagePart, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { CanvasService } from "../canvas/service.ts";
-import type { AgentHooks, StageToolSpec, ToolBriefing } from "./hooks.ts";
+import type { AgentHooks, DecksToolSpec, ToolBriefing } from "./hooks.ts";
 import { GUIDELINES } from "./guidelines.ts";
 import { PERSON, type CreateSpec, type QueuedWork, type SendSpec, type CanvasSnapshot } from "./work.ts";
 import type { AgentStateStore } from "./agent-state.ts";
@@ -65,12 +65,12 @@ export class DeckAgent {
 	constructor(
 		private readonly deck: Deck,
 		private readonly emit: (message: ServerMessage) => void,
-		private readonly stage: CanvasService,
+		private readonly canvas: CanvasService,
 		private readonly host: {
 			port: number;
 			camera(agentId: string): Camera;
 			/**
-			 * A board was given a place: the arrangement changed, so the deck state has to go out.
+			 * A card was given a place: the arrangement changed, so the deck state has to go out.
 			 *
 			 * Optional because a unit fixture has no browsers to tell; absent means the place is
 			 * recorded and nothing is broadcast, which is exactly right for a test.
@@ -101,7 +101,7 @@ export class DeckAgent {
 			/** What is waiting for one agent, for `decks.agent.inbox`. */
 			queue(agentId: string): QueuedWork[];
 			/**
-			 * This agent is acting on a board — a write or edit tool call, or a stage verb — so
+			 * This agent is acting on a card — a write or edit tool call, or a canvas verb — so
 			 * the canvas can draw its cursor and marks there (`agents/acts.ts`). Optional: a unit
 			 * fixture has no canvas to draw on.
 			 */
@@ -112,14 +112,14 @@ export class DeckAgent {
 			 * The briefing a handed-over task is run with — the same one `delegate` uses.
 			 *
 			 * Called when the item *runs*, not when it was queued, so the receiver reads the
-			 * board as it is by then. A brief composed at send time is a snapshot of a plan
+			 * card as it is by then. A brief composed at send time is a snapshot of a plan
 			 * that may have moved twice while it sat in the queue.
 			 */
-			brief(task: string, boards: string[], person?: boolean): string;
+			brief(task: string, cards: string[], person?: boolean): string;
 			recordRevision(path: string): string | undefined;
-			/** This agent said it wrote a board. Optional: a unit fixture has no byline to keep. */
+			/** This agent said it wrote a card. Optional: a unit fixture has no byline to keep. */
 			wrote?(path: string, who: string): void;
-			boardPathOf(file: string): string | undefined;
+			cardPathOf(file: string): string | undefined;
 		},
 		options: {
 			name?: string;
@@ -129,7 +129,7 @@ export class DeckAgent {
 			kind: AgentKind;
 			snapshots: AgentStateStore;
 			store: AgentStore;
-			/** The agent this one was forked from, so its stage can be inherited. */
+			/** The agent this one was forked from, so its canvas can be inherited. */
 			forkedFrom?: { agentId: string; at: number };
 			/** The model and mode to open on, handed down rather than read off disk — see `Registry.create`. */
 			model?: AgentModel;
@@ -175,8 +175,8 @@ export class DeckAgent {
 				context: string[];
 				inPlay: string[];
 				/**
-				 * Where this conversation had put its boards, so the arrangement it was looking at comes
-				 * back with it. Absent on a record written before a stage could have one, and the stage
+				 * Where this conversation had put its cards, so the arrangement it was looking at comes
+				 * back with it. Absent on a record written before a canvas could have one, and the canvas
 				 * then falls to the auto-layout rather than to nothing.
 				 */
 				positions?: Record<string, { x: number; y: number }>;
@@ -203,7 +203,7 @@ export class DeckAgent {
 				/** An outside agent's own: its key, its app, when it last called and its waiting mail. */
 				outside?: NonNullable<AgentRecord["outside"]>;
 				workspace?: string;
-				/** The folder its stage drawing is in (`canvas/pens.ts`). */
+				/** The folder its canvas drawing is in (`canvas/pens.ts`). */
 				stage?: string;
 			};
 		},
@@ -213,7 +213,7 @@ export class DeckAgent {
 			{
 				id: this.id,
 				deck,
-				stage,
+				canvas: canvas,
 				emit: (message) => this.emit(message),
 				save: () => this.save(),
 				...(host.arranged ? { arranged: () => host.arranged!() } : {}),
@@ -232,7 +232,7 @@ export class DeckAgent {
 				prompt: (text, parts, at) => this.prompt(text, parts, at),
 				run: (text) => this.run(text),
 				notice: (level, text) => this.conversation.translator.notice(level, text),
-				brief: (task, boards, person) => host.brief(task, boards, person),
+				brief: (task, cards, person) => host.brief(task, cards, person),
 				report: (agentId, text) => host.report(agentId, text),
 				outside: () => (this.inbox.client === undefined ? undefined : { client: this.inbox.client }),
 				mailChanged: () => this.inbox.changed(),
@@ -285,7 +285,7 @@ export class DeckAgent {
 			this.identity = { ...this.identity, workspace };
 		}
 		// After construction, so nothing is announced for a chat the browsers have not been told of yet.
-		if (options.restored) setTimeout(() => this.seat.adoptStage(), 0);
+		if (options.restored) setTimeout(() => this.seat.adoptCanvas(), 0);
 		this.parentId = options.parentId;
 		this.kind = options.kind;
 		this.snapshots = options.snapshots;
@@ -310,7 +310,7 @@ export class DeckAgent {
 				},
 				acted: (event) => host.act?.(this.id, { kind: "tool", event }),
 				tool: () => this.briefing(),
-				hooks: () => this.stageHooks(),
+				hooks: () => this.canvasHooks(),
 				opened: (name) => {
 					if (name) this.identity = { ...this.identity, name };
 					// A resumed session had a canvas; without this it opens holding nothing, which reads as the cards having been lost.
@@ -372,7 +372,7 @@ export class DeckAgent {
 		this.parentId = undefined;
 	}
 
-	/** Put a remembered stage back: what the agent held, showed and called itself. */
+	/** Put a remembered canvas back: what the agent held, showed and called itself. */
 	private apply(snapshot: CanvasSnapshot | undefined): void {
 		if (!snapshot) return;
 		if (Array.isArray(snapshot.context)) this.seat.setContext(snapshot.context.filter((path) => typeof path === "string"));
@@ -408,7 +408,7 @@ export class DeckAgent {
 	}
 
 	/** What the canvas extension is allowed to reach on this agent (§6.2). */
-	private stageHooks(): AgentHooks {
+	private canvasHooks(): AgentHooks {
 		return {
 			id: this.id,
 			identity: () => this.identity,
@@ -437,13 +437,13 @@ export class DeckAgent {
 				this.seat.setSize(path, size);
 				this.host.arranged?.();
 			},
-			drew: (stage: string, ids: string[], boxes: ActBox[]) => this.host.act?.(this.id, { kind: "draw", stage, ids, boxes }),
-			boardPathOf: (file: string) => this.host.boardPathOf(file),
-			stageName: () => this.seat.stageName(true),
+			drew: (canvas: string, ids: string[], boxes: ActBox[]) => this.host.act?.(this.id, { kind: "draw", canvas, ids, boxes }),
+			cardPathOf: (file: string) => this.host.cardPathOf(file),
+			canvasName: () => this.seat.canvasFolder(true),
 
-			openStage: (name: string) => this.seat.openStage(name),
-			newStage: (title: string) => this.seat.newStage(title),
-			setHome: (name: string) => this.seat.openStage(name),
+			openCanvas: (name: string) => this.seat.openCanvas(name),
+			newCanvas: (title: string) => this.seat.newCanvas(title),
+			setHome: (name: string) => this.seat.openCanvas(name),
 			deliver: (target: string, spec: { task: string; boards?: string[] }) => {
 				if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 				return this.host.deliver(this.id, target, spec);
@@ -470,7 +470,7 @@ export class DeckAgent {
 	 * empty "Agent" row behind and the list would fill with them.
 	 *
 	 * A **restored** chat is the other case, and it is written even before anything is said to
-	 * it: the row is already on disk, so a rename, a tag or a board hung on it has somewhere to
+	 * it: the row is already on disk, so a rename, a tag or a card hung on it has somewhere to
 	 * go. Its transcript has not been read though — that is the whole point of restoring — which
 	 * is why `flush` writes the record on its own in that state rather than reading the
 	 * conversation to write it back.
@@ -536,28 +536,28 @@ export class DeckAgent {
 	}
 
 	/**
-	 * What this agent's stage tools are made from (`calls/agent-tools.ts` makes each once and keeps it).
+	 * What this agent's canvas tools are made from (`calls/agent-tools.ts` makes each once and keeps it).
 	 *
 	 * - `agent`: the `stage` its code runs against, and what `/api/v1/<verb>` calls when a request
 	 *   names this agent (`calls/caller.ts`). Each run is recorded, so a rewind can put the canvas back
 	 *   to what it was at that point and a fork can inherit it (§6.2).
-	 * - `person`: the person acting on this agent's stage from the browser (`calls/person.ts`): the
-	 *   same verbs, and the same stage, with the person as the one who acted, so nothing they do draws
+	 * - `person`: the person acting on this agent's canvas from the browser (`calls/person.ts`): the
+	 *   same verbs, and the same canvas, with the person as the one who acted, so nothing they do draws
 	 *   this agent's cursor or counts as its work.
 	 */
-	toolSpec(who: "agent" | "person"): StageToolSpec {
+	toolSpec(who: "agent" | "person"): DecksToolSpec {
 		if (who === "agent") {
 			return {
-				stage: this.stage,
-				agent: this.stageHooks(),
+				canvas: this.canvas,
+				agent: this.canvasHooks(),
 				port: this.host.port,
 				persist: (snapshot) => this.snapshots.record(this.id, snapshot),
 			};
 		}
 		return {
-			stage: this.stage,
+			canvas: this.canvas,
 			agent: {
-				...this.stageHooks(),
+				...this.canvasHooks(),
 				person: true,
 				acted: undefined,
 				worked: undefined,
@@ -579,7 +579,7 @@ export class DeckAgent {
 
 	/** What a backend's briefing says of the tool: the guidelines, and whether a tab is shared now. */
 	private briefing(): ToolBriefing {
-		return { guidelines: GUIDELINES, webShared: () => this.stage.web?.status().paired === true };
+		return { guidelines: GUIDELINES, webShared: () => this.canvas.web?.status().paired === true };
 	}
 
 	/**
@@ -593,7 +593,7 @@ export class DeckAgent {
 		this.conversation.window();
 		// An outside agent has no runtime to prompt: the words wait in its inbox (`Inbox.leave`), with where they were written. A slash command means nothing to it.
 		if (this.inbox.outsideKey !== undefined) {
-			this.inbox.leave(text, parts, at ? lookingLineIn(at, this.deck, this.stage.pens, this.seat.stageName()) : undefined);
+			this.inbox.leave(text, parts, at ? lookingLineIn(at, this.deck, this.canvas.pens, this.seat.canvasFolder()) : undefined);
 			return;
 		}
 		await this.conversation.say(text, parts, (slash) => this.notesFor(slash, at));
@@ -622,38 +622,38 @@ export class DeckAgent {
 		if (unsaid) notes.push(unsaid);
 		const progress = progressReminder(this.conversation.state === "idle");
 		if (progress) notes.push(progress);
-		const unnamed = canvasNameReminder(this.stage.pens, this.seat.stageName());
+		const unnamed = canvasNameReminder(this.canvas.pens, this.seat.canvasFolder());
 		if (unnamed) notes.push(unnamed);
-		if (at) notes.push(lookingLineIn(at, this.deck, this.stage.pens, this.seat.stageName()));
+		if (at) notes.push(lookingLineIn(at, this.deck, this.canvas.pens, this.seat.canvasFolder()));
 		return notes;
 	}
 
 	/**
 	 * Run one task to completion and report — what a delegating parent awaits (§6.2).
 	 *
-	 * The boards it touched are found by comparing revisions either side of the run,
-	 * rather than by watching what tools it called: an agent might write a board with
-	 * `bash` and a heredoc, and the parent still wants to know the board changed.
+	 * The cards it touched are found by comparing revisions either side of the run,
+	 * rather than by watching what tools it called: an agent might write a card with
+	 * `bash` and a heredoc, and the parent still wants to know the card changed.
 	 */
 	/**
-	 * Run one turn of handed-over work, and say which boards it was about.
+	 * Run one turn of handed-over work, and say which cards it was about.
 	 *
-	 * **The boards are the ones the agent named, not the ones that moved.** This used to hash
-	 * every board before the turn and list whatever differed after it, which credited the turn
-	 * with anything anybody wrote meanwhile: another agent's board, the person's retype. Now the
-	 * list is what the agent fitted, showed or reported through the stage tool during the turn
+	 * **The cards are the ones the agent named, not the ones that moved.** This used to hash
+	 * every card before the turn and list whatever differed after it, which credited the turn
+	 * with anything anybody wrote meanwhile: another agent's card, the person's retype. Now the
+	 * list is what the agent fitted, showed or reported through the canvas tool during the turn
 	 * (`workedOn`), in the order it first named them.
 	 */
 	async run(text: string): Promise<{ report: string; boards: string[] }> {
 		this.worked = new Set();
 		await this.prompt(text);
-		const boards = [...this.worked].filter((path) => this.deck.card(path));
-		return { report: this.conversation.translator.lastAssistantText(), boards };
+		const cards = [...this.worked].filter((path) => this.deck.card(path));
+		return { report: this.conversation.translator.lastAssistantText(), boards: cards };
 	}
 
 	/**
-	 * The agent fitted, showed or reported this board: it is its writer, and the board is part of
-	 * what this turn did. The stage tool calls this; nothing reads authorship off the disk.
+	 * The agent fitted, showed or reported this card: it is its writer, and the card is part of
+	 * what this turn did. The canvas tool calls this; nothing reads authorship off the disk.
 	 */
 	workedOn(path: string): void {
 		if (!this.deck.card(path)) return;
@@ -661,7 +661,7 @@ export class DeckAgent {
 		this.host.wrote?.(path, this.id);
 	}
 
-	/** Boards named through the stage tool since the last `run` began. */
+	/** Cards named through the canvas tool since the last `run` began. */
 	private worked = new Set<string>();
 
 	// --- the time machine (§6.7) -----------------------------------------------------
@@ -787,7 +787,7 @@ export class DeckAgent {
 	 * One row in the chat list: everything a browser knows about this conversation.
 	 *
 	 * It carries what the greeting used to send after it, one message per fact per chat —
-	 * the identity, the boards, the model, the account, the reading. Each of those is still
+	 * the identity, the cards, the model, the account, the reading. Each of those is still
 	 * broadcast on its own when it changes; this is the same facts, gathered, so that
 	 * arriving is one change to the browser's state instead of seven per chat.
 	 *
@@ -840,7 +840,7 @@ export class DeckAgent {
 	 * A prompt and the end of a turn used to publish the whole chat list — every chat on the
 	 * deck, to report that one of them had spoken. This is the same news in about a hundred
 	 * bytes. Everything else a turn moves already says so on its own: the state, the model,
-	 * the cost, the boards.
+	 * the cost, the cards.
 	 */
 	sayRow(): void {
 		this.emit({ type: "agent.row", id: this.id, ...this.rowFacts() });

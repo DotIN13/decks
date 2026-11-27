@@ -29,7 +29,7 @@ export interface OpencodeServerSpec {
 	 */
 	cwd: string;
 	/** Decks' own address on this process's port, which the Google Docs tools call back to (`/api/gdocs/call`). */
-	stageUrl: string;
+	decksUrl: string;
 	/** Decks' own port, for the `decks` command in every session's shell (`runtimes/decks-env.ts`). */
 	decksPort?: number;
 	/**
@@ -107,7 +107,7 @@ export class OpencodeManager extends SharedServer<OpencodeServerSpec> {
 			OPENCODE_CONFIG_DIR: opencodeConfigDir(),
 			// …and what the Google Docs tools call back with. One token for the whole server,
 			// and the session id does the rest of the naming.
-			DECKS_STAGE_URL: spec.stageUrl,
+			DECKS_STAGE_URL: spec.decksUrl,
 			DECKS_OPENCODE_SECRET: token,
 			// The `decks` command and where Decks is, for every session's shell; the plugin in
 			// `runtime/opencode/plugin/` trades the session for its agent's token (`runtimes/decks-env.ts`).

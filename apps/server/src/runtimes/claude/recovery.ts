@@ -106,8 +106,8 @@ export class ClaudeRecovery {
 	 *
 	 * - the reply **is** the failure (`transient.ts`, which matches on prose because there
 	 *   is nothing structural to match on, and says so);
-	 * - the turn **did nothing** — no tool call, no board write. Decks agents edit files, and
-	 *   replaying a turn that got halfway could write the same board twice. The rate-limit
+	 * - the turn **did nothing** — no tool call, no card write. Decks agents edit files, and
+	 *   replaying a turn that got halfway could write the same card twice. The rate-limit
 	 *   path used to resend under the same guard; it does not resend at all now;
 	 * - there are retries left, so a refresh that is genuinely stuck ends in the message
 	 *   standing rather than in a turn that never finishes.
@@ -166,7 +166,7 @@ export class ClaudeRecovery {
 			return { handled: false };
 		}
 		/*
-		 * A turn that already changed a board is not repeated — the rule the busy-login retry
+		 * A turn that already changed a card is not repeated — the rule the busy-login retry
 		 * follows too. Here it also means the failure stands: the turn did something, so "ask it
 		 * again in a fresh session" is not a repair, it is a second attempt at work already done.
 		 */

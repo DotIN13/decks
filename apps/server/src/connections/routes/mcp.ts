@@ -66,18 +66,18 @@ export function registerMcp(routers: Router[], deps: { app: CallsHost & PersonHo
 				if (!actsAsPerson(session.principal)) return undefined;
 				const label = client?.title || client?.name || "MCP client";
 				const { agent, made } = app.agents.attach({ key: `${client?.name ?? "mcp"}:web:${session.tokenId ?? "token"}`, client: label, name: label });
-				if (made && !agent.seat.stageName()) {
+				if (made && !agent.seat.canvasFolder()) {
 					try {
 						const latest = app.agents.latestCanvas(agent.workspace, agent.id);
-						if (latest) agent.seat.openStage(latest);
-						else agent.seat.newStage?.(agent.chat().name, { provisional: true });
+						if (latest) agent.seat.openCanvas(latest);
+						else agent.seat.newCanvas?.(agent.chat().name, { provisional: true });
 					} catch {
 						/* it has a canvas once it draws */
 					}
 					app.publishStages();
 				}
 				session.principal = { kind: "agent", id: agent.id };
-				const canvas = agent.seat.stageName();
+				const canvas = agent.seat.canvasFolder();
 				return `You are on this deck as "${agent.chat().name}"${canvas ? `, and your home canvas is "${canvas}"` : ""}. ${made ? "This is your first time here: say who you are with decks_agent_update." : "You have been here before: your name, your cards and your mail are as you left them."} You have no disk in common with the deck: write files with decks_file_write.`;
 			},
 		});

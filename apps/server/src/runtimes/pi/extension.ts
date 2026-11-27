@@ -14,7 +14,7 @@ import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
  * close over this agent's hooks and variables.
  */
 
-export function decksStage(deps: {
+export function decksCanvas(deps: {
 	agent: AgentHooks;
 	gdocs?: GdocsCall;
 	/** The agent's shell: where it runs, and the variables that put `decks` in it (`runtimes/decks-env.ts`). */
@@ -54,17 +54,17 @@ export function decksStage(deps: {
 			}
 
 			/**
-			 * Write down which version of a board this turn produced (§6.7).
+			 * Write down which version of a card this turn produced (§6.7).
 			 *
 			 * A custom entry, so it costs no LLM context and travels in the session tree —
-			 * which is what lets the time machine name the exact revision a board was at,
+			 * which is what lets the time machine name the exact revision a card was at,
 			 * rather than the newest one written before that moment. Claude has no
-			 * equivalent and falls back to timestamps (`App.boardsAt`), which is the same
+			 * equivalent and falls back to timestamps (`App.cardsAt`), which is the same
 			 * answer except where two writes share a second.
 			 *
 			 * Keyed off the tool result rather than the watcher because the watcher cannot
 			 * say *when* in the conversation the file was written. It names no author: who
-			 * wrote a board is what the agent says through the stage tool (`worked`), and
+			 * wrote a card is what the agent says through the canvas tool (`worked`), and
 			 * nothing ever read a `by` from here.
 			 */
 			pi.on("tool_result", async (event) => {
@@ -78,11 +78,11 @@ export function decksStage(deps: {
 				const args = result.input ?? {};
 				const candidate = typeof args.path === "string" ? args.path : typeof args.file === "string" ? args.file : undefined;
 				if (!candidate) return;
-				const board = agent.boardPathOf(candidate);
-				if (!board) return;
+				const card = agent.cardPathOf(candidate);
+				if (!card) return;
 
-				const sha = agent.recordRevision(board);
-				if (sha) pi.appendEntry("board-rev", { path: board, sha });
+				const sha = agent.recordRevision(card);
+				if (sha) pi.appendEntry("board-rev", { path: card, sha });
 			});
 		},
 	};

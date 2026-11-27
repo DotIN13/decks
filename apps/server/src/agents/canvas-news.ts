@@ -5,7 +5,7 @@ import type { Author, ChangeRecord } from "../canvas/log.ts";
  * What changed on a canvas since an agent last heard, as the lines put in front of its next message.
  *
  * An agent's instructions say changes others make on a canvas reach it with its next message, and
- * for a long time nothing did: the one note there was ("the user edited this board") went with board
+ * for a long time nothing did: the one note there was ("the user edited this board") went with card
  * editing. So each message now carries this: the agent's canvases as they are, against what they were
  * at its last message, item by item, with who made each change (`ChangeRecord`, kept by the canvas's
  * log at every write, `canvas/log.ts`) and its own changes left out, since it knows those.

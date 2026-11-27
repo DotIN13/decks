@@ -39,7 +39,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Verbs, "agent" | "here"> {
 	const me = () => {
 		const identity = agent.identity();
 		const row = agent.agents().find((one) => one.id === agent.id);
-		const home = agent.stageName?.();
+		const home = agent.canvasName?.();
 		return {
 			...(agent.app ? {} : { id: agent.id }),
 			name: identity.name,

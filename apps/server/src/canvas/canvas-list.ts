@@ -10,7 +10,7 @@ import type { CanvasPens } from "./pens.ts";
  * that has never been drawn on still has one. A server with no canvas files answers with nothing,
  * and the manager draws nothing rather than an empty room.
  */
-export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id: string; name: string; color: string; seat: { canvasName(): string | undefined } }>): ServerMessage {
+export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id: string; name: string; color: string; seat: { canvasFolder(): string | undefined } }>): ServerMessage {
 	const stages = pens.names().map((name) => {
 		const { boards: cards, rev, shot, words } = pens.summary(name);
 		let changedAt: number | undefined;
@@ -31,7 +31,7 @@ export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id
 			words,
 			...(pens.formerly(name).length ? { formerly: pens.formerly(name) } : {}),
 			agents: everyone
-				.filter((agent) => agent.seat.canvasName() === name)
+				.filter((agent) => agent.seat.canvasFolder() === name)
 				.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),
 		};
 	});

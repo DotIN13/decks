@@ -71,19 +71,19 @@ export interface AgentRecord {
 	context: string[];
 	inPlay: string[];
 	/**
-	 * Where this conversation has put its boards.
+	 * Where this conversation has put its cards.
 	 *
-	 * **Per stage, not per deck.** A board's place belongs to the arrangement you are looking at, so
-	 * the same board can sit differently in this chat and the next. Absent means "this stage has not
-	 * placed it", which falls through to `Deck.arrange`. No `w`/`h`: a board's size is its file's
+	 * **Per canvas, not per deck.** A card's place belongs to the arrangement you are looking at, so
+	 * the same card can sit differently in this chat and the next. Absent means "this canvas has not
+	 * placed it", which falls through to `Deck.arrange`. No `w`/`h`: a card's size is its file's
 	 * `<meta>`, or its own measured extent, and a copy here would go stale.
 	 */
 	positions?: Record<string, { x: number; y: number }>;
 	/**
-	 * The canvas a record written while boards lived on shared canvases pointed at, by id.
+	 * The canvas a record written while cards lived on shared canvases pointed at, by id.
 	 *
-	 * Read once and never written: `restore` copies that canvas's boards and places onto this
-	 * chat's own stage (`old-records.ts`), and the next write stores them here instead.
+	 * Read once and never written: `restore` copies that canvas's cards and places onto this
+	 * chat's own canvas (`old-records.ts`), and the next write stores them here instead.
 	 */
 	fromCanvas?: string;
 	/** The deck's dispatcher, which no longer exists: its record is read so it can be skipped. */
@@ -91,9 +91,9 @@ export interface AgentRecord {
 	/** The workspace the agent works in, as a slug (`workspaces.ts`). Its own fact, kept across restarts. */
 	workspace?: string;
 	/**
-	 * The folder its stage drawing lives in, `stages/<stage>/stage.pen` (`canvas/pens.ts`).
+	 * The folder its canvas drawing lives in, `stages/<stage>/stage.pen` (`canvas/pens.ts`).
 	 *
-	 * Named once, when the stage is first drawn on, and kept: the folder does not follow a rename.
+	 * Named once, when the canvas is first drawn on, and kept: the folder does not follow a rename.
 	 */
 	stage?: string;
 	createdAt: number;
@@ -200,7 +200,7 @@ export class AgentStore {
 	 * Persist one agent's record and leave its transcript alone.
 	 *
 	 * For a change that is about the *row* rather than the conversation — a rename, a tag, the
-	 * boards it is holding — on a chat whose transcript has not been read. Writing the whole
+	 * cards it is holding — on a chat whose transcript has not been read. Writing the whole
 	 * pair would mean reading `chat.json` first, and reading a conversation nobody has opened
 	 * is the cost the list exists to avoid; writing an empty one over it would lose it. So
 	 * this is the narrow write for the narrow case.
@@ -486,10 +486,10 @@ function validate(raw: unknown, id: string): AgentRecord {
 	const userTags = strings(source.userTags);
 	const lastLine = typeof source.lastLine === "string" && source.lastLine ? source.lastLine : undefined;
 	/*
-	 * And the stage's own arrangement, read back for the same reason.
+	 * And the canvas's own arrangement, read back for the same reason.
 	 *
 	 * This is the field the whole per-stage change is *for*: without it, every restart puts every
-	 * conversation back to the deck's auto-layout, and the one thing that had to keep working — a board
+	 * conversation back to the deck's auto-layout, and the one thing that had to keep working — a card
 	 * you dragged staying where you dragged it — does not. Validated here rather than trusted, because
 	 * it arrives from a file and is fed to `Deck.arrange` as coordinates.
 	 */
@@ -557,12 +557,12 @@ const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "x
 const MODES: AgentMode[] = ["manual", "acceptEdits", "plan", "auto"];
 
 /**
- * Where a stage put its boards, if the stored value is one.
+ * Where a canvas put its cards, if the stored value is one.
  *
  * A pair of finite numbers per path and nothing else: this arrives from a file and is handed to
  * `Deck.arrange` as coordinates, so a string from an older hand-edit drops the entry rather than
- * pulling a board to `NaN`. Whole-map-or-nothing would lose the good entries to the bad one, which is
- * what the map having one key per board is for.
+ * pulling a card to `NaN`. Whole-map-or-nothing would lose the good entries to the bad one, which is
+ * what the map having one key per card is for.
  */
 function placesOf(raw: unknown): Record<string, { x: number; y: number }> | undefined {
 	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;

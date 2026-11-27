@@ -24,8 +24,8 @@ test("canvas changes since an agent's last message come with its next, its own l
 	try {
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
-		one.seat.newStage("Plan");
-		const canvas = one.seat.stageName()!;
+		one.seat.newCanvas("Plan");
+		const canvas = one.seat.canvasFolder()!;
 		assert.deepEqual(one.seat.canvasNotes(), [], "the first message has nothing to compare with");
 
 		app.pens.edit(canvas, [{ op: "insert", node: { id: "n1", type: "note", content: "Ship on Friday", x: 0, y: 0 } }]);

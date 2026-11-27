@@ -27,7 +27,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Verbs, "view"> {
 				if (!agent.setHome || agent.app) {
 					throw new Error("Only an agent's conversation moves to a canvas: decks view focus shows a card on the canvas on screen.");
 				}
-				const was = agent.stageName?.();
+				const was = agent.canvasName?.();
 				const moved = await moveHome(ctx, name);
 				if (moved.offered) notes.push(`The screen did not move: ${moved.offered}.`);
 				else if (!moved.onScreen && was !== name) notes.push("Your conversation is on that canvas now; the person's screen shows it when they open your chat.");
@@ -43,7 +43,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Verbs, "view"> {
 				const fromPath = options?.canvas ? undefined : wanted.map((one) => canvasOfPath(one)).find((one) => one !== undefined);
 				const name = canvasOf(options?.canvas ?? fromPath);
 				let arrived = false;
-				if (agent.setHome && !agent.app && agent.stageName?.() !== name) {
+				if (agent.setHome && !agent.app && agent.canvasName?.() !== name) {
 					const moved = await moveHome(ctx, name);
 					if (moved.offered) {
 						notes.push(`The view did not move: ${moved.offered}.`);

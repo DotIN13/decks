@@ -54,11 +54,11 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
 			report: () => {},
-			// The real one pastes the board source in; here the task is the whole briefing, so
+			// The real one pastes the card source in; here the task is the whole briefing, so
 			// a drained item is recognisable in the transcript by its own words.
 			brief: (task: string) => task,
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 		{ color, kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
@@ -71,7 +71,7 @@ function registryOn(deck: Deck): { registry: Registry; sent: ServerMessage[] } {
 		defaultKind: "pi",
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
-		boardPathOf: () => undefined,
+		cardPathOf: () => undefined,
 	});
 	return { registry, sent };
 }
@@ -106,7 +106,7 @@ test("where a conversation put its boards comes back after a restart", () => {
 	const agent = agentOn(deck);
 	agent.conversation.translator.user("put those two down here");
 	agent.seat.setInPlay(["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"]);
-	// Two boards, placed differently from any auto-layout — the whole point of a stage owning
+	// Two cards, placed differently from any auto-layout — the whole point of a canvas owning
 	// its arrangement is that these numbers are not derivable from the deck.
 	agent.seat.setPosition("canvases/t/cards/plan/index.html", 120, 340);
 	agent.seat.setPosition("canvases/t/cards/notes/index.html", 900, 80);
@@ -148,8 +148,8 @@ test("two conversations keep two arrangements of one deck, and the switch is wha
 	assert.deepEqual(registry.looking()?.seat.positions(), { "canvases/t/cards/plan/index.html": { x: 10, y: 20 } });
 	assert.deepEqual(
 		[
-			deck.state(registry.looking()!.seat.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.x,
-			deck.state(registry.looking()!.seat.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.y,
+			deck.state(registry.looking()!.seat.positions()).boards.find((card) => card.path === "canvases/t/cards/plan/index.html")?.x,
+			deck.state(registry.looking()!.seat.positions()).boards.find((card) => card.path === "canvases/t/cards/plan/index.html")?.y,
 		],
 		[10, 20],
 	);
@@ -388,9 +388,9 @@ test("a restored chat is opened on the model the conversation was last held in",
 });
 
 /*
- * Boards lived on shared canvases for a while, and a chat's record named its canvas instead of
- * carrying its own boards. Each agent owns its stage again, so such a record is given that
- * canvas's boards and places once, on restore, and the dispatcher's records are skipped.
+ * Cards lived on shared canvases for a while, and a chat's record named its canvas instead of
+ * carrying its own cards. Each agent owns its canvas again, so such a record is given that
+ * canvas's cards and places once, on restore, and the dispatcher's records are skipped.
  */
 test("a chat that was on a shared canvas comes back with that canvas as its own stage", () => {
 	const { deck, cleanup } = deckOn();
@@ -490,7 +490,7 @@ test("an address that cannot be resolved is refused rather than guessed at", () 
 });
 
 /*
- * What `decks.agent.list()` reports about every agent — the twenty newest boards, the true
+ * What `decks.agent.list()` reports about every agent — the twenty newest cards, the true
  * total, and the runtime.
  *
  * The cap is a screen of the held list, not a truncation: `holding` rides beside it so a
@@ -572,7 +572,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 					report: () => {},
 					brief: (task: string) => task,
 					recordRevision: () => undefined,
-					boardPathOf: () => undefined,
+					cardPathOf: () => undefined,
 				},
 				{
 					...(options.name ? { name: options.name } : {}),
@@ -593,7 +593,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 		defaultKind: "pi",
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
-		boardPathOf: () => undefined,
+		cardPathOf: () => undefined,
 	});
 	// The parent: built directly so nothing starts, spoken to so its notices land, then put
 	// on the registry's list under its real id — which is all `spawn` asks of it. Its emit
@@ -611,7 +611,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 			report: () => {},
 			brief: (task: string) => task,
 			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
@@ -748,9 +748,9 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 					// The real wiring under test: the receiver's `report` call becomes a
 					// notice in whoever is named — a transcript item, not a queued task.
 					report: (agentId, text) => this.get(agentId)?.conversation.translator.notice("info", text),
-					brief: (task: string, boards: string[]) => (boards.length > 0 ? `${task} [${boards.join(" ")}]` : task),
+					brief: (task: string, cards: string[]) => (cards.length > 0 ? `${task} [${cards.join(" ")}]` : task),
 					recordRevision: () => undefined,
-					boardPathOf: () => undefined,
+					cardPathOf: () => undefined,
 				},
 				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 			);
@@ -764,7 +764,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 		defaultKind: "pi",
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
-		boardPathOf: () => undefined,
+		cardPathOf: () => undefined,
 	});
 
 	const sender = registry.create({ name: "Ada" });
@@ -870,7 +870,7 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 	const wrote: Array<[string, string]> = [];
 	class NamingAgent extends DeckAgent {
 		override async prompt(): Promise<void> {
-			// Somebody else rewrites a board during the turn; this agent only names its own.
+			// Somebody else rewrites a card during the turn; this agent only names its own.
 			put(join(deck.path, "canvases", "t", "cards", "other", "index.html"), "<!doctype html><title>Other, rewritten</title><body class=\"board\"></body>");
 			deck.refresh("canvases/t/cards/other/index.html");
 			this.workedOn("canvases/t/cards/plan/index.html");
@@ -892,7 +892,7 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 			brief: (task: string) => task,
 			recordRevision: () => undefined,
 			wrote: (path: string, who: string) => void wrote.push([path, who]),
-			boardPathOf: () => undefined,
+			cardPathOf: () => undefined,
 		},
 		{ color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
