@@ -101,5 +101,36 @@ export async function cardAgentCall(call: { verb: string; args: unknown[]; card:
 		if (!yes) throw new Error(`You did not let ${call.card} ${call.verb === "agent.create" ? "start an agent" : "message an agent"}.`);
 	}
 	const answer = await connect({ url: deckAddress(), stage: () => stageOnScreen(), notes: () => {}, headers: authHeaders() }).call(call.verb, call.args);
-	return answer.value;
+	return inlineAvatars(answer.value);
+}
+
+/**
+ * An agent's avatar as a picture a card can show. The harness answers `/api/avatar/<id>`, an address on
+ * this page's server behind your sign-in, which a card in the sandboxed canvas frame cannot load: it
+ * showed as a broken picture. The page fetches it with your sign-in and hands the card the picture
+ * itself, as a data address, once per avatar.
+ */
+const avatars = new Map<string, Promise<string | undefined>>();
+const dataAddress = (blob: Blob) =>
+	new Promise<string>((done, fail) => {
+		const reader = new FileReader();
+		reader.onload = () => done(String(reader.result));
+		reader.onerror = () => fail(reader.error);
+		reader.readAsDataURL(blob);
+	});
+async function inlineAvatars(value: unknown): Promise<unknown> {
+	const one = async (agent: unknown) => {
+		const avatar = (agent as { avatar?: unknown } | null)?.avatar;
+		if (typeof avatar !== "string" || !avatar.startsWith("/api/avatar/")) return agent;
+		let picture = avatars.get(avatar);
+		if (!picture) {
+			picture = fetch(api(avatar), { headers: authHeaders() })
+				.then(async (response) => (response.ok ? dataAddress(await response.blob()) : undefined))
+				.catch(() => undefined);
+			avatars.set(avatar, picture);
+		}
+		const inline = await picture;
+		return inline ? { ...(agent as object), avatar: inline } : agent;
+	};
+	return Array.isArray(value) ? Promise.all(value.map(one)) : one(value);
 }

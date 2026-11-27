@@ -12,6 +12,7 @@
 	.face { display: grid; width: 30px; height: 30px }
 	.face > * { grid-area: 1 / 1 }
 	.face img { width: 30px; height: 30px; border-radius: 8px; display: block; object-fit: cover }
+	.face .initial { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px }
 	.face .dot { justify-self: end; align-self: end; margin: 0 -3px -3px 0; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--b-bg); background: var(--b-faint) }
 	.face .dot.on { background: var(--b-ok); animation: pulse 1.8s infinite }
 	@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--b-ok) 60%, transparent) } 100% { box-shadow: 0 0 0 7px transparent } }
@@ -171,7 +172,10 @@
 			const working = data.status !== "done" && data.status !== "waiting";
 			const stale = working && age > 10;
 			const when = Number.isFinite(age) ? (age < 1 ? "updated just now" : `updated ${Math.round(age)} min ago`) : "";
-			$("who").innerHTML = `<span class="face">${face.src ? `<img src="${esc(face.src)}" alt="" />` : ""}<span class="dot${working && !stale ? " on" : ""}"></span></span><b>${esc(data.agent ?? "")}</b>${when ? ` · ${stale ? `<span class="stale">no update for ${Math.round(age)} min</span>` : esc(when)}` : ""}${data.status === "waiting" ? " · waiting on you" : ""}`;
+			const who = String(data.agent ?? "?");
+			const hue = [...who].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 360;
+			$("who").innerHTML = `<span class="face"><span class="initial" style="background:hsl(${hue} 55% 45%)">${esc(who.slice(0, 1).toUpperCase())}</span>${face.src ? `<img src="${esc(face.src)}" alt="" />` : ""}<span class="dot${working && !stale ? " on" : ""}"></span></span><b>${esc(data.agent ?? "")}</b>${when ? ` · ${stale ? `<span class="stale">no update for ${Math.round(age)} min</span>` : esc(when)}` : ""}${data.status === "waiting" ? " · waiting on you" : ""}`;
+			$("who").querySelector("img")?.addEventListener("error", (event) => event.target.remove(), { once: true });
 			$("segs").innerHTML = steps.map((s) => `<i class="${stateOf(s)}"></i>`).join("");
 		}
 
