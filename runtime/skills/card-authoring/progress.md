@@ -59,7 +59,9 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
   - `cloud.html`: a word cloud and a few example lines, when what the data looks like is the point;
   - `waterfall.html`: a trace of where the time went, one lane per variant;
   - `bars.html`: a few numbers side by side, the one that matters in the accent colour;
-  - `compare.html`: before and after, as large numbers or two pictures.
+  - `compare.html`: before and after, as large numbers or two pictures;
+  - `codebase.html`: the files before and after an upgrade or a refactor, as two trees with sizes,
+    what is new, changed or gone, and a line on what the change bought.
 
   Each template says in a comment how to fill it. When none fits, write your own piece: a diff, a
   table, a map, a screenshot with an `<img src="files/…">`. Pick the picture that makes the result

@@ -25,6 +25,15 @@
 		},
 		{
 			"id": 3,
+			"title": "Split reading from counting",
+			"status": "done",
+			"verdict": "held",
+			"goal": "time reading, splitting and counting apart, so the race shows where the time goes",
+			"method": "move each phase into a file of its own, keep the tests",
+			"expect": "the same 23 tests pass"
+		},
+		{
+			"id": 4,
 			"title": "Make a big, realistic test text",
 			"status": "done",
 			"verdict": "held",
@@ -33,7 +42,7 @@
 			"expect": "10 MB in under a minute"
 		},
 		{
-			"id": 4,
+			"id": 5,
 			"title": "Race Counter against a loop",
 			"status": "active",
 			"hypothesis": "Counter is faster, since it counts in C",
@@ -87,34 +96,49 @@
 		},
 		{
 			"step": 3,
+			"at": "18:09",
+			"kind": "run",
+			"command": "python3 -m unittest test_count",
+			"why": "the same tests, after the split",
+			"status": "done"
+		},
+		{
+			"step": 3,
+			"at": "18:10",
+			"kind": "result",
+			"text": "23 of 23 still pass, in 17 fewer lines",
+			"file": "log/step3-codebase.html"
+		},
+		{
+			"step": 4,
 			"at": "18:10",
 			"kind": "run",
 			"command": "timeout 300 python3 make_corpus.py",
 			"why": "build the 10 MB test text",
 			"status": "done",
-			"file": "log/step3-process.html"
+			"file": "log/step4-process.html"
 		},
 		{
-			"step": 3,
+			"step": 4,
 			"at": "18:15",
 			"kind": "fail",
 			"text": "Stopped at the 5 minute limit"
 		},
 		{
-			"step": 3,
+			"step": 4,
 			"at": "18:16",
 			"kind": "finding",
 			"text": "Each weighted draw rescans 50,000 words. Draw in batches.",
-			"file": "log/step3-before-after.html"
+			"file": "log/step4-before-after.html"
 		},
 		{
-			"step": 3,
+			"step": 4,
 			"at": "18:17",
 			"kind": "result",
 			"text": "10.5 MB in 0.83 s"
 		},
 		{
-			"step": 4,
+			"step": 5,
 			"at": "18:18",
 			"kind": "run",
 			"command": "python3 bench.py --repeat 7",
@@ -123,7 +147,7 @@
 			"done": 2,
 			"of": 7,
 			"unit": "rounds",
-			"file": "log/step4-trace.html"
+			"file": "log/step5-trace.html"
 		}
 	],
 	"questions": []

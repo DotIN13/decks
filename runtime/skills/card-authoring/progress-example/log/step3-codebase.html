@@ -1,0 +1,26 @@
+<!-- Codebase before and after, for an upgrade or a refactor: the files as a tree on each side, each
+     with its size in lines. After: <span class="add">…</span> for a new file, <span class="chg">…</span>
+     for one that changed, <span class="del">…</span> for one gone; a note on the right says what moved
+     there. A line under the trees says what the change bought. -->
+<div class="code-ba">
+	<div>
+		<b class="side">Before: 2 files, 268 lines</b>
+		<div class="tree">
+			<div>files/</div>
+			<div class="in">count.py<span class="n">212 lines</span><span class="note">reads, splits and counts in one loop</span></div>
+			<div class="in">test_count.py<span class="n">56 lines</span></div>
+		</div>
+	</div>
+	<div>
+		<b class="side">After: 5 files, 251 lines</b>
+		<div class="tree">
+			<div>files/</div>
+			<div class="in"><span class="add">read.py</span><span class="n">48 lines</span><span class="note">chunks, carries a cut word over</span></div>
+			<div class="in"><span class="add">split.py</span><span class="n">39 lines</span><span class="note">words, case folded</span></div>
+			<div class="in"><span class="add">tally.py</span><span class="n">44 lines</span><span class="note">Counter or a plain dict</span></div>
+			<div class="in"><span class="chg">count.py</span><span class="n">31 lines</span><span class="note">joins the three</span></div>
+			<div class="in"><span class="chg">test_count.py</span><span class="n">89 lines</span><span class="note">the same 23 tests, grouped by part</span></div>
+		</div>
+	</div>
+</div>
+<div class="cap">each phase can now be timed on its own, which the race in step 5 needs</div>

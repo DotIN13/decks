@@ -1,4 +1,4 @@
-<title>Word counter: on step 4</title>
+<title>Word counter: on step 5</title>
 <meta name="card" content='{"w":1100}' />
 <style>
 	.doc { --ok-soft: color-mix(in srgb, var(--b-ok) 14%, transparent); --bad-soft: color-mix(in srgb, var(--b-danger) 12%, transparent);
@@ -101,7 +101,16 @@
 	.viz .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
 	.viz .compare > div { border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px }
 	.viz .compare .big { font-size: 24px; font-weight: 650; line-height: 1.2 }
-	.viz .compare .side { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--b-muted) }
+	.viz .code-ba { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+	.viz .code-ba > div { border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px; min-width: 0 }
+	.viz .tree { font-family: var(--b-mono); font-size: 14px; line-height: 1.6; margin-top: 4px }
+	.viz .tree .in { padding-left: 16px; display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline }
+	.viz .tree .n { color: var(--b-muted) }
+	.viz .tree .note { flex-basis: 100%; font-family: var(--b-font); color: var(--b-muted); padding-left: 2px }
+	.viz .add { color: var(--b-ok) } .viz .add::before { content: "+ " }
+	.viz .chg { color: var(--b-warn) } .viz .chg::before { content: "~ " }
+	.viz .del { color: var(--b-danger); text-decoration: line-through }
+	.viz .compare .side, .viz .code-ba .side { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--b-muted) }
 </style>
 <div class="doc" data-id="doc">
 	<div class="head">
