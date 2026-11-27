@@ -3,14 +3,15 @@ import { DocSync } from "../client.ts";
 import { spliceDiff } from "../merge.ts";
 import type { DocSync as Sync } from "../client.ts";
 import { docxBlocks, readParagraph } from "./blocks.ts";
-import { findMarks, marksOf, segments, shiftMarks, spliceBetween, type Mark } from "./marks.ts";
+import { findMarks, marksOf, shiftMarks, type Mark } from "./marks.ts";
 import { LiveEditor } from "./live.ts";
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
 import type { DocsRequest } from "../gdoc/types.ts";
 import { formatList, formatNumber, getLocale, m } from "@decks/i18n";
-import { pageDom, type Mode, type PageContext, type PageHooks, type View } from "./context.ts";
+import { pageDom, type PageContext, type PageHooks, type View } from "./context.ts";
 import { addStyle } from "./style.ts";
+import { mountSource } from "./source.ts";
 import { mountTools } from "./tools.ts";
 import { base, clip, dir, el, iconButton, initial, svg, when, whoOf } from "./ui.ts";
 
@@ -81,7 +82,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	const pdfBody = el("div", { class: "dp-pdfbody" });
 	pdfPane.append(pdfBar, errList, pdfBody);
 
-	let composing = false;
 	/** A Google Doc's open comments, from Drive, or why they cannot be shown. */
 	let comments: GComment[] = [];
 	let commentsError = "";
@@ -172,7 +172,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	scroll.append(live.root, reading.root, gview.root, old);
 	reading.root.hidden = true;
 	gview.root.hidden = true;
-	const cleanups = [mountTools(ctx)];
+	const cleanups = [mountTools(ctx), mountSource(ctx)];
 	/**
 	 * Styles for Google, each with the text the page had when it was made, sent in order once the
 	 * typing before it has reached the server: the server brings the Doc to that text, applies the
@@ -208,102 +208,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 
 	const { isGoogle, isWord, isTex } = ctx;
 
-	function setMode(next: Mode): void {
-		if (viewing) closeVersion();
-		ctx.mode = next;
-		sourceButton.setAttribute("aria-pressed", String(ctx.mode === "source"));
-		text.hidden = ctx.mode !== "source";
-		const word = isWord();
-		const google = isGoogle();
-		live.root.hidden = ctx.mode !== "page" || word || google;
-		reading.root.hidden = ctx.mode !== "page" || !word;
-		gview.root.hidden = ctx.mode !== "page" || !google;
-		tools.hidden = ctx.mode !== "page" || word || sync.readOnly || !sync.ready;
-		if (ctx.mode === "source") draw(false);
-		else if (word) reading.render();
-		else if (google) gview.render();
-		else live.render();
-	}
-
-	// --- Source: the file's text as it is -------------------------------------------------------
-
-	function texts(): Text[] {
-		const out: Text[] = [];
-		const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
-		for (let node = walker.nextNode(); node; node = walker.nextNode()) out.push(node as Text);
-		return out;
-	}
-
-	function offsetOf(node: Node, offset: number): number {
-		let total = 0;
-		if (node.nodeType !== Node.TEXT_NODE) {
-			const range = document.createRange();
-			range.setStart(text, 0);
-			range.setEnd(node, offset);
-			return range.toString().length;
-		}
-		for (const t of texts()) {
-			if (t === node) return total + offset;
-			total += t.data.length;
-		}
-		return total;
-	}
-
-	function caret(): { start: number; end: number } | undefined {
-		const selection = getSelection();
-		if (!selection || selection.rangeCount === 0 || !text.contains(selection.anchorNode)) return undefined;
-		return { start: offsetOf(selection.anchorNode!, selection.anchorOffset), end: offsetOf(selection.focusNode!, selection.focusOffset) };
-	}
-
-	function place(at: { start: number; end: number }): void {
-		const find = (offset: number): [Node, number] => {
-			let total = 0;
-			const all = texts();
-			for (const t of all) {
-				if (offset <= total + t.data.length) return [t, offset - total];
-				total += t.data.length;
-			}
-			const last = all.at(-1);
-			return last ? [last, last.data.length] : [text, 0];
-		};
-		const [an, ao] = find(at.start);
-		const [fn, fo] = find(at.end);
-		getSelection()?.setBaseAndExtent(an, ao, fn, fo);
-	}
-
-	function draw(keepCaret = true): void {
-		const where = keepCaret ? caret() : undefined;
-		const frag = document.createDocumentFragment();
-		for (const segment of segments(sync.text, ctx.marks.filter((m) => m.kind === "ins"))) {
-			if (!("mark" in segment)) frag.append(document.createTextNode(segment.text));
-			else frag.append(el("span", { class: "dp-ins" }, segment.text));
-		}
-		frag.append(el("br"));
-		text.replaceChildren(frag);
-		if (where) place(where);
-	}
-
-	const shiftCaret = (at: { start: number; end: number }, applied: readonly Splice[]) => {
-		const move = (p: number) => applied.reduce((q, s) => (q <= s.at ? q : q >= s.at + s.before.length ? q + s.text.length - s.before.length : s.at + s.text.length), p);
-		return { start: move(at.start), end: move(at.end) };
-	};
-
-	text.addEventListener("compositionstart", () => (composing = true));
-	text.addEventListener("compositionend", () => {
-		composing = false;
-		typed();
-	});
-	text.addEventListener("input", () => {
-		if (!composing) typed();
-	});
-
-	function typed(): void {
-		const now = text.textContent ?? "";
-		const at = caret();
-		const splice = spliceBetween(sync.text, now, at?.end ?? now.length);
-		if (splice) sync.edit(splice);
-	}
-
 	// --- what changed ---------------------------------------------------------------------
 
 	function updated(why: "open" | "remote" | "local" | "outside" | "review", applied?: readonly Splice[]): void {
@@ -324,26 +228,23 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			if (isGoogle() && ctx.mode === "source") ctx.mode = "page";
 			ctx.hooks.buildTools();
 			live.reset();
-			setMode(ctx.mode);
+			ctx.hooks.setMode(ctx.mode);
 		} else if (why === "local") {
 			for (const splice of applied ?? []) ctx.marks = shiftMarks(ctx.marks, splice);
 			if (ctx.mode === "source") {
-				if (ctx.marks.length) draw();
+				if (ctx.marks.length) ctx.hooks.draw();
 			} else if (isWord()) reading.update(applied ?? []);
 			else if (isGoogle()) gview.update(applied ?? [], true);
 			else live.local();
 		} else {
-			const where = ctx.mode === "source" ? caret() : undefined;
 			for (const splice of applied ?? []) ctx.marks = shiftMarks(ctx.marks, splice);
 			const change = why === "outside" ? sync.changes.at(-1) : undefined;
 			if (change) ctx.marks.push(...marksOf(change.id, applied ?? []));
 			// Accepted or rejected: its highlight goes.
 			const waiting = new Set(sync.changes.map((c) => c.id));
 			ctx.marks = ctx.marks.filter((m) => waiting.has(m.change));
-			if (ctx.mode === "source") {
-				draw(false);
-				if (where) place(shiftCaret(where, applied ?? []));
-			} else if (isWord()) reading.update(applied ?? []);
+			if (ctx.mode === "source") ctx.hooks.drawShifted(applied ?? []);
+			else if (isWord()) reading.update(applied ?? []);
 			else if (isGoogle()) gview.update(applied ?? []);
 			else live.remote(applied ?? []);
 		}
@@ -1011,7 +912,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		divider.addEventListener("pointerup", up, { once: true });
 	});
 
-	sourceButton.onclick = () => setMode(ctx.mode === "source" ? "page" : "source");
 	historyButton.onclick = () => show("history");
 	commentsButton.onclick = () => show("comments");
 	changesButton.onclick = () => show("changes");
@@ -1053,13 +953,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		refresh,
 		show,
 		header,
-		setMode,
-		draw,
-		drawShifted: (applied: readonly Splice[]) => {
-			const where = caret();
-			draw(false);
-			if (where) place(shiftCaret(where, applied));
-		},
 		drawChanges: (onlyIfChanged = false) => {
 			if (!onlyIfChanged || changesDrawn !== changesKey()) drawChanges();
 		},

@@ -14,7 +14,7 @@ import { base, el, svg } from "./ui.ts";
  * page's frame of elements, the little state more than one panel reads, and the calls one panel
  * makes on another.
  *
- * Each panel (`tools.ts`, …) is mounted with this and fills in its own calls
+ * Each panel (`tools.ts`, `source.ts`, …) is mounted with this and fills in its own calls
  * in `hooks`; `page.ts` mounts them all, so a panel reaches another only through here.
  */
 
@@ -67,11 +67,11 @@ export interface PageHooks {
 	gpressed(): void;
 	/** `tools.ts`: ask for a link and put it on a Doc's selected words. */
 	askLink(): void;
-	/** `page.ts`: show the page or the file's text. */
+	/** `source.ts`: show the page or the file's text. */
 	setMode(next: Mode): void;
-	/** `page.ts`: draw the file's text again, keeping the caret where it was unless told not to. */
+	/** `source.ts`: draw the file's text again, keeping the caret where it was unless told not to. */
 	draw(keepCaret?: boolean): void;
-	/** `page.ts`: draw the file's text again after others' splices, the caret moved past them. */
+	/** `source.ts`: draw the file's text again after others' splices, the caret moved past them. */
 	drawShifted(applied: readonly Splice[]): void;
 	/** `page.ts`: draw the Changes panel, or only when the list in it changed. */
 	drawChanges(onlyIfChanged?: boolean): void;
