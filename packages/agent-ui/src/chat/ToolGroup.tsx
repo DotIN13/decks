@@ -21,7 +21,23 @@ import { formatList, m } from "@decks/i18n";
  * however many calls it made, so these rows sit inside the agent's card with the reply,
  * which is also what keeps the count next to the sentence explaining it.
  */
+/**
+ * The failed calls a later call of the same tool got past, in this turn: worth seeing, but not the alarm
+ * of a failure that stood. Shown red, a retry that worked read as the turn having gone wrong.
+ */
+function recoveredIn(slots: readonly ToolSlot[]): Set<string> {
+	const recovered = new Set<string>();
+	slots.forEach((slot, i) => {
+		if (slot.kind !== "call" || slot.call.state !== "error") return;
+		const name = slot.call.name;
+		const later = slots.slice(i + 1).some((one) => (one.kind === "call" ? one.call.state === "done" && one.call.name === name : one.calls.some((call) => call.state === "done" && call.name === name)));
+		if (later) recovered.add(slot.call.id);
+	});
+	return recovered;
+}
+
 export function ToolGroup(props: { slots: ToolSlot[] }) {
+	const recovered = () => recoveredIn(props.slots);
 	return (
 		<div class="stream-tools">
 			{/*
@@ -36,7 +52,7 @@ export function ToolGroup(props: { slots: ToolSlot[] }) {
 					const grouped = () => (slot().kind === "group" ? (slot() as Extract<ToolSlot, { kind: "group" }>) : undefined);
 					const bare = () => (slot().kind === "call" ? (slot() as Extract<ToolSlot, { kind: "call" }>) : undefined);
 					return (
-						<Show when={grouped()} fallback={<Show when={bare()}>{(one) => <ToolChip item={one().call} />}</Show>}>
+						<Show when={grouped()} fallback={<Show when={bare()}>{(one) => <ToolChip item={one().call} recovered={recovered().has(one().call.id)} />}</Show>}>
 							{(group) => <Group slot={group()} alone={props.slots.length === 1} />}
 						</Show>
 					);

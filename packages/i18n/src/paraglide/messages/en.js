@@ -687,6 +687,7 @@
 /** @typedef {{}} Chat_Tool_Hide_OutputInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Chat_Tool_ImagesInputs */
 /** @typedef {{}} Chat_Tool_Loading_RestInputs */
+/** @typedef {{}} Chat_Tool_RetriedInputs */
 /** @typedef {{}} Chat_Tool_Show_OutputInputs */
 /** @typedef {{}} Chat_TypingInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Waiting_For_YouInputs */
@@ -4352,6 +4353,10 @@ export const chat_tool_images = /** @type {(inputs: Chat_Tool_ImagesInputs) => L
 
 export const chat_tool_loading_rest = /** @type {(inputs: Chat_Tool_Loading_RestInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Loading the rest…`)
+};
+
+export const chat_tool_retried = /** @type {(inputs: Chat_Tool_RetriedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`retried`)
 };
 
 export const chat_tool_show_output = /** @type {(inputs: Chat_Tool_Show_OutputInputs) => LocalizedString} */ () => {

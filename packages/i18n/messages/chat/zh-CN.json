@@ -59,5 +59,6 @@
 	"chat_alert_ask_note": "它会等你回答。",
 	"chat_alert_problem": "出现问题时",
 	"chat_alert_problem_note": "某个回合失败，或某次编辑被拒绝。",
-	"chat_sound_silent": "静音"
+	"chat_sound_silent": "静音",
+	"chat_tool_retried": "已重试"
 }

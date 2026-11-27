@@ -32,7 +32,7 @@ import { formatNumber, m } from "@decks/i18n";
  *    disclosure at the end of a row is a column you can run your eye down; on the left it
  *    sat between the state and the name and pushed the two things you read out of line.
  */
-export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
+export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }>; /** A failure a later call of the same tool got past: shown quietly, "retried". */ recovered?: boolean }) {
 	const [open, setOpen] = createSignal(false);
 	/*
 	 * The whole output once it has been fetched, else what came with the row — which for a long
@@ -48,7 +48,7 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 	const openable = () => result() !== "";
 
 	return (
-		<div class="tool" data-item={props.item.id} data-state={props.item.state}>
+		<div class="tool" data-item={props.item.id} data-state={props.recovered ? "recovered" : props.item.state}>
 			<button
 				class="row"
 				type="button"
@@ -70,12 +70,15 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 					its glyph would be a list with a ragged left edge.
 				*/}
 				<span class="state" aria-hidden="true">
-					<Show when={props.item.state === "error"}>
+					<Show when={props.item.state === "error" && !props.recovered}>
 						<Icon of={TriangleAlert} size={11} />
 					</Show>
 				</span>
 				<span class="name">{props.item.name}</span>
 				<span class="title">{props.item.title}</span>
+				<Show when={props.recovered}>
+					<span class="retried">{m.chat_tool_retried()}</span>
+				</Show>
 				<Show when={props.item.images}>{(count) => <span class="imgs">{m.chat_tool_images({ count: count() })}</span>}</Show>
 				<Show when={openable()}>
 					{/* Turned rather than swapped for a second glyph, which is this app's

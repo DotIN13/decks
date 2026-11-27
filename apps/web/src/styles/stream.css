@@ -468,6 +468,17 @@
 		color: var(--color-danger);
 	}
 
+	/* A failure a later call got past: quiet, with the word that says so. */
+	.tool[data-state="recovered"] > .row .title {
+		color: var(--muted);
+	}
+
+	.tool > .row > .retried {
+		flex: none;
+		color: var(--muted);
+		font-size: 11px;
+	}
+
 	/*
 	 * The name: an identifier, so mono — and uppercase, which is what stops a 10px word from
 	 * reading as the sentence rather than the label on it.

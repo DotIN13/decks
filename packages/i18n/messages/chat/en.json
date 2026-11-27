@@ -116,5 +116,6 @@
 	"chat_alert_ask_note": "It waits until you answer.",
 	"chat_alert_problem": "Something goes wrong",
 	"chat_alert_problem_note": "A turn failed, or an edit was refused.",
-	"chat_sound_silent": "Silent"
+	"chat_sound_silent": "Silent",
+	"chat_tool_retried": "retried"
 }

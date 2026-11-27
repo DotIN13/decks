@@ -4824,6 +4824,13 @@ export const chat_tool_loading_rest: ((inputs?: Chat_Tool_Loading_RestInputs, op
 /**
 * | output |
 * | --- |
+* | "retried" |
+*
+*/
+export const chat_tool_retried: ((inputs?: Chat_Tool_RetriedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Chat_Tool_RetriedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Show the output" |
 *
 */
@@ -11668,6 +11675,7 @@ export type Chat_Tool_Group_ToolsInputs = { count: NonNullable<unknown> };
 export type Chat_Tool_Hide_OutputInputs = {};
 export type Chat_Tool_ImagesInputs = { count: NonNullable<unknown> };
 export type Chat_Tool_Loading_RestInputs = {};
+export type Chat_Tool_RetriedInputs = {};
 export type Chat_Tool_Show_OutputInputs = {};
 export type Chat_TypingInputs = {};
 export type Chat_Waiting_For_YouInputs = { name: NonNullable<unknown> };

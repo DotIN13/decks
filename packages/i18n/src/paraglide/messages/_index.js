@@ -689,6 +689,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_Tool_Hide_OutputInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Chat_Tool_ImagesInputs */
 /** @typedef {{}} Chat_Tool_Loading_RestInputs */
+/** @typedef {{}} Chat_Tool_RetriedInputs */
 /** @typedef {{}} Chat_Tool_Show_OutputInputs */
 /** @typedef {{}} Chat_TypingInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Waiting_For_YouInputs */
@@ -11198,6 +11199,20 @@ export const chat_tool_loading_rest = /** @type {((inputs?: Chat_Tool_Loading_Re
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.chat_tool_loading_rest(inputs)
 	return __en.chat_tool_loading_rest(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "retried" |
+*
+* @param {Chat_Tool_RetriedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const chat_tool_retried = /** @type {((inputs?: Chat_Tool_RetriedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Tool_RetriedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.chat_tool_retried(inputs)
+	return __en.chat_tool_retried(inputs)
 });
 /**
 * | output |
