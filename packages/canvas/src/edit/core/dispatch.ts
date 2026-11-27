@@ -9,7 +9,6 @@
  */
 import type { PenTool, PointerKind, Pt } from "./model.ts";
 
-export const DRAG_SLOP_PX = 3;
 /** A finger that has gone this far on the screen is a pan or a carry, not a tap. */
 export const TAP_SLOP_PX = 10;
 /** A finger held longer than this before it lifts is not a tap. */

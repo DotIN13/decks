@@ -5,10 +5,8 @@ import { formatNumber, m } from "@decks/i18n";
 /**
  * Which agents want you, and in what order.
  *
- * A `.ts` rather than living beside the markup in `AgentStack.tsx`, because this is the
- * part that has rules worth testing and no DOM in it: who is in the corner, who is only in
- * the dropdown, and which face is leftmost. The drawing is in `AgentStack.tsx`; the policy
- * is here, and `agent-order.test.ts` is the only place either is asserted.
+ * A `.ts` of its own because this is the part that has rules worth testing and no DOM in it:
+ * who is listed, in what order, and which face is leftmost. `agent-order.test.ts` asserts it.
  *
  * The division of labour the whole feature rests on, from
  * `boards/the-agent-stack-comes-back`: **the corner is what is happening, the dropdown is

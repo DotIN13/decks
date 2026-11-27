@@ -52,10 +52,8 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * tabs were the same list with a line drawn through it, and finding a board began with
  * guessing which side of the line the app had put it on *this second*.
  *
- * So there is one scroller with three headings in it — **on the canvas**, **held, not
- * shown**, **in the deck** — and one search field over all of it. `panel-groups.ts` owns the
- * grouping and argues it; what is left here is the surface. Agents are the second tab, filed by
- * workspace (`agent-sections.ts`).
+ * The panel has four tabs now: Recent, Canvas (an outline of the canvas on screen), Agents, filed by
+ * workspace (`agent-sections.ts`), and Apps.
  *
  * The first two sections are the **focused agent's**, all of them and nothing else — no
  * other agent's holdings appear anywhere, and a board somebody else is holding is simply in
@@ -83,8 +81,7 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * ### Presentational
  *
  * No socket, no app state: boards in, `onPickItem` out. The panel is a picture of what it is
- * given, and everything with a rule behind it — which board is in which section, what the
- * search matches — is in `panel-groups.ts`, where it can be tested without a DOM.
+ * given, and a rule worth testing without a DOM lives in a module beside it (`agent-sections.ts`).
  */
 
 /**

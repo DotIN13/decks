@@ -35,8 +35,8 @@ export function SidePanel(props: { parts: Parts }) {
 				The agent list moved into the pill's dropdown — a list you switch *with* is a
 				selector, and a selector belongs on the thing it selects — and the board browser
 				stopped being a full-screen sheet over the canvas you were trying to look at.
-				It was this panel's second tab for a while; it is the third section of its one
-				list now, because Context and Deck were never two collections (`panel-groups.ts`).
+				It was this panel's second tab for a while; the panel's tabs now are Recent,
+				Canvas, Agents and Apps.
 
 				Mounted while folded, deliberately: it registers `⌘\`, and a `<Show>` here
 				would take the shortcut away in exactly the state it exists for.

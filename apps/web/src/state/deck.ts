@@ -73,8 +73,7 @@ function createDeck() {
 		/**
 		 * Boards each agent is holding, from `context.changed`.
 		 *
-		 * Still a map, unlike the nine that moved: this one is handed *whole* to
-		 * `panelSections`, which indexes it itself. Moving it means changing that signature.
+		 * Still a map, unlike the nine that moved, keyed by agent.
 		 */
 		contexts: Record<string, string[]>;
 		defaultKind: AgentKind;

@@ -3,8 +3,7 @@ import { slug } from "@decks/deck-kit";
 /**
  * What a tag is allowed to be.
  *
- * The whole of what the feature *knows*, in one pure function, for the reason
- * `panel/panel-groups.ts` is pure: a free-text field an agent writes into itself will fill
+ * The whole of what the feature *knows*, in one pure function: a free-text field an agent writes into itself will fill
  * with sentences unless the shape refuses them, and "does it refuse them" is a question that
  * should be answerable without starting a runtime and reading a menu.
  *

@@ -40,9 +40,9 @@ import { AuthedImg } from "../lib/authed.tsx";
 /**
  * An agent's face: its avatar or its initial, filled with *who* and ringed with *what*.
  *
- * Here rather than in `AgentStack.tsx`, where the corner's faces are, because four things
- * draw this circle — this pill, the stack, a dropdown row, the hover card — and the only
- * thing that differs between them is the diameter. Everything else is `styles/agents.css`;
+ * Here, because the things that draw this circle — this pill, a dropdown row, the hover card —
+ * differ only in
+ * the diameter. Everything else is `styles/agents.css`;
  * `size` and `ring` are the whole API.
  *
  * `aria-hidden`, because every caller pairs it with a name: a dropdown row is a button
@@ -225,7 +225,7 @@ export function AgentMenu(props: {
 	 * Which row the card is describing, and where that row is.
 	 *
 	 * `held` keeps the last row after the pointer leaves so the card fades out with words
-	 * still in it — the same arrangement `AgentStack` makes, and for the same reason: a card
+	 * still in it: a card
 	 * emptied the instant it starts fading is a card that fades out blank.
 	 */
 	type Anchor = Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height">;
@@ -235,8 +235,7 @@ export function AgentMenu(props: {
 	onCleanup(() => clearTimeout(exit));
 
 	/**
-	 * At once, and it lingers 80ms on the way out — which is exactly what the corner stack
-	 * does with the same card (`AgentStack`).
+	 * At once, and it lingers 80ms on the way out.
 	 *
 	 * There was a 350ms wait before the card, to stop a pointer run down five rows from
 	 * flashing five cards. The fear was reasonable and the cure was worse: the same card

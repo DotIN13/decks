@@ -5,7 +5,7 @@ import { agentStatus, type AgentStatus } from "./agent-order.ts";
 /**
  * What the panel's Agents tab lists: every agent, filed under the workspace it says it is in.
  *
- * Pure and tested, for the reason `panel-groups.ts` is: this is the whole of what the list
+ * Pure and tested: this is the whole of what the list
  * *knows*, and leaving it inside the component would mean the only way to ask "which heading
  * is this agent under" is to render one and look.
  *
@@ -91,7 +91,7 @@ const fold = (query?: string) => (query ?? "").trim().toLowerCase();
  * an agent you tagged yourself is one of them. The workspace too: `irb` finds every agent
  * filed under `irb-84069`.
  *
- * Substring and case-insensitive rather than fuzzy, as `panel-groups.ts` matches a board: tags
+ * Substring and case-insensitive rather than fuzzy: tags
  * and workspaces are slugs, so what somebody types is usually a word that is really in one.
  */
 export function agentMatches(row: Pick<AgentRow, "chat" | "tags" | "userTags" | "workspace">, needle: string): boolean {

@@ -4,7 +4,7 @@ import type { AgentUsage } from "@decks/protocol";
  * How full an agent's context is, and whether that is worth a colour.
  *
  * The arithmetic and the two thresholds, in a module of their own, for the same reason
- * `panel-groups.ts` and `agent-order.ts` are: the component beside this is a picture of
+ * `agent-order.ts` is: the component beside this is a picture of
  * these two functions, and the only way to ask "does 84.6% read as amber or as red" of a
  * component is to render one and look.
  *
