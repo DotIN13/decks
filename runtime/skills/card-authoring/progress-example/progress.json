@@ -55,12 +55,7 @@
 			"at": "18:07",
 			"kind": "result",
 			"text": "Matches a hand count: 41 words",
-			"viz": {
-				"type": "tally",
-				"text": "The cat saw the dog, and the dog saw the cat. The end.",
-				"top": 5,
-				"caption": "one paragraph, counted case-blind"
-			}
+			"file": "log/step1-tally.html"
 		},
 		{
 			"step": 2,
@@ -75,214 +70,21 @@
 			"at": "18:08",
 			"kind": "fail",
 			"text": "21 of 23 pass: a word cut across a read loses its apostrophe",
-			"viz": {
-				"type": "tests",
-				"items": [
-					{
-						"name": "empty text",
-						"status": "pass"
-					},
-					{
-						"name": "one word",
-						"status": "pass"
-					},
-					{
-						"name": "case folded",
-						"status": "pass"
-					},
-					{
-						"name": "commas dropped",
-						"status": "pass"
-					},
-					{
-						"name": "full stops dropped",
-						"status": "pass"
-					},
-					{
-						"name": "hyphen kept",
-						"status": "pass"
-					},
-					{
-						"name": "apostrophe kept",
-						"status": "pass"
-					},
-					{
-						"name": "numbers counted",
-						"status": "pass"
-					},
-					{
-						"name": "tabs and newlines",
-						"status": "pass"
-					},
-					{
-						"name": "unicode letters",
-						"status": "pass"
-					},
-					{
-						"name": "top N order",
-						"status": "pass"
-					},
-					{
-						"name": "ties by first seen",
-						"status": "pass"
-					},
-					{
-						"name": "top N larger than words",
-						"status": "fail",
-						"detail": "the test asked for the wrong length"
-					},
-					{
-						"name": "only punctuation",
-						"status": "pass"
-					},
-					{
-						"name": "repeated spaces",
-						"status": "pass"
-					},
-					{
-						"name": "quotes dropped",
-						"status": "pass"
-					},
-					{
-						"name": "leading apostrophe",
-						"status": "pass"
-					},
-					{
-						"name": "trailing apostrophe",
-						"status": "pass"
-					},
-					{
-						"name": "apostrophe at a cut",
-						"status": "fail",
-						"detail": "\"don\" + \"t\" counted as two words"
-					},
-					{
-						"name": "word at a cut",
-						"status": "pass"
-					},
-					{
-						"name": "huge word",
-						"status": "pass"
-					},
-					{
-						"name": "mixed scripts",
-						"status": "pass"
-					},
-					{
-						"name": "chunked read matches whole",
-						"status": "pass"
-					}
-				]
-			}
+			"file": "log/step2-first-run.html"
 		},
 		{
 			"step": 2,
 			"at": "18:09",
 			"kind": "finding",
-			"text": "A real bug: reads split words. Carry the tail into the next read."
+			"text": "A real bug: reads split words. Carry the tail into the next read.",
+			"html": "<code>\"don\" + \"t\"</code> → <code>\"don't\"</code>: the last word of each read now waits for the next one"
 		},
 		{
 			"step": 2,
 			"at": "18:09",
 			"kind": "result",
 			"text": "23 of 23 pass",
-			"viz": {
-				"type": "tests",
-				"items": [
-					{
-						"name": "empty text",
-						"status": "pass"
-					},
-					{
-						"name": "one word",
-						"status": "pass"
-					},
-					{
-						"name": "case folded",
-						"status": "pass"
-					},
-					{
-						"name": "commas dropped",
-						"status": "pass"
-					},
-					{
-						"name": "full stops dropped",
-						"status": "pass"
-					},
-					{
-						"name": "hyphen kept",
-						"status": "pass"
-					},
-					{
-						"name": "apostrophe kept",
-						"status": "pass"
-					},
-					{
-						"name": "numbers counted",
-						"status": "pass"
-					},
-					{
-						"name": "tabs and newlines",
-						"status": "pass"
-					},
-					{
-						"name": "unicode letters",
-						"status": "pass"
-					},
-					{
-						"name": "top N order",
-						"status": "pass"
-					},
-					{
-						"name": "ties by first seen",
-						"status": "pass"
-					},
-					{
-						"name": "top N larger than words",
-						"status": "pass"
-					},
-					{
-						"name": "only punctuation",
-						"status": "pass"
-					},
-					{
-						"name": "repeated spaces",
-						"status": "pass"
-					},
-					{
-						"name": "quotes dropped",
-						"status": "pass"
-					},
-					{
-						"name": "leading apostrophe",
-						"status": "pass"
-					},
-					{
-						"name": "trailing apostrophe",
-						"status": "pass"
-					},
-					{
-						"name": "apostrophe at a cut",
-						"status": "pass"
-					},
-					{
-						"name": "word at a cut",
-						"status": "pass"
-					},
-					{
-						"name": "huge word",
-						"status": "pass"
-					},
-					{
-						"name": "mixed scripts",
-						"status": "pass"
-					},
-					{
-						"name": "chunked read matches whole",
-						"status": "pass"
-					}
-				]
-			}
+			"file": "log/step2-rerun.html"
 		},
 		{
 			"step": 3,
@@ -302,83 +104,15 @@
 			"step": 3,
 			"at": "18:16",
 			"kind": "finding",
-			"text": "Each weighted draw rescans 50,000 words. Draw in batches."
+			"text": "Each weighted draw rescans 50,000 words. Draw in batches.",
+			"file": "log/step3-before-after.html"
 		},
 		{
 			"step": 3,
 			"at": "18:17",
 			"kind": "result",
 			"text": "10.5 MB in 0.83 s",
-			"viz": {
-				"type": "cloud",
-				"words": [
-					[
-						"the",
-						70
-					],
-					[
-						"of",
-						38
-					],
-					[
-						"and",
-						36
-					],
-					[
-						"kalo",
-						22
-					],
-					[
-						"mi",
-						19
-					],
-					[
-						"renta",
-						15
-					],
-					[
-						"to",
-						30
-					],
-					[
-						"voshi",
-						11
-					],
-					[
-						"brido",
-						9
-					],
-					[
-						"in",
-						24
-					],
-					[
-						"nor",
-						8
-					],
-					[
-						"supel",
-						6
-					],
-					[
-						"quazin",
-						5
-					],
-					[
-						"a",
-						28
-					],
-					[
-						"delka",
-						4
-					]
-				],
-				"examples": [
-					"the kalo of mi renta voshi and the brido in nor supel",
-					"a quazin to the delka, and mi renta of kalo"
-				],
-				"caption": "the 15 most common of 50,000 words, sized by count"
-			}
+			"file": "log/step3-cloud.html"
 		},
 		{
 			"step": 4,
@@ -390,49 +124,7 @@
 			"done": 2,
 			"of": 7,
 			"unit": "rounds",
-			"viz": {
-				"type": "waterfall",
-				"unit": "ms",
-				"spans": [
-					{
-						"lane": "Counter",
-						"label": "read",
-						"start": 0,
-						"dur": 118
-					},
-					{
-						"lane": "Counter",
-						"label": "split",
-						"start": 118,
-						"dur": 101
-					},
-					{
-						"lane": "Counter",
-						"label": "count",
-						"start": 219,
-						"dur": 65
-					},
-					{
-						"lane": "dict loop",
-						"label": "read",
-						"start": 0,
-						"dur": 121
-					},
-					{
-						"lane": "dict loop",
-						"label": "split",
-						"start": 121,
-						"dur": 148
-					},
-					{
-						"lane": "dict loop",
-						"label": "count",
-						"start": 269,
-						"dur": 84
-					}
-				],
-				"caption": "round 5 of 7: splitting costs more than counting either way"
-			}
+			"file": "log/step4-trace.html"
 		}
 	],
 	"questions": []

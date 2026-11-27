@@ -15,7 +15,14 @@
  * palette as everything else and light and dark are decided in the same two places.
  */
 
-@import url("theme.css");
+/*
+ * Everything here sits in one cascade layer, `decks`, beneath a card's own styles: any rule a card
+ * writes wins over these, whatever its specificity (`.doc { padding: 0 }` beats `.board .doc`), so a
+ * card changes what it likes without fighting the defaults.
+ */
+@import url("theme.css") layer(decks);
+
+@layer decks {
 
 * {
 	box-sizing: border-box;
@@ -1031,3 +1038,5 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 	align-self: flex-start;
 	margin-top: auto;
 }
+
+} /* @layer decks */

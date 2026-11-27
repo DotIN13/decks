@@ -220,7 +220,8 @@ function cssInDeck(css: string, base: string): boolean {
  * `body.board` turned into the card's own host and element, and the fonts declared once in the page
  * itself, since a shadow root's `@font-face` is not used.
  *
- * It goes in each root as a `<style>` before the card's own (`data-card-sheet`), not as an adopted
+ * Its rules sit in the cascade layer `decks`, so any rule of the card's own wins whatever its
+ * specificity. It goes in each root as a `<style>` before the card's own (`data-card-sheet`), not as an adopted
  * sheet: adopted sheets cascade after every sheet in the tree, so card.css's `h1 { font-size: 30px }`
  * beat a card's own `h1 { font-size: 23px }`, and `.board .doc`'s padding a card's `.board .doc`,
  * where on a page of its own (and in every picture and screenshot of it) the card's own rule, written
@@ -258,7 +259,9 @@ function cardSheet(lib: string): Promise<string | undefined> {
 				style.textContent = fonts.join("\n");
 				document.head.append(style);
 			}
-			const css = (theme.replace(/@font-face\s*\{[^}]*\}/g, "") + "\n" + board.replace(/@import[^;]*;/g, ""))
+			// card.css is one cascade layer, `decks`, under the card's own styles; its theme.css, imported
+			// into that layer on a page, joins it here, so any rule a card writes beats both.
+			const css = ("@layer decks {\n" + theme.replace(/@font-face\s*\{[^}]*\}/g, "") + "\n}\n" + board.replace(/@import[^;]*;/g, ""))
 				.replace(/html:not\(\[data-theme="light"\]\)/g, ':host(:not([data-theme="light"]))')
 				.replace(/(^|[\s,}])\[data-theme="dark"\]/g, '$1:host([data-theme="dark"])')
 				.replace(/:root\b/g, ":host")

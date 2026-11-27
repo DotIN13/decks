@@ -1,0 +1,10 @@
+<!-- Tests: one block per test, in the order they ran: <i></i> passed, <i class="fail"></i> failed,
+     <i class="skip"></i> skipped; title="" names it on hover. Then each failing test by name, and why. -->
+<div class="blocks">
+	<i title="empty text"></i><i title="one word"></i><i title="case folded"></i><i title="commas dropped"></i><i title="full stops dropped"></i><i title="hyphen kept"></i><i title="apostrophe kept"></i><i title="numbers counted"></i><i title="tabs and newlines"></i><i title="unicode letters"></i><i title="top N order"></i><i class="fail" title="top N larger than words"></i><i title="ties by first seen"></i><i title="only punctuation"></i><i title="repeated spaces"></i><i title="quotes dropped"></i><i title="leading apostrophe"></i><i class="fail" title="apostrophe at a cut"></i><i title="word at a cut"></i><i title="huge word"></i><i title="mixed scripts"></i><i title="trailing apostrophe"></i><i title="chunked read matches whole"></i>
+</div>
+<ul class="failing">
+	<li><span>apostrophe at a cut <small>"don" + "t" counted as two words</small></span></li>
+	<li><span>top N larger than words <small>the test asked for the wrong length</small></span></li>
+</ul>
+<div class="cap">21 of 23 pass</div>

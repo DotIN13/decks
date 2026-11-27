@@ -47,18 +47,21 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
 
   The log follows the newest line; pressing a step scrolls to its lines.
 
-- **Show, do not only tell.** Any log entry can carry a `viz`, a small picture drawn under it, so the
-  reader sees what the run did. Pick the one that makes the result obvious:
-  - `tally`: words being counted, then the counts (`{ "type": "tally", "text": "the cat saw the dog" }`);
-  - `tests`: one block per test, green or red, with the failing ones named and why
-    (`{ "type": "tests", "items": [{ "name": "apostrophe at a cut", "status": "fail", "detail": "…" }] }`);
-  - `cloud`: a word cloud and a few example lines, for data you made or read;
-  - `waterfall`: a trace of where the time went, one lane per variant
-    (`{ "type": "waterfall", "unit": "ms", "spans": [{ "lane": "Counter", "label": "read", "start": 0, "dur": 118 }] }`);
-  - `bars`: a few numbers side by side, the best in the accent colour; `image`: a plot or a screenshot you saved.
+- **Show, do not only tell.** Any log entry can carry its own HTML, drawn under it, so the reader
+  sees what the run did: `"html"` for a line or two inline, or `"file"` for a piece in the card's
+  folder (`"file": "log/bench.html"`), read again whenever it changes. A piece is plain HTML and SVG
+  styled with the card's colours; its scripts do not run. Start from a template in
+  [templates/](progress-example/templates/), copy it into `log/`, and put your numbers in:
+  - `tally.html`: the words or items a run looked at, then how many of each;
+  - `tests.html`: one block per test, green or red, with the failing ones named and why;
+  - `cloud.html`: a word cloud and a few example lines, for data you made or read;
+  - `waterfall.html`: a trace of where the time went, one lane per variant;
+  - `bars.html`: a few numbers side by side, the one that matters in the accent colour;
+  - `compare.html`: before and after, as large numbers or two pictures.
 
-  [viz.js](progress-example/viz.js) draws them; add a kind there when none fits (a diff, a map, a
-  before and after).
+  Each template says in a comment how to fill it. When none fits, write your own piece: a diff, a
+  table, a map, a screenshot with an `<img src="files/…">`. Pick the picture that makes the result
+  obvious, and keep text 14 px or larger.
 
 ```jsonc
 {
@@ -74,7 +77,9 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
             "why": "time both on the same words", "status": "running", "done": 2, "of": 7, "unit": "rounds" },
           { "step": 3, "at": "18:16", "kind": "finding", "text": "Each weighted draw rescans 50,000 words." },
           { "step": 2, "at": "18:08", "kind": "fail", "text": "21 of 23 pass",
-            "viz": { "type": "tests", "items": [{ "name": "apostrophe at a cut", "status": "fail" }] } }],
+            "file": "log/step2-first-run.html" },
+          { "step": 2, "at": "18:09", "kind": "finding", "text": "Reads split words.",
+            "html": "<code>\"don\" + \"t\"</code> → <code>\"don't\"</code>" }],
   "questions": [{ "ask": "Keep Counter?", "options": ["Yes", "No"] }]          // buttons that message you
 }
 ```

@@ -2,7 +2,7 @@
 <meta name="card" content='{"w":1100}' />
 <style>
 	.doc { --ok-soft: color-mix(in srgb, var(--b-ok) 14%, transparent); --bad-soft: color-mix(in srgb, var(--b-danger) 12%, transparent);
-		padding: 0; font-size: 17px; line-height: 1.4; color: var(--b-fg); font-family: var(--b-font) }
+		font-size: 17px; line-height: 1.4; color: var(--b-fg); font-family: var(--b-font) }
 
 	.head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 16px; padding: 18px 22px 14px; border-bottom: 1px solid var(--b-border) }
 	.head h1 { margin: 0; font-size: 22px; line-height: 1.25; letter-spacing: -0.01em }
@@ -20,8 +20,7 @@
 	.segs i.done { background: var(--b-ok) } .segs i.blocked, .segs i.not { background: var(--b-danger) }
 	.segs i.active { background: linear-gradient(90deg, var(--b-accent) 40%, var(--b-border) 40%) }
 
-	.cols { display: grid; grid-template-columns: 430px 1fr; height: 470px }
-	@container card (width < 760px) { .cols { grid-template-columns: 1fr; height: auto } .steps, .log { height: 300px } }
+	.cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 39% 1fr; grid-template-rows: minmax(0, 1fr) }
 	.steps { overflow: auto; padding: 10px; border-right: 1px solid var(--b-border); background: var(--b-bg-layer); display: flex; flex-direction: column; gap: 7px }
 	.step { display: grid; grid-template-columns: 24px 1fr; column-gap: 10px; text-align: left; font: inherit; color: var(--b-fg); background: var(--b-bg); border: 1px solid var(--b-border); border-radius: 10px; padding: 9px 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s }
 	.step:hover { border-color: var(--b-border-strong) }
@@ -41,7 +40,7 @@
 	.pill.todo { background: var(--b-bg-deep); color: var(--b-muted) }
 
 	.log { overflow: auto; padding: 0 18px 14px }
-	.sep { position: sticky; top: 0; z-index: 1; background: var(--b-bg); padding: 12px 0 6px; font-size: 14px; font-weight: 700; color: var(--b-muted); letter-spacing: .04em; text-transform: uppercase; display: flex; gap: 8px; align-items: center }
+	.sep { position: sticky; top: 0; z-index: 1; background: var(--b-bg); padding: 12px 0 6px; font-size: 14px; font-weight: 700; color: var(--b-muted); display: flex; gap: 8px; align-items: center }
 	.sep::after { content: ""; flex: 1; height: 1px; background: var(--b-border) }
 	.e > .x { min-width: 0 }
 	.e { display: grid; grid-template-columns: 46px 20px minmax(0, 1fr); gap: 8px; align-items: start; padding: 5px 6px; border-radius: 8px; font-size: 15px; line-height: 1.4 }
@@ -60,7 +59,7 @@
 	.result .x { font-weight: 600; color: var(--b-ok) }
 	.fail .x { color: var(--b-danger) }
 	.finding .x { border-left: 3px solid var(--b-accent); padding-left: 10px; font-weight: 550 }
-	.finding .x small { display: block; font-size: 14px; font-weight: 600; color: var(--b-accent); letter-spacing: .03em; text-transform: uppercase }
+	.finding .x small { display: block; font-size: 14px; font-weight: 600; color: var(--b-accent) }
 	.prog { display: flex; align-items: center; gap: 10px; margin-top: 7px; font-size: 14px; color: var(--b-muted) }
 	.bar { flex: 1; height: 6px; border-radius: 3px; background: var(--b-border); overflow: hidden }
 	.bar i { display: block; height: 100%; border-radius: 3px; transition: width .5s ease; background: var(--b-accent) }
@@ -72,8 +71,38 @@
 	.ask button { font: 15px var(--b-font); min-height: 40px; padding: 6px 14px; margin: 0 8px 0 0; border-radius: 8px; border: 1px solid var(--b-border-strong); background: var(--b-bg); color: var(--b-fg); cursor: pointer }
 	.ask button[disabled] { opacity: .6; cursor: default }
 	.empty { color: var(--b-muted); padding: 14px 0 }
+	/* Edge to edge, in a 16:10 shape, its two panes scrolling inside. Decks's own styles sit in a layer
+	   beneath these, so this rule replaces its padding and display outright. */
+	.doc { display: flex; flex-direction: column; aspect-ratio: 16 / 10; overflow: hidden; padding: 0; font-size: 17px; line-height: 1.4 }
+	@container card (width < 760px) { .doc { aspect-ratio: auto } .cols { grid-template-columns: 1fr } .steps, .log { height: 300px } }
 </style>
-<style data-viz></style>
+<style>
+	/* What an entry's own HTML can use (templates/ shows each). */
+	.viz { box-sizing: border-box; max-width: 100%; min-width: 0; overflow: hidden; color: var(--b-fg); font-weight: 400; margin-top: 8px; border: 1px solid var(--b-border); border-radius: 8px; background: var(--b-bg); padding: 10px 12px; font-size: 14px }
+	.viz .cap { color: var(--b-muted); margin-top: 6px }
+	.viz .words { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px }
+	.viz .w { padding: 1px 7px; border-radius: 5px; font-family: var(--b-mono); font-size: 14px }
+	.viz .tally b { font-weight: 600 }
+	.viz .tally { display: grid; grid-template-columns: max-content 1fr max-content; gap: 3px 8px; align-items: center }
+	.viz .tally .bar { height: 8px; border-radius: 4px }
+	.viz .blocks { display: flex; flex-wrap: wrap; gap: 3px }
+	.viz .blocks i { width: 14px; height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--b-ok) 70%, transparent) }
+	.viz .blocks i.fail { background: var(--b-danger) } .viz .blocks i.skip { background: var(--b-border-strong) }
+	.viz .failing { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px }
+	.viz .failing li { display: flex; gap: 8px; align-items: baseline }
+	.viz .failing li::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 2px; background: var(--b-danger); transform: translateY(1px) }
+	.viz .failing small, .viz small { font-size: 14px; color: var(--b-muted) }
+	.viz .cloud { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 10px; line-height: 1.1 }
+	.viz .ex { margin-top: 8px; font-family: var(--b-mono); color: var(--b-muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+	.viz svg { display: block; width: 100%; height: auto; overflow: visible }
+	.viz svg text { font: 16px var(--b-font); fill: var(--b-muted) }
+	.viz svg .lab { fill: var(--b-fg) }
+	.viz img { max-width: 100%; border-radius: 6px; display: block }
+	.viz .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+	.viz .compare > div { border: 1px solid var(--b-border); border-radius: 6px; padding: 8px 10px }
+	.viz .compare .big { font-size: 24px; font-weight: 650; line-height: 1.2 }
+	.viz .compare h4 { margin: 0 0 4px; font-size: 14px; color: var(--b-muted); letter-spacing: .04em }
+</style>
 <div class="doc" data-id="doc">
 	<div class="head">
 		<h1 id="task">Loading the progress…</h1>
@@ -87,12 +116,13 @@
 	</div>
 </div>
 <script type="module">
-	import { vizHtml, vizCss } from "./viz.js";
 	// A progress card. Left: the steps, each a goal or hypothesis, a method and what is expected. Right:
 	// a log of what actually happened (commands, failures, findings, results) under each step, newest at
 	// the foot. It reads progress.json beside it every 4 seconds; the agent, or a script it runs, rewrites
 	// that file in place. Copy the folder and change anything: the JSON's shape is this card's own.
-	// A log entry's "viz" draws a small picture under it (viz.js lists the kinds).
+	// A log entry can carry its own HTML under it: "html" inline, or "file", an .html piece in this
+	// folder (log/bench.html). templates/ holds pieces to copy: a tally, test blocks, a word cloud, a
+	// waterfall trace, bars, before and after. Scripts in a piece do not run; SVG and CSS do.
 	const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 	const VERDICT = { held: "done", "not held": "not", blocked: "blocked" };
 	const stateOf = (step) => (step.verdict && VERDICT[step.verdict]) || (step.status === "active" ? "active" : step.status === "done" ? "done" : step.status === "blocked" ? "blocked" : "todo");
@@ -102,8 +132,7 @@
 
 	export default function (card) {
 		const $ = (id) => card.root.getElementById(id);
-		card.root.querySelector("style[data-viz]").textContent = vizCss;
-		let text = "", data = null, chosen = null, follow = true, face = { name: "", src: "" };
+		let text = "", data = null, pieces = {}, chosen = null, follow = true, face = { name: "", src: "" };
 
 		async function faceOf(name) {
 			if (!name || face.name === name) return;
@@ -157,7 +186,8 @@
 				body = `${e.command ? `<span class="term">${esc(e.command)}</span>` : ""}${e.why ? `<span class="why">${esc(e.why)}</span>` : ""}${e.text ? `<span class="why">${esc(e.text)}</span>` : ""}${bar}`;
 			} else if (kind === "finding") body = `<small>Finding</small>${esc(e.text)}`;
 			else body = esc(e.text);
-			body += vizHtml(e.viz);
+			const own = e.file ? pieces[e.file] : e.html;
+			if (own) body += `<div class="viz">${own}</div>`;
 			return `<div class="e ${kind}${running ? " running" : ""}${String(e.step) === String(chosen) ? " lit" : ""}" data-s="${esc(e.step)}"><span class="at">${esc(e.at ?? "")}</span><span class="ic">${ICON[kind]}</span><span class="x">${body}</span></div>`;
 		}
 
@@ -192,7 +222,11 @@
 				chosen = steps[i] ? (steps[i].id ?? i + 1) : null;
 			}
 			drawHead(); drawAsks(); drawSteps(); drawLog();
-			if (first || follow) { showChosen(); requestAnimationFrame(showChosen); }
+			if (first || follow) {
+				// The panes take their height from the card's 16:10 shape, which settles after this draw.
+				const settle = () => { showChosen(); if (follow) $("log").scrollTop = $("log").scrollHeight; };
+				settle(); requestAnimationFrame(settle); setTimeout(settle, 300);
+			}
 			faceOf(data.agent);
 		}
 
@@ -205,21 +239,41 @@
 			const head = $("log").querySelector(`.sep[data-s="${CSS.escape(chosen)}"]`);
 			if (head) $("log").scrollTop = head.parentElement.offsetTop - $("log").offsetTop;
 		}, { signal: card.signal });
+		// Following the newest line stops when the reader scrolls up, and starts again at the foot. Only the
+		// reader's own scrolling counts: the panes resizing as the card settles scrolls the log too.
+		let reading = false;
+		for (const type of ["wheel", "touchstart", "pointerdown", "keydown"]) $("log").addEventListener(type, () => (reading = true), { signal: card.signal, passive: true });
 		$("log").addEventListener("scroll", () => {
+			if (!reading) return;
 			const log = $("log");
 			follow = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
 		}, { signal: card.signal });
 
+		async function read(name) {
+			const res = await fetch(card.file(name), { cache: "no-store", signal: card.signal });
+			return res.ok ? res.text() : "";
+		}
+
 		async function load() {
+			let changed = false;
 			try {
-				const res = await fetch(card.file("progress.json"), { cache: "no-store", signal: card.signal });
-				const next = await res.text();
-				if (next === text) { if (data) drawHead(); return; }
-				const parsed = JSON.parse(next); // half-written: keep the last good one
-				text = next; data = parsed;
+				const next = await read("progress.json");
+				if (next !== text) {
+					const parsed = JSON.parse(next); // half-written: keep the last good one
+					text = next; data = parsed; changed = true;
+				}
 			} catch (error) {
-				if (error.name === "AbortError" || !data) return;
+				if (error.name === "AbortError") return;
 			}
+			if (!data) return;
+			// An entry's own HTML file is read again too, so editing it shows without touching the JSON.
+			for (const name of new Set((data.log ?? []).map((e) => e.file).filter(Boolean))) {
+				try {
+					const piece = await read(name);
+					if (piece !== pieces[name]) { pieces[name] = piece; changed = true; }
+				} catch (error) { if (error.name === "AbortError") return; }
+			}
+			if (!changed) { drawHead(); return; }
 			try { draw(); } catch (error) { $("task").textContent = `progress.json could not be drawn: ${error.message}`; }
 		}
 		load();

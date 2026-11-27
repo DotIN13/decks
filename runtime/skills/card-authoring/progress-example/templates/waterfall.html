@@ -1,0 +1,17 @@
+<!-- Waterfall: where the time went, one lane per variant, one bar per phase. In the viewBox the time
+     axis runs from x=96 to x=516 (420 wide): a phase at start s and length d out of a total T is
+     x = 96 + 420*s/T, width = 420*d/T. Each bar steps down 22 units; leave 10 between lanes. Ticks
+     mark 0, T/4 … T. Keep the viewBox 600 wide so its 16-unit text reads at 14 px or more. -->
+<svg viewBox="0 0 600 170">
+	<g stroke="var(--b-border)"><line x1="96" x2="96" y1="0" y2="146"/><line x1="201" x2="201" y1="0" y2="146"/><line x1="306" x2="306" y1="0" y2="146"/><line x1="411" x2="411" y1="0" y2="146"/><line x1="516" x2="516" y1="0" y2="146"/></g>
+	<text x="96" y="164" text-anchor="middle">0</text><text x="201" y="164" text-anchor="middle">88</text><text x="306" y="164" text-anchor="middle">177</text><text x="411" y="164" text-anchor="middle">265</text><text x="516" y="164" text-anchor="middle">353</text>
+	<text class="lab" x="0" y="18">Counter</text>
+	<rect x="96" y="4" width="140" height="16" rx="3" fill="hsl(210 60% 52%)"/><text x="242" y="17">read 118</text>
+	<rect x="236" y="26" width="120" height="16" rx="3" fill="hsl(150 60% 45%)"/><text x="362" y="39">split 101</text>
+	<rect x="357" y="48" width="77" height="16" rx="3" fill="hsl(30 70% 52%)"/><text x="440" y="61">count 65</text>
+	<text class="lab" x="0" y="94">dict loop</text>
+	<rect x="96" y="80" width="144" height="16" rx="3" fill="hsl(210 60% 52%)"/><text x="246" y="93">read 121</text>
+	<rect x="240" y="102" width="176" height="16" rx="3" fill="hsl(150 60% 45%)"/><text x="422" y="115">split 148</text>
+	<rect x="416" y="124" width="100" height="16" rx="3" fill="hsl(30 70% 52%)"/><text x="522" y="137">count 84</text>
+</svg>
+<div class="cap">time from the start, ms: splitting costs more than counting either way</div>

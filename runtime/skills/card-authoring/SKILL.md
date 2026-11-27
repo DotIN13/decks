@@ -11,7 +11,8 @@ Everything that used to be a board is a card. A board file left in a deck from b
 
 - A card is read in about ten seconds. One idea, the title is the finding as a sentence, one main
   visual (diagram, chart, table, or two to four large numbers), about 120 words, five blocks at most.
-- No section headings (Summary, Method, Next), no background, no recap. About 1000 by 700 or smaller.
+- No section headings (Summary, Method, Next), no background, no recap. About 1000 by 700 or smaller; a card with more in it (a progress
+  card, a finding with views behind tabs, a dashboard) is 16:10, 1100 by 688, with `.doc { aspect-ratio: 16 / 10 }`.
   What does not fit is cut at the card's foot; a real second idea is a second card, linked with `<a href="../other/index.html">`.
 - Body text 17px or larger, nothing under 14px, the title on one or two full-width lines; when it runs longer, shorten the words before shrinking the type.
 - Say each thing once. The title carries the finding and its number, so the body does not restate them: it shows what stands behind them. If the title already has the headline number, the large figures under it are other numbers. A caption never repeats a label, and a detail view never repeats the row that opened it. Write for a smart reader from outside the project. The first time a term of art, an abbreviation or an internal name appears (a KV cache, a t value, a file or variable name, an arm of an experiment), either replace it with plain words or say in a few words what it is. A statistic says how to read it, for example "t 2.3, where above 2 is unlikely to be chance". Before you finish, reread the card as someone who has never seen this project or paper: every name that came from its files (an arm, a scheme, a clause, a metric, a model's nickname, a statistic) is either replaced by what it does or explained once. The cheapest way costs no space: give the term a dotted underline and put its meaning in a hover or tap note, `<abbr title="what it means, in plain words">term</abbr>` with `abbr { text-decoration: underline dotted; cursor: help }`. A chart labels both axes with their units and says in its own title what to see in it; small multiples each carry their scale.
@@ -43,6 +44,19 @@ Everything that used to be a board is a card. A board file left in a deck from b
   card's block.
 - **Nothing is placed by coordinates.** No `position: absolute` blocks, no `left` and `top`, no pixel
   grid. The content flows, and its order in the file is its order on the card.
+- **Your styles always win over Decks's.** Decks's own card styles (`.doc`'s padding of 28 by 32 px,
+  its 14.5 px type, the headings, the ready-made boxes) sit in a cascade layer beneath yours, so any
+  rule you write replaces them whatever its specificity: `.doc { padding: 0 }` makes a card edge to
+  edge, `.doc { font-size: 17px; line-height: 1.5 }` sets the body type, `h1 { … }` your own
+  headings. For a fixed shape with panes that scroll inside it:
+
+  ```css
+  .doc { display: flex; flex-direction: column; aspect-ratio: 16 / 10; overflow: hidden; padding: 0 }
+  .panes { flex: 1; min-height: 0; display: grid; grid-template-columns: 2fr 3fr; grid-template-rows: minmax(0, 1fr) }
+  .panes > * { overflow: auto }
+  ```
+
+  A rule inside `@container` that changes one of these goes after it, so it wins by order.
 - The width comes from `<meta name="card">` (`"w"`). The height is the card's box on the canvas:
   `decks canvas fit <path>` measures the content and sets it.
 - **Fit any width.** The meta's `w` is only where the card starts: a person can resize its item, and
@@ -80,8 +94,8 @@ Everything that used to be a board is a card. A board file left in a deck from b
 - Work of three steps or more, or a background run, gets a progress card in your row of Working,
   made when the work starts. It is an ordinary card, copied from the template
   [progress-example/](progress-example/): steps on the left (a goal or hypothesis, a method, what you
-  expect, a verdict), a log on the right of every command, failure, finding and result, all read
-  from a progress.json you keep current. [progress.md](progress.md) says how.
+  expect, a verdict), a log on the right of every command, failure, finding and result, each with
+  its own HTML picture if it helps (templates included), all read from a progress.json you keep current. [progress.md](progress.md) says how.
 
 **Scripts: modules handed the card**
 
