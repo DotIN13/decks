@@ -116,6 +116,7 @@ export class EngineLayout {
 		if (changes.all || changes.roots.length || changes.removed.length || changes.bases.length) {
 			this.cardList = undefined;
 			this.of.questions.placedList = undefined;
+			this.of.questions.frameIds = undefined;
 			// A gesture's or a glide's step re-lays only the arrows it bends: no page's item changes, so the page ids stand.
 			if (!quiet) this.of.questions.pageIds = undefined;
 			this.of.questions.placedIndex = undefined;
@@ -157,6 +158,7 @@ export class EngineLayout {
 		this.of.bounds = boundsOf(placed);
 		this.cardList = undefined;
 		this.of.questions.placedList = undefined;
+		this.of.questions.frameIds = undefined;
 		this.of.questions.pageIds = undefined;
 		this.of.questions.placedIndex = undefined;
 		this.of.drawnDoc = this.of.doc;

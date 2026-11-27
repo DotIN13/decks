@@ -12,6 +12,8 @@ export interface SceneQuery {
 	/** Every placed item, in paint order. */
 	items(): Iterable<Placed>;
 	item(id: string): Placed | undefined;
+	/** The ids of the frames among the placed items, in paint order, when the scene keeps them: a drag looks for drop targets only there. */
+	frames?(): readonly string[];
 	/** Where an item is drawn (text measured, shapes at their outline), else where it is placed. */
 	box(id: string): Rect | undefined;
 	/**

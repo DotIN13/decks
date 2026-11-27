@@ -1,9 +1,22 @@
 /**
  * Where a drag would drop what it carries: which frame, and where among a frame's children.
  */
-import { isShape, type PenNode } from "@decks/pen";
+import { isShape, type PenNode, type Placed } from "@decks/pen";
 import type { Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
+
+/** The placed frames, from the scene's own list when it keeps one, else picked out of every item. */
+function* framesOf(scene: SceneQuery): Iterable<Placed> {
+	const ids = scene.frames?.();
+	if (!ids) {
+		yield* scene.items();
+		return;
+	}
+	for (const id of ids) {
+		const placed = scene.item(id);
+		if (placed) yield placed;
+	}
+}
 
 /**
  * The topmost frame under a point. Only frames that place their children where they say, unless
@@ -12,7 +25,7 @@ import type { SceneQuery } from "./scene.ts";
  */
 export function frameAt(scene: SceneQuery, point: Pt, stacking = false): string | undefined {
 	let best: { id: string; order: number } | undefined;
-	for (const placed of scene.items()) {
+	for (const placed of framesOf(scene)) {
 		const { node, box } = placed;
 		if (node.type !== "frame" || node.id.includes("/") || isShape(node)) continue;
 		if (node.layout !== "none" && !stacking) continue;
@@ -110,8 +123,10 @@ export function nearDrops(scene: SceneQuery, point: Pt, carrying: readonly strin
 		return false;
 	};
 	const same = (a: Rect, b: Rect | undefined) => !!b && Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5 && Math.abs(a.w - b.w) < 0.5 && Math.abs(a.h - b.h) < 0.5;
-	for (const { node, box: placedBox } of scene.items()) {
-		if (node.type !== "frame" || node.id.includes("/") || isShape(node) || carried(node.id)) continue;
+	for (const { node, box: placedBox } of framesOf(scene)) {
+		if (node.type !== "frame" || node.id.includes("/") || isShape(node)) continue;
+		// Every slot line lies inside its frame's box: a frame out of reach has none in reach.
+		if (boxDistance(point, scene.box(node.id) ?? placedBox) > reach || carried(node.id)) continue;
 		const frame = laidOut(scene, node.id);
 		if (!frame) {
 			if (node.layout !== "none" || node.id === current?.into) continue;

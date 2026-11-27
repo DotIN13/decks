@@ -37,6 +37,17 @@ export class EngineQuestions {
 
 	placedIndex: BoxIndex | undefined;
 
+	/** The ids of the frames among `placed`, in paint order, made when first asked for after a change: what a drag's drop targets are looked for in. */
+	frameIds: string[] | undefined;
+
+	frames(): readonly string[] {
+		if (!this.frameIds) {
+			this.frameIds = [];
+			for (const one of this.of.placed.values()) if (one.node.type === "frame") this.frameIds.push(one.node.id);
+		}
+		return this.frameIds;
+	}
+
 	scrolls = new Map<string, number>();
 
 	private penHit?: CanvasRenderingContext2D;
