@@ -642,7 +642,7 @@ export class Registry {
 		const from = this.sender(fromId);
 		const to = this.resolve(target);
 		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
-		to.noteAsked();
+		to.waits.asked();
 		const answer = to.turns.deliver({ ...from, task: spec.task.trim(), boards: handed, at: Date.now() });
 		this.publish();
 		return answer;
@@ -651,7 +651,8 @@ export class Registry {
 	/** Wait until an agent's work is done (`agent.wait`), by id or by a name only one agent answers to. */
 	async wait(target: string, timeoutMs: number): Promise<{ name: string; state: AgentState; reply: string; waited: number; timedOut: boolean }> {
 		const agent = this.resolve(target);
-		return { name: agent.chat().name, ...(await agent.waitTurn(timeoutMs)) };
+		const now = () => ({ state: agent.chat().state, queued: agent.turns.queued, reply: agent.conversation.translator.lastAssistantText() });
+		return { name: agent.chat().name, ...(await agent.waits.wait(now, timeoutMs)) };
 	}
 
 	/**
@@ -674,7 +675,7 @@ export class Registry {
 		// its own decision, and a sender that could rewrite it would be a sender that can take
 		// somebody's canvas away. The source rides in the briefing instead.
 		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
-		to.noteAsked();
+		to.waits.asked();
 		const position = to.turns.enqueue({
 			...from,
 			task: spec.task.trim(),
