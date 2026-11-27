@@ -23,6 +23,14 @@ const RECENT = 5;
  * opens finds rather than going nowhere; on a touch screen it waits for a tap, so opening the menu does
  * not throw up the keyboard over it.
  */
+/** What the switcher lists: the canvases matching the words typed, or the latest, the one you are on first. */
+function listedStages(stages: StageRow[], here: string | undefined, typed: string): StageRow[] {
+	const q = typed.trim();
+	if (q) return searchStages(stages, q).filter((one) => one.hit).map((one) => one.stage).slice(0, 8);
+	const at = (one: StageRow) => (one.name === here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
+	return [...stages].sort((a, b) => at(b) - at(a)).slice(0, RECENT);
+}
+
 export function CanvasSwitcher(props: {
 	stages: StageRow[];
 	here: string | undefined;
@@ -48,12 +56,7 @@ export function CanvasSwitcher(props: {
 		dismiss?.();
 		run();
 	};
-	const listed = () => {
-		const q = find().trim();
-		if (q) return searchStages(props.stages, q).filter((one) => one.hit).map((one) => one.stage).slice(0, 8);
-		const at = (one: StageRow) => (one.name === props.here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
-		return [...props.stages].sort((a, b) => at(b) - at(a)).slice(0, RECENT);
-	};
+	const listed = () => listedStages(props.stages, props.here, find());
 	return (
 		<Popover
 			placement={props.placement ?? "bottom-start"}

@@ -53,6 +53,21 @@ const saved = (): Section => {
 };
 
 /**
+ * Close on Escape, heard before anything else (the capture phase): the canvas takes Escape for itself
+ * and marks it handled, and a Settings window listening after it never closed on Escape.
+ */
+function closeOnEscape(close: () => void): void {
+	const onKey = (event: KeyboardEvent) => {
+		if (event.key !== "Escape") return;
+		event.preventDefault();
+		event.stopPropagation();
+		close();
+	};
+	window.addEventListener("keydown", onKey, true);
+	onCleanup(() => window.removeEventListener("keydown", onKey, true));
+}
+
+/**
  * Settings, one section at a time, as the "Settings redesign" drawing has it.
  *
  * On a computer and an iPad it is a window: the seven sections on a grey left, the open one on the
@@ -96,18 +111,7 @@ export function Settings(props: {
 	};
 	const label = () => SECTIONS.find((one) => one.id === section())!.label();
 
-	onMount(() => {
-		// Before anything else hears it (the capture phase): the canvas takes Escape for itself and marks
-		// it handled, and a Settings window listening after it never closed on Escape.
-		const onKey = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") return;
-			event.preventDefault();
-			event.stopPropagation();
-			props.onClose();
-		};
-		window.addEventListener("keydown", onKey, true);
-		onCleanup(() => window.removeEventListener("keydown", onKey, true));
-	});
+	onMount(() => closeOnEscape(props.onClose));
 
 	const body = () => (
 		<div class="sw-body">
