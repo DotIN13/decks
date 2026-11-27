@@ -31,7 +31,7 @@ const other = await until(() => (link.last("agent.list")?.chats ?? []).map((chat
 say("a second chat to draw with", !!other);
 const notes = [[6000, 4000], [6400, 4100], [6200, 4400]].map(([x, y], index) => ({ op: "insert", node: { type: "note", id: `far-${index}`, content: "Far away" }, box: { x1: x, y1: y, x2: x + 240, y2: y + 120 } }));
 link.edit(other, notes);
-const canvas = await until(() => (link.received.filter((m) => m.type === "canvas.list").at(-1)?.stages ?? []).find((one) => one.agents.some((agent) => agent.id === other))?.name, 12000);
+const canvas = await until(() => (link.received.filter((m) => m.type === "canvas.list").at(-1)?.canvases ?? []).find((one) => one.agents.some((agent) => agent.id === other))?.name, 12000);
 say("the second chat has a canvas of drawing only", !!canvas, String(canvas));
 
 // What the camera shows: are the notes' middle and the window's middle close, at a zoom where notes read?

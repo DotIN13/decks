@@ -31,7 +31,7 @@ await settle(page, 900);
 const link = await socket();
 const deck = await deckState();
 const agentId = await until(() => link.last("agent.list")?.focused);
-const stageName = await until(() => link.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
+const stageName = await until(() => link.last("canvas.list")?.canvases.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 const file = join(deck.path, "canvases", stageName ?? "?", "canvas.pen");
 const items = () => (existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).children ?? [] : []);
 const tagged = (type) => items().filter((node) => node.type === "browser" && node.metadata?.type === type);

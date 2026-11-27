@@ -22,11 +22,11 @@ await shot(page, "01-open");
 const cardCount = await frame.evaluate(() => globalThis.__decksProbes?.cards?.().length ?? 0);
 say("the app opens with the fixture's cards on the canvas", cardCount >= 3, `${cardCount} cards`);
 
-// 1. the side panel: the Canvas tab lists the cards; a row glides to its card
+// 1. the side panel: the Objects tab lists the cards; a row glides to its card
 await openPanel(page);
-const rows = page.locator('.v3-item[data-kind="board"]');
+const rows = page.locator('.v3-item[data-kind="card"]');
 const rowCount = await rows.count();
-say("the side panel's Canvas tab lists the cards", rowCount >= 3, `${rowCount} rows`);
+say("the side panel's Objects tab lists the cards", rowCount >= 3, `${rowCount} rows`);
 if (rowCount > 0) await rows.first().click();
 await settle(page, 1200);
 await shot(page, "02-panel-row-glide");

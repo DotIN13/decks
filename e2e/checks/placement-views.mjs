@@ -20,7 +20,7 @@ const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Dat
 const deck = await deckState();
 const link = await socket();
 const agentA = await until(() => link.last("agent.list")?.focused);
-const stageName = await until(() => link.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentA))?.name);
+const stageName = await until(() => link.last("canvas.list")?.canvases.find((row) => row.agents.some((agent) => agent.id === agentA))?.name);
 const file = stageName ? join(deck.path, "canvases", stageName, "canvas.pen") : "";
 const doc = () => JSON.parse(readFileSync(file, "utf8"));
 const boards = () => doc().children.filter((n) => n.type === "browser").map((n) => ({ path: n.metadata.path, x: n.x, y: n.y, w: n.width, h: n.height }));
@@ -87,7 +87,11 @@ const n = note && { x: note.x, y: note.y, w: note.width ?? 240, h: note.height ?
 const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const gap = made && Math.max(Math.max(newest.x - (made.x + made.w), made.x - (newest.x + newest.w)), Math.max(newest.y - (made.y + made.h), made.y - (newest.y + newest.h)));
 say("doc.place put a document item on A's stage", !!made, JSON.stringify(made));
-say("…beside the newest board, closer than half a document's width", made && gap < 500, `gap ${gap} px`);
+/*
+ * Beside the newest board, top edges level, stepped on right past the note in its slot and no further
+ * (`deck/place.ts`, `joinSpot`: aim, then step clear, 160 px from what is there; fc267d28).
+ */
+say("…beside the newest board, top edges level, just past the note in the way", made && n && made.y === newest.y && made.x === n.x + n.w + 160, `gap ${gap} px, at ${made?.x},${made?.y}`);
 say("…not on the note drawn in the slot", made && n && !hit(made, n), JSON.stringify(n));
 say("…and not where either window was looking", made && Math.hypot(made.x - camA.x, made.y - camA.y) > 15000);
 say("…on no other board", made && boards().filter((b) => b.path !== made.path).every((b) => !hit(made, b)));

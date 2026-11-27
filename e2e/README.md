@@ -101,7 +101,9 @@ list's order. **Deleting it did not fix that; it removed the only thing reportin
 - `canvases/auth-refresh/`: the canvas most checks work on, five **cards** (`cards/<name>/index.html`:
   `plan`, `risks`, `notes`, `sources`, `how-deep-is-the-deep-sea`), stacked with their right-hand
   edges in line. They were the five library boards of the old fixture, put through the
-  boards-to-cards migration (`apps/server/src/migrations/2026-10-29-boards-to-cards.ts`).
+  boards-to-cards migration (`apps/server/src/migrations/2026-10-29-boards-to-cards.ts`). Their pages were then
+  given the new names by the card-and-canvas migration's own code (`2026-11-26-card-and-canvas-names.ts`,
+  `planNames`): `<meta name="card">`, as the app writes them.
   `card("plan")` is a card's deck path, `cardFile("plan")` its file, `nameOf(path)` the name a
   check compares by. `resetStage()` sends the focused agent to this canvas (`agent.stage`) and puts
   each card back where `canvas.pen` has it; `deckState()` reads every place from the canvas files.

@@ -10,7 +10,7 @@
  * (black), the plain one's is the canvas's (round); red just outside the framed card, blue past that,
  * neither by the plain one. (A sleeping card's picture takes its corners in the engine: `engine.rs`, `a_cards_picture_has_its_items_corners`.)
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { API, asPerson, canvasFrame, deckState, flyToCard, open, resetStage, say, selectCard, settle } from "../harness.mjs";
 
@@ -83,7 +83,16 @@ const onScreen = (r) => r && r.x > 380 && r.y > 30 && r.x + r.width < 1370 && r.
 {
 	const shot = await call("canvas.screenshot", [{ of: [plain.value.id, framed.value.id], scale: 1, scheme: "dark" }]);
 	const v = shot.value ?? {};
-	say("a screenshot of both, drawn natively", shot.ok === true && /native/.test(String(v.how)), JSON.stringify(v).slice(0, 200));
+	/*
+	 * The native renderer is a Rust binary (`cargo build --release -p stage-shot` in packages/stage, or
+	 * `DECKS_CANVAS_SHOT`); without it the server falls back to Chromium, whose `how` says why
+	 * ("chromium: the native renderer is not built …", which the old /native/ test took for native).
+	 * The corners are the native renderer's to get right, so they are asked of it only when it is there,
+	 * as stage-shot does.
+	 */
+	const nativeBuilt = process.env.DECKS_CANVAS_SHOT ? existsSync(process.env.DECKS_CANVAS_SHOT) : existsSync(new URL("../../packages/stage/target/release/stage-shot", import.meta.url));
+	if (nativeBuilt) say("a screenshot of both, drawn natively", shot.ok === true && v.how === "native", JSON.stringify(v).slice(0, 200));
+	else console.log(`SKIP  the native renderer is not built here: its corners are not checked (${String(v.how).slice(0, 60)})`);
 	if (shot.ok) {
 		const bytes = readFileSync(join((await deckState()).path, v.file)).toString("base64");
 		const k = v.width / (v.box.x2 - v.box.x1);
@@ -94,8 +103,10 @@ const onScreen = (r) => r && r.x > 380 && r.y > 30 && r.x + r.width < 1370 && r.
 			g.drawImage(image, 0, 0);
 			return points.map(([x, y]) => [...g.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3)]);
 		}, { data: bytes, points: [at(-2500 + 1.5, -3000 + 1.5), at(-3000 + 1.5, -3000 + 1.5), at(-2500 - 3, -2940), at(-2500 - 11, -2940)] });
-		say("screenshot: the framed card's corner is square", black(px[0]), JSON.stringify(px[0]));
-		say("screenshot: …the plain card's is round", !black(px[1]), JSON.stringify(px[1]));
+		if (nativeBuilt) {
+			say("screenshot: the framed card's corner is square", black(px[0]), JSON.stringify(px[0]));
+			say("screenshot: …the plain card's is round", !black(px[1]), JSON.stringify(px[1]));
+		}
 		say("screenshot: the red outline and the blue shadow outside the framed card", red(px[2]) && blue(px[3]), JSON.stringify(px.slice(2)));
 	}
 }

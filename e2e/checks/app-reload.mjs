@@ -28,7 +28,7 @@ await settle(page, 900);
 const link = await socket();
 const deck = await deckState();
 const agentId = await until(async () => link.last("agent.list")?.focused);
-const stageName = await until(async () => link.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
+const stageName = await until(async () => link.last("canvas.list")?.canvases.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 
 const made = await call("apps.create", ["e2e-reload", { title: "E2E reload", starter: "static" }]);
 const file = join(deck.path, "apps", "e2e-reload", "index.html");

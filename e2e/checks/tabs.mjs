@@ -54,8 +54,8 @@ const shown = await until(async () => ((await drawnIn()).some((path) => String(p
 say("the window shows that canvas: its card is in the frame", !!shown, JSON.stringify(await drawnIn()).slice(0, 200));
 say("…and none of the first one's", !(await drawnIn()).some((path) => firstDrawn.includes(path)));
 say("the harness is told: that chat's camera is on the canvas opened, and no longer on the first", (await until(async () => ((await agentsOn(second)).length === firstAgents.length && (await agentsOn(CANVAS)).length === 0 ? true : undefined))) === true, JSON.stringify([await agentsOn(CANVAS), await agentsOn(second)]));
-// The side panel's Canvas tab lists what is on the canvas on screen.
-await page.locator('.v3-nav-tab:has-text("Canvas")').first().click().catch(() => {});
+// The side panel's Objects tab lists what is on the canvas on screen.
+await page.locator('.v3-nav-tab:has-text("Objects")').first().click().catch(() => {});
 say("the side panel lists the card of the canvas in front", !!(await until(() => page.locator('.panel-shell :text("Second card")').count())), (await page.locator(".panel-shell").innerText().catch(() => "")).slice(0, 160));
 
 // --- an edit there lands on that canvas --------------------------------------------------------------------

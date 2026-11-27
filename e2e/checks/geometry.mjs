@@ -20,7 +20,7 @@ const canvas = await canvasFrame(page);
 
 /** The `{"w":…,"h":…}` the board file declares, which is the number the drag has to move. */
 const metaOf = (text) => {
-	const found = text.match(/name="board"\s+content='([^']*)'/) ?? text.match(/name="board"\s+content="([^"]*)"/);
+	const found = text.match(/name="card"\s+content='([^']*)'/) ?? text.match(/name="card"\s+content="([^"]*)"/);
 	if (!found) return null;
 	try {
 		return JSON.parse(found[1]);
@@ -61,7 +61,7 @@ const select = async (path) => {
 	await new Promise((resolve) => setTimeout(resolve, 500));
 	link.close();
 	await settle(page, 500);
-	// The panel has no row per board file any more (its Canvas tab lists items by their names), so it is
+	// The panel has no row per board file any more (its Objects tab lists items by their names), so it is
 	// picked on the canvas and flown to with its Fit, which finds it wherever the camera is (`flyToCard`).
 	await flyToCard(page, path);
 	await settle(page, 300);

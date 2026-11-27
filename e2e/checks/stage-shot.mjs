@@ -224,7 +224,7 @@ const PATHS = [
 	{ label: "", extra: {} },
 	{ label: " [browser]", extra: { live: "1" } },
 ];
-const nativeBuilt = existsSync(new URL("../../packages/stage/target/release/canvas-shot", import.meta.url));
+const nativeBuilt = existsSync(new URL("../../packages/stage/target/release/stage-shot", import.meta.url));
 for (const path of PATHS)
 for (const raw of CASES) {
 	const c = { ...raw, name: `${raw.name}${path.label}`, query: { ...raw.query, ...path.extra } };

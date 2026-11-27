@@ -20,7 +20,7 @@
  */
 import { canvasFrame, open, resetStage, say, settle, zoom } from "../harness.mjs";
 
-// The panel's Canvas tab lists the boards on the canvas (`panel/ObjectsTab.tsx`, `itemRow`); a board's row flies to it.
+// The panel's Objects tab lists the boards on the canvas (`panel/ObjectsTab.tsx`, `itemRow`); a board's row flies to it.
 const { browser, page, errors } = await open({ width: 1500, height: 1000, panelTab: "canvas" });
 await resetStage(page);
 await settle(page, 600);
@@ -52,11 +52,11 @@ const watched = async (press, ms) => {
 		return { before, samples };
 	}, ms);
 	// The row is the page's, beside the frame.
-	await page.evaluate((label) => [...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === label)?.click(), press.label);
+	await page.evaluate((label) => [...document.querySelectorAll('.v3-item[data-kind="card"]')].find((row) => row.title === label)?.click(), press.label);
 	return sampling;
 };
 
-/** A board's row in the Canvas tab, which is labelled with the board's name on the canvas rather than its file. */
+/** A board's row in the Objects tab, which is labelled with the board's name on the canvas rather than its file. */
 const LABEL = { "risks.html": "Auth refresh — risks", "plan.html": "Auth refresh — the plan" };
 const row = (name) => ({ kind: "row", name, label: LABEL[name] });
 const same = (a, b) => a.x === b.x && a.y === b.y && a.zoom === b.zoom;
@@ -124,7 +124,7 @@ const stealing = (await canvasFrame(page)).evaluate(async () => {
 	return { midFlight, after };
 });
 // Back to the plan: the camera is on risks.html after the reduced-motion-free row above, so this has somewhere to glide.
-await page.evaluate(() => [...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === "Auth refresh — the plan")?.click());
+await page.evaluate(() => [...document.querySelectorAll('.v3-item[data-kind="card"]')].find((row) => row.title === "Auth refresh — the plan")?.click());
 const stolen = await stealing;
 const landed = stolen.after.at(-1);
 say(

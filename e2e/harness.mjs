@@ -648,7 +648,7 @@ export async function socket(api) {
 	const last = (type) => received.filter((m) => m.type === type).at(-1);
 	/** A canvas's own name, or the canvas an agent is on, as the last list of canvases said. */
 	const canvasOf = (of) => {
-		const rows = last("canvas.list")?.stages ?? [];
+		const rows = last("canvas.list")?.canvases ?? [];
 		return rows.some((row) => row.name === of) ? of : rows.find((row) => row.agents?.some((agent) => agent.id === of))?.name;
 	};
 	const call = (verb, args = [], on = {}) =>
@@ -913,11 +913,11 @@ export async function newAgent(page, kind = "pi") {
  * worth asking under that name.
  */
 export async function openAllCards(page) {
-	// The side panel's Canvas tab lists what is on the canvas, boards among it (`.v3-item`).
+	// The side panel's Objects tab lists what is on the canvas, boards among it (`.v3-item`).
 	await openPanel(page);
 	const tab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Canvas\s*$/i }).first();
 	if ((await tab.count()) > 0 && (await tab.getAttribute("aria-selected")) !== "true") await tab.click();
-	await page.waitForSelector('.v3-item[data-kind="board"]', { timeout: 6000 });
+	await page.waitForSelector('.v3-item[data-kind="card"]', { timeout: 6000 });
 	await page.waitForTimeout(300);
 }
 
