@@ -1,5 +1,5 @@
 import type { Page, Camera } from "@decks/protocol";
-import { createEffect, createSignal, on, untrack, type Accessor, type Component } from "solid-js";
+import { createEffect, createSelector, createSignal, on, untrack, type Accessor, type Component } from "solid-js";
 import { boxOf } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import type { ItemSlotProps } from "../items/item-slot-props.ts";
@@ -35,6 +35,15 @@ export function createPageNode(d: PageNodeNeeds) {
 
 	createEffect(on(() => d.props.selected, (selected) => { if (selected !== untrack(activeItem)) setActiveItem(undefined); }));
 
+	/*
+	 * Which item is selected, and which is active, asked per item through a selector: a change wakes only
+	 * the item that lost it and the one that gained it, not every item on the canvas. Each item's
+	 * `selected` feeds its outline, its card's `card.active` (`card.ts`) and its app's input, so a plain
+	 * `selected === path` re-ran all of those on every item at each click, on a canvas of hundreds.
+	 */
+	const isSelected = createSelector(() => d.props.selected);
+	const isActive = createSelector(activeItem);
+
 	/** One placed item's slot: the host's, told where it is and what it may do. */
 	const pageNode = (board: Page) => (
 		<d.Frame
@@ -47,8 +56,8 @@ export function createPageNode(d: PageNodeNeeds) {
 			visible={d.isNear(board.path)}
 			onLive={(on: boolean) => d.markLive(board.path, on)}
 			carried={d.carriedPages().has(board.path) || d.draggedAsPicture().has(board.path)}
-			selected={d.props.selected === board.path}
-			active={activeItem() === board.path}
+			selected={isSelected(board.path)}
+			active={isActive(board.path)}
 			onActivate={() => setActiveItem(board.path)}
 			gestures={d.gestures}
 			{...(d.props.onOpenPage ? { onOpenPage: d.props.onOpenPage } : {})}
