@@ -1,7 +1,7 @@
 {
 	"counts": {
-		"files over 1,000 lines": 7,
-		"functions over 150 lines": 42,
+		"files over 1,000 lines": 6,
+		"functions over 150 lines": 41,
 		"classes over 30 methods": 10,
 		"server folder pairs that import each other": 12,
 		"imports across packages by relative path": 0,
@@ -16,7 +16,6 @@
 		"apps/web/src/panel/LeftPanel.tsx": 1049,
 		"packages/docs/src/page/gview.ts": 2091,
 		"packages/docs/src/page/live.ts": 2054,
-		"packages/docs/src/page/page.ts": 1752,
 		"packages/sync-client/src/sync.ts": 1655,
 		"apps/server/src/apps/starters.ts: files": 169,
 		"apps/server/src/auth/issue.ts: doorRoutes": 171,
@@ -56,7 +55,6 @@
 		"packages/canvas/src/view/CanvasView.tsx: CanvasView": 357,
 		"packages/docs/src/gdoc/fake.ts: one": 162,
 		"packages/docs/src/page/live.ts: inlineMd": 154,
-		"packages/docs/src/page/page.ts: mountDocPage": 1270,
 		"packages/pen/src/layout.ts: layout": 212,
 		"packages/ui/src/Popover.tsx: Popover": 268,
 		"packages/ui/src/float/float.ts: makeFloat": 493,
