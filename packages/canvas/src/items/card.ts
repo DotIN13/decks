@@ -142,6 +142,8 @@ export interface MountedCard {
 	dispose(): void;
 	/** Settles once card.css is in and its markdown, maths, diagrams and code are drawn (its scripts start after). */
 	drawn: Promise<void>;
+	/** Settles once each of its scripts has run its default export (or failed): what it draws is drawn. */
+	ran: Promise<void>;
 }
 
 /** A script's type that is JavaScript a card runs: none, a module, or a plain script. The server counts the same ones. */
@@ -754,9 +756,10 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	const cleanups: Array<() => void> = [];
 	// Its markdown, maths, diagrams and code drawn, after card.css so a diagram takes the card's colours.
 	const partsDrawn = sheetReady.then(() => drawParts(host, root, body, lib));
+	let ran: Promise<void> = partsDrawn.then(() => undefined, () => undefined);
 	if (source.trusted && scripts.length) {
 		const base = source.url.replace(/[?#].*$/, "");
-		void (async () => {
+		ran = (async () => {
 			// After card.css and the parts it draws, so a script that measures its card measures it as it shows.
 			await sheetReady;
 			await partsDrawn;
@@ -776,7 +779,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 					console.error(`card ${source.path}: ${address}`, error);
 				}
 			}
-		})();
+		})().catch(() => undefined);
 	}
 	const heightListeners = new Set<(h: number) => void>();
 	let lastHeight = 0;
@@ -790,6 +793,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	return {
 		root,
 		drawn: partsDrawn.then(() => undefined, () => undefined),
+		ran,
 		reading: () => readingOfCard(body),
 		onHeight(listener) {
 			heightListeners.add(listener);

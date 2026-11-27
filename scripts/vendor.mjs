@@ -117,6 +117,22 @@ await build({
 });
 console.log(`[vendor] hljs.bundle.mjs`);
 
+// d3 as a module, for the import maps' `d3` (`apps/web/index.html`, `canvas-frame.html`): one of the
+// app's own public files, readable by the sandboxed canvas frame, so the server's Chrome pictures a
+// chart card without reaching a CDN, and a card draws offline.
+const d3Out = join(root, "apps", "web", "public", "vendor", "d3.mjs");
+await build({
+	stdin: { contents: 'export * from "d3";', resolveDir: root, loader: "js" },
+	bundle: true,
+	format: "esm",
+	minify: true,
+	platform: "browser",
+	target: ["es2022"],
+	outfile: d3Out,
+	logLevel: "error",
+});
+console.log(`[vendor] apps/web/public/vendor/d3.mjs`);
+
 // A note beside the files saying where they came from, since `lib/` is copied
 // into decks and someone will eventually find it there without this repo.
 const versions = Object.fromEntries(

@@ -117,7 +117,8 @@ async function measureCard(): Promise<void> {
 	let height = 0;
 	let changed = started;
 	let drawn = false;
-	void card.drawn.then(() => {
+	// After its scripts have run, so a chart whose library is still loading is not pictured empty.
+	void card.ran.then(() => {
 		drawn = true;
 		changed = Math.max(changed, performance.now());
 	});
