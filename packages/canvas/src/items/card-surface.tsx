@@ -53,6 +53,33 @@ function readCardFile(url: string, reload: number): Promise<Response> {
 	return kept.then((response) => response.clone());
 }
 
+/*
+ * How a card reads (`card-reading.ts`) walks every text box in it, a forced layout each time, and only
+ * `decks canvas fit` reads it. So it is taken when the page is idle, once for a burst of height
+ * changes, and kept by address and size: a card waking again at the same revision and size (a pan back
+ * and forth) is not walked again. The oldest go past 300.
+ */
+type Reading = ReturnType<MountedCard["reading"]>;
+const readings = new Map<string, Reading>();
+const idle = (run: () => void): (() => void) => {
+	if (typeof requestIdleCallback === "function") {
+		const id = requestIdleCallback(run, { timeout: 400 });
+		return () => cancelIdleCallback(id);
+	}
+	const id = setTimeout(run, 50);
+	return () => clearTimeout(id);
+};
+function readingOnce(card: MountedCard, url: string, w: number, h: number): Reading {
+	const key = `${url} ${w} ${h}`;
+	let kept = readings.get(key);
+	if (!kept) {
+		kept = card.reading();
+		readings.set(key, kept);
+		if (readings.size > 300) readings.delete(readings.keys().next().value!);
+	}
+	return kept;
+}
+
 export function CardSurface(props: CardSurfaceProps) {
 	let host!: HTMLDivElement;
 	// For the checks: how many surfaces were made for each card, and how many times each mounted its file.
@@ -66,6 +93,7 @@ export function CardSurface(props: CardSurfaceProps) {
 	const stamped = () => new URL(props.page, location.href).href.replace(/[?#].*$/, "").replace(/\/cards\/([^/@]+)\/index\.html$/i, `/cards/$1@${(props.rev >>> 0).toString(36)}/index.html`);
 	let mounted: MountedCard | undefined;
 	let forget = () => {};
+	let stopReading = () => {};
 	const cardCall = canvasHost().cardCall;
 	/*
 	 * Mounted only once its file has come: a file refused (a ticket run out) or not reached leaves the
@@ -113,8 +141,13 @@ export function CardSurface(props: CardSurfaceProps) {
 		// What fit reads (`card-reading.ts`): the height, and how the card reads at it.
 		const card = mounted;
 		mounted.onHeight((h) => {
-			const w = untrack(props.size).w;
-			props.onExtent?.({ w, h, at: w, page: h, ...card.reading() });
+			stopReading();
+			stopReading = idle(() => {
+				stopReading = () => {};
+				if (mounted !== card) return;
+				const w = untrack(props.size).w;
+				props.onExtent?.({ w, h, at: w, page: h, ...readingOnce(card, url, w, h) });
+			});
 		});
 		props.onShown();
 	};
@@ -162,6 +195,7 @@ export function CardSurface(props: CardSurfaceProps) {
 	onCleanup(() => {
 		loader.stop();
 		forget();
+		stopReading();
 		mounted?.dispose();
 	});
 
