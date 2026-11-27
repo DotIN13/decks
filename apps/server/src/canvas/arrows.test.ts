@@ -20,10 +20,10 @@ test("the server's Rust router reroutes a drawing exactly as pen's own does", ()
 		],
 	} as unknown as PenDocument;
 	const placed = placements(doc, { theme: baseTheme(doc, "light"), measure: estimateText });
-	const boards = (name: string) => (name === "boards/x.html" ? { x: 900, y: -300, w: 400, h: 300 } : undefined);
+	const cards = (name: string) => (name === "boards/x.html" ? { x: 900, y: -300, w: 400, h: 300 } : undefined);
 	const ts = clone(doc);
 	const rust = clone(doc);
-	assert.equal(reroute(ts, placed, boards), true);
-	assert.equal(reroute(rust, placed, boards, rustRouter), true);
+	assert.equal(reroute(ts, placed, cards), true);
+	assert.equal(reroute(rust, placed, cards, rustRouter), true);
 	assert.deepEqual(rust, ts);
 });

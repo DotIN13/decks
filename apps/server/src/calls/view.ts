@@ -1,5 +1,5 @@
 import { walk } from "@decks/pen";
-import { boardOf } from "../canvas/pens.ts";
+import { cardOf } from "../canvas/pens.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 import { documentKeyOf } from "../docs/resolve.ts";
@@ -57,7 +57,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 				const paths: string[] = [];
 				const items: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }> = [];
 				for (const one of wanted) {
-					const board = [...walk(doc.children)].find((node) => boardOf(node) === one);
+					const board = [...walk(doc.children)].find((node) => cardOf(node) === one);
 					if (board) {
 						paths.push(one);
 						continue;
@@ -65,7 +65,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 					const box = placed.get(one)?.box;
 					if (!box) throw new Error(`Nothing called ${one} is on the canvas "${pens.titleOf(name)}": decks canvas read lists what is.`);
 					// A board named by its item id is the board.
-					const path = boardOf(placed.get(one)!.node);
+					const path = cardOf(placed.get(one)!.node);
 					if (path) paths.push(path);
 					else items.push({ id: one, box: { x: box.x, y: box.y, w: box.w, h: box.h } });
 				}
@@ -142,7 +142,7 @@ export function tabFor(ctx: VerbContext, what: string, kind?: TabKindName): { ki
 	const fits: Record<TabKindName, () => { target: string; title: string } | undefined> = {
 		card: () => {
 			const path = /\.html?$/.test(asked) ? asked : `${asked.replace(/\/+$/, "")}/index.html`;
-			const card = service.fileBoard(path);
+			const card = service.fileCard(path);
 			return card ? { target: card.path, title: card.title || card.path } : undefined;
 		},
 		canvas: () => {

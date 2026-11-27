@@ -77,7 +77,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 			},
 			claim: async (cards: string | string[]) => {
 				const paths = Array.isArray(cards) ? cards : [cards];
-				for (const one of paths) if (!service.fileBoard(one)) throw new Error(`No such card: ${one}`);
+				for (const one of paths) if (!service.fileCard(one)) throw new Error(`No such card: ${one}`);
 				for (const one of paths) agent.worked?.(one);
 				return paths;
 			},

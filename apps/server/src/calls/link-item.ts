@@ -1,5 +1,5 @@
 import { chipLink, chipTitle, deckLinkOf, deckLinkTo, itemLinkOf, itemLinkTo, linkChip, linkOpenFor, withLinkOpen, walk, type LinkKind, type LinkOpen, type PenNode } from "@decks/pen";
-import { boardOf } from "../canvas/pens.ts";
+import { cardOf } from "../canvas/pens.ts";
 import type { VerbContext } from "./context.ts";
 import { tabFor } from "./view.ts";
 
@@ -31,7 +31,7 @@ function itemTitle(node: PenNode): string {
 	if (typeof node.content === "string" && node.content.trim()) return node.content.trim().split("\n")[0]!.replace(/^#+\s*/, "");
 	const words = [...walk(node.children ?? [])].find((one) => one.type === "text" && typeof one.content === "string" && one.content.trim());
 	if (words) return String(words.content).trim().split("\n")[0]!;
-	return boardOf(node) ?? node.id;
+	return cardOf(node) ?? node.id;
 }
 
 /** An item finder over the canvases a server keeps: the item with that id anywhere in the canvas's drawing. */

@@ -68,7 +68,7 @@ export function chatTable(host: ChatTableHost): PersonVerbs {
 		"chat.preview": async ([id, entry], call) => {
 			const agent = need(id);
 			const entryId = entry === null || entry === undefined ? null : String(entry);
-			call.tell({ type: "chat.preview", agentId: agent.id, entryId, boards: entryId ? host.boards.boardsAt(agent.conversation, entryId) : {} });
+			call.tell({ type: "chat.preview", agentId: agent.id, entryId, boards: entryId ? host.boards.cardsAt(agent.conversation, entryId) : {} });
 		},
 		"chat.rewind": async ([id, entry], call) => {
 			const agent = need(id);
@@ -102,7 +102,7 @@ export function chatTable(host: ChatTableHost): PersonVerbs {
 		},
 		"chat.restore": async ([id, entry], call) => {
 			const agent = need(id);
-			const wanted = host.boards.boardsAt(agent.conversation, String(entry));
+			const wanted = host.boards.cardsAt(agent.conversation, String(entry));
 			let restored = 0;
 			for (const [path, sha] of Object.entries(wanted)) {
 				try {

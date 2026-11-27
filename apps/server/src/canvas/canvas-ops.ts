@@ -1,14 +1,14 @@
 /**
- * Boards on a stage, read from and written to its file (`canvas/pens.ts`), by anyone who names it.
+ * Cards on a canvas, read from and written to its file (`canvas/pens.ts`), by anyone who names it.
  *
- * The stage file is the one record of which boards are on a stage, where, and how big. An agent
- * works on its own stage (`agents/session.ts`), a person on the stage on screen (`calls/person-canvas.ts`);
- * both come here with the stage's name, and neither keeps a copy of what the file says.
+ * The canvas file is the one record of which cards are on a canvas, where, and how big. An agent
+ * works on its own canvas (`agents/session.ts`), a person on the canvas on screen (`calls/person-canvas.ts`);
+ * both come here with the canvas's name, and neither keeps a copy of what the file says.
  */
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces, type Box } from "../deck/place.ts";
 import type { CanvasPens } from "./pens.ts";
-import type { BoardSpot } from "./cards-on.ts";
+import type { CardSpot } from "./cards-on.ts";
 
 export interface OnCanvas {
 	path: string;
@@ -18,30 +18,30 @@ export interface OnCanvas {
 	h: number;
 }
 
-/** The deck's boards on a stage, as its file has them. */
-export function boardsOn(pens: CanvasPens, deck: Deck, name: string): OnCanvas[] {
+/** The deck's cards on a canvas, as its file has them. */
+export function cardsOn(pens: CanvasPens, deck: Deck, name: string): OnCanvas[] {
 	if (!pens.has(name)) return [];
 	try {
-		return pens.cards.boards(name).filter((one) => deck.card(one.path));
+		return pens.cards.cards(name).filter((one) => deck.card(one.path));
 	} catch {
 		return [];
 	}
 }
 
-/** What is drawn on a stage besides its boards, which a joining board keeps clear of. */
+/** What is drawn on a canvas besides its cards, which a joining card keeps clear of. */
 function drawnOn(pens: CanvasPens, name: string): Box[] {
 	try {
 		return pens.cards.drawn(name);
 	} catch {
-		// A stage file that does not parse still has its boards to place against.
+		// A canvas file that does not parse still has its cards to place against.
 		return [];
 	}
 }
 
 /**
- * Put boards on a stage. Each goes where `at` says, or near where `remembered` had it (a board taken
- * off and shown again), or into the nearest open slot beside the stage's newest board (`deck/place.ts`),
- * at the size its own file states. A board already on the stage is left where it is. Returns the paths
+ * Put cards on a canvas. Each goes where `at` says, or near where `remembered` had it (a card taken
+ * off and shown again), or into the nearest open slot beside the canvas's newest card (`deck/place.ts`),
+ * at the size its own file states. A card already on the canvas is left where it is. Returns the paths
  * put on.
  */
 export function putOn(
@@ -51,9 +51,9 @@ export function putOn(
 	paths: readonly string[],
 	options: { at?: Record<string, { x: number; y: number }>; remembered?: Record<string, { x: number; y: number }> } = {},
 ): string[] {
-	const on = boardsOn(pens, deck, name);
+	const on = cardsOn(pens, deck, name);
 	const present = new Set(on.map((one) => one.path));
-	// A copy a canvas has just made of a board (`CanvasPens.ownPath`) is read now, before the watcher finds it.
+	// A copy a canvas has just made of a card (`CanvasPens.ownPath`) is read now, before the watcher finds it.
 	const joining = paths.filter((path, index) => paths.indexOf(path) === index && !present.has(path) && (deck.card(path) ?? deck.refresh(path)));
 	if (joining.length === 0) return [];
 	const known: Record<string, { x: number; y: number }> = { ...(options.remembered ?? {}) };
@@ -63,31 +63,31 @@ export function putOn(
 		sizes[one.path] = { w: one.w, h: one.h };
 	}
 	const spots = joinPlaces({
-		// The whole canvas is wanted: the boards on it are what a newcomer sits beside and keeps clear of.
+		// The whole canvas is wanted: the cards on it are what a newcomer sits beside and keeps clear of.
 		wanted: [...on.map((one) => one.path), ...joining],
 		...(options.at ? { at: options.at } : {}),
 		playing: on.map((one) => one.path),
 		places: known,
 		size: (path) => {
-			const board = deck.card(path);
-			return sizes[path] ?? (board ? { w: board.w, h: board.h } : undefined);
+			const card = deck.card(path);
+			return sizes[path] ?? (card ? { w: card.w, h: card.h } : undefined);
 		},
 		drawn: drawnOn(pens, name),
 	});
-	const placing: BoardSpot[] = [];
+	const placing: CardSpot[] = [];
 	for (const path of joining) {
-		const board = deck.card(path);
+		const card = deck.card(path);
 		const spot = spots[path] ?? known[path];
-		if (board && spot) placing.push({ path, x: spot.x, y: spot.y, w: board.w, h: board.h, title: board.title });
+		if (card && spot) placing.push({ path, x: spot.x, y: spot.y, w: card.w, h: card.h, title: card.title });
 	}
-	pens.cards.placeBoards(name, placing);
+	pens.cards.placeCards(name, placing);
 	return placing.map((one) => one.path);
 }
 
-/** Take boards off a stage. Returns where each was, for whoever wants to put it back there. */
+/** Take cards off a canvas. Returns where each was, for whoever wants to put it back there. */
 export function takeOff(pens: CanvasPens, deck: Deck, name: string, paths: readonly string[]): Record<string, { x: number; y: number }> {
 	const was: Record<string, { x: number; y: number }> = {};
-	for (const one of boardsOn(pens, deck, name)) if (paths.includes(one.path)) was[one.path] = { x: one.x, y: one.y };
-	if (Object.keys(was).length) pens.cards.removeBoards(name, Object.keys(was));
+	for (const one of cardsOn(pens, deck, name)) if (paths.includes(one.path)) was[one.path] = { x: one.x, y: one.y };
+	if (Object.keys(was).length) pens.cards.removeCards(name, Object.keys(was));
 	return was;
 }

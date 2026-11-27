@@ -23,20 +23,20 @@ export function shotTarget(deck: string, to: string): string {
 type Browser = import("playwright").Browser;
 
 /**
- * A picture of a stage, or of part of one: what pen.dev's `get_screenshot` and `export_nodes` are,
- * for a Decks stage.
+ * A picture of a canvas, or of part of one: what pen.dev's `get_screenshot` and `export_nodes` are,
+ * for a Decks canvas.
  *
- * Drawn natively when it can be (`native-shots.ts`): the stage engine's own painter on this
- * machine's graphics card, the drawing over each board's picture of its current revision, with no
- * browser. Otherwise — a PDF, live boards asked for, math, a picture it cannot load, a board not yet
+ * Drawn natively when it can be (`native-shots.ts`): the canvas engine's own painter on this
+ * machine's graphics card, the drawing over each card's picture of its current revision, with no
+ * browser. Otherwise — a PDF, live cards asked for, math, a picture it cannot load, a card not yet
  * pictured — taken in the server's own Chromium, the one the dashboard's card pictures come from,
- * loading `shot.html`, a page that draws one stage the way the canvas does: the drawing under and
- * over the boards, and the boards themselves, live, between them. `how` says which. Nobody's open
+ * loading `shot.html`, a page that draws one canvas the way the canvas does: the drawing under and
+ * over the cards, and the cards themselves, live, between them. `how` says which. Nobody's open
  * canvas is used.
  *
- * `of` says what to take: nothing for everything on the stage, an item's id or a board's path, a
+ * `of` says what to take: nothing for everything on the canvas, an item's id or a card's path, a
  * list of them, or a box. It is framed with a margin, and drawn at a zoom that keeps the long side
- * to `MAX_CSS` so a whole stage fits a picture someone can read; `scale` multiplies the pixels.
+ * to `MAX_CSS` so a whole canvas fits a picture someone can read; `scale` multiplies the pixels.
  */
 
 export type ShotFormat = "png" | "jpeg" | "pdf";
@@ -44,7 +44,7 @@ export type ShotOf = string | string[] | Partial<Box> | undefined;
 
 interface ShotRequest {
 	stage: string;
-	/** A .pen file to picture instead of the stage, whole: a saved frame, or any other (`CanvasPens.penFile`). */
+	/** A .pen file to picture instead of the canvas, whole: a saved frame, or any other (`CanvasPens.penFile`). */
 	file?: string;
 	of?: ShotOf;
 	scale?: number;
@@ -52,7 +52,7 @@ interface ShotRequest {
 	format?: ShotFormat;
 	/** A deck-relative file to write; a fresh one under `.decks/shots/` otherwise. */
 	to?: string;
-	/** The boards as live pages, in the browser, rather than their pictures. */
+	/** The cards as live pages, in the browser, rather than their pictures. */
 	live?: boolean;
 }
 
@@ -82,16 +82,16 @@ interface ShotHost {
 	/** The native renderer (`native-shots.ts`): the default, with Chromium when it cannot. */
 	native?: NativeShots;
 	/** Who last wrote a canvas, as its placeholder frames are marked on the canvas (`CanvasPens.writerOf`); none: the accent, no name. */
-	writer?: (stage: string) => { name?: string; color: string } | undefined;
+	writer?: (canvas: string) => { name?: string; color: string } | undefined;
 }
 
-/** The long side of the page, in CSS pixels: a whole stage is shrunk to fit it. */
+/** The long side of the page, in CSS pixels: a whole canvas is shrunk to fit it. */
 const MAX_CSS = 1600;
 const MARGIN = 24;
 const READY_MS = 20_000;
 
-/** The box `of` names on this stage, with a margin; a sentence when it names nothing. */
-export function shotBox(pens: CanvasPens, stage: string, of: ShotOf): Box {
+/** The box `of` names on this canvas, with a margin; a sentence when it names nothing. */
+export function shotBox(pens: CanvasPens, canvas: string, of: ShotOf): Box {
 	const pad = (b: Box, m: number): Box => ({ x1: Math.floor(b.x1 - m), y1: Math.floor(b.y1 - m), x2: Math.ceil(b.x2 + m), y2: Math.ceil(b.y2 + m) });
 	if (of && typeof of === "object" && !Array.isArray(of)) {
 		const { x1, y1, x2, y2 } = of;
@@ -100,22 +100,22 @@ export function shotBox(pens: CanvasPens, stage: string, of: ShotOf): Box {
 		}
 		return { x1: x1!, y1: y1!, x2: x2!, y2: y2! };
 	}
-	const placed = pens.placedOf(stage);
-	const doc = pens.get(stage).doc;
-	const boards = pens.cards.boards(stage);
+	const placed = pens.placedOf(canvas);
+	const doc = pens.get(canvas).doc;
+	const cards = pens.cards.cards(canvas);
 	const boxOfName = (name: string): Box | undefined => {
-		const board = boards.find((one) => one.path === name || one.path === `boards/${name}`);
-		const found = board ? placed.get(board.id)?.box : placed.get(name)?.box;
+		const card = cards.find((one) => one.path === name || one.path === `boards/${name}`);
+		const found = card ? placed.get(card.id)?.box : placed.get(name)?.box;
 		return found ? { x1: found.x, y1: found.y, x2: found.x + found.w, y2: found.y + found.h } : undefined;
 	};
 	const names = of === undefined ? doc.children.map((node) => node.id) : Array.isArray(of) ? of : [of];
 	const boxes: Box[] = [];
 	for (const name of names) {
 		const box = boxOfName(String(name));
-		if (!box) throw new Error(`"${name}" is not an item or a board on stage ${stage}: decks canvas read lists the items and boards.`);
+		if (!box) throw new Error(`"${name}" is not an item or a board on stage ${canvas}: decks canvas read lists the items and boards.`);
 		boxes.push(box);
 	}
-	if (boxes.length === 0) throw new Error(`Stage ${stage} has nothing on it to picture.`);
+	if (boxes.length === 0) throw new Error(`Stage ${canvas} has nothing on it to picture.`);
 	return pad(
 		{
 			x1: Math.min(...boxes.map((b) => b.x1)),
@@ -131,15 +131,15 @@ export class CanvasShots {
 	constructor(private host: ShotHost) {}
 
 	async take(request: ShotRequest): Promise<Shot> {
-		const { stage } = request;
+		const { stage: canvas } = request;
 		const fileFrame = request.file ? this.host.pens.files.fileFrame(request.file) : undefined;
-		if (!fileFrame && !this.host.pens.names().includes(stage)) throw new Error(`There is no stage "${stage}".`);
+		if (!fileFrame && !this.host.pens.names().includes(canvas)) throw new Error(`There is no stage "${canvas}".`);
 		let box: Box;
 		if (fileFrame?.stage) box = shotBox(this.host.pens, fileFrame.stage, request.of);
 		else if (fileFrame) {
 			if (!fileFrame.box) throw new Error(`${request.file} has nothing in it to picture.`);
 			box = { x1: Math.floor(fileFrame.box.x1 - MARGIN), y1: Math.floor(fileFrame.box.y1 - MARGIN), x2: Math.ceil(fileFrame.box.x2 + MARGIN), y2: Math.ceil(fileFrame.box.y2 + MARGIN) };
-		} else box = shotBox(this.host.pens, stage, request.of);
+		} else box = shotBox(this.host.pens, canvas, request.of);
 		const format: ShotFormat = request.format === "jpeg" || request.format === "pdf" ? request.format : "png";
 		const scale = Math.min(3, Math.max(0.25, Number.isFinite(request.scale) ? Number(request.scale) : 1));
 		const scheme = request.scheme === "dark" ? "dark" : "light";
@@ -149,32 +149,32 @@ export class CanvasShots {
 		const width = Math.max(1, Math.round(w * zoom));
 		const height = Math.max(1, Math.round(h * zoom));
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-		const named = fileFrame ? (fileFrame.stage ?? basename(request.file!).replace(/\.pen$/, "")) : stage;
+		const named = fileFrame ? (fileFrame.stage ?? basename(request.file!).replace(/\.pen$/, "")) : canvas;
 		// Placeholder frames are marked as on the canvas: in the colour and name of the canvas's last writer.
-		const writerStage = fileFrame ? fileFrame.stage : stage;
-		const writer = writerStage ? this.host.writer?.(writerStage) : undefined;
+		const writerCanvas = fileFrame ? fileFrame.stage : canvas;
+		const writer = writerCanvas ? this.host.writer?.(writerCanvas) : undefined;
 		const target = request.to ? shotTarget(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
 		mkdirSync(dirname(target), { recursive: true });
 		const shot = { file: relative(this.host.deck, target), format, width: Math.round(width * scale), height: Math.round(height * scale), box };
 
 		/*
-		 * Natively when it can be (`native-shots.ts`): the drawing over the boards' pictures, with no
-		 * browser. A PDF, live boards, and whatever the native renderer says it cannot draw as the
+		 * Natively when it can be (`native-shots.ts`): the drawing over the cards' pictures, with no
+		 * browser. A PDF, live cards, and whatever the native renderer says it cannot draw as the
 		 * person would see it go to the browser page below, and `how` says why.
 		 */
 		const native = this.host.native;
 		const why = format === "pdf" ? "a PDF is printed by the browser" : request.live ? "live boards were asked for" : !native ? "this server has no native renderer" : undefined;
 		let notNative = why;
 		if (native && !why) {
-			const drawn = fileFrame?.stage ? this.host.pens.drawingOf(fileFrame.stage) : fileFrame ? { doc: fileFrame.doc, base: fileFrame.base } : this.host.pens.drawingOf(stage);
-			const onStage = fileFrame?.stage ?? (fileFrame ? undefined : stage);
-			const boards = onStage ? this.host.pens.cards.boards(onStage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
-			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, boards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target, ...(writer ? { writer } : {}) });
+			const drawn = fileFrame?.stage ? this.host.pens.drawingOf(fileFrame.stage) : fileFrame ? { doc: fileFrame.doc, base: fileFrame.base } : this.host.pens.drawingOf(canvas);
+			const onCanvas = fileFrame?.stage ?? (fileFrame ? undefined : canvas);
+			const cards = onCanvas ? this.host.pens.cards.cards(onCanvas).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, boards: cards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target, ...(writer ? { writer } : {}) });
 			if (outcome.ok) return { ...shot, bytes: readFileSync(target), how: "native" as const };
 			notNative = outcome.why;
 		}
 
-		const drawn: Record<string, string> = fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage };
+		const drawn: Record<string, string> = fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage: canvas };
 		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(writer ? { writerColor: writer.color, ...(writer.name ? { writerName: writer.name } : {}) } : {}), ...(this.host.pass ? { pass: this.host.pass(drawn.stage ?? "") } : {}) });
 		const url = `${this.host.webOrigin()}/shot.html?${query}`;
 
@@ -200,11 +200,11 @@ export class CanvasShots {
 	 * Measure one card where no canvas has: `measure.html` mounts it at its own size in this
 	 * Chromium as the canvas frame does and reads it the same way. Undefined when it never laid out.
 	 */
-	async measure(board: { path: string; w: number; h: number }): Promise<{ w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined> {
-		const query = new URLSearchParams({ path: board.path, w: String(Math.round(board.w)), h: String(Math.round(board.h)) });
+	async measure(card: { path: string; w: number; h: number }): Promise<{ w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined> {
+		const query = new URLSearchParams({ path: card.path, w: String(Math.round(card.w)), h: String(Math.round(card.h)) });
 		const url = `${this.host.webOrigin()}/measure.html?${query}`;
 		return this.host.borrow(async (browser) => {
-			const context = await browser.newContext({ viewport: { width: Math.max(320, Math.round(board.w)), height: Math.max(240, Math.round(board.h)) }, reducedMotion: "reduce" });
+			const context = await browser.newContext({ viewport: { width: Math.max(320, Math.round(card.w)), height: Math.max(240, Math.round(card.h)) }, reducedMotion: "reduce" });
 			try {
 				const page = await context.newPage();
 				await page.goto(url, { waitUntil: "load", timeout: READY_MS });
@@ -218,7 +218,7 @@ export class CanvasShots {
 	}
 
 	/**
-	 * A picture in another format, drawn again by the server's Chromium: a board's picture is WebP,
+	 * A picture in another format, drawn again by the server's Chromium: a card's picture is WebP,
 	 * and a caller who asked for PNG or JPEG gets that.
 	 */
 	async convert(bytes: Buffer, format: "png" | "jpeg"): Promise<Buffer> {
@@ -239,8 +239,8 @@ export class CanvasShots {
 		});
 	}
 
-	/** Keep a picture of one board where a screenshot keeps its pictures, or at `to`: the deck-relative file. */
-	keepBoard(path: string, bytes: Buffer, ext: "png" | "jpg" | "webp", to?: string): string {
+	/** Keep a picture of one card where a screenshot keeps its pictures, or at `to`: the deck-relative file. */
+	keepCard(path: string, bytes: Buffer, ext: "png" | "jpg" | "webp", to?: string): string {
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 		const name = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "board";
 		const target = to ? shotTarget(this.host.deck, to) : join(this.host.deck, ".decks", "shots", `${name}-${stamp}.${ext}`);
@@ -250,29 +250,29 @@ export class CanvasShots {
 	}
 
 	/**
-	 * A small picture of a whole stage, for the manager's cards, taken once per drawing.
+	 * A small picture of a whole canvas, for the manager's cards, taken once per drawing.
 	 *
-	 * Kept on disk by name, the drawing's hash (`pens.summary`, `shot`) and scheme, exactly as a board's picture is
+	 * Kept on disk by name, the drawing's hash (`pens.summary`, `shot`) and scheme, exactly as a card's picture is
 	 * (`pictures/service.ts`) and for the same reason: the picture is the expensive part, a browser
-	 * asks for it by a URL carrying that hash, and an unchanged stage never misses. Older
-	 * pictures of the same stage are removed as they are replaced, so the folder is one file per
-	 * stage per scheme rather than a history nobody reads.
+	 * asks for it by a URL carrying that hash, and an unchanged canvas never misses. Older
+	 * pictures of the same canvas are removed as they are replaced, so the folder is one file per
+	 * canvas per scheme rather than a history nobody reads.
 	 *
-	 * One at a time per stage: two cards asking at once would otherwise start two Chromium pages
+	 * One at a time per canvas: two cards asking at once would otherwise start two Chromium pages
 	 * for one picture.
 	 */
-	async thumb(stage: string, shot: string, scheme: "light" | "dark"): Promise<string> {
+	async thumb(canvas: string, shot: string, scheme: "light" | "dark"): Promise<string> {
 		const dir = join(this.host.deck, ".decks", "thumbs", "stages");
-		const file = join(dir, `${stage}-${shot}-${scheme}.jpg`);
+		const file = join(dir, `${canvas}-${shot}-${scheme}.jpg`);
 		if (existsSync(file)) return file;
-		const key = `${stage}-${scheme}`;
+		const key = `${canvas}-${scheme}`;
 		const waiting = this.thumbing.get(key);
 		if (waiting) return waiting;
 		const work = (async () => {
-			const shot = await this.take({ stage, scheme, format: "jpeg", scale: 1, to: relative(this.host.deck, file) });
-			// Whatever this stage's picture was before, of an older drawing; never another stage's whose name begins with this one's.
+			const shot = await this.take({ stage: canvas, scheme, format: "jpeg", scale: 1, to: relative(this.host.deck, file) });
+			// Whatever this canvas's picture was before, of an older drawing; never another canvas's whose name begins with this one's.
 			for (const old of existsSync(dir) ? readdirSync(dir) : []) {
-				if (old !== basename(file) && isThumbOf(old, stage, scheme)) rmSync(join(dir, old), { force: true });
+				if (old !== basename(file) && isThumbOf(old, canvas, scheme)) rmSync(join(dir, old), { force: true });
 			}
 			void shot;
 			return file;
@@ -285,19 +285,19 @@ export class CanvasShots {
 		}
 	}
 
-	/** A picture being taken now, by stage and scheme: the second asker waits for the first. */
+	/** A picture being taken now, by canvas and scheme: the second asker waits for the first. */
 	private readonly thumbing = new Map<string, Promise<string>>();
 }
 
-/** Whether a file in the stages' pictures folder is this stage's in this scheme: `<stage>-<hash or old revision>-<scheme>.jpg`, the middle with no hyphen in it. */
-export function isThumbOf(file: string, stage: string, scheme: "light" | "dark"): boolean {
-	const head = `${stage}-`;
+/** Whether a file in the canvases' pictures folder is this canvas's in this scheme: `<stage>-<hash or old revision>-<scheme>.jpg`, the middle with no hyphen in it. */
+export function isThumbOf(file: string, canvas: string, scheme: "light" | "dark"): boolean {
+	const head = `${canvas}-`;
 	const tail = `-${scheme}.jpg`;
 	if (!file.startsWith(head) || !file.endsWith(tail) || file.length <= head.length + tail.length) return false;
 	return /^[0-9a-z]+$/i.test(file.slice(head.length, -tail.length));
 }
 
-/** What a picture's bytes are, by their first ones: a board's whole picture and a browser's snapshot are WebP. */
+/** What a picture's bytes are, by their first ones: a card's whole picture and a browser's snapshot are WebP. */
 export function imageKind(bytes: Buffer): { format: "png" | "jpeg" | "webp"; mime: string; ext: "png" | "jpg" | "webp" } | undefined {
 	if (bytes.length > 8 && bytes.readUInt32BE(0) === 0x89504e47) return { format: "png", mime: "image/png", ext: "png" };
 	if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8) return { format: "jpeg", mime: "image/jpeg", ext: "jpg" };

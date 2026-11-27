@@ -2,7 +2,7 @@ import type { PenDocument } from "@decks/pen";
 import type { DeckState, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
-import { boardsOn, putOn, takeOff, type OnCanvas } from "../canvas/canvas-ops.ts";
+import { cardsOn, putOn, takeOff, type OnCanvas } from "../canvas/canvas-ops.ts";
 import type { CanvasService } from "../canvas/service.ts";
 import { canvasNews } from "./canvas-news.ts";
 import { recordedBoardsToAdopt } from "./old-records.ts";
@@ -179,7 +179,7 @@ export class Seat {
 	/** The deck's boards on this agent's stage, as the file has them. */
 	private onCanvas(): OnCanvas[] {
 		const name = this.canvasName();
-		return name ? boardsOn(this.of.stage.pens!, this.of.deck, name) : [];
+		return name ? cardsOn(this.of.stage.pens!, this.of.deck, name) : [];
 	}
 
 	/** The boards on the stage: the file's, or, with no stage file, the ones this session was given. */
@@ -233,7 +233,7 @@ export class Seat {
 	setSize(path: string, size: { w?: number; h?: number }): void {
 		const name = this.canvasName();
 		if (!name) return;
-		this.of.stage.pens!.cards.sizeBoard(name, path, size);
+		this.of.stage.pens!.cards.sizeCard(name, path, size);
 	}
 
 	/**
@@ -243,7 +243,7 @@ export class Seat {
 	setPosition(path: string, x: number, y: number): void {
 		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 		const name = this.canvasName();
-		if (name && this.of.stage.pens!.cards.moveBoard(name, path, x, y)) return;
+		if (name && this.of.stage.pens!.cards.moveCard(name, path, x, y)) return;
 		this.places[path] = { x: Math.round(x), y: Math.round(y) };
 		this.of.save();
 	}
@@ -428,7 +428,7 @@ export class Seat {
 		this.loosePlaying = this.loosePlaying.filter((one) => one !== path);
 		delete this.places[path];
 		const name = this.canvasName();
-		if (playing && name) this.of.stage.pens!.cards.removeBoards(name, [path]);
+		if (playing && name) this.of.stage.pens!.cards.removeCards(name, [path]);
 		this.publishContext();
 		return true;
 	}

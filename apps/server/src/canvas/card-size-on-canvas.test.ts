@@ -18,10 +18,10 @@ function put(file: string, data: string | Uint8Array): void {
 
 
 /*
- * How big a board is drawn is its stage's: the size of its item in the stage file. Only an agent's
+ * How big a card is drawn is its canvas's: the size of its item in the canvas file. Only an agent's
  * `decks.canvas.fit` or `decks.canvas.update` with a size, and a person's drag, set it; a browser's reading never does, since two browsers
- * read a board a pixel or two apart and, when both readings sized it, answered each other for ever.
- * A board joining a stage comes at the size its own file states.
+ * read a card a pixel or two apart and, when both readings sized it, answered each other for ever.
+ * A card joining a canvas comes at the size its own file states.
  */
 function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-board-size-")));
@@ -32,7 +32,7 @@ function open() {
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }
 
-/** A library board; each canvas it is put on places its own copy, as a card (`canvas/copy-in.ts`). */
+/** A library card; each canvas it is put on places its own copy, as a card (`canvas/copy-in.ts`). */
 const PATH = "canvases/t/cards/plan/index.html";
 const settle = () => new Promise((done) => setTimeout(done, 250));
 
@@ -43,7 +43,7 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		one.seat.setInPlay([PATH], { place: true });
 		const mine = app.pens.cards.copyOf(one.seat.stageName()!, PATH);
 		assert.equal(mine, `canvases/${one.seat.stageName()}/cards/plan/index.html`, "the canvas places its own copy, as a card");
-		const shown = () => app.stage.boards(one.id).find((board) => board.path === mine)!;
+		const shown = () => app.stage.cards(one.id).find((card) => card.path === mine)!;
 		assert.deepEqual([shown().w, shown().h], [900, 400], "it joins at its file's size");
 
 		app.boards.noteExtent(mine, { rev: shown().rev, w: 900, h: 690 });
@@ -52,7 +52,7 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		one.seat.setSize(PATH, { h: 520 });
 		assert.equal(shown().h, 520);
 		await settle();
-		const item = app.pens.cards.boards(one.seat.stageName()!).find((board) => board.path === mine);
+		const item = app.pens.cards.cards(one.seat.stageName()!).find((card) => card.path === mine);
 		assert.deepEqual([item?.w, item?.h], [900, 520], "and the stage file holds it");
 		assert.equal(app.deck.card(mine)?.h, 400, "while the board's own file is as its agent wrote it");
 
@@ -62,10 +62,10 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		two.seat.setInPlay([PATH], { place: true });
 		const theirs = app.pens.cards.copyOf(two.seat.stageName()!, PATH);
 		assert.notEqual(theirs, mine, "another canvas places a copy of its own");
-		assert.equal(app.stage.boards(two.id).find((board) => board.path === theirs)?.h, 400, "another stage takes it at its file's size");
-		assert.equal(app.stage.boards(one.id).find((board) => board.path === mine)?.h, 520, "and the first keeps its own");
+		assert.equal(app.stage.cards(two.id).find((card) => card.path === theirs)?.h, 400, "another stage takes it at its file's size");
+		assert.equal(app.stage.cards(one.id).find((card) => card.path === mine)?.h, 520, "and the first keeps its own");
 		one.seat.setInPlay([PATH], { place: true });
-		assert.deepEqual(app.pens.cards.boards(one.seat.stageName()!).map((board) => board.path), [mine], "asked for again, the canvas keeps the copy it has");
+		assert.deepEqual(app.pens.cards.cards(one.seat.stageName()!).map((card) => card.path), [mine], "asked for again, the canvas keeps the copy it has");
 	} finally {
 		cleanup();
 	}
@@ -86,17 +86,17 @@ test("two agents on one stage: a save by one does not put back a size or a place
 		// waiting when One's lands, so Two never reads One's change before it writes its own copy.
 		const plan = app.pens.cards.copyOf(one.seat.stageName()!, PATH);
 		const notesOwn = app.pens.cards.copyOf(one.seat.stageName()!, "canvases/t/cards/notes/index.html");
-		const before = app.stage.boards(one.id).find((board) => board.path === plan)!;
-		const notes = app.stage.boards(two.id).find((board) => board.path === notesOwn)!;
+		const before = app.stage.cards(one.id).find((card) => card.path === plan)!;
+		const notes = app.stage.cards(two.id).find((card) => card.path === notesOwn)!;
 		one.seat.setSize(PATH, { h: 640 });
 		one.seat.setPosition(PATH, before.x + 500, before.y);
 		two.seat.setPosition("canvases/t/cards/notes/index.html", notes.x, notes.y + 900);
 		await settle();
 		await settle();
-		const item = app.pens.cards.boards(one.seat.stageName()!).find((board) => board.path === plan);
+		const item = app.pens.cards.cards(one.seat.stageName()!).find((card) => card.path === plan);
 		assert.equal(item?.h, 640, "the plan keeps the height One gave it");
 		assert.equal(item?.x, before.x + 500, "and the place");
-		const moved = app.pens.cards.boards(one.seat.stageName()!).find((board) => board.path === notesOwn);
+		const moved = app.pens.cards.cards(one.seat.stageName()!).find((card) => card.path === notesOwn);
 		assert.equal(moved?.y, notes.y + 900, "while Two's own move is written");
 	} finally {
 		cleanup();
@@ -114,7 +114,7 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 		two.seat.setInPlay([PATH], { place: true });
 		const second = two.seat.stageName()!;
 		app.agents.focus(two.id);
-		const on = (name: string) => app.pens.cards.boards(name).find((board) => board.path === app.pens.cards.copyOf(name, PATH));
+		const on = (name: string) => app.pens.cards.cards(name).find((card) => card.path === app.pens.cards.copyOf(name, PATH));
 		const before = on(second)!;
 		// The person drags the copy that is on the canvas they are looking at.
 		const shown = app.pens.cards.copyOf(first, PATH);

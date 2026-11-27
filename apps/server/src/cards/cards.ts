@@ -5,7 +5,7 @@ import { IMPORT_MAP } from "./size.ts";
 const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 
 /**
- * A card: a piece of HTML in a canvas's `cards/`, which the stage puts in a shadow root of its own
+ * A card: a piece of HTML in a canvas's `cards/`, which the canvas puts in a shadow root of its own
  * page instead of a frame (`packages/canvas/src/items/card.ts`). Its scripts run as modules, each served at
  * its own address beside the card (`sales.html.m0.js`), so a relative `import "./sales.js"` resolves
  * from the card's folder and an error names the card's file. A card opened by itself, or pictured by
@@ -24,7 +24,7 @@ function withoutModules(source: string): { html: string; srcs: string[] } {
 	return { html, srcs };
 }
 
-/** The boards' import map, with the deck's own names (`assets/importmap.json`) added where the boards' have none. */
+/** The cards' import map, with the deck's own names (`assets/importmap.json`) added where the cards' have none. */
 function withDeckImports(extra: Record<string, string> | undefined): string {
 	if (!extra || !Object.keys(extra).length) return IMPORT_MAP;
 	const map = JSON.parse(IMPORT_MAP) as { imports: Record<string, string> };

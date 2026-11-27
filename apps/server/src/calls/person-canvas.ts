@@ -69,7 +69,7 @@ export function canvasTable(host: CanvasTableHost): PersonVerbs {
 		},
 		"card.delete": async ([card], call) => {
 			let refused: string | undefined;
-			host.boards.deleteBoard(String(card), (message) => {
+			host.boards.deleteCard(String(card), (message) => {
 				if (message.type === "harness.notice") refused = message.text;
 				else call.tell(message);
 			});
@@ -100,7 +100,7 @@ export function canvasTable(host: CanvasTableHost): PersonVerbs {
 				const held = pens();
 				if (!held) return undefined;
 				try {
-					const boards = held.cards.boards(name);
+					const boards = held.cards.cards(name);
 					const spot = joinSpot(DOCUMENT_SIZE, boards.at(-1), [...boards, ...held.cards.drawn(name)]);
 					return { x1: spot.x, y1: spot.y };
 				} catch {

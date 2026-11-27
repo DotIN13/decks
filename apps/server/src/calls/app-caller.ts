@@ -101,7 +101,7 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | 
 			return pens?.names().find((canvas) => canvasShowsApp(pens, canvas, name)) ?? conversation.seat.stageName?.();
 		},
 		recordRevision: (path) => host.boards.recordRevision(path),
-		boardPathOf: (file) => host.boards.boardPathOf(file),
+		boardPathOf: (file) => host.boards.cardPathOf(file),
 	};
 	return { tool: createDecksTool({ stage: host.stage, agent: actor, port: host.port }), conversation };
 }

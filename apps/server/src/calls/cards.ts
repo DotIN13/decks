@@ -2,7 +2,7 @@ import { canvasFolder, canvasOfPath } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { cardShell, slug } from "@decks/deck-kit";
-import { boardWidth } from "../cards/size.ts";
+import { cardWidth } from "../cards/size.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
@@ -22,7 +22,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 	};
 	const needBoard = (path: unknown) => {
 		if (typeof path !== "string" || !path.trim()) throw new Error('A card is named by its path, as in "canvases/plan/cards/q3/index.html": decks card list lists them.');
-		const board = service.fileBoard(path);
+		const board = service.fileCard(path);
 		if (!board) throw new Error(`There is no card ${path}. decks card list lists them.`);
 		return board;
 	};
@@ -46,7 +46,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 
 	const card = {
 			/** Every card in the deck, placed or not. */
-			list: async () => service.allBoards().map(asBoard),
+			list: async () => service.allCards().map(asBoard),
 			get: async (path: string) => asBoard(needBoard(path)),
 			canvases: async (path: string) => {
 				const file = needBoard(path);
@@ -56,7 +56,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 				if (!home) return [];
 				let held;
 				try {
-					held = pens.cards.boards(home.name).find((one) => one.path === path);
+					held = pens.cards.cards(home.name).find((one) => one.path === path);
 				} catch {
 					return [];
 				}
@@ -77,7 +77,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 				notes.push(
 					`card width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. Its folder is ${path.replace(/\/index\.html$/, "/")}: anything it keeps beside it (card.css, chart.js, data.json) goes there. Not placed yet: decks canvas insert --type card --card ${path} --canvas ${stageName} --beside <id> puts it there, then decks canvas fit ${path}.`,
 				);
-				return asBoard(service.fileBoard(path) ?? { path, title });
+				return asBoard(service.fileCard(path) ?? { path, title });
 			},
 	};
 
@@ -108,10 +108,10 @@ function makeCard(ctx: VerbContext, options: { title: string; w?: number; h?: nu
 	const title = options?.title?.trim();
 	if (!title) throw new Error("A card needs a title: the finding it states, as a sentence.");
 	const view = viewport();
-	const width = boardWidth(options.w, view?.width);
+	const width = cardWidth(options.w, view?.width);
 	const base = slug(title, 48) || "card";
 	let path = `${canvasFolder(stageName)}/cards/${base}/index.html`;
-	for (let n = 2; service.fileBoard(path) || existsSync(join(service.deckPath(), path)); n++) path = `${canvasFolder(stageName)}/cards/${base}-${n}/index.html`;
+	for (let n = 2; service.fileCard(path) || existsSync(join(service.deckPath(), path)); n++) path = `${canvasFolder(stageName)}/cards/${base}-${n}/index.html`;
 	service.writeCard(path, cardShell(title, { w: width, ...(options.h ? { h: options.h } : {}) }));
 	agent.worked?.(path);
 	if (view) notes.push(`viewport ${view.width}×${view.height} px`);

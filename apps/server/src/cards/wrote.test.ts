@@ -42,7 +42,7 @@ test("an agent's byline and act time reach every browser, are on disk, and come 
 	assert.equal(changes[1]?.type === "card.changed" && changes[1].card?.namedAt, 2000);
 	assert.match(readFileSync(join(root, ".decks", "authors.json"), "utf8"), /"canvases\/t\/cards\/plan\/index\.html": \{\s*"who": "agent-1",\s*"at": 2000\s*\}/);
 
-	// The loader re-describes boards from disk and knows no authors.
+	// The loader re-describes cards from disk and knows no authors.
 	deck.reload();
 	assert.equal(deck.card("canvases/t/cards/plan/index.html")?.lastWrittenBy, undefined);
 	service.restamp();
@@ -54,7 +54,7 @@ test("an agent's byline and act time reach every browser, are on disk, and come 
 	assert.equal(serviceOn(root).deck.card("canvases/t/cards/plan/index.html")?.namedAt, 2000);
 
 	// Gone from the disk, gone from the file.
-	service.forgetBoard("canvases/t/cards/plan/index.html");
+	service.forgetCard("canvases/t/cards/plan/index.html");
 	assert.doesNotMatch(readFileSync(join(root, ".decks", "authors.json"), "utf8"), /plan\.html/);
 	rmSync(root, { recursive: true, force: true });
 });

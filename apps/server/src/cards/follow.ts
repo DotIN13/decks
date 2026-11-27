@@ -13,9 +13,9 @@ import type { CardService } from "./service.ts";
  */
 
 /**
- * How often the deck re-reads its boards from disk regardless of what the watcher said.
+ * How often the deck re-reads its cards from disk regardless of what the watcher said.
  *
- * Slow enough that it is free (a walk and a `stat` per board), fast enough that a missed
+ * Slow enough that it is free (a walk and a `stat` per card), fast enough that a missed
  * event is a beat rather than a session.
  */
 const RESYNC_MS = 4000;
@@ -36,7 +36,7 @@ const ASSETS_WAIT_MS = 1000;
 export interface FollowHost {
 	/** The deck open now: asked each time, since another can be opened. */
 	deck(): Deck;
-	boards: CardService;
+	cards: CardService;
 	send(message: ServerMessage): void;
 	/** The deck as the conversation on screen sees it, and one card so. */
 	state(): DeckState;
@@ -50,21 +50,21 @@ export interface FollowHost {
 /** Follow the deck's files until the answer is called. */
 export function followDeck(of: FollowHost): () => void {
 	/**
-	 * Re-read the boards directory and tell everyone what moved.
+	 * Re-read the cards directory and tell everyone what moved.
 	 *
 	 * The same two messages the watcher's own branch sends, from the same place, so a
-	 * board that arrives this way is indistinguishable from one the watcher caught.
+	 * card that arrives this way is indistinguishable from one the watcher caught.
 	 */
 	const resync = (): void => {
 		const { changed, removed } = of.deck().resync();
-		for (const board of changed) {
-			of.boards.recordRevision(board.path);
-			of.send({ type: "card.changed", path: board.path, rev: board.rev, card: of.placed(board) });
+		for (const card of changed) {
+			of.cards.recordRevision(card.path);
+			of.send({ type: "card.changed", path: card.path, rev: card.rev, card: of.placed(card) });
 		}
 		for (const path of removed) {
 			// A dead path left in a context silently empties the rail and the canvas.
 			of.gone(path);
-			of.boards.forgetBoard(path);
+			of.cards.forgetCard(path);
 			of.send({ type: "card.changed", path, rev: 0, removed: true });
 		}
 	};
@@ -92,12 +92,12 @@ export function followDeck(of: FollowHost): () => void {
 			if (change.kind === "deck") {
 				/*
 				 * A hand edit, always: **the app never writes `deck.json`** any more, so there is no echo of
-				 * its own to tell apart from somebody's. A place belongs to a stage and a size belongs to the
-				 * board's file, so the only things left in here — the name, the roots, and an older build's
+				 * its own to tell apart from somebody's. A place belongs to a canvas and a size belongs to the
+				 * card's file, so the only things left in here — the name, the roots, and an older build's
 				 * arrangement — are the user's to change.
 				 */
 				of.deck().reload();
-				of.boards.restamp();
+				of.cards.restamp();
 				of.send({ type: "deck.changed", deck: of.state() });
 				return;
 			}
@@ -108,33 +108,33 @@ export function followDeck(of: FollowHost): () => void {
 				 * was read again, recorded and said to every page.
 				 */
 				if (of.deck().unchanged(change.path)) return;
-				const board = of.deck().refresh(change.path);
+				const card = of.deck().refresh(change.path);
 				// Whoever wrote it — the agent, an editor, a shell redirect — this is the
 				// moment the new version exists, so this is where it is recorded.
-				if (board) {
+				if (card) {
 					try {
-						of.boards.recordRevision(change.path);
-						// Whoever was holding this board with a write or edit tool is done, and the diff says what changed.
+						of.cards.recordRevision(change.path);
+						// Whoever was holding this card with a write or edit tool is done, and the diff says what changed.
 						of.landed(change.path);
 					} catch {
 						/* the file went away between the event and the read */
 					}
 				}
-				// A board that is gone must leave every agent's context with it, or the
+				// A card that is gone must leave every agent's context with it, or the
 				// dead path silently empties the rail and the canvas (DeckAgent.forget).
-				if (!board) {
+				if (!card) {
 					of.gone(change.path);
-					of.boards.forgetBoard(change.path);
+					of.cards.forgetCard(change.path);
 				}
 				of.send(
-					board
-						? { type: "card.changed", path: change.path, rev: board.rev, card: of.placed(board) }
+					card
+						? { type: "card.changed", path: change.path, rev: card.rev, card: of.placed(card) }
 						: { type: "card.changed", path: change.path, rev: 0, removed: true },
 				);
 				return;
 			}
-			// An asset under the deck moved. A board may be showing it, and the frame
-			// has no way to know, so every board reloads: once for a burst of them.
+			// An asset under the deck moved. A card may be showing it, and the frame
+			// has no way to know, so every card reloads: once for a burst of them.
 			assetsChanged();
 		});
 
@@ -147,8 +147,8 @@ export function followDeck(of: FollowHost): () => void {
 		 * recoverable from the inside, and the failure is silent — the canvas simply stops
 		 * agreeing with the files.
 		 *
-		 * So every few seconds the deck stats its boards and reports what actually moved.
-		 * It costs a directory walk and one `stat` per board, it reads nothing that has
+		 * So every few seconds the deck stats its cards and reports what actually moved.
+		 * It costs a directory walk and one `stat` per card, it reads nothing that has
 		 * not changed, and it says nothing when nothing has. `unref` so it never holds a
 		 * process open, which matters for the tests and for a headless run.
 		 */

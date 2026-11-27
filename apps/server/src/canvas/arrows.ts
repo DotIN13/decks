@@ -4,7 +4,7 @@ import { arrowEndItem, isPointEnd, type ArrowRouter, type Frame } from "@decks/p
 import { initSync, routeArrow } from "@decks/stage";
 
 /**
- * The server's arrow router: the stage engine's own (`stage_scene::arrows`, through `routeArrow`),
+ * The server's arrow router: the canvas engine's own (`stage_scene::arrows`, through `routeArrow`),
  * so a path saved after an edit is the path the page routes while the same arrow is dragged. The
  * engine's module is the one `text.ts` loads to measure words; it is loaded here on first use, at
  * once, since a save cannot wait for it.

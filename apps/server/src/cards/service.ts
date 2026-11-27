@@ -12,22 +12,22 @@ import { onlySizeChanged, withCardSize } from "@decks/deck-kit";
  *
  * The service owns files and revisions; who hears about a change is the shell's business.
  * Narrowed to an interface rather than handed the `Registry`, for the reason
- * `agents/backend.ts` narrows its account switcher: the boards layer should not know what
+ * `agents/backend.ts` narrows its account switcher: the cards layer should not know what
  * an agent is, only that something wants telling.
  */
-interface BoardHooks {
+interface CardHooks {
 	/** To every browser. `card.changed` is the message this service exists to send. */
 	send(message: ServerMessage): void;
 	/**
-	 * The deck as the focused stage sees it — where every board on it sits for the conversation being
+	 * The deck as the focused canvas sees it — where every card on it sits for the conversation being
 	 * looked at.
 	 *
-	 * The service holds the boards; it does not know what a stage is, and the loader's copy of a board
-	 * has carried no place of its own since positions became per stage. So a broadcast asks for the
-	 * arrangement rather than sending the board it happens to be holding — see `placed`.
+	 * The service holds the cards; it does not know what a canvas is, and the loader's copy of a card
+	 * has carried no place of its own since positions became per canvas. So a broadcast asks for the
+	 * arrangement rather than sending the card it happens to be holding — see `placed`.
 	 */
 	state(): DeckState;
-	/** A board is gone: every agent must drop it, or a dead path empties the rail. */
+	/** A card is gone: every agent must drop it, or a dead path empties the rail. */
 	removed(path: string): void;
 }
 
@@ -38,8 +38,8 @@ interface BoardHooks {
  * panel, and it is the only part of the server that writes a file a person did not name.
  * It is a service for three reasons that showed up separately:
  *
- * - **A board write and its revision are one act.** Every path that writes a board also
- *   records it — `writeBoard` — and the one
+ * - **A card write and its revision are one act.** Every path that writes a card also
+ *   records it — `writeCard` — and the one
  *   place that got it wrong (`boards.restore`, which wrote without recording) was the bug
  *   the split made visible.
  * - **The extent bookkeeping is a browser fact, not a deck fact.** What a frame measured is
@@ -59,7 +59,7 @@ export class CardService {
 
 	constructor(
 		private deck: Deck,
-		private readonly hooks: BoardHooks,
+		private readonly hooks: CardHooks,
 	) {
 		this.revisions = new Revisions(deck);
 		this.authors = new Authors(deck.path);
@@ -78,10 +78,10 @@ export class CardService {
 	}
 
 	/**
-	 * Say who named a board, and when, and tell every browser if that is news.
+	 * Say who named a card, and when, and tell every browser if that is news.
 	 *
 	 * **Authorship is said, never detected.** A file event has no author, so nothing here reads
-	 * one off the disk: an agent that fits, shows or reports a board through the stage tool is
+	 * one off the disk: an agent that fits, shows or reports a card through the canvas tool is
 	 * its writer (`calls/tool.ts`). `who` is an
 	 * agent id or `"you"`. Kept in `.decks/authors.json`, so the byline outlives a restart.
 	 *
@@ -90,82 +90,82 @@ export class CardService {
 	 * agent's `decks.canvas.insert` or `decks.agent.claim` touches no file and the file's time would be somebody else's.
 	 */
 	wrote(path: string, who: string, now = Date.now()): void {
-		const board = this.deck.card(path);
-		if (!board) return;
+		const card = this.deck.card(path);
+		if (!card) return;
 		const changed = this.authors.say(path, who, now);
-		if (board.lastWrittenBy === who && board.namedAt === now && !changed) return;
-		board.lastWrittenBy = who;
-		board.namedAt = now;
-		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
-		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: { ...placed, lastWrittenBy: who, namedAt: now } });
+		if (card.lastWrittenBy === who && card.namedAt === now && !changed) return;
+		card.lastWrittenBy = who;
+		card.namedAt = now;
+		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? card;
+		this.hooks.send({ type: "card.changed", path, rev: card.rev, card: { ...placed, lastWrittenBy: who, namedAt: now } });
 	}
 
 	/**
-	 * The person looked at a board: read it on the canvas, or in the focus view.
+	 * The person looked at a card: read it on the canvas, or in the focus view.
 	 *
-	 * Stamped with the later of now and the board's own last time, so a clock that disagrees with
-	 * the disk cannot leave a board marked that has just been read. Nothing is sent when the board
+	 * Stamped with the later of now and the card's own last time, so a clock that disagrees with
+	 * the disk cannot leave a card marked that has just been read. Nothing is sent when the card
 	 * was already read since it last changed, which is every press after the first.
 	 *
 	 * "Last changed" is the later of the file's time and the naming act (`wrote`), because that is
-	 * what `isNews` reads. An agent that writes a board and then fits it names it *after* the
-	 * file moved; a read that only looked at the file's time would refuse to stamp, and the board
+	 * what `isNews` reads. An agent that writes a card and then fits it names it *after* the
+	 * file moved; a read that only looked at the file's time would refuse to stamp, and the card
 	 * would stay news for ever.
 	 */
 	seen(path: string, now = Date.now()): void {
-		const board = this.deck.card(path);
-		if (!board) return;
-		const last = Math.max(board.modifiedAt ?? 0, board.namedAt ?? 0);
-		if ((board.seenAt ?? 0) >= last) return;
+		const card = this.deck.card(path);
+		if (!card) return;
+		const last = Math.max(card.modifiedAt ?? 0, card.namedAt ?? 0);
+		if ((card.seenAt ?? 0) >= last) return;
 		const at = Math.max(now, last);
 		this.seenAt.set(path, at);
-		board.seenAt = at;
-		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
-		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: { ...placed, seenAt: at } });
+		card.seenAt = at;
+		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? card;
+		this.hooks.send({ type: "card.changed", path, rev: card.rev, card: { ...placed, seenAt: at } });
 	}
 
-	/** Put the stored bylines back on the deck's records: the loader re-describes boards from disk and knows no authors. */
+	/** Put the stored bylines back on the deck's records: the loader re-describes cards from disk and knows no authors. */
 	restamp(): void {
 		for (const [path, author] of this.authors.entries()) {
-			const board = this.deck.card(path);
-			if (!board) continue;
-			board.lastWrittenBy = author.who;
-			if (author.at > 0) board.namedAt = author.at;
+			const card = this.deck.card(path);
+			if (!card) continue;
+			card.lastWrittenBy = author.who;
+			if (author.at > 0) card.namedAt = author.at;
 		}
 		for (const [path, at] of this.seenAt.entries()) {
-			const board = this.deck.card(path);
-			if (board) board.seenAt = at;
+			const card = this.deck.card(path);
+			if (card) card.seenAt = at;
 		}
 	}
 
 	/**
-	 * One board as the focused stage sees it.
+	 * One card as the focused canvas sees it.
 	 *
-	 * Every broadcast that carries a board goes through this, because the loader's board is a *file* — a
+	 * Every broadcast that carries a card goes through this, because the loader's card is a *file* — a
 	 * revision, a size, a title — and has not carried a place of its own since positions became per
-	 * stage. Sending it raw is a board at the origin, on every write, for everyone; the failure looks
+	 * canvas. Sending it raw is a card at the origin, on every write, for everyone; the failure looks
 	 * like "the drag did not stick" on one surface only, which is what makes it worth one function.
 	 */
 	/**
-	 * A board file that appeared without this service writing it (a canvas's copy of a board from
-	 * elsewhere, `CanvasPens.ownPath`): read now and told to every browser, as a new board is.
+	 * A card file that appeared without this service writing it (a canvas's copy of a card from
+	 * elsewhere, `CanvasPens.ownPath`): read now and told to every browser, as a new card is.
 	 */
 	appeared(path: string): void {
-		const board = this.deck.refresh(path);
-		if (!board) return;
+		const card = this.deck.refresh(path);
+		if (!card) return;
 		this.revisions.record(path, readFileSync(this.deck.fileOf(path), "utf8"));
-		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: this.placed(board) });
+		this.hooks.send({ type: "card.changed", path, rev: card.rev, card: this.placed(card) });
 	}
 
-	private placed(board: Page): Page {
-		return this.hooks.state().boards.find((one) => one.path === board.path) ?? board;
+	private placed(card: Page): Page {
+		return this.hooks.state().boards.find((one) => one.path === card.path) ?? card;
 	}
 
 	/**
 	 * A reading from a frame: keep it, and wake anything waiting for one.
 	 *
 	 * Last writer wins, including when the numbers are for an older revision — two frames
-	 * showing the same board agree, and a stale reading is filtered where it is read
+	 * showing the same card agree, and a stale reading is filtered where it is read
 	 * rather than hoarded here.
 	 */
 	noteExtent(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void {
@@ -178,7 +178,7 @@ export class CardService {
 	}
 
 	/**
-	 * The measurement for this board *at this revision*, or nothing.
+	 * The measurement for this card *at this revision*, or nothing.
 	 *
 	 * `h` is the room the content needs: the page's own height, measured in the browser. `page` is
 	 * the same number, kept for callers that read it.
@@ -188,15 +188,15 @@ export class CardService {
 		return extent && extent.rev === rev && atWidth(extent, at) ? { w: extent.w, h: extent.h, ...(extent.page === undefined ? {} : { page: extent.page }) } : undefined;
 	}
 
-	/** How many words the browser counted on this board at this revision, and its smallest type. */
+	/** How many words the browser counted on this card at this revision, and its smallest type. */
 	reading(path: string, rev: number): { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
 		const extent = this.extents.get(path);
 		return extent && extent.rev === rev ? { ...(extent.words === undefined ? {} : { words: extent.words }), ...(extent.minFont === undefined ? {} : { minFont: extent.minFont }), ...(extent.overflowX === undefined ? {} : { overflowX: extent.overflowX }), ...(extent.cut === undefined ? {} : { cut: extent.cut }), ...(extent.overlaps === undefined ? {} : { overlaps: extent.overlaps }) } : {};
 	}
 
-	/** Nobody is looking at that board any more, or it is gone. */
-	/** A board left the deck by the disk rather than by the button: drop its reading and its byline. */
-	forgetBoard(path: string): void {
+	/** Nobody is looking at that card any more, or it is gone. */
+	/** A card left the deck by the disk rather than by the button: drop its reading and its byline. */
+	forgetCard(path: string): void {
 		this.forgetExtent(path);
 		this.authors.forget(path);
 		this.seenAt.forget(path);
@@ -237,32 +237,32 @@ export class CardService {
 	}
 
 	/**
-	 * Write a board's file and tell everyone — the path a changed board or a new card takes.
+	 * Write a card's file and tell everyone — the path a changed card or a new card takes.
 	 *
 	 * Deliberately not left to the watcher. The watcher would get there in 80ms and the
 	 * caller would have to wait to see its own write; refreshing here means a `decks.canvas.update` with a size
-	 * returns the board as it now is, and the browser is told once rather than twice
+	 * returns the card as it now is, and the browser is told once rather than twice
 	 * (the watcher's event finds the same bytes and the same revision, and says nothing).
 	 */
 	/**
-	 * Set a board's size by editing the one number in its own file.
+	 * Set a card's size by editing the one number in its own file.
 	 *
-	 * The same write `decks.canvas.update` makes, here rather than in the stage service because this
-	 * is the object that owns writing a board and recording a revision — a resize that skipped
+	 * The same write `decks.canvas.update` makes, here rather than in the canvas service because this
+	 * is the object that owns writing a card and recording a revision — a resize that skipped
 	 * the record would be the one edit the time machine did not have.
 	 *
 	 * The rules are the caller's, not this one's: a flow document's height is its content, so
 	 * that caller sends one dimension.
 	 */
 	resize(path: string, size: { w?: number; h?: number }): Page {
-		const board = this.deck.card(path);
-		if (!board) throw new Error(`No such board: ${path}`);
+		const card = this.deck.card(path);
+		if (!card) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
-		return this.writeBoard(path, withCardSize(html, size));
+		return this.writeCard(path, withCardSize(html, size));
 	}
 
-	/** Why a board on a friend's canvas shared with you to view may not be changed or deleted, or undefined. */
+	/** Why a card on a friend's canvas shared with you to view may not be changed or deleted, or undefined. */
 	viewOnly(path: string): string | undefined {
 		const at = canvasOfPath(path);
 		if (!at || !isSharedCanvas(at.name)) return undefined;
@@ -280,7 +280,7 @@ export class CardService {
 		return viewOnlySentence(typeof title === "string" && title ? title : at.name, owner, at.name);
 	}
 
-	writeBoard(path: string, html: string): Page {
+	writeCard(path: string, html: string): Page {
 		const refused = this.viewOnly(path);
 		if (refused) throw new Error(refused);
 		const file = this.deck.fileOf(path);
@@ -296,16 +296,16 @@ export class CardService {
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
-		const board = this.deck.refresh(path);
-		if (!board) throw new Error(`No such board: ${path}`);
+		const card = this.deck.refresh(path);
+		if (!card) throw new Error(`No such board: ${path}`);
 		// Only the size in its tag: the surfaces showing it keep their document (`items/card-surface.tsx`, `sized`).
 		const sized = before !== undefined && heard && onlySizeChanged(before, html);
-		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: this.placed(board), ...(sized ? { sized: true as const } : {}) });
-		return board;
+		this.hooks.send({ type: "card.changed", path, rev: card.rev, card: this.placed(card), ...(sized ? { sized: true as const } : {}) });
+		return card;
 	}
 
 	/**
-	 * Delete a board: keep a copy of what it said, unlink it, and tell everyone.
+	 * Delete a card: keep a copy of what it said, unlink it, and tell everyone.
 	 *
 	 * The order is the whole of it. **A last revision first**, because the point of
 	 * `.decks/revisions` is that a version the server has seen is on disk under its sha —
@@ -321,11 +321,11 @@ export class CardService {
 	 * the watcher would, so the duplicate that follows is a no-op.
 	 *
 	 * A refusal is a notice to the browser that asked, not a throw: this arrives from a
-	 * button, and the two ways it fails — a path with no board, and a file the OS will not
+	 * button, and the two ways it fails — a path with no card, and a file the OS will not
 	 * unlink — are both things the person pressing it should read rather than a stack trace
 	 * in a log they do not have.
 	 */
-	deleteBoard(path: string, reply: (message: ServerMessage) => void): void {
+	deleteCard(path: string, reply: (message: ServerMessage) => void): void {
 		if (!this.deck.card(path)) {
 			reply({ type: "harness.notice", level: "warn", text: `There is no board at ${path} to delete.` });
 			return;
@@ -349,7 +349,7 @@ export class CardService {
 		this.hooks.send({ type: "card.changed", path, rev: 0, removed: true });
 	}
 
-	/** Store a board's current bytes as a revision; used right after an agent writes. */
+	/** Store a card's current bytes as a revision; used right after an agent writes. */
 	recordRevision(path: string): string | undefined {
 		try {
 			return this.revisions.record(path, readFileSync(this.deck.fileOf(path), "utf8"));
@@ -359,12 +359,12 @@ export class CardService {
 	}
 
 	/**
-	 * An absolute (or relative) file an agent wrote -> the board it is, if it is one.
+	 * An absolute (or relative) file an agent wrote -> the card it is, if it is one.
 	 *
 	 * Agents write with absolute paths as often as not, and only a card's `index.html` is a
 	 * card: an agent editing `lib/card.css` has not produced a new revision of anything.
 	 */
-	boardPathOf(file: string): string | undefined {
+	cardPathOf(file: string): string | undefined {
 		const relative = file.startsWith(this.deck.path)
 			? file.slice(this.deck.path.length).replace(/^\/+/, "")
 			: file.replace(/^\.\//, "");
@@ -373,11 +373,11 @@ export class CardService {
 	}
 
 	/**
-	 * Which revision each board was at, at a point in a conversation.
+	 * Which revision each card was at, at a point in a conversation.
 	 *
-	 * The session's `board-rev` entries answer this for boards the conversation has
+	 * The session's `board-rev` entries answer this for cards the conversation has
 	 * touched. For the rest, the store answers by time: the newest version that
-	 * already existed when that message was sent. A board created later resolves to
+	 * already existed when that message was sent. A card created later resolves to
 	 * its first version rather than "did not exist" — a real past state, and closer to
 	 * the truth than showing today's file.
 	 *
@@ -385,16 +385,16 @@ export class CardService {
 	 * not, when this lived in two places: hovering showed the past and restoring said
 	 * there was nothing to do.
 	 */
-	boardsAt(
+	cardsAt(
 		agent: { revisionsAt(entryId: string): Record<string, string>; timeline(): Array<{ id: string; at?: number }> },
 		entryId: string,
 	): Record<string, string> {
 		const recorded = agent.revisionsAt(entryId);
 		const when = agent.timeline().find((entry) => entry.id === entryId)?.at ?? Date.now();
 		const at: Record<string, string> = {};
-		for (const board of this.deck.cards) {
-			const sha = recorded[board.path] ?? this.revisions.at(board.path, when);
-			if (sha) at[board.path] = sha;
+		for (const card of this.deck.cards) {
+			const sha = recorded[card.path] ?? this.revisions.at(card.path, when);
+			if (sha) at[card.path] = sha;
 		}
 		return at;
 	}

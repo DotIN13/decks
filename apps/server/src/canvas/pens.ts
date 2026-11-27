@@ -35,7 +35,7 @@ export type ReadMore = Omit<ReadOptions, "theme" | "measure"> & { theme?: Record
 export const CARD_ITEM = "decks.card";
 
 /** The card an item stands for, by its deck path, or undefined when it is not one. */
-export function boardOf(node: PenNode): string | undefined {
+export function cardOf(node: PenNode): string | undefined {
 	if (node.type !== "browser" || !node.metadata || node.metadata.type !== CARD_ITEM) return undefined;
 	const path = node.metadata.path;
 	return typeof path === "string" && path ? path : undefined;
@@ -151,7 +151,7 @@ export class CanvasPens {
 		return join(this.deckPath, canvasFolder(name));
 	}
 
-	/** Whether a stage of this name exists, without listing them all. */
+	/** Whether a canvas of this name exists, without listing them all. */
 	has(name: string): boolean {
 		return canvasNameOk(name) && existsSync(this.folderOf(name));
 	}
@@ -196,7 +196,7 @@ export class CanvasPens {
 	}
 
 	/**
-	 * Take a folder for a new stage, named from a title; made now, so two agents cannot take one name.
+	 * Take a folder for a new canvas, named from a title; made now, so two agents cannot take one name.
 	 * The title is kept as given. `provisional` is a name nobody chose for what is on the canvas —
 	 * the agent's own, given to the canvas it lands on — which the agent is asked to replace
 	 * (`naming`).
@@ -210,28 +210,28 @@ export class CanvasPens {
 	}
 
 	/**
-	 * A stage's name as the person reads it, which is not its folder's.
+	 * A canvas's name as the person reads it, which is not its folder's.
 	 *
-	 * The folder is the stage's id — agents open it, board paths run through it, and a camera is
+	 * The folder is the canvas's id — agents open it, card paths run through it, and a camera is
 	 * kept under it — so it is a slug made once and never moved. The name beside it, in
 	 * `stage.json`, is whatever the person or an agent calls the canvas, spaces, capitals and all,
-	 * and changing it touches nothing else. A stage with no `stage.json` is called by its folder.
+	 * and changing it touches nothing else. A canvas with no `stage.json` is called by its folder.
 	 */
 	titleOf(name: string): string {
 		return this.naming(name).title ?? name;
 	}
 
 	/**
-	 * How a stage came by its name: the name, whether anybody chose it (`provisional` when it is the
-	 * agent's own, given at claim), and the boards it held when it was named — what an agent is
+	 * How a canvas came by its name: the name, whether anybody chose it (`provisional` when it is the
+	 * agent's own, given at claim), and the cards it held when it was named — what an agent is
 	 * asked about when the canvas has since filled with other things (`canvas/canvas-name.ts`).
 	 */
 	naming(name: string): { title?: string; provisional: boolean; boards?: string[] } {
 		try {
 			const parsed = JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as { title?: unknown; provisional?: unknown; boards?: unknown };
 			const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : undefined;
-			const boards = Array.isArray(parsed.boards) ? parsed.boards.filter((one): one is string => typeof one === "string") : undefined;
-			return { ...(title ? { title } : {}), provisional: parsed.provisional === true, ...(boards ? { boards } : {}) };
+			const cards = Array.isArray(parsed.boards) ? parsed.boards.filter((one): one is string => typeof one === "string") : undefined;
+			return { ...(title ? { title } : {}), provisional: parsed.provisional === true, ...(cards ? { boards: cards } : {}) };
 		} catch {
 			/* no canvas.json, or one that does not parse: no name but the folder's */
 			return { provisional: false };
@@ -239,8 +239,8 @@ export class CanvasPens {
 	}
 
 	/**
-	 * Call a stage something else. Only the name changes; the folder, its boards and its drawing stay
-	 * where they are. The boards on it now are written down with the name, as what it was named for.
+	 * Call a canvas something else. Only the name changes; the folder, its cards and its drawing stay
+	 * where they are. The cards on it now are written down with the name, as what it was named for.
 	 */
 	setTitle(name: string, title: string, options: { provisional?: boolean } = {}): string {
 		if (!this.names().includes(name)) throw new Error(`No canvas "${name}".`);
@@ -255,19 +255,19 @@ export class CanvasPens {
 			/* a first title */
 		}
 		const { provisional: _was, ...rest } = kept;
-		let boards: string[] = [];
+		let cards: string[] = [];
 		try {
-			boards = this.cards.boards(name).map((one) => one.path);
+			cards = this.cards.cards(name).map((one) => one.path);
 		} catch {
 			/* a stage with no drawing yet holds no boards */
 		}
-		writeFileSync(file, `${JSON.stringify({ ...rest, title: clean, boards, ...(options.provisional ? { provisional: true } : {}) }, null, "\t")}\n`);
+		writeFileSync(file, `${JSON.stringify({ ...rest, title: clean, boards: cards, ...(options.provisional ? { provisional: true } : {}) }, null, "\t")}\n`);
 		return clean;
 	}
 
 	/**
-	 * Move a stage to a new folder name, drawing and all. Board items whose path `repoint` changes
-	 * (boards kept in the stage's own folder, which moved with it) are pointed at the new path in
+	 * Move a canvas to a new folder name, drawing and all. Card items whose path `repoint` changes
+	 * (cards kept in the canvas's own folder, which moved with it) are pointed at the new path in
 	 * place, so their ids — and any arrow joined to them — stay as they were.
 	 */
 	rename(from: string, to: string, repoint: (path: string) => string): void {
@@ -280,7 +280,7 @@ export class CanvasPens {
 		this.log.moved(from, to);
 		const ops: Op[] = [];
 		for (const node of walk(this.get(to).doc.children)) {
-			const path = boardOf(node);
+			const path = cardOf(node);
 			if (!path || repoint(path) === path) continue;
 			const next = repoint(path);
 			ops.push({ op: "update", id: node.id, set: { url: `../../${next}`, metadata: { ...node.metadata, path: next } } });
@@ -288,7 +288,7 @@ export class CanvasPens {
 		if (ops.length > 0) this.edit(to, ops, undefined, { undoable: false });
 	}
 
-	/** Delete a stage: its folder, its drawing and any boards kept in it. */
+	/** Delete a canvas: its folder, its drawing and any cards kept in it. */
 	remove(name: string): void {
 		if (!this.names().includes(name)) throw new Error(`No canvas "${name}".`);
 		rmSync(this.folderOf(name), { recursive: true, force: true });
@@ -296,7 +296,7 @@ export class CanvasPens {
 		this.log.forget(name);
 	}
 
-	/** A folder name for a new stage, from a title, not already taken by a file or by `alsoTaken`. */
+	/** A folder name for a new canvas, from a title, not already taken by a file or by `alsoTaken`. */
 	freshName(title: string, alsoTaken: Iterable<string> = []): string {
 		const base = slug(title, 40) || "stage";
 		const taken = new Set([...this.names(), ...alsoTaken]);
@@ -304,7 +304,7 @@ export class CanvasPens {
 		for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
 	}
 
-	/** The document as it stands, read from disk when the file changed. A stage with no file is empty. */
+	/** The document as it stands, read from disk when the file changed. A canvas with no file is empty. */
 	get(name: string): PenEntry {
 		const file = this.fileOf(name);
 		const cached = this.cache.get(name);
@@ -333,9 +333,9 @@ export class CanvasPens {
 	 * Apply edits together, write the file, and say so. Nothing is written if any edit fails.
 	 *
 	 * Arrows are redrawn after the edits, so one that joins something that moved follows it
-	 * (`@decks/pen`'s `reroute`). `boards` finds a board by path, for an arrow that ends on one.
+	 * (`@decks/pen`'s `reroute`). `boards` finds a card by path, for an arrow that ends on one.
 	 */
-	edit(name: string, ops: readonly Op[], boards?: (path: string) => Frame | undefined, options?: { undoable?: boolean }): { entry: PenEntry; results: OpResult[] } {
+	edit(name: string, ops: readonly Op[], cards?: (path: string) => Frame | undefined, options?: { undoable?: boolean }): { entry: PenEntry; results: OpResult[] } {
 		this.rights.mayWrite(name);
 		const current = this.get(name);
 		if (current.error) throw new PenError(`${current.error}. Fix the file, or replace it whole, before editing it.`);
@@ -348,7 +348,7 @@ export class CanvasPens {
 		 */
 		const { doc, results } = apply(withColors(current.doc, ops), ops, { theme, measure });
 		const placed = placements(this.files.withImported(name, doc), { theme, measure });
-		reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards?.(path), rustRouter);
+		reroute(doc, placed, (path) => cardBox(doc, placed, path) ?? cards?.(path), rustRouter);
 		const before = current.text ?? serialize(current.doc);
 		const entry = this.write(name, doc);
 		if (options?.undoable) this.log.undoable(name, before, entry.text!);
@@ -356,18 +356,18 @@ export class CanvasPens {
 	}
 
 	/**
-	 * Redraw a stage's arrows because something outside the file moved — a board an arrow ends on.
+	 * Redraw a canvas's arrows because something outside the file moved — a card an arrow ends on.
 	 * Written only when an arrow actually changed.
 	 */
-	follow(name: string, boards: (path: string) => Frame | undefined): void {
+	follow(name: string, cards: (path: string) => Frame | undefined): void {
 		const current = this.get(name);
 		if (current.error || !existsSync(this.fileOf(name)) || this.rights.sharing(name)?.role === "view") return;
 		const doc = structuredClone(current.doc);
 		const placed = placements(this.files.withImported(name, doc), { theme: baseTheme(doc, "light"), measure });
-		if (reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards(path), rustRouter)) this.write(name, doc);
+		if (reroute(doc, placed, (path) => cardBox(doc, placed, path) ?? cards(path), rustRouter)) this.write(name, doc);
 	}
 
-	/** Where everything in a stage is, laid out once per version of the file. */
+	/** Where everything in a canvas is, laid out once per version of the file. */
 	placedOf(name: string): Map<string, Placed> {
 		const entry = this.get(name);
 		entry.placed ??= placements(this.files.withImported(name, entry.doc), { theme: baseTheme(entry.doc, "light"), measure });
@@ -375,18 +375,18 @@ export class CanvasPens {
 	}
 
 	/*
-	 * Boards on a stage, changed one at a time in its file. These are the only writes of boards to a
-	 * stage: whoever asks, a person on the canvas or an agent on its own stage, names the stage and
-	 * the board, and nothing else in the file is touched. There is no copy of the stage anywhere else
+	 * Cards on a canvas, changed one at a time in its file. These are the only writes of cards to a
+	 * canvas: whoever asks, a person on the canvas or an agent on its own canvas, names the canvas and
+	 * the card, and nothing else in the file is touched. There is no copy of the canvas anywhere else
 	 * to fall out of step with it.
 	 */
 
 	/**
-	 * What one stage holds, for the manager's list: how many boards, and the words in it.
+	 * What one canvas holds, for the manager's list: how many cards, and the words in it.
 	 *
-	 * The words are what the manager's search matches beyond the name — every board's title and
+	 * The words are what the manager's search matches beyond the name — every card's title and
 	 * every note's text — gathered here because this is the only place that reads the file. A
-	 * stage with a file that does not parse still answers, from the last good document.
+	 * canvas with a file that does not parse still answers, from the last good document.
 	 *
 	 * `shot` is what a picture of the canvas is kept and asked for by (`shots.ts`, `thumb`): the
 	 * drawing's text as a short hash. `rev` cannot do it, since it counts from 1 again each time the
@@ -397,19 +397,19 @@ export class CanvasPens {
 	summary(name: string): { boards: number; rev: number; shot: string; words: string } {
 		const entry = this.get(name);
 		const words: string[] = [];
-		let boards = 0;
+		let cards = 0;
 		for (const node of walk(entry.doc.children)) {
-			if (boardOf(node)) boards += 1;
+			if (cardOf(node)) cards += 1;
 			if (typeof node.name === "string" && node.name) words.push(node.name);
 			const content = (node as { content?: unknown }).content;
 			if (typeof content === "string" && content) words.push(content);
 		}
 		entry.shot ??= entry.text === undefined ? "0" : createHash("sha1").update(entry.text).digest("hex").slice(0, 12);
-		return { boards, rev: entry.rev, shot: entry.shot, words: words.join(" ").replace(/\s+/g, " ").slice(0, 600) };
+		return { boards: cards, rev: entry.rev, shot: entry.shot, words: words.join(" ").replace(/\s+/g, " ").slice(0, 600) };
 	}
 
-	/** The `stage.pen` frame for one agent looking at this stage. */
-	/** A stage's drawing as the page is given it (imports in place) and the folder its fills are read against, without counting as sent. */
+	/** The `stage.pen` frame for one agent looking at this canvas. */
+	/** A canvas's drawing as the page is given it (imports in place) and the folder its fills are read against, without counting as sent. */
 	drawingOf(name: string): { doc: PenDocument; base: string } {
 		return { doc: this.files.withImported(name, this.get(name).doc), base: `${fileUrl(this.folderOf(name))}/` };
 	}
@@ -428,7 +428,7 @@ export class CanvasPens {
 		return penOrigin.run(by, () => this.write(name, toMemory(name, parse(text)), { unchecked: true }));
 	}
 
-	/** What an agent reads: the file's items, each with its box on the stage. */
+	/** What an agent reads: the file's items, each with its box on the canvas. */
 	read(name: string, more: ReadMore = {}) {
 		const entry = this.get(name);
 		const { theme, ...rest } = more;
@@ -445,7 +445,7 @@ export class CanvasPens {
 		const file = this.fileOf(name);
 		mkdirSync(this.folderOf(name), { recursive: true });
 		if (!this.watcher) this.watch();
-		// Named from the canvas's own folder on disk, a board from elsewhere copied in first (`canvas-refs.ts`).
+		// Named from the canvas's own folder on disk, a card from elsewhere copied in first (`canvas-refs.ts`).
 		const text = serialize(toDisk(name, doc, this.cards.adopt));
 		writeFileSync(file, text);
 		doc = toMemory(name, parse(text));
@@ -459,7 +459,7 @@ export class CanvasPens {
 
 	/**
 	 * Notice hand edits: an agent writing `stage.pen` with its own tools, or a person saving from
-	 * pen.dev. Debounced per stage, and a write that matches what the server wrote is not news.
+	 * pen.dev. Debounced per canvas, and a write that matches what the server wrote is not news.
 	 */
 	watch(): void {
 		this.close();
@@ -491,7 +491,7 @@ export class CanvasPens {
 			if (rest.length === 1 && rest[0] === FILE) drawing(name);
 			else if (rest[0] === "frames" && rest.length > 1 && rest.at(-1)!.endsWith(".pen")) frame(name, rest.slice(1));
 		};
-		// No folder yet is no stage yet: `claim` and `write` start watching when they make one.
+		// No folder yet is no canvas yet: `claim` and `write` start watching when they make one.
 		try {
 			if (existsSync(this.dir)) {
 				this.watcher = watch(this.dir, { recursive: true }, (_event, file) => {
@@ -514,13 +514,13 @@ export class CanvasPens {
 		}
 	}
 
-	/** Every stage that uses a saved frame, sent again with a new revision, so each copy shows the change. */
+	/** Every canvas that uses a saved frame, sent again with a new revision, so each copy shows the change. */
 	resendUsing(key: string, canvas?: string): void {
 		for (const [stage, entry] of this.cache) {
 			if (!entry.text.includes(`"${key}`)) continue;
 			// A canvas's own frame is that canvas's; the deck's is any canvas's that has no copy of its own.
 			if (canvas ? stage !== canvas : existsSync(join(this.folderOf(stage), `${key}.pen`))) continue;
-			// A new revision, so the canvas takes it as news and lays the stage out again.
+			// A new revision, so the canvas takes it as news and lays the canvas out again.
 			const next = { ...entry, rev: entry.rev + 1, placed: undefined };
 			this.cache.set(stage, next);
 			this.changed(stage, next);
@@ -545,7 +545,7 @@ export class CanvasPens {
 	}
 }
 
-/** A board's box on this stage, found by path, for an arrow that ends on it. */
+/** A card's box on this canvas, found by path, for an arrow that ends on it. */
 /**
  * `doc` with the Decks colours `ops` use and it lacks defined (`withDecksColors`), as a document of
  * its own, so the edit's results and an error's "Edit 2" still count the caller's ops. `doc` itself
@@ -557,8 +557,8 @@ export function withColors(doc: PenDocument, ops: readonly Op[]): PenDocument {
 	return apply(doc, [colored[0] as Op], { theme: baseTheme(doc, "light"), measure }).doc;
 }
 
-function boardBox(doc: PenDocument, placed: ReadonlyMap<string, Placed>, path: string): Frame | undefined {
-	for (const node of walk(doc.children)) if (boardOf(node) === path) return placed.get(node.id)?.box;
+function cardBox(doc: PenDocument, placed: ReadonlyMap<string, Placed>, path: string): Frame | undefined {
+	for (const node of walk(doc.children)) if (cardOf(node) === path) return placed.get(node.id)?.box;
 	return undefined;
 }
 

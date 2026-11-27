@@ -56,7 +56,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** Every move written, with the stage it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new CanvasService(deck, {
-		writeBoard: (path, html) => {
+		writeCard: (path, html) => {
 			// A card in its own folder, as the real service writes it (`newBoard` writes a card now).
 			mkdirSync(dirname(join(root, path)), { recursive: true });
 			writeFileSync(join(root, path), html);
@@ -94,7 +94,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		broadcast: () => {},
 		camera: () => camera,
 		agents: () => others,
-		...(options.stageful ? { boards: () => deck.cards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
+		...(options.stageful ? { cards: () => deck.cards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
 	});
 
 	// The agent in these tests works on its canvas, "ada", and its calls name it (`names-canvas.test-helper.ts`).
@@ -145,7 +145,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		const pens = withPens();
 		const board = deck.refresh(path) ?? deck.card(path);
 		if (!board) throw new Error(`no board at ${path}`);
-		pens.cards.placeBoards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
+		pens.cards.placeCards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
 	};
 	return {
 		tool,
@@ -406,8 +406,8 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 	});
 	hold(PLAN);
 	const pens = service.pens!;
-	pens.cards.placeBoards("narrow", [{ path: PLAN, title: "plan", x: 0, y: 0, w: 640, h: 300 }]);
-	const ada = pens.cards.boards("ada").find((one) => one.path === PLAN)!;
+	pens.cards.placeCards("narrow", [{ path: PLAN, title: "plan", x: 0, y: 0, w: 640, h: 300 }]);
+	const ada = pens.cards.cards("ada").find((one) => one.path === PLAN)!;
 
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { canvas: "canvases/narrow/canvas.pen" })`);
 	assert.equal(result.isError, false, result.text);
@@ -416,9 +416,9 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 	const copy = pens.cards.copyOf("narrow", PLAN);
 	assert.equal(copy, "canvases/narrow/cards/plan/index.html");
 	assert.deepEqual([deck.card(copy)?.w, deck.card(copy)?.h], [640, 812], "both numbers go to the copy's file");
-	const narrow = pens.cards.boards("narrow").find((one) => one.path === copy)!;
+	const narrow = pens.cards.cards("narrow").find((one) => one.path === copy)!;
 	assert.deepEqual([narrow.w, narrow.h], [640, 812], "and to the canvas it was fitted on");
-	const still = pens.cards.boards("ada").find((one) => one.path === PLAN)!;
+	const still = pens.cards.cards("ada").find((one) => one.path === PLAN)!;
 	assert.deepEqual([still.w, still.h], [ada.w, ada.h], "the agent's own canvas keeps its size");
 	cleanup();
 });
@@ -722,7 +722,7 @@ test("a person's hide takes off only what it names", async () => {
 	}
 	const deck = Deck.open(root);
 	const service = new CanvasService(deck, {
-		writeBoard: () => {
+		writeCard: () => {
 			throw new Error("not used here");
 		},
 		extent: () => undefined,

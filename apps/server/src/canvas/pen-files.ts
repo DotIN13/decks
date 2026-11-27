@@ -64,7 +64,7 @@ export class PenFiles {
 		return this.withImportedAt(this.of.folderOf(name), doc);
 	}
 
-	/** The same, for a `.pen` file in `here` (a frame's folder, or a stage's). */
+	/** The same, for a `.pen` file in `here` (a frame's folder, or a canvas's). */
 	private withImportedAt(here: string, doc: PenDocument): PenDocument {
 		const imports = doc.imports && typeof doc.imports === "object" ? doc.imports : {};
 		const out: Record<string, PenDocument> = {};
@@ -102,7 +102,7 @@ export class PenFiles {
 	/**
 	 * Every saved frame a document uses, by `ref: "frames/<name>"` (or `"frames/<name>:<id>"`) anywhere in
 	 * it, its overrides included, and the frames those use in turn: as `IMPORTED["frames/<name>"]`, read
-	 * from the deck's `frames/` folder with nothing to declare, as a board is placed by its path.
+	 * from the deck's `frames/` folder with nothing to declare, as a card is placed by its path.
 	 */
 	/**
 	 * Where `frames/<name>` is read from for a file in `here`: its canvas's folder, when it is in one
@@ -141,20 +141,20 @@ export class PenFiles {
 	}
 
 	/**
-	 * Save an item on a stage as a reusable frame, `frames/<name>.pen`, and put a ref to it in its place
+	 * Save an item on a canvas as a reusable frame, `frames/<name>.pen`, and put a ref to it in its place
 	 * (unless `replace` is false). The file is a pen document whose one item is the frame, reusable, with
-	 * the stage's variables and themes so its colours come with it. Saving over a name changes the frame
+	 * the canvas's variables and themes so its colours come with it. Saving over a name changes the frame
 	 * everywhere it is used.
 	 */
-	saveFrame(stage: string, id: string, path: string, replace = true): { frame: string; ref: string; replaced: boolean; overwrote: boolean } {
-		if (replace) this.of.rights.mayWrite(stage);
-		const entry = this.of.get(stage);
+	saveFrame(canvas: string, id: string, path: string, replace = true): { frame: string; ref: string; replaced: boolean; overwrote: boolean } {
+		if (replace) this.of.rights.mayWrite(canvas);
+		const entry = this.of.get(canvas);
 		if (entry.error) throw new PenError(`${entry.error}. Fix the file before saving from it.`);
 		// A frame is saved in the canvas's own frames/, so the canvas still stands alone (`deck/layout.ts`).
-		const target = this.penFile(/^\.?\/?frames\//.test(path.trim()) ? `${canvasFolder(stage)}/${path.trim().replace(/^\.?\/+/, "")}` : path);
+		const target = this.penFile(/^\.?\/?frames\//.test(path.trim()) ? `${canvasFolder(canvas)}/${path.trim().replace(/^\.?\/+/, "")}` : path);
 		if (!target.ref) throw new PenError(`A frame is saved in frames/ or boards/: give a path there, such as "frames/agent-card" or "frames/ui/agent-card".`);
 		const found = indexOf(entry.doc).get(id);
-		if (!found) throw new PenError(`No item "${id}" on stage ${stage}: decks canvas read lists the items.`);
+		if (!found) throw new PenError(`No item "${id}" on stage ${canvas}: decks canvas read lists the items.`);
 		const node = clone(found.node);
 		const { x, y } = node;
 		delete node.x;
@@ -166,16 +166,16 @@ export class PenFiles {
 		this.writePen(target.file, saved);
 		if (replace) {
 			const ref: PenNode = { type: "ref", id, ref: target.ref, ...(x !== undefined ? { x } : {}), ...(y !== undefined ? { y } : {}) };
-			this.of.edit(stage, [{ op: "replace", id, node: ref } as Op]);
+			this.of.edit(canvas, [{ op: "replace", id, node: ref } as Op]);
 		}
 		this.of.resendUsing(target.ref, target.canvas);
 		return { frame: target.shown, ref: target.ref, replaced: replace, overwrote };
 	}
 
 	/**
-	 * A `.pen` file named by an agent: relative to the deck, as a board's path is (`"frames/ui/button"`,
-	 * `"canvases/research-notes/canvas.pen"`), or an absolute path anywhere. `.pen` may be left off. Its deck-relative path to show, the stage it is when it is a
-	 * stage's own file, and the ref that places it when it is a frame.
+	 * A `.pen` file named by an agent: relative to the deck, as a card's path is (`"frames/ui/button"`,
+	 * `"canvases/research-notes/canvas.pen"`), or an absolute path anywhere. `.pen` may be left off. Its deck-relative path to show, the canvas it is when it is a
+	 * canvas's own file, and the ref that places it when it is a frame.
 	 */
 	penFile(path: string): { file: string; shown: string; stage?: string; ref?: string; canvas?: string } {
 		const asked = typeof path === "string" ? path.trim() : "";
@@ -237,7 +237,7 @@ export class PenFiles {
 	/**
 	 * Any .pen file as a page draws it (`shot.html`, for `decks.canvas.screenshot`): its document with what it
 	 * imports and the saved frames it uses, the folder its relative links resolve from, and the box
-	 * round all its items. A stage's own file answers as the stage does, its boards included.
+	 * round all its items. A canvas's own file answers as the canvas does, its cards included.
 	 */
 	fileFrame(path: string): { doc: PenDocument; base: string; box?: { x1: number; y1: number; x2: number; y2: number }; stage?: string } {
 		const target = this.penFile(path);
@@ -271,7 +271,7 @@ export class PenFiles {
 		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), ...read(this.withImportedAt(dirname(target.file), doc), { theme: themeFrom(doc, theme), measure, ...rest }) };
 	}
 
-	/** The same edits as a stage takes, on any .pen file; a frame's change reaches every stage that uses it. */
+	/** The same edits as a canvas takes, on any .pen file; a frame's change reaches every canvas that uses it. */
 	editFile(path: string, ops: readonly Op[]): { file: string; ref?: string; results: Array<OpResult & { box?: { x1: number; y1: number; x2: number; y2: number } }> } {
 		const target = this.penFile(path);
 		const theme = (doc: PenDocument) => baseTheme(doc, "light");
@@ -308,8 +308,8 @@ export class PenFiles {
 	private framesWatchers = new Map<string, FSWatcher>();
 
 	/**
-	 * A saved frame changed on disk (an agent's write, a person's edit, a save): every stage that uses
-	 * it is sent again, so each copy shows the change, as a board's edit shows on every stage.
+	 * A saved frame changed on disk (an agent's write, a person's edit, a save): every canvas that uses
+	 * it is sent again, so each copy shows the change, as a card's edit shows on every canvas.
 	 */
 	watchFrames(): void {
 		for (const folder of ["frames", "boards"]) {
@@ -318,12 +318,12 @@ export class PenFiles {
 			try {
 				this.framesWatchers.set(folder, this.watchPens(folder, dir));
 			} catch {
-				// Without a watcher a frame's change shows when its stage is next sent.
+				// Without a watcher a frame's change shows when its canvas is next sent.
 			}
 		}
 	}
 
-	/** `.pen` files under one folder, each change sent to the stages that place it. */
+	/** `.pen` files under one folder, each change sent to the canvases that place it. */
 
 	private watchPens(folder: string, dir: string): FSWatcher {
 		return watch(dir, { recursive: true }, (_event, file) => {

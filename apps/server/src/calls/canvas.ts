@@ -3,7 +3,7 @@ import { canvasOfPath } from "./move-home.ts";
 import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, clone, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../canvas/canvas-files.ts";
-import { boardOf, CARD_ITEM, type ReadMore } from "../canvas/pens.ts";
+import { cardOf, CARD_ITEM, type ReadMore } from "../canvas/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { serverText } from "../canvas/text.ts";
@@ -80,7 +80,7 @@ export function toItem(node: Record<string, unknown>): Record<string, unknown> {
 	const link = linkToItem(node);
 	if (link) return link;
 	const children = Array.isArray(node.children) ? (node.children as Record<string, unknown>[]).map(toItem) : undefined;
-	const path = boardOf(node as unknown as PenNode);
+	const path = cardOf(node as unknown as PenNode);
 	if (path) {
 		const { type: _type, url: _url, metadata: _metadata, name, children: _children, ...rest } = node;
 		return { type: "card", ...rest, card: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
@@ -151,7 +151,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	const idIn = (doc: PenDocument, ref: unknown, what = "id"): string => {
 		if (typeof ref !== "string" || !ref.trim()) throw new Error(`${what} names an item: its id from decks canvas read, or a board's path.`);
 		const own = ownOn(ref);
-		for (const node of walk(doc.children)) if (boardOf(node) === ref || boardOf(node) === own) return node.id;
+		for (const node of walk(doc.children)) if (cardOf(node) === ref || cardOf(node) === own) return node.id;
 		return ref;
 	};
 
@@ -173,7 +173,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			const base = slug(title, 48) || "card";
 			// A folder of its own, `cards/<title>/index.html`, for what the card keeps beside it.
 			let path = `${canvasFolder(onCanvas)}/cards/${base}/index.html`;
-			for (let n = 2; service.fileBoard(path) || existsIn(path); n++) path = `${canvasFolder(onCanvas)}/cards/${base}-${n}/index.html`;
+			for (let n = 2; service.fileCard(path) || existsIn(path); n++) path = `${canvasFolder(onCanvas)}/cards/${base}-${n}/index.html`;
 			const head = [/<title>/i.test(html) ? "" : `<title>${title.replace(/</g, "&lt;")}</title>`, /<meta\s+name=["'](?:card|board)["']/i.test(html) ? "" : `<meta name="card" content='${JSON.stringify(size)}' />`].filter(Boolean).join("\n");
 			service.writeCard(path, `${head}${head ? "\n" : ""}${html.trim()}\n`);
 			item = { ...others, type: "card", card: path, ...(typeof width === "number" ? { width } : {}), ...(typeof height === "number" ? { height } : {}) };
@@ -217,7 +217,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		// Its folder or the folder's index.html, either way.
 		const card = /\.html$/i.test(named) ? named : `${named.replace(/\/+$/, "")}/index.html`;
 		if (!isCardPath(card)) throw new Error(`${named} is not a card: a card is a folder in a canvas's cards/, with its index.html in it.`);
-		const file = service.fileBoard(card);
+		const file = service.fileCard(card);
 		if (!file) throw new Error(`There is no card ${card} in the deck. decks card create makes one; decks card list lists them.`);
 		let id = typeof own.id === "string" && own.id ? own.id : undefined;
 		if (!id) {
@@ -295,9 +295,9 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					case "insert": {
 						const node = fromItem(op.item, ids(doc), frame);
 						if (!agent.person && (op.parent === undefined || op.parent === null)) colourDefaults(node);
-						const path = boardOf(node as unknown as PenNode);
+						const path = cardOf(node as unknown as PenNode);
 						if (path) {
-							const there = [...walk(doc.children)].find((one) => boardOf(one) === path || boardOf(one) === ownOn(path));
+							const there = [...walk(doc.children)].find((one) => cardOf(one) === path || cardOf(one) === ownOn(path));
 							if (there) throw new Error(`${path} is already on this canvas, as ${there.id}: move it with decks canvas move.`);
 						}
 						const box = placeOf(doc, placed, op);
@@ -311,11 +311,11 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					case "update": {
 						const id = idIn(doc, op.id);
 						const node = [...walk(doc.children)].find((one) => one.id === id);
-						const path = node ? boardOf(node) : undefined;
+						const path = node ? cardOf(node) : undefined;
 						const set: Record<string, unknown> = { ...(op.set ?? {}) };
 						// A card item pointed at another card: `set: { card: <path> }`.
 						if (path && typeof set.card === "string") {
-							const file = isCardPath(set.card) ? service.fileBoard(set.card) : undefined;
+							const file = isCardPath(set.card) ? service.fileCard(set.card) : undefined;
 							if (!file) throw new Error(`There is no card ${set.card} in the deck.`);
 							set.url = `../../${set.card}`;
 							set.metadata = { ...(node?.metadata ?? {}), type: CARD_ITEM, path: set.card };
@@ -366,13 +366,13 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						pen = { op: "move", id, ...(op.parent !== undefined ? { parent: op.parent === null ? null : idIn(doc, op.parent, "parent") } : {}), ...(op.index !== undefined ? { index: op.index } : {}), ...(box ? { box } : {}) };
 						// Moved beside or below another at the top level: aimed there, then on past what is in the way, as an insert is.
 						const moving = doc.children.find((one) => one.id === id);
-						if (box && moving && (op.parent === undefined || op.parent === null) && (op.beside || op.below)) pen = landItem(on(), pen as Op & { box?: { x1: number; y1: number } }, id, boardOf(moving) ?? id, op.beside ? "right" : "down", placed, id);
+						if (box && moving && (op.parent === undefined || op.parent === null) && (op.beside || op.below)) pen = landItem(on(), pen as Op & { box?: { x1: number; y1: number } }, id, cardOf(moving) ?? id, op.beside ? "right" : "down", placed, id);
 						break;
 					}
 					case "copy": {
 						const id = idIn(doc, op.id);
 						const node = [...walk(doc.children)].find((one) => one.id === id);
-						if (node && boardOf(node)) throw new Error(`${op.id} is a board, and a canvas holds a board once: make another board, or copy its file.`);
+						if (node && cardOf(node)) throw new Error(`${op.id} is a board, and a canvas holds a board once: make another board, or copy its file.`);
 						const box = cornerOf(op.at);
 						pen = { op: "copy", id, ...(op.as !== undefined ? { as: op.as } : {}), ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(box ? { box } : {}) };
 						break;
@@ -419,7 +419,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			results = edited.results;
 			variables = () => (edited.entry.doc.variables ?? {}) as Record<string, unknown>;
 			for (const one of sized) {
-				const file = service.fileBoard(one.path);
+				const file = service.fileCard(one.path);
 				if (!file) continue;
 				service.resize(one.path, { ...(one.w !== undefined ? { w: one.w } : {}), ...(one.h !== undefined ? { h: one.h } : {}) });
 				if (agent.person) service.wrote(one.path, "you");
@@ -532,7 +532,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const deck = service.deckPath();
 				const page = resolveInDeck(deck, to ?? `exports/${itemIds[0]!.replace(/\//g, "-")}.html`);
 				const folder = frame ? dirname(pens.files.penFile(target.frame!).file) : pens.folderOf(target.canvas!);
-				const done = await exportPage({ doc, ids: itemIds, format, deck, page, folder, measure, ...(target.canvas ? { title: pens.titleOf(target.canvas) } : {}), boardOf: (node) => boardOf(node) });
+				const done = await exportPage({ doc, ids: itemIds, format, deck, page, folder, measure, ...(target.canvas ? { title: pens.titleOf(target.canvas) } : {}), boardOf: (node) => cardOf(node) });
 				ctx.notes.push(...done.notes);
 				return { file: done.file } as never;
 			},

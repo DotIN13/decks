@@ -254,12 +254,12 @@ export class App {
 			 * No id is an app running its own code, which acts for a conversation on a canvas
 			 * showing it (`calls/app-caller.ts`), so that case keeps the old answer.
 			 */
-			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
+			cards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
-			writeBoard: (path, html) => this.boards.writeBoard(path, html),
-			deleteBoard: (path) => {
+			writeCard: (path, html) => this.boards.writeCard(path, html),
+			deleteCard: (path) => {
 				let refused: string | undefined;
-				this.boards.deleteBoard(path, (message) => {
+				this.boards.deleteCard(path, (message) => {
 					if (message.type === "harness.notice") refused = message.text;
 				});
 				return refused;
@@ -375,7 +375,7 @@ export class App {
 			dir: join(deck.path, ".decks", "thumbs"),
 			boards: () => this.deck.cards,
 			apps: () => this.apps.list().map((one) => one.name),
-			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.cards.boards(name).map((one) => one.path))),
+			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.cards.cards(name).map((one) => one.path))),
 			// Its own reads of the harness, on a pass it makes for no canvas (`auth/guard.ts`, `harnessReads`).
 			reader: () => this.passes.canvas("", "view", HARNESS_ID).pass,
 			extraOrigins: () => (process.env.DECKS_WEB_PORT ? [`http://127.0.0.1:${process.env.DECKS_WEB_PORT}`] : []),
@@ -421,7 +421,7 @@ export class App {
 			},
 		});
 		this.stage.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
-		this.stage.boardPicture = async (path, scheme) => {
+		this.stage.cardPicture = async (path, scheme) => {
 			const board = deck.card(path);
 			if (!board) throw new Error(`There is no board ${path}.`);
 			return readFileSync(await this.thumbs.get(board, scheme, () => false));
@@ -454,7 +454,7 @@ export class App {
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
 			identity: (agentId) => this.agents.get(agentId)?.who(),
-			boardPathOf: (file) => this.boards.boardPathOf(file),
+			boardPathOf: (file) => this.boards.cardPathOf(file),
 			read: (path) => {
 				try {
 					return this.stage.read(path);
@@ -485,7 +485,7 @@ export class App {
 				publishRuntimes: () => this.send({ type: "harness.runtimes", list: this.runtimes() }),
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
-				boardPathOf: (file) => this.boards.boardPathOf(file),
+				boardPathOf: (file) => this.boards.cardPathOf(file),
 				accounts: this.claudeAccounts,
 				accountsChanged: () => void this.accountList.publish(),
 				// Ask the person to sign in (the page's modal), unless this agent's account is there to run on (`claude/login.ts`).
@@ -565,7 +565,7 @@ export class App {
 		this.unwatch?.();
 		this.unwatch = followDeck({
 			deck: () => this.deck,
-			boards: this.boards,
+			cards: this.boards,
 			send: (message) => this.send(message),
 			state: () => this.stageState(),
 			placed: (card) => this.placed(card),

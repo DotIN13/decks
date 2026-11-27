@@ -28,7 +28,7 @@ async function following() {
 	const landed: string[] = [];
 	const host: FollowHost = {
 		deck: () => deck,
-		boards: { recordRevision() {}, forgetBoard() {}, restamp() {} } as unknown as CardService,
+		cards: { recordRevision() {}, forgetBoard() {}, restamp() {} } as unknown as CardService,
 		send: (message) => void said.push(message),
 		state: () => ({}) as DeckState,
 		placed: (page) => page,

@@ -9,7 +9,7 @@ import type { VerbContext } from "./context.ts";
  */
 export async function shootOn(ctx: VerbContext, stage: string, options?: { of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark"; live?: boolean }) {
 	const { service, agent, images } = ctx;
-	const onIt = () => (service.pens ? service.pens.cards.boards(stage) : []);
+	const onIt = () => (service.pens ? service.pens.cards.cards(stage) : []);
 	if (!service.shots) throw new Error("This server cannot take pictures of a stage.");
 	const { of, scale, format, to, scheme, live } = options ?? {};
 	/*
@@ -19,7 +19,7 @@ export async function shootOn(ctx: VerbContext, stage: string, options?: { of?: 
 	 * the answer says it does not show their interaction.
 	 */
 	if (typeof of === "string" && format !== "pdf" && onIt().some((board) => board.path === of)) {
-		const seen = await service.seenBoard(agent.id, of);
+		const seen = await service.seenCard(agent.id, of);
 		let bytes: Buffer;
 		let mime: string;
 		let note: string;
@@ -28,8 +28,8 @@ export async function shootOn(ctx: VerbContext, stage: string, options?: { of?: 
 			mime = seen.mime;
 			note = seen.how === "canvas" ? "As the person's browser shows it now, drawn there by HTML-in-Canvas: it includes what they did on the page." : "As the person's browser has it now, from a snapshot of the page: it includes what they did on the page, such as tabs pressed, text typed and boxes scrolled.";
 		} else {
-			if (!service.boardPicture) throw new Error("This server cannot take pictures of a board.");
-			bytes = await service.boardPicture(of, scheme === "dark" ? "dark" : "light");
+			if (!service.cardPicture) throw new Error("This server cannot take pictures of a board.");
+			bytes = await service.cardPicture(of, scheme === "dark" ? "dark" : "light");
 			mime = imageKind(bytes)?.mime ?? "image/jpeg";
 			note = `Taken by the server from the board's file, because ${seen.why}. It does not show anything the person did on the page (tabs pressed, text typed, boxes scrolled); ask them to open the board if that matters.`;
 		}
@@ -38,7 +38,7 @@ export async function shootOn(ctx: VerbContext, stage: string, options?: { of?: 
 		const kind = imageKind(bytes);
 		if (kind) mime = kind.mime;
 		const size = imageSize(bytes);
-		const file = service.shots.keepBoard(of, bytes, kind?.ext ?? (mime === "image/jpeg" ? "jpg" : "png"), to);
+		const file = service.shots.keepCard(of, bytes, kind?.ext ?? (mime === "image/jpeg" ? "jpg" : "png"), to);
 		images.push({ data: bytes.toString("base64"), mimeType: mime });
 		const at = onIt().find((board) => board.path === of)!;
 		note += " Only the board: the drawing around it (arrows, labels, notes touching it) is not in this picture; pass its box as `of` to see that too.";

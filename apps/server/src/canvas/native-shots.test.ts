@@ -8,7 +8,7 @@ import { imageSize } from "./shots.ts";
 import { nativeBinary, NativeShots, type NativeRequest } from "./native-shots.ts";
 
 /**
- * The native stage picture, through the real `stage-shot` when it is built (`cargo build --release
+ * The native canvas picture, through the real `stage-shot` when it is built (`cargo build --release
  * -p stage-shot` in packages/stage), and what it says when it cannot draw a box.
  */
 

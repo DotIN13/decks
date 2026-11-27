@@ -5,15 +5,15 @@ import { canvasFolder, referenceFor, resolveReference, urlFor } from "@decks/hub
 /**
  * A canvas's drawing as it is on disk, and as the harness holds it.
  *
- * On disk a board item names its board from the canvas's own folder (`"boards/plan.html"`), so the
- * folder can be copied anywhere whole (`deck/layout.ts`). Inside the harness every board is named by
+ * On disk a card item names its card from the canvas's own folder (`"boards/plan.html"`), so the
+ * folder can be copied anywhere whole (`deck/layout.ts`). Inside the harness every card is named by
  * its deck path (`"canvases/plan/boards/plan.html"`), as every record, picture, route and page always
  * named it. `toMemory` turns the one into the other as a drawing is read, and `toDisk` back as it is
  * written. Nothing else in the harness sees the difference.
  *
  * A reference the rules refuse (another canvas's card, a hidden folder) is held as an
- * item that is no board, with nothing to load, and written back as it was: what a hand edit wrote is
- * not lost, and it is not shown either. A board placed from somewhere else is copied into the canvas
+ * item that is no card, with nothing to load, and written back as it was: what a hand edit wrote is
+ * not lost, and it is not shown either. A card placed from somewhere else is copied into the canvas
  * as the drawing is written (`adopt`), so a canvas only ever names its own.
  */
 /** A card: drawn in a shadow root of the canvas's own page (`deck/layout.ts`, `isCardPath`), and named in the canvas's folder by `path`. */
@@ -33,7 +33,7 @@ interface Meta {
 
 const metaOf = (node: PenNode): Meta | undefined => (node.metadata && typeof node.metadata === "object" ? (node.metadata as Meta) : undefined);
 
-/** A drawing read from disk, each board named by its deck path. Changes `doc` in place and answers it. */
+/** A drawing read from disk, each card named by its deck path. Changes `doc` in place and answers it. */
 export function toMemory(name: string, doc: PenDocument): PenDocument {
 	for (const node of walk(doc.children)) {
 		const meta = metaOf(node);
@@ -49,10 +49,10 @@ export function toMemory(name: string, doc: PenDocument): PenDocument {
 	return doc;
 }
 
-/** How a canvas takes in what it was given from elsewhere: a board copied into its folder, and a frame. */
+/** How a canvas takes in what it was given from elsewhere: a card copied into its folder, and a frame. */
 export interface Adopt {
-	/** Copy the board at this deck path into the canvas, and answer the deck path of the copy. */
-	board(canvas: string, path: string): string;
+	/** Copy the card at this deck path into the canvas, and answer the deck path of the copy. */
+	card(canvas: string, path: string): string;
 	/** Copy a saved frame (`frames/<name>`) the drawing uses into the canvas, if it is not there yet. */
 	frame?(canvas: string, ref: string): void;
 	/**
@@ -63,7 +63,7 @@ export interface Adopt {
 }
 
 /**
- * A drawing as it is written to disk: a copy, each board named from the canvas's own folder. A board
+ * A drawing as it is written to disk: a copy, each card named from the canvas's own folder. A card
  * from anywhere else is copied in first (`adopt`); with nothing to copy it, the write is refused.
  */
 export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocument {
@@ -82,11 +82,11 @@ export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocume
 		let deckPath = meta.path;
 		if ("refused" in reference) {
 			if (!adopt) throw new PenError(`${meta.path} cannot be placed on ${name}: ${reference.refused}.`);
-			deckPath = adopt.board(name, meta.path);
+			deckPath = adopt.card(name, meta.path);
 			reference = referenceFor(name, deckPath);
 			if ("refused" in reference) throw new PenError(`${meta.path} cannot be placed on ${name}: ${reference.refused}.`);
 		}
-		// A board copied in may have landed as a card (`copy-in.ts`): its tag follows its path in the deck.
+		// A card copied in may have landed as a card (`copy-in.ts`): its tag follows its path in the deck.
 		node.metadata = { ...meta, type: CARD_ITEM, path: reference.path };
 		node.url = urlFor(name, reference.path);
 	}

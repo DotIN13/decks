@@ -199,7 +199,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				deckPath: app.deck.path,
 				deckName: app.deck.name,
 				board: (path) => app.deck.card(path),
-				stage: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.cards.boards(name) },
+				stage: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.cards.cards(name) },
 				picture: async (board, scheme) => {
 					const near = app.thumbs.nearest(board, scheme, "whole");
 					if (near) return near.file;
@@ -232,12 +232,12 @@ export function register(api: Router, { app }: RouteDeps): void {
 		 * Each card and board on it with its record (title, revision, card or not, who wrote it and when,
 		 * when it was read), at its place on this drawing: what the canvas frame shows them from.
 		 */
-		const cards = pens.cards.boards(name).flatMap(({ path, x, y, w, h }) => {
+		const cards = pens.cards.cards(name).flatMap(({ path, x, y, w, h }) => {
 			const board = app.deck.card(path);
 			return board ? [{ ...board, x, y, w, h }] : [];
 		});
 // Squeezed: a frame reads this whole each time it starts, and a large canvas's is most of a megabyte as it stands.
-		sendSqueezedJson(req, res, { doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.cards.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
+		sendSqueezedJson(req, res, { doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.cards.cards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
 	});
 
 	/**
@@ -252,7 +252,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 		}
 		try {
 			const frame = pens.files.fileFrame(req.query.path);
-			const boards = frame.stage ? pens.cards.boards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			const boards = frame.stage ? pens.cards.cards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
 			res.setHeader("Cache-Control", "no-store");
 			res.json({ doc: frame.doc, base: frame.base, boards });
 		} catch (error) {

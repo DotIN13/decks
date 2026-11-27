@@ -23,7 +23,7 @@ export interface VerbContext {
 	needStage(): string;
 	needWeb(): NonNullable<CanvasService["web"]>;
 	needTarget(value: unknown, sentence: string): WebTarget;
-	here(): ReturnType<CanvasService["boards"]>;
+	here(): ReturnType<CanvasService["cards"]>;
 	askedWorkspace(raw: unknown): string;
 	/**
 	 * The canvas a call means when it names none: the one the call says it was made on (a person's or a
@@ -140,7 +140,7 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 	 * to. Every read in this file goes through here, so a verb cannot quietly answer for somebody
 	 * else's arrangement.
 	 */
-	const here = () => service.boards(agent.id);
+	const here = () => service.cards(agent.id);
 	/** A workspace a caller named, cleaned as the store cleans it, or a sentence. */
 	const askedWorkspace = (raw: unknown): string => {
 		const clean = typeof raw === "string" ? cleanWorkspace(raw) : null;
@@ -183,7 +183,7 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 		const mine = agent.stageName?.();
 		let cards = 0;
 		try {
-			cards = pens.cards.boards(name).length;
+			cards = pens.cards.cards(name).length;
 		} catch {
 			/* a canvas whose file does not parse holds no cards we can count */
 		}

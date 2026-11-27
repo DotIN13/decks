@@ -39,7 +39,7 @@ export function gestures(ctx: VerbContext): Gestures {
 		 */
 		resize: async (path: string, size: { w?: number; h?: number }) => {
 			if (!size || (size.w === undefined && size.h === undefined)) throw new Error("A resize needs a width, a height, or both");
-			const file = service.fileBoard(path);
+			const file = service.fileCard(path);
 			if (!file) throw new Error(`No such card: ${path}`);
 			const bounded = (value: unknown, low: number, high: number) =>
 				typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined;

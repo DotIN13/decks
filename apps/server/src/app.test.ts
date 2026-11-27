@@ -36,7 +36,7 @@ function open() {
 }
 
 const TALL = "canvases/work/cards/tall/index.html";
-const boardOf = (app: App) => app.stage.boards().find((one) => one.path === TALL)!;
+const boardOf = (app: App) => app.stage.cards().find((one) => one.path === TALL)!;
 
 test("a frame's measurement is reported but sizes nothing, and fit writes it back", async () => {
 	const { app, deck, cleanup } = open();
@@ -98,12 +98,12 @@ test("a size written just after an edit the watcher has not heard yet is not tak
 		// An agent's own tools write new words, and before the watcher reads them `decks canvas fit` writes the height.
 		const edited = readFileSync(file, "utf8").replace("<body class=\"board\"></body>", "<body class=\"board\"><p>New words</p></body>");
 		writeFileSync(file, edited);
-		app.boards.writeBoard(TALL, edited.replace('"h":400', '"h":520'));
+		app.boards.writeCard(TALL, edited.replace('"h":400', '"h":520'));
 		const changed = said.filter((m) => m.type === "card.changed" && m.path === TALL);
 		assert.equal(changed.length, 1);
 		assert.equal(changed[0]!.sized, undefined, "not size-only: the words changed since the browsers last heard");
 		// The height alone, with nothing unheard on disk: size-only, as before.
-		app.boards.writeBoard(TALL, readFileSync(file, "utf8").replace('"h":520', '"h":600'));
+		app.boards.writeCard(TALL, readFileSync(file, "utf8").replace('"h":520', '"h":600'));
 		assert.equal(said.filter((m) => m.type === "card.changed" && m.path === TALL).at(-1)!.sized, true);
 	} finally {
 		cleanup();

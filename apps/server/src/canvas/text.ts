@@ -70,7 +70,7 @@ class ServerText {
 		const align = markdown ? (node!.textAlign ?? "left") : "";
 		/*
 		 * Kept, as the page keeps them: one edit lays the drawing out more than once, and setting every
-		 * text anew made the largest stage's layout ten times the estimate's.
+		 * text anew made the largest canvas's layout ten times the estimate's.
 		 */
 		const key = JSON.stringify([this.generation, markdown, align, maxWidth === undefined ? -1 : Math.round(maxWidth * 10), style, text]);
 		const known = this.sizes.get(key);
