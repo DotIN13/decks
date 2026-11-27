@@ -208,7 +208,8 @@
 				body = `${e.command ? `<span class="term">${esc(e.command)}</span>` : ""}${e.why ? `<span class="why">${esc(e.why)}</span>` : ""}${e.text ? `<span class="why">${esc(e.text)}</span>` : ""}${bar}`;
 			} else if (kind === "finding") body = `<small>Finding</small>${esc(e.text)}`;
 			else body = esc(e.text);
-			// A piece's relative addresses (files/demo.mp4) are the card's folder's, not the page's.
+			// Every relative path in a piece is read from the card's index.html, as in any card: a picture's
+			// here (files/demo.mp4, ../../files/plot.png), a link by the card's own link handling.
 			// A piece from a file, then any inline HTML; links in either are the card's own, as anywhere in a card.
 			const own = [e.file ? pieces[e.file] : "", e.html ?? ""].join("").replace(/\b(src|poster)="(?![a-z][a-z0-9+.-]*:|\/|#)([^"]+)"/gi, (_m, at, path) => `${at}="${card.file(path)}"`);
 			if (own) body += `<div class="viz">${own}</div>`;

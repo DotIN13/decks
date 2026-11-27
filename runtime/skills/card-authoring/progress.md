@@ -52,12 +52,16 @@ sides scroll inside the card.
 
   The log follows the newest line until the reader scrolls up; pressing a step glides to its lines.
 
-- **Link out.** An entry's HTML is part of the card, so a link in it works like any link in a card:
+- **Link out.** An entry's HTML is part of the card, so its links are a card's links, with the
+  same paths and the same behaviour (the card skill, "Links and buttons", lists them):
   `<a href="../race-rounds/index.html">every round, both ways</a>` opens that card beside this one,
-  `#item/<canvas>/<id>` flies to a drawing, `#doc/<path>` opens a document, an https address a
-  source. Link whenever there is something to go to, so the card is the way into the work: every result
-  card, detail card and drawing the work made gets a link from the entry that produced it. An entry
-  can carry a piece (`file`) and a line of HTML (`html`) together, the line often just the link.
+  `#card/<path>` or `#item/<canvas>/<id>` flies to a card or a drawing, `#doc/<path>` opens a
+  document, an https address a source. Every relative path, in an entry's `html` or in a piece under
+  `log/`, is read from the card's own `index.html`, exactly as in any card: `../race-rounds/index.html`
+  from a piece in `log/` too, and `../../files/plot.png` for a picture in the canvas's `files/`.
+  Link whenever there is something to go to, so the card is the way into the work: every result card,
+  detail card and drawing the work made gets a link from the entry that produced it. An entry can carry
+  a piece (`file`) and a line of HTML (`html`) together, the line often just the link.
 
 ## Steps are small, and grow as you go
 

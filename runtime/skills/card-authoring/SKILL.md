@@ -189,6 +189,8 @@ Everything that used to be a board is a card. A board file left in a deck from b
   item opens on the canvas, the view flying to it, and the rest in a tab; add `?open=tab` or
   `?open=canvas` to say otherwise, and ⌘ or Ctrl always opens a tab. Every other link opens in a new browser
   tab of its own, never in place of the app, so a claim can cite its source with `href="https://…"`.
+  The same paths work in HTML a card loads into itself (a progress card's log pieces): every relative
+  path is read from the card's own `index.html`, wherever the HTML came from.
 - **A button acts through `card.decks`, wired in the card's module.** The calls are the `decks`
   command's, by group and name, answering a promise: a decision is a button whose listener calls
   `await card.decks.agent.send("<your id>", { task: "Option A", cards: [card.path] })`, your id from
