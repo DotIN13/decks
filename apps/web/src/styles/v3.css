@@ -873,7 +873,7 @@ body {
 		padding: 0 5px;
 		border: 1px solid var(--v3-line2);
 		border-radius: 4px;
-		color: var(--v3-fg3);
+		color: var(--v3-fg2);
 		font-family: inherit;
 		font-size: 11px;
 		letter-spacing: 0.5px;
@@ -971,13 +971,14 @@ body {
 	.v3-panel .agent-list .agent-row[data-current="true"] .row-label {
 		font-weight: 500;
 	}
+	/* Read, not decoration: the muted colour (4.5:1 on the panel) at 12px, where the faint one was 2:1. */
 	.v3-panel .agent-list .kind {
-		color: var(--v3-fg3);
-		font-size: 11.5px;
+		color: var(--v3-fg2);
+		font-size: 12px;
 	}
 	.v3-panel .agent-list .ago {
-		color: var(--v3-fg3);
-		font-size: 11.5px;
+		color: var(--v3-fg2);
+		font-size: 12px;
 	}
 	.v3-panel .agent-list .ago[data-busy="true"] {
 		color: var(--v3-fg2);
