@@ -393,10 +393,13 @@ export class OpencodeBackend implements AgentBackend {
 				);
 				return;
 			case "compact":
+				// As opencode2 does: no session, nothing to summarise; a failed summary must not leave the chat busy.
+				if (!this.sessionId) return;
 				this.streamingNow = true;
-				await this.client.session
-					.summarize({ path: { id: this.sessionId! }, body: {} as never })
-					.catch((error: Error) => notice("warn", `Could not summarise: ${error.message}`));
+				await this.client.session.summarize({ path: { id: this.sessionId }, body: {} as never }).catch((error: Error) => {
+					this.streamingNow = false;
+					notice("warn", `Could not summarise: ${error.message}`);
+				});
 				return;
 			case "help":
 				notice("info", helpText(this.commands()));

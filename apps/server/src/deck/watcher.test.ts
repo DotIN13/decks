@@ -123,7 +123,7 @@ test("the revision store is not watched, or every save would loop", async () => 
 		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/b/index.html")));
 		assert.deepEqual(
 			// The probe that proved the watcher listening (`watching`) may still be heard late.
-			changes.filter((c) => c.kind === "asset" && c.path !== "probe.txt").map((c) => c.path),
+			changes.filter((c) => c.kind === "asset").map((c) => c.path).filter((path) => path !== "probe.txt"),
 			[],
 		);
 	} finally {
