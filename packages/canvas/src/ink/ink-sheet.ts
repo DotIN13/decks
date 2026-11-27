@@ -41,12 +41,12 @@ export function mountInkSheet(d: MountInkSheetNeeds) {
 		const options = { passive: false } as const;
 		/*
 		 * Once a pencil has been used the glass lets fingers through (`data-pencil`, ink.css), so a finger
-		 * pans by the stage's own scrolling and presses a card as it would without the draw tool: the
+		 * pans by the canvas's own scrolling and presses a card as it would without the draw tool: the
 		 * glass's `touch-action: none` had stopped every finger pan, and it lay over every card. The
-		 * pencil (and a mouse) is caught on its way down instead, on the stage it now lands on, and
+		 * pencil (and a mouse) is caught on its way down instead, on the canvas it now lands on, and
 		 * the stylus's touches are still kept from scrolling it there.
 		 */
-		const stage = (sheet.closest(".stage") ?? sheet.parentElement ?? sheet) as HTMLElement;
+		const canvas = (sheet.closest(".stage") ?? sheet.parentElement ?? sheet) as HTMLElement;
 		const onGlass = (event: Event) => event.target instanceof Node && !!sheet?.contains(event.target);
 		const caught = (event: PointerEvent) => {
 			if (!penSeen() || onGlass(event)) return;
@@ -65,25 +65,25 @@ export function mountInkSheet(d: MountInkSheetNeeds) {
 			if (event.type === "pointermove") d.onMove(event);
 			else d.onUp(event);
 		};
-		// A palm while the pencil is on the glass, or a moment after, does not scroll the stage either.
+		// A palm while the pencil is on the glass, or a moment after, does not scroll the canvas either.
 		const palmScroll = (event: TouchEvent) => {
 			if (penSeen() && d.palm(event as unknown as PointerEvent) && event.cancelable) event.preventDefault();
 		};
 		for (const type of ["touchstart", "touchmove", "touchend"] as const) {
 			sheet.addEventListener(type, own, options);
-			stage.addEventListener(type, own, options);
+			canvas.addEventListener(type, own, options);
 		}
-		stage.addEventListener("touchmove", palmScroll, options);
-		stage.addEventListener("pointerdown", caught, true);
-		for (const type of ["pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) stage.addEventListener(type, followed, true);
+		canvas.addEventListener("touchmove", palmScroll, options);
+		canvas.addEventListener("pointerdown", caught, true);
+		for (const type of ["pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) canvas.addEventListener(type, followed, true);
 		onCleanup(() => {
 			for (const type of ["touchstart", "touchmove", "touchend"] as const) {
 				sheet?.removeEventListener(type, own);
-				stage.removeEventListener(type, own);
+				canvas.removeEventListener(type, own);
 			}
-			stage.removeEventListener("touchmove", palmScroll);
-			stage.removeEventListener("pointerdown", caught, true);
-			for (const type of ["pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) stage.removeEventListener(type, followed, true);
+			canvas.removeEventListener("touchmove", palmScroll);
+			canvas.removeEventListener("pointerdown", caught, true);
+			for (const type of ["pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) canvas.removeEventListener(type, followed, true);
 		});
 	});
 

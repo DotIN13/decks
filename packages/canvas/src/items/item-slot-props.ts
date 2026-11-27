@@ -44,7 +44,7 @@ export interface ItemSlotProps {
 	onCollapse?: () => void;
 	/** How much room a card's content took, for `decks.canvas.fit`, with the revision it was measured at. */
 	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
-	/** A link on a card to another board or card of the deck: `true` once the host has opened it. */
+	/** A link on a card to another card of the deck: `true` once the host has opened it. */
 	onOpenPage?: (path: string, from: string) => boolean;
 	/** Words selected in a card, to comment on: the canvas gives this while you may. */
 	onWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;

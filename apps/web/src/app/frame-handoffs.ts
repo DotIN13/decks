@@ -25,7 +25,7 @@ export const frameComment = (handed: { path: string; title: string; quote: strin
 	if (!agentId) return;
 	const canvas = canvasOnScreen()?.name;
 	const comment = cleanFrameComment(handed);
-	const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
+	const note = { id: `c${Date.now().toString(36)}`, card: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
 	if (comment.send) setDraft({ text: commentBlock([note]), at: Date.now(), insert: true, agentId });
 	else {
 		addComment(agentId, canvas, note);
@@ -49,7 +49,7 @@ export const pageComment = (target: { path: string; title?: string; quote: strin
 	if (!agentId) return;
 	const canvas = stageOf(agentId)?.name;
 	const comment = cleanFrameComment({ path: target.path, title: target.title ?? "", quote: target.quote, text, ...(target.component ? { component: target.component } : {}), ...(target.items?.length ? { items: target.items } : {}) });
-	const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
+	const note = { id: `c${Date.now().toString(36)}`, card: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
 	addComment(agentId, canvas, note);
 	if (send && sendComments) return sendComments([note.id]);
 	setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });

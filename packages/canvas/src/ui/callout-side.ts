@@ -5,7 +5,7 @@ import { canvasBox } from "../camera/insets.ts";
 import { COARSE } from "../edit/core/touch-rules.ts";
 import type { PageCalloutProps } from "./callout-props.ts";
 
-/** The gap between the pill and the board's edge, in screen pixels. */
+/** The gap between the pill and the card's edge, in screen pixels. */
 const GAP = 10;
 
 /** What `createCalloutSide` reads of `PageCallout` (`Callout.tsx`). */
@@ -17,7 +17,7 @@ export interface CalloutSideNeeds {
 
 /** Which side of what is picked the pill sits on, above or below, chosen once things rest so it does not jump while they move. */
 export function createCalloutSide(d: CalloutSideNeeds) {
-	/* The pill's own height, measured: it goes above the board only if it fits there whole. */
+	/* The pill's own height, measured: it goes above the card only if it fits there whole. */
 	const [tall, setTall] = createSignal(40);
 
 	/** Where the selection's top and bottom middles are on screen, with the camera as it is now. */
@@ -33,7 +33,7 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 	 * Which edge the pill is on, chosen when the selection appears and again only when what it is on
 	 * moves or changes size: never as the camera moves, so a pan carries the pill with its edge, off
 	 * the screen with it, rather than sending it looking for room. Of the two edges, the one whose
-	 * slot is on screen, clear of floating chrome and covering no other board or item; else the one
+	 * slot is on screen, clear of floating chrome and covering no other card or item; else the one
 	 * covering less of them. With neither on screen when it was chosen (the camera on its way to the
 	 * selection), it is chosen again once the camera has stopped.
 	 */
@@ -44,13 +44,13 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 		const x = top.x;
 		const half = d.width() / 2;
 		const gap = d.props.gap ?? GAP;
-		const stage = d.element?.parentElement?.getBoundingClientRect();
+		const canvas = d.element?.parentElement?.getBoundingClientRect();
 		// Chrome floating over the canvas (the composer, a toolbar, a float): the room leaves out only what is docked.
 		const underChrome = (slot: { from: number; to: number }) => {
-			if (!stage || typeof document === "undefined") return false;
-			const y = stage.top + (slot.from + slot.to) / 2;
+			if (!canvas || typeof document === "undefined") return false;
+			const y = canvas.top + (slot.from + slot.to) / 2;
 			return [x - half + 8, x, x + half - 8].some((at) => {
-				const hit = document.elementFromPoint(stage.left + at, y);
+				const hit = document.elementFromPoint(canvas.left + at, y);
 				return !!hit && !hit.closest(".stage");
 			});
 		};
@@ -81,7 +81,7 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 
 	/*
 	 * Chosen once the box has stopped changing, not at every step it moves: choosing reads the page's
-	 * layout (the stage's rect, elementFromPoint for each slot), which at every step of a drag or a
+	 * layout (the canvas's rect, elementFromPoint for each slot), which at every step of a drag or a
 	 * glide cost more than the drawing did. The edge it had rides with the box meanwhile; out of
 	 * sight (hidden while something moves) it is chosen when it shows again.
 	 */

@@ -25,15 +25,15 @@ export type Offset = { dx: number; dy: number };
 export type Corners = { x1: number; y1: number; x2: number; y2: number };
 
 /**
- * One outline round something selected. `id` is the item's, `page:<path>` for a card, board, document or app, and empty
+ * One outline round something selected. `id` is the item's, `page:<path>` for a card, document or app, and empty
  * for the marquee: the page keys on these, so they are kept as they were.
  */
 export type Outline = Rect & {
 	id: string;
 	role: "item" | "page" | "marquee";
-	/** Notes and cards have a board's corners, and so does the outline round one. */
+	/** Notes and cards have a card's corners, and so does the outline round one. */
 	round?: true;
-	/** A card's own corner (`PageBox.corners`), which its outline follows rather than a board's. */
+	/** A card's own corner (`PageBox.corners`), which its outline follows rather than a card's. */
 	corner?: number;
 };
 /** The selected card's eight handles. */

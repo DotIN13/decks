@@ -17,7 +17,7 @@ import type { CanvasViewProps } from "./CanvasView.tsx";
  *     40 documents in view  126 on layers · 181 without
  *    120 documents in view  700 on layers · 523 without   ← the trade has reversed
  *
- * Those documents were boards' iframes, which the canvas no longer runs. What goes on a layer now
+ * What goes on a layer now
  * is an awake card's root, a document's editor or an app's window (`canvas.css`, `data-scaling`),
  * a few elements each, and only those are counted: a card is its picture on the sheet and has no
  * layer to make. Measured on a canvas of 65 cards, all on screen below 25%, a ctrl-wheel zoom

@@ -81,8 +81,8 @@ test("cards are the drawing's decks.card items, and moving one moves its item", 
 	);
 	drawing.movePage("canvases/t/cards/plan/index.html", 420.4, -7.6);
 	drawing.resizePage("canvases/t/cards/plan/index.html", { w: 640, h: 380 });
-	const board = drawing.doc().children[1]!;
-	assert.deepEqual([board.x, board.y, board.width, board.height], [420, -8, 640, 380]);
+	const card = drawing.doc().children[1]!;
+	assert.deepEqual([card.x, card.y, card.width, card.height], [420, -8, 640, 380]);
 });
 
 /** A host-owned drawing, and what it sent: each edit's ops and name, each step's direction and name. */
@@ -251,7 +251,7 @@ test("each new drawing comes with the edits that made it, for the stage, and edi
 	assert.equal(own?.from, first);
 	assert.deepEqual(own?.edits, [{ op: "set", id: "a", key: "content", value: "two" }]);
 	assert.equal(drawing.editsTo(first), undefined, "only for the drawing they made");
-	// Someone else's edit: followed in place, the board item shared with the drawing before.
+	// Someone else's edit: followed in place, the card item shared with the drawing before.
 	const before = drawing.doc();
 	assert.equal(drawing.follow([{ op: "set", id: "a", key: "x", value: 40 }]), true);
 	assert.equal(drawing.doc().children[0]?.x, 40);

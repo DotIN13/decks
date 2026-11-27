@@ -66,7 +66,7 @@ export function fileKind(path: string): { label: string; icon: string; tone: str
 	return { label: extension ? extension.toUpperCase() : "File", icon: "file", tone: "#6b7280" };
 }
 
-/** How wide a file card is on the canvas, in stage pixels. */
+/** How wide a file card is on the canvas, in canvas pixels. */
 export const FILE_CARD_W = 320;
 
 /**
@@ -104,10 +104,10 @@ export function fileCard(path: string, fresh: () => string, facts: { preview?: s
 }
 
 /**
- * An SVG shown live on the canvas, as itself, animations and all. In the stage file it is pen's own
+ * An SVG shown live on the canvas, as itself, animations and all. In the canvas file it is pen's own
  * rectangle filled with a picture of the file the server made, marked `decks.live-file` with the
- * file's deck path, so pen.dev and a zoomed-out canvas show the still, and the stage puts the real
- * image under a hole in the sheet where it is (`CanvasView.tsx`, file items). A web page is a board.
+ * file's deck path, so pen.dev and a zoomed-out canvas show the still, and the canvas puts the real
+ * image under a hole in the sheet where it is (`CanvasView.tsx`, file items). A web page is a card.
  */
 export { LIVE_FILE, isLiveFile };
 /** How wide an SVG lands on the canvas. */
@@ -147,7 +147,7 @@ export function cardMarkdown(children: readonly PenNode[]): string {
 }
 
 interface ChildrenOptions {
-	/** A fresh id that no item on the stage has. */
+	/** A fresh id that no item on the canvas has. */
 	fresh(): string;
 	/** A picture's own size, when it is known. */
 	size?(url: string): { w: number; h: number } | undefined;
@@ -187,7 +187,7 @@ export function cardChildren(markdown: string, previous: readonly PenNode[], opt
 	const spare = previous.filter((node) => node.type === "text" && !used.has(node.id));
 	return blocks.flatMap((block, i) => {
 		if (kept[i]) return [kept[i]!];
-		if (PLACEHOLDER.test(block.raw)) return []; // an item that is no longer on the stage
+		if (PLACEHOLDER.test(block.raw)) return []; // an item that is no longer on the canvas
 		const file = fileOf(block.token as Tokens.Paragraph);
 		if (file) return [fileItem(file, options.fresh)];
 		const picture = pictureOf(block.token as Tokens.Paragraph);

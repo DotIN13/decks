@@ -24,7 +24,7 @@ import type { Box } from "../model/boxes.ts";
 export interface LandingHost {
 	views(): AgentViews;
 	camera(): Camera;
-	/** The card or board selected, kept with the view. */
+	/** The card selected, kept with the view. */
 	selected(): string | undefined;
 	/** Everything on the canvas on screen, cards and drawing alike, in canvas units. */
 	boxes(): Box[];

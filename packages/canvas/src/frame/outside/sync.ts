@@ -19,7 +19,7 @@ export interface SyncNeeds {
 
 export function createSync(d: SyncNeeds) {
 	/*
-	 * The host's state, kept in step: the cards and boards, the camera an agent or the app moved, the
+	 * The host's state, kept in step: the cards, the camera an agent or the app moved, the
 	 * selected card, the mode, the scheme, ink, and what is going on around the canvas.
 	 */
 	const keepInStep = () => {

@@ -15,7 +15,7 @@ export type Rect = Frame;
  * card that reads top to bottom needs for its content: what it is drawn at, at least, and what a
  * drag of its height cannot go under, since its height is a floor its content raises.
  */
-/** A card, board, document or app on the canvas; `corners` its item's own (`Page.corners`), the canvas's 12 when absent. */
+/** A card, document or app on the canvas; `corners` its item's own (`Page.corners`), the canvas's 12 when absent. */
 export type PageBox = { path: string; x: number; y: number; w: number; h: number; least?: number; corners?: readonly number[] };
 /**
  * What a press on the canvas's drawing does: `select` picks up, every other tool makes one item and

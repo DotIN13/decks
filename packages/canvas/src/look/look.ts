@@ -2,7 +2,7 @@ import { FALLBACK_FAMILY, FONT_CDN, fontsourceId, roundWeight } from "./font-fil
 import type { Block } from "../model/markdown.ts";
 
 /**
- * What the stage's own HTML takes from how the engine draws: a card's palette and where its first
+ * What the canvas's own HTML takes from how the engine draws: a card's palette and where its first
  * line sits, so the editor over a card lines up with the words under it, and a note's corner.
  * The engine draws the same (`packages/stage/crates/text/src/card.rs`).
  */
@@ -43,7 +43,7 @@ export function firstLine(block: Block | undefined, size: number, lineHeight?: n
 /** The serif a page font is fetched in for the editor (`card-syntax.ts`, `FACE_ALIAS`). */
 export { SERIF_FAMILY } from "./font-files.ts";
 
-/** A note's and a board's corner on the canvas (`--radius-panel`). */
+/** A note's and a card's corner on the canvas (`--radius-panel`). */
 export const NOTE_RADIUS = 12;
 
 /**

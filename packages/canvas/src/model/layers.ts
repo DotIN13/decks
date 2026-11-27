@@ -6,8 +6,8 @@ import { topBoxMap } from "./boxes.ts";
  * its box; the arrows are one row, since a canvas can have dozens and none has a name.
  */
 
-export type ItemKind = "board" | "note" | "text" | "shape" | "frame" | "ink" | "other";
-export type CanvasItem = { id: string; kind: ItemKind; label: string; board?: string; box: { x: number; y: number; w: number; h: number } };
+export type ItemKind = "card" | "note" | "text" | "shape" | "frame" | "ink" | "other";
+export type CanvasItem = { id: string; kind: ItemKind; label: string; card?: string; box: { x: number; y: number; w: number; h: number } };
 
 const clip = (text: unknown, fallback: string) => {
 	const line = String(text ?? "").split("\n").find((one) => one.trim()) ?? "";
@@ -37,8 +37,8 @@ export function canvasItems(doc: PenDocument | undefined, query = "", options?: 
 		} else if (meta.type === "decks.document" || meta.type === "decks.app") {
 			// A document or an app item: listed with the cards, by its name, its file's or its app's.
 			const what = meta.type === "decks.app" ? String((meta as { name?: unknown }).name ?? "App") : String(meta.path ?? "Document").split("/").pop()!;
-			item = { id, box, kind: "board", label: named ?? clip(what, "Item"), board: `item:${id}` };
-		} else if (meta.type === "decks.card") item = { id, box, kind: "board", label: named ?? clip(meta.path?.split("/").at(-2), "Card"), ...(meta.path ? { board: meta.path } : {}) };
+			item = { id, box, kind: "card", label: named ?? clip(what, "Item"), card: `item:${id}` };
+		} else if (meta.type === "decks.card") item = { id, box, kind: "card", label: named ?? clip(meta.path?.split("/").at(-2), "Card"), ...(meta.path ? { card: meta.path } : {}) };
 		else if (n.type === "note") item = { id, box, kind: "note", label: named ?? clip(n.content, "Note") };
 		else if (n.type === "text") item = { id, box, kind: "text", label: named ?? clip(n.content, "Text") };
 		else if (meta.type === "decks.ink" || n.type === "path") item = { id, box, kind: "ink", label: named ?? "Drawing" };

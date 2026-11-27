@@ -12,7 +12,7 @@ import { Icon } from "@decks/ui";
 import { m } from "@decks/i18n";
 import { canvasItems, type CanvasItem, type ItemKind } from "@decks/canvas/tools";
 
-const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
+const ITEM_ICON: Record<ItemKind, typeof Layers> = { card: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
 
 /**
  * The side panel's Objects tab (once called Canvas, and still `canvas` to the code): an outline of
@@ -37,15 +37,15 @@ export function ObjectsTab(props: {
 	// Listed without laying the drawing out (it ran on every change, whichever tab showed); the one picked is read again with its box, to fly to it.
 	const items = createMemo(() => canvasItems(props.canvasDoc, props.query, { boxes: false }));
 	const selectedItems = createMemo(() => new Set(props.selectedItems ?? []));
-	const cardItems = () => items().items.filter((item) => item.board !== undefined);
-	const drawnItems = () => items().items.filter((item) => item.board === undefined);
+	const cardItems = () => items().items.filter((item) => item.card !== undefined);
+	const drawnItems = () => items().items.filter((item) => item.card === undefined);
 	const itemRow = (item: CanvasItem) => (
 		<button
 			type="button"
 			class="v3-item"
 			data-row
 			data-kind={item.kind}
-			data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
+			data-on={selectedItems().has(item.id) || (item.card !== undefined && props.current !== undefined && props.current.endsWith(item.card)) ? "true" : undefined}
 			title={item.label}
 			onClick={() => props.onPickItem?.(canvasItems(props.canvasDoc, props.query).items.find((one) => one.id === item.id) ?? item)}
 		>

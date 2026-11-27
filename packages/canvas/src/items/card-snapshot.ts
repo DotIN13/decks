@@ -1,8 +1,7 @@
 /**
  * A card as it stands, written out as a page the server's Chrome draws the same way (`boards/snapshot.ts`
  * on the server): what an agent's `decks canvas screenshot` of a card shows, so it has what the person
- * did in it. Boards had this as `snapshotOf` while the canvas ran their pages; a card is the same rules
- * over its shadow root.
+ * did in it, by the same rules over its shadow root.
  *
  * The card's markup after every script has run is most of it; what a fresh load would lose is written
  * in: what was typed into fields, which boxes were scrolled and how far (`data-decks-scroll`, put back by

@@ -262,7 +262,7 @@ export const boxOf = (card: Page) => ({ x: card.x, y: card.y, w: card.w, h: card
  * came for. A landing that could be typed into straight away would have to be a landing on one
  * card, and the manager's whole job is the other question.
  */
-export const STAGE_ZOOM = 0.3;
+export const CANVAS_ZOOM = 0.3;
 
 export function middleOf(
 	boxes: Array<{ x: number; y: number; w: number; h: number }>,
@@ -270,7 +270,7 @@ export function middleOf(
 	view: Viewport,
 	at?: Camera,
 ): Camera {
-	const zoom = clampZoom(STAGE_ZOOM);
+	const zoom = clampZoom(CANVAS_ZOOM);
 	if (boxes.length === 0) return { x: at?.x ?? 0, y: at?.y ?? 0, zoom };
 	const median = (values: number[]) => {
 		const sorted = [...values].sort((a, b) => a - b);

@@ -194,7 +194,7 @@ export function fontNeeds(nodes: readonly PenNode[], doc: PenDocument, theme: Th
 }
 
 /**
- * What the stage engine will ask for (`font_needs` in `crates/web/src/engine.rs`), read from the
+ * What the canvas engine will ask for (`font_needs` in `crates/web/src/engine.rs`), read from the
  * drawing before the engine is up, so the files are on their way while it loads: each text, note,
  * prompt and context in its face, and a markdown one in its bold, semibold and italic and in the
  * monospace face too. Read the same way, so nothing is fetched here that the engine would not ask

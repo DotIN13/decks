@@ -1,7 +1,7 @@
 import type { Setter } from "solid-js";
 import { setInkSelection } from "./ink.ts";
 import type { PenPreview } from "../render/types.ts";
-import { STAGE_INK } from "./ink.ts";
+import { CANVAS_INK } from "./ink.ts";
 import { type Gesture, type CanvasInkProps } from "./CanvasInk.tsx";
 
 /** What `createPenMove` reads of `CanvasInk` (`CanvasInk.tsx`), each read when it is used. */
@@ -88,7 +88,7 @@ export function createPenMove(of: PenMoveNeeds) {
 				of.gesture.dx = dx;
 				of.gesture.dy = dy;
 				of.props.layer.previews.preview(new Map<string, PenPreview>(of.gesture.ids.map((id) => [id, { dx, dy }])));
-				setInkSelection({ path: STAGE_INK, ids: [...of.gesture.ids] });
+				setInkSelection({ path: CANVAS_INK, ids: [...of.gesture.ids] });
 				return;
 			}
 		}

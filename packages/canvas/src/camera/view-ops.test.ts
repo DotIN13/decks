@@ -25,7 +25,7 @@ function host(focused: string | undefined, hands = false) {
 	const selected: Array<string | undefined> = [];
 	const offered: Array<{ agentId: string; camera: Camera; selected?: string; what: string }> = [];
 	const api: ViewOpsHost = {
-		boards: () => [card("boards/plan.html", 0, 0), card("boards/risks.html", 6000, 0)],
+		cards: () => [card("boards/plan.html", 0, 0), card("boards/risks.html", 6000, 0)],
 		viewport: () => ({ width: 1200, height: 800 }),
 		focused: () => focused,
 		setCamera: (camera, options) => {
@@ -203,7 +203,7 @@ test("while the person is using the canvas, the agent on screen is offered a but
 function gotoHost(focused: string | undefined, hands: boolean) {
 	const offers: Array<{ agentId: string; canvas: string }> = [];
 	const api: ViewOpsHost = {
-		boards: () => [],
+		cards: () => [],
 		viewport: () => ({ width: 1200, height: 800 }),
 		focused: () => focused,
 		canvasOnScreen: () => "plan",

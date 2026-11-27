@@ -6,7 +6,7 @@ import type { CanvasEngine } from "../render/engine.ts";
 import type { LiveInk } from "../render/types.ts";
 import { mountInkSheet } from "./ink-sheet.ts";
 import { createPenUp } from "./pen-up.ts";
-import { STAGE_INK } from "./ink.ts";
+import { CANVAS_INK } from "./ink.ts";
 import { createPenMove } from "./pen-move.ts";
 import { createInkScale } from "./ink-scale.ts";
 import { createInkFingers } from "./ink-fingers.ts";
@@ -48,23 +48,23 @@ export interface CanvasInkProps {
 	camera: Camera;
 	view: { width: number; height: number };
 	toView: (event: PointerEvent) => { x: number; y: number };
-	/** The ink on the stage now, each stroke in stage pixels. */
+	/** The ink on the canvas now, each stroke in canvas pixels. */
 	strokes: () => InkStroke[];
 	layer: CanvasEngine;
 	/** A new stroke's pen item; the drawing's edit defines its colour's variable when it lacks it (`withDecksColors`). */
 	onEdit: (ops: unknown[]) => void;
 	newId: () => string;
-	/** Move items by this much, as every other move on the stage does. */
+	/** Move items by this much, as every other move on the canvas does. */
 	onShift: (ids: readonly string[], dx: number, dy: number) => void;
 	/** Take back the last edit, or put it back: a two- or three-finger tap. */
 	onStep?: (direction: "undo" | "redo") => void;
 }
 
 /**
- * Drawing on the stage: a sheet of glass over the whole canvas while the draw tool is on.
+ * Drawing on the canvas: a sheet of glass over the whole canvas while the draw tool is on.
  *
- * What is drawn goes into the stage's `.pen` file as ink (`ink.ts`), one pen `path` per stroke,
- * through the same edits an agent sends. The strokes in the file are drawn on the stage's one sheet
+ * What is drawn goes into the canvas's `.pen` file as ink (`ink.ts`), one pen `path` per stroke,
+ * through the same edits an agent sends. The strokes in the file are drawn on the canvas's one sheet
  * (`scene.ts`) as items. The stroke under the pen, before it is in the file, is drawn here, on this
  * glass, as SVG paths shaped as the sheet shapes ink, at most once a frame: handing it to the sheet
  * redrew the whole sheet, three screens of pixels, for every sample, and on an iPad that is two
@@ -74,7 +74,7 @@ export interface CanvasInkProps {
  * **Which pointer draws.** A pen, with its pressure, and a mouse. A finger draws only on a device
  * that has never shown a pencil (a phone, an iPad without one; remembered, `state/ink.ts`), and a
  * second finger ends its stroke; once a pencil has been seen, a finger is the canvas's and goes on up
- * to the stage, one finger to pan, two to pan and pinch. A palm is ignored as far as it can be while
+ * to the canvas, one finger to pan, two to pan and pinch. A palm is ignored as far as it can be while
  * the pencil is in use: any touch while the pencil is on the glass or has just left it
  * (`PALM_AFTER_MS`) does nothing at all, neither drawing nor moving the canvas. iPadOS turns away a
  * resting palm by itself.
@@ -111,7 +111,7 @@ export function CanvasInk(props: CanvasInkProps) {
 	const [resizing, setResizing] = createSignal<{ anchor: { x: number; y: number }; by: number } | undefined>();
 	const held = createMemo(() => {
 		const picked = inkSelection();
-		return picked?.path === STAGE_INK ? picked.ids : [];
+		return picked?.path === CANVAS_INK ? picked.ids : [];
 	});
 	const selection = createMemo(() => {
 		const ids = new Set(held());

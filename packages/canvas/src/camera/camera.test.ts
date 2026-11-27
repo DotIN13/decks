@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { between, breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { between, breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, CANVAS_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -248,13 +248,13 @@ test("landing frames the middle of the work, and a stray board does not drag it"
 test("every landing is at the same zoom, whatever the stage holds", () => {
 	const one = middleOf([{ x: 0, y: 0, w: 1000, h: 700 }], REGION, VIEW);
 	const many = middleOf([{ x: 0, y: 0, w: 9000, h: 6000 }, { x: 200, y: 200, w: 200, h: 120 }], REGION, VIEW);
-	assert.equal(one.zoom, STAGE_ZOOM);
-	assert.equal(many.zoom, STAGE_ZOOM);
+	assert.equal(one.zoom, CANVAS_ZOOM);
+	assert.equal(many.zoom, CANVAS_ZOOM);
 });
 
 test("an empty stage leaves the camera where it is, at the same arriving zoom", () => {
 	const kept = middleOf([], REGION, VIEW, { x: 50, y: 60, zoom: 0.02 });
 	assert.deepEqual({ x: kept.x, y: kept.y }, { x: 50, y: 60 });
-	assert.equal(kept.zoom, STAGE_ZOOM);
+	assert.equal(kept.zoom, CANVAS_ZOOM);
 });
 

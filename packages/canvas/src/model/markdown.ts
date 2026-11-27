@@ -2,7 +2,7 @@ import type { Token, Tokens } from "marked";
 import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Size, type CriticToken, type HighlightToken, type MathToken, type WikiToken } from "./card-syntax.ts";
 
 /**
- * The markdown a card on the stage is written in: Obsidian's, with coloured words and an agent's
+ * The markdown a card on the canvas is written in: Obsidian's, with coloured words and an agent's
  * suggestions on top (`card-syntax.ts` says what each adds).
  *
  * pen has no rich text: a note's `content` is a plain string. A card is a note whose metadata says

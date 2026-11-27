@@ -33,9 +33,9 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 	 * and brought to the middle of the canvas, framed whole when it would not fit at this zoom.
 	 */
 	const pickItem = (item: CanvasItem) => {
-		if (item.board) {
+		if (item.card) {
 			const name = canvasOnScreen()?.name;
-			const path = state.pages.find((one) => one.path === item.board || (name && one.path === `canvases/${name}/${item.board}`))?.path;
+			const path = state.pages.find((one) => one.path === item.card || (name && one.path === `canvases/${name}/${item.card}`))?.path;
 			if (path) return playAndFrame(path);
 		}
 		untrack(editorHandle)?.select([item.id]);
@@ -61,10 +61,10 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 	const showPill = (node: DraftMention, comment?: WaitingComment) => {
 		// Read with this tab's token, as every file is (`lib/authed.tsx`).
 		if (node.kind === "file") return void openAuthed(api(`/file?path=${encodeURIComponent(node.id)}`)).catch((error: unknown) => notice("warn", m.app_file_open_failed({ name: node.id, error: (error as Error).message })));
-		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
+		const target = comment ? (comment.items?.[0] ?? comment.card) : node.id;
 		const name = canvasOnScreen()?.name;
 		const item = canvasItems(stagePen()?.doc).items.find(
-			(one) => one.id === target || (!!one.board && (one.board === target || target.endsWith(`/${one.board}`) || (!!name && `canvases/${name}/${one.board}` === target))),
+			(one) => one.id === target || (!!one.card && (one.card === target || target.endsWith(`/${one.card}`) || (!!name && `canvases/${name}/${one.card}` === target))),
 		);
 		if (item) return pickItem(item);
 		const board = state.pages.find((one) => one.path === target);

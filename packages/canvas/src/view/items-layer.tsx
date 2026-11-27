@@ -45,7 +45,7 @@ type ItemsLayerDeps = {
 export type LiveFile = { id: string; file: string; name: string };
 
 /**
- * The placed items: cards, documents, apps and boards, which of them are near, have a slot and are
+ * The placed items: cards, documents and apps, which of them are near, have a slot and are
  * awake, how the sheet draws each, their sizes easing, the SVGs shown live, and the one film or sound
  * playing. Made inside `CanvasView`, after the editor, which it reads.
  */

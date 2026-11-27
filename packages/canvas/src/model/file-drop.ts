@@ -8,9 +8,9 @@ import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, l
  * where, so every host that takes a drop (the Decks page, Studio) lands it the same.
  */
 
-/** How wide a dropped picture lands on the stage, at most, in stage pixels. */
+/** How wide a dropped picture lands on the canvas, at most, in canvas pixels. */
 const PICTURE_W = 640;
-/** How wide a dropped text file's card is, in stage pixels. */
+/** How wide a dropped text file's card is, in canvas pixels. */
 const DROP_CARD_W = 480;
 /** The gap between items dropped together. */
 const DROP_GAP = 32;
@@ -79,7 +79,7 @@ export function mediaItem(name: string, file: string, facts: MediaFacts, url: (p
 	};
 }
 
-/** Items in a row centred on `middle`, a stage point, their tops level with the tallest's; `id` names each. */
+/** Items in a row centred on `middle`, a canvas point, their tops level with the tallest's; `id` names each. */
 export function rowOps(items: readonly DroppedItem[], middle: Point, id: (index: number) => string): Op[] {
 	if (items.length === 0) return [];
 	const total = items.reduce((sum, item) => sum + item.w, 0) + DROP_GAP * (items.length - 1);

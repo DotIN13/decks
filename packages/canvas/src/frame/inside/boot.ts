@@ -55,7 +55,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		if (data.pictures) picturesAt = data.pictures;
 	});
 	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Page[] } : await backend.drawing();
-	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
+	/** The cards on the canvas: their records from the harness, their places from the drawing. */
 	const own = (path: string): FramePage["trust"] => (path.startsWith("shared/") ? "friend" : "own");
 	const [pages, setPages] = createSignal<FramePage[]>(studio ? cardsOf(first.doc, own) : first.cards.map((card) => ({ ...card, trust: own(card.path) })));
 	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
@@ -96,7 +96,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		const doc = made?.handle.drawn();
 		return doc ? pagesOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
 	};
-	/** Every place the canvas draws a page in: the cards and boards, and the document and app items. */
+	/** Every place the canvas draws a page in: the cards, and the document and app items. */
 	const places = () => [...pages(), ...items()];
 	const changed = () => {
 		setRevision((n) => n + 1);
@@ -257,7 +257,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	};
 }
 
-/** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
+/** The cards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
 function cardsOf(doc: PenDocument, trust: (path: string) => FramePage["trust"]): FramePage[] {
 	return pageItems(doc).map((item) => ({ path: item.path!, title: item.name ?? item.path!.split("/").slice(-2).join("/"), rev: 0, ...item.box, inContext: [], ...(item.type === "decks.card" ? { card: true as const } : {}), trust: trust(item.path!) }));
 }

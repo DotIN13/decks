@@ -17,7 +17,7 @@ import { boxOf, fit } from "./camera.ts";
  */
 
 export interface ViewOpsHost {
-	boards(): Page[];
+	cards(): Page[];
 	viewport(): { width: number; height: number };
 	/** Which conversation is on screen, so an op that moves the view can tell whose it is. */
 	focused(): string | undefined;
@@ -89,7 +89,7 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 				return { shown: [], deferred: "the person's screen shows another canvas; decks view goto brings it to this one first" };
 			}
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
-			const cards = host.boards().filter((card) => paths.includes(card.path));
+			const cards = host.cards().filter((card) => paths.includes(card.path));
 			/*
 			 * Drawn items arrive as boxes the server measured off the canvas's layout, because an
 			 * item's id means nothing to this file: the drawing is painted on a canvas, not
@@ -133,7 +133,7 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 			// Counted (`view.reload`): this page reloads the card only if its canvas shows it.
 			if (args.count === true) {
 				if (typeof args.stage === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.stage) return { pages: 0 };
-				if (!host.boards().some((card) => card.path === args.path)) return { pages: 0 };
+				if (!host.cards().some((card) => card.path === args.path)) return { pages: 0 };
 				host.reload(args.path);
 				return { reloaded: args.path, pages: 1 };
 			}

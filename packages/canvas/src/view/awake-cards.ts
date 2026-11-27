@@ -25,7 +25,7 @@ export function createAwakeCards(d: AwakeCardsNeeds) {
 	const pageCamera = d.ctl.settled;
 
 	/**
-	 * The boards and cards within a window of the screen, by path, from the R-tree, as of the settled
+	 * The cards within a window of the screen, by path, from the R-tree, as of the settled
 	 * camera. A new set only when one enters or leaves it, so what reads it through `isNear` hears only
 	 * about its own item, and a pan that keeps the same ones near reaches none of them.
 	 */
@@ -61,15 +61,14 @@ export function createAwakeCards(d: AwakeCardsNeeds) {
 	};
 
 	/** The placed items as the chooser sees them: the same order as `props.boards` and `pageIndex`, each with its kind. */
-	// A card its host has no copy of (`base/missing.ts`) is never woken, as a board is not: its page would be blank paper, and the sheet paints why.
+	// A card its host has no copy of (`base/missing.ts`) is never woken: its page would be blank paper, and the sheet paints why.
 	const awakeItems = createMemo<readonly AwakeItem[]>(() => d.props.cards.map((card) => ({ path: card.path, x: card.x, y: card.y, w: card.w, h: card.h, kind: card.card ? (missing().has(card.path) ? undefined : "card") : card.item })));
 
 	/*
 	 * Which items are awake (`items/awake.ts`): chosen from the camera at rest, so nothing mounts or
 	 * unmounts while a pinch, a pan or a glide moves it; the nearest the middle of the screen, each kind
 	 * cut to this device's budget, none below `LIVE_ZOOM`, and the selected item at any zoom. Every other
-	 * card, app or document sleeps as its picture. A board is never awake: the sheet draws it as its
-	 * picture, and the canvas runs no board's page.
+	 * card, app or document sleeps as its picture.
 	 */
 	const cardChoice = createMemo<Awake>((was) => {
 		const v = d.view();

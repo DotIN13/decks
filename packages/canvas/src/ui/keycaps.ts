@@ -2,9 +2,9 @@
  * Which parts of "shift-arrows" are keys and which are words.
  *
  * The cheat sheet's left column is a mix: real keys (`0`, `⌘D`, `⌫`), gestures (`pinch`,
- * `two-finger scroll`), whole sentences (`drop a file on a board`), and hybrids of a key and
+ * `two-finger scroll`), whole sentences (`drop a file on a card`), and hybrids of a key and
  * a word (`space-drag`, `⌘-wheel`). Only the keys should be drawn as keycaps — a rounded
- * bordered box round "drop a file on a board" is a caption pretending to be a keyboard.
+ * bordered box round "drop a file on a card" is a caption pretending to be a keyboard.
  *
  * The alternative was to mark them up in the data, and it was worse: the rows read as prose
  * today and would have become `[["⌘"], [{word: "wheel"}]]`, which is harder to write, harder

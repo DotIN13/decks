@@ -17,10 +17,10 @@ export function createInkPaint(of: InkPaintNeeds) {
 	let frame = 0;
 
 	/*
-	 * A finished stroke stays on the sheet as live ink until the stage has drawn it: it is sent to the
+	 * A finished stroke stays on the sheet as live ink until the canvas has drawn it: it is sent to the
 	 * server and drawn from the answer, and taking it off at the lift left a frame or more with no
 	 * stroke at all. Each one waiting is the live stroke under its id, taken off the moment that id
-	 * is among the strokes the stage drew — the same layout the drawing shows it in — or after a few
+	 * is among the strokes the canvas drew — the same layout the drawing shows it in — or after a few
 	 * seconds if the edit never came back.
 	 */
 	const waiting = new Map<string, { ink: LiveInk; timer: ReturnType<typeof setTimeout> }>();

@@ -19,17 +19,17 @@ export function createCalloutMenu(d: CalloutMenuNeeds) {
 
 	/*
 	 * Where the menu opens, measured once it is drawn: always down, under the pill, as the person asked;
-	 * its left edge under the ⋯ button, as a menu bar's menu hangs from its title, kept on the stage.
+	 * its left edge under the ⋯ button, as a menu bar's menu hangs from its title, kept on the canvas.
 	 */
 	const [menuAt, setMenuAt] = createSignal<{ left: number }>();
 
 	const placeMenu = (menu: HTMLDivElement) => {
-		const stage = d.element?.parentElement?.getBoundingClientRect();
-		if (!d.element || !moreButton || !stage) return;
+		const canvas = d.element?.parentElement?.getBoundingClientRect();
+		if (!d.element || !moreButton || !canvas) return;
 		const pill = d.element.getBoundingClientRect();
 		const button = moreButton.getBoundingClientRect();
 		const w = menu.offsetWidth;
-		const left = Math.max(stage.left + 8 - pill.left, Math.min(button.left - 4 - pill.left, stage.right - 8 - w - pill.left));
+		const left = Math.max(canvas.left + 8 - pill.left, Math.min(button.left - 4 - pill.left, canvas.right - 8 - w - pill.left));
 		setMenuAt({ left });
 	};
 

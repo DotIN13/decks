@@ -43,7 +43,7 @@ export function createPenDown(d: PenDownNeeds) {
 				return;
 			}
 			d.fingerDown(event);
-			// With a pencil about, a finger is the canvas's: it goes on up to the stage, one to pan, two to pan and pinch.
+			// With a pencil about, a finger is the canvas's: it goes on up to the canvas, one to pan, two to pan and pinch.
 			if (penSeen()) return;
 			// Without one, a finger draws, and a second finger is half of a pinch: the first one's stroke is over.
 			if (d.gesture) {

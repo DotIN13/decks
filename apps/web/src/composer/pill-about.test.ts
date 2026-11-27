@@ -6,9 +6,9 @@ import { draftForAgent, draftComments, fileMention, type Draft, type DraftMentio
 import { withoutName } from "../app/send-from-bar.ts";
 import { aboutAddress, aboutComment, aboutSent, commentName, commentPill, messageParts, pathName, readParts, readSent } from "./pill-about.ts";
 
-const mine: WaitingComment = { id: "c1", board: "canvases/md/cards/sdk/index.html", component: "choices", quote: "Corner only", text: "Use this one.", at: 1 };
-const handed: WaitingComment = { id: "c2", board: "canvases/md/cards/sdk/index.html", quote: "SDK; each", text: "test note\nsecond line", at: 2, from: "canvas" };
-const drawn: WaitingComment = { id: "c3", board: "canvases/md/canvas.pen", items: ["note-4", "arrow-7"], quote: "hello", text: "", at: 3 };
+const mine: WaitingComment = { id: "c1", card: "canvases/md/cards/sdk/index.html", component: "choices", quote: "Corner only", text: "Use this one.", at: 1 };
+const handed: WaitingComment = { id: "c2", card: "canvases/md/cards/sdk/index.html", quote: "SDK; each", text: "test note\nsecond line", at: 2, from: "canvas" };
+const drawn: WaitingComment = { id: "c3", card: "canvases/md/canvas.pen", items: ["note-4", "arrow-7"], quote: "hello", text: "", at: 3 };
 const board: DraftMention = { type: "mention", kind: "card", id: "canvases/x/boards/the-chrome-choice.html", label: "The chrome choice" };
 const item: DraftMention = { type: "mention", kind: "item", id: "rect-9", label: "a square", name: "a square" };
 
@@ -75,7 +75,7 @@ test("comments sent with no words, items, whole boards, and plain messages", () 
 	assert.equal(only.draft.filter((node) => node.type === "mention").length, 2);
 	assert.deepEqual(only.comments.get("sent-2")?.items, ["note-4", "arrow-7"]);
 	assert.equal(only.comments.get("sent-2")?.quote, "hello");
-	const whole = readSent(withComments("Look", [{ id: "w", board: "boards/plan.html", quote: "", text: "all of it", at: 0 }]))!;
+	const whole = readSent(withComments("Look", [{ id: "w", card: "boards/plan.html", quote: "", text: "all of it", at: 0 }]))!;
 	assert.equal(whole.comments.get("sent-1")?.text, "all of it");
 	assert.equal(whole.comments.get("sent-1")?.quote, "");
 	// Words with no pills, a name, an email: the text as it is.

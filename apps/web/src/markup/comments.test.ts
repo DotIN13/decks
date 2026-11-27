@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { commentBlock, COMMENTS_KEY, loadComments, popupPlace, QUOTE_LIMIT, quoteOf, saveComments, withComments, type CardComment } from "./comments.ts";
 
-const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", board: "boards/plan.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
+const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", card: "boards/plan.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
 
 test("a quotation is one line, and not the whole page", () => {
 	assert.equal(quoteOf("  Keep\n\tit   short. "), "Keep it short.");
@@ -60,7 +60,7 @@ test("a comment on the whole board has no quote, and says so", () => {
 });
 
 test("a comment on drawn items names the canvas file, the items by id, and their words", () => {
-	const note: CardComment = { id: "c1", board: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
+	const note: CardComment = { id: "c1", card: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
 	const block = commentBlock([note]);
 	assert.match(block, /^A comment on items drawn on a canvas:/);
 	assert.match(block, /on canvases\/plan\/canvas\.pen, item "term-1" \("Program start"\)\n   make this green/);
@@ -68,7 +68,7 @@ test("a comment on drawn items names the canvas file, the items by id, and their
 
 test("waiting comments are kept per agent and canvas, and ones kept under the agent alone move to its canvas once", async () => {
 	const { adoptComments, commentsKey } = await import("./comments.ts");
-	const note = { id: "c1", board: "boards/a.html", quote: "q", text: "t", at: 1 };
+	const note = { id: "c1", card: "cards/a/index.html", quote: "q", text: "t", at: 1 };
 	assert.equal(commentsKey("a1", "x"), "a1@x");
 	assert.equal(commentsKey("a1", undefined), "a1");
 	const moved = adoptComments({ a1: [note], "a1@x": [] }, "a1", "x");

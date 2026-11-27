@@ -69,7 +69,7 @@ export function createPageNode(d: PageNodeNeeds) {
 			{...(d.props.onCollapse ? { onCollapse: () => d.props.onCollapse?.(card.path) } : {})}
 			{...(d.props.onComment
 				? {
-						// Words selected in a card while browsing: a comment on them, as on a board's page before.
+						// Words selected in a card while browsing: a comment on them.
 						onWords: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => {
 							if (d.props.mode !== "browse" || drawing()) return;
 							d.props.onComment?.({ path: card.path, title: card.title, quote: words.quote, ...(words.component ? { component: words.component } : {}), anchor: words.anchor });

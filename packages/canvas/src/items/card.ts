@@ -1,7 +1,7 @@
 import { readingOfCard } from "./card-reading.ts";
 import { freshAddress, passless } from "../base/host.ts";
 /**
- * A card: a piece of HTML drawn in a closed shadow root of the canvas's own page, where a board has a
+ * A card: a piece of HTML drawn in a closed shadow root of the canvas's own page, where a card has a
  * frame of its own.
  *
  * A frame is a whole document: its own copy of the styles, of every library its scripts import, and,
@@ -11,7 +11,7 @@ import { freshAddress, passless } from "../base/host.ts";
  * is read and run once for the page (`import` keeps one copy per address).
  *
  * The price is that a shadow root fences styles, not code: a card's script runs as the page does.
- * So only the deck's own cards run scripts, as its own boards run theirs; a card from a canvas a
+ * So only the deck's own cards run scripts; a card from a canvas a
  * friend shared is cleaned of anything that runs before it is placed (`clean`).
  *
  * ### A card's scripts
@@ -57,7 +57,7 @@ function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) |
 
 /** What a card's script is handed: its own root, and what the canvas knows of it. */
 export interface CardContext {
-	/** The card's closed shadow root: what `document` is to a board. `querySelector` and `getElementById` work on it. */
+	/** The card's closed shadow root: what `document` is to a page. `querySelector` and `getElementById` work on it. */
 	root: ShadowRoot;
 	/**
 	 * The root dressed as a document, for a script written for a card: `body` and `documentElement`
@@ -300,7 +300,7 @@ function cardSheet(lib: string): Promise<string | undefined> {
 				.replace(/html\[data-decks-focus\]\s*/g, ":host([data-decks-focus]) ")
 				.replace(/body\.board/g, ".card-body")
 				.replace(/(^|[\s,}])html,\s*body\s*\{/g, "$1.card-body {")
-				// The card is as wide as its box, and as tall as the box at least: card.css sizes a board's body by its meta.
+				// The card is as wide as its box, and as tall as the box at least: card.css sizes a card's body by its meta.
 				/*
 				 * As tall as what is in it, so the card can be measured (`onHeight`, what `decks canvas fit` reads);
 				 * the paper is the host's, so a card shorter than its box still fills it, and what does not fit in the
@@ -348,7 +348,7 @@ function asDocument(root: ShadowRoot, body: HTMLElement): Document {
 }
 
 /*
- * What `card.js` draws on a board, drawn in a card: `[data-md]` as markdown, maths in it and in a
+ * What `card.js` draws on a card, drawn here: `[data-md]` as markdown, maths in it and in a
  * `.doc`, `[data-mermaid]` as a diagram, and code in `<pre>` coloured. From the same vendored files in
  * the deck's `lib/`, each loaded once for the page whatever number of cards asks for it.
  */
@@ -499,7 +499,7 @@ async function cardMermaid(host: HTMLElement, target: HTMLElement, lib: string, 
 	}
 }
 
-/** Draw a card's markdown, maths, diagrams and code, as `card.js` draws a board's. Never throws: a part that fails says so in place. */
+/** Draw a card's markdown, maths, diagrams and code, as `card.js` draws a card's. Never throws: a part that fails says so in place. */
 async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement, lib: string): Promise<void> {
 	const work: Promise<unknown>[] = [];
 	for (const element of body.querySelectorAll<HTMLElement>("[data-md], [data-mermaid]")) {
@@ -718,7 +718,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 
 	const { fragment, scripts } = readFragment(source);
 	const body = document.createElement("div");
-	// Also `board`, so a board's own `.board .doc` rules match a card made from it.
+	// Also `card`, so a card's own `.board .doc` rules match a card made from it.
 	body.className = "card-body board";
 	// Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`items/input.ts`).
 	body.tabIndex = -1;

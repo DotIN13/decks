@@ -19,7 +19,7 @@ export interface CardSurfaceProps {
 	 */
 	onAddPress?: ((event: PointerEvent, on: HTMLElement) => boolean) | undefined;
 	onShown: () => void;
-	/** Open a board or card the card links to, beside it (`CanvasView`'s `onOpenPage`), by its deck path. */
+	/** Open a card the card links to, beside it (`CanvasView`'s `onOpenPage`), by its deck path. */
 	onOpenPage?: ((path: string) => void) | undefined;
 	/** The card's content height, for `decks.canvas.fit` (`card-reading.ts`): its file's height stays the floor. */
 	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;

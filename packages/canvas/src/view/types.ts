@@ -15,7 +15,7 @@ import type { PenTool } from "../edit/pen-tools.ts";
 
 /** Where the canvas's pictures of cards come from (`CanvasView`'s `shots`). */
 export interface CanvasShots {
-	/** The picture of a board or a card, as an address the sheet can fetch. */
+	/** The picture of a card, as an address the sheet can fetch. */
 	picture(card: Pick<Page, "path" | "rev">, scheme: "light" | "dark"): string;
 }
 
@@ -72,7 +72,7 @@ export interface CanvasOptions {
 		list?(): Page[];
 		/** A card measured itself: its size and how it reads, for the host's agents (`decks.canvas.fit`). */
 		onExtent?(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void;
-		/** A link on a card to a board or card of the deck: open it, and say whether this host has it. */
+		/** A link on a card to a card of the deck: open it, and say whether this host has it. */
 		onOpenLink?(path: string, from: string): boolean;
 		/** Cards written since the person last looked (path to who wrote them): each shows a dot. Read reactively. */
 		news?(): Record<string, string>;
@@ -196,9 +196,9 @@ export interface CanvasHandle {
 	tool(): PenTool;
 	/** Fit everything on the drawing in the host. */
 	fit(): void;
-	/** Select these drawn items (a host's list of layers), or none; with `page`, that card or board is the one selected, as a press on it makes it. */
+	/** Select these drawn items (a host's list of layers), or none; with `page`, that card is the one selected, as a press on it makes it. */
 	select(ids: readonly string[], page?: string): void;
-	/** What is selected, by id: the drawn items, and the card or board selected by a press on it. */
+	/** What is selected, by id: the drawn items, and the card selected by a press on it. */
 	selection?(): string[];
 	/**
 	 * Paste what the page's clipboard had, when the page had the focus: a copy of items (`@decks/pen`'s

@@ -5,7 +5,7 @@
  * once it is pressed, by the one live player laid over it (`MediaPlayer.tsx`). The press must not
  * move anything — the play button under the pointer is the pause button a frame later, and the
  * waveform the sound was drawn with is the one its progress runs along — so both read their
- * places from here, in the item's own stage pixels.
+ * places from here, in the item's own canvas pixels.
  */
 
 interface MediaBox {
@@ -60,7 +60,7 @@ export function soundLayout(box: MediaBox): SoundLayout {
 }
 
 /**
- * The waveform's bars, as rectangles in stage pixels: one per peak, centred on the band's middle,
+ * The waveform's bars, as rectangles in canvas pixels: one per peak, centred on the band's middle,
  * never shorter than a dot so a silence still reads as part of the line. With no peaks (a sound
  * placed before the server read them, or one ffmpeg could not decode) there are none, and the
  * band is drawn as a plain track.
@@ -92,7 +92,7 @@ export function filmLayout(box: MediaBox): FilmLayout {
 	};
 }
 
-/** A running time as a clock, as the board runtime prints it: 1:04, or 1:02:03 past an hour. */
+/** A running time as a clock, as the card runtime prints it: 1:04, or 1:02:03 past an hour. */
 export function clockOf(seconds: number): string {
 	const whole = Math.max(0, Math.floor(seconds));
 	const pad = (value: number) => String(value).padStart(2, "0");

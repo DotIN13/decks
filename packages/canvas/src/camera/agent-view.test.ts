@@ -21,12 +21,12 @@ const card = (path: string, x: number, y: number): Page => ({
 });
 
 // The example deck's own geometry, which is where the bug was measured: 3009px apart.
-const boards = [card("boards/plan.html", 0, 0), card("boards/risks.html", 1760, 0), card("boards/deep.html", 0, 2440)];
+const cards = [card("boards/plan.html", 0, 0), card("boards/risks.html", 1760, 0), card("boards/deep.html", 0, 2440)];
 const viewport = { width: 1500, height: 1000 };
 /* The canvas's own box: the window minus the cards panel on the left, which is what the
    app's Fit button frames into. A fit that centres a card behind the panel is not a fit. */
 const region = { x: 276, y: 0, width: 1224, height: 1000 };
-const at = (over: Record<string, unknown>) => ({ boards, viewport, region, ...over }) as Parameters<typeof viewOnSwitch>[0];
+const at = (over: Record<string, unknown>) => ({ cards, viewport, region, ...over }) as Parameters<typeof viewOnSwitch>[0];
 const somewhere = { x: 612, y: 2964, zoom: 0.735 };
 
 test("an agent with nothing on the canvas leaves the camera alone", () => {
@@ -54,18 +54,18 @@ test("a remembered view comes back exactly, not as a fresh fit of the same board
  */
 test("a remembered view that has stopped showing anything is refitted, not restored", () => {
 	const moved = [card("boards/plan.html", 0, 0), card("boards/deep.html", 40000, 40000)];
-	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), boards: moved });
+	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), cards: moved });
 
 	assert.notDeepEqual(next, somewhere, "the saved camera is 40000px from the only board it has");
 	assert.ok(next, "and it does move, because there is something to look at");
 	// A fit of what it is showing now, which is what no memory at all would have given.
-	assert.deepEqual(next, viewOnSwitch({ ...at({ view: undefined, playing: ["boards/deep.html"] }), boards: moved }));
+	assert.deepEqual(next, viewOnSwitch({ ...at({ view: undefined, playing: ["boards/deep.html"] }), cards: moved }));
 });
 
 test("…while a view that still has its board on screen is left exactly alone", () => {
 	// The card moved, but not out of shot: this is still the view you left.
 	const nudged = [card("boards/plan.html", 0, 0), card("boards/deep.html", 700, 2900)];
-	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), boards: nudged });
+	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), cards: nudged });
 	assert.deepEqual(next, somewhere);
 });
 

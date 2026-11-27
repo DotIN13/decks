@@ -4,7 +4,7 @@ import { setInkSelection } from "./ink.ts";
 import { inkItem } from "../model/ink.ts";
 import type { PenPreview } from "../render/types.ts";
 import { type Gesture, type CanvasInkProps, } from "./CanvasInk.tsx";
-import { STAGE_INK } from "./ink.ts";
+import { CANVAS_INK } from "./ink.ts";
 
 /** What `createPenUp` reads of `CanvasInk` (`CanvasInk.tsx`), each read when it is used. */
 export interface PenUpNeeds {
@@ -53,7 +53,7 @@ export function createPenUp(d: PenUpNeeds) {
 				return;
 			}
 			case "erase":
-				// Hidden until the server's answer redraws the stage without them.
+				// Hidden until the server's answer redraws the canvas without them.
 				if (done.gone.size) d.props.onEdit([...done.gone].map((id) => ({ op: "delete", id })));
 				return;
 			case "move":
@@ -80,7 +80,7 @@ export function createPenUp(d: PenUpNeeds) {
 				const ids = far
 					? lassoPick(strokes, done.polygon)
 					: [...strokes].reverse().filter((stroke) => hitStroke(stroke, x0, y0, 6 / d.zoom())).slice(0, 1).map((stroke) => stroke.id);
-				setInkSelection(ids.length > 0 ? { path: STAGE_INK, ids } : undefined);
+				setInkSelection(ids.length > 0 ? { path: CANVAS_INK, ids } : undefined);
 				return;
 			}
 		}

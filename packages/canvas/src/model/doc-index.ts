@@ -3,7 +3,7 @@ import { expand, indexOf, walk, type PenDocument, type PenNode } from "@decks/pe
 type Located = ReturnType<typeof indexOf> extends Map<string, infer L> ? L : never;
 
 /**
- * Lookups on a drawing, made once per document and kept with it. The stage is handed a new document
+ * Lookups on a drawing, made once per document and kept with it. The canvas is handed a new document
  * for every change and never changes one in place, so a document's answers stay its own: asked once
  * per frame under the pointer (a drag asks the parent and children of every frame near it), a fresh
  * walk of 2,000 items each time was a drag step's largest cost.
@@ -19,7 +19,7 @@ export function docIndex(doc: PenDocument): Map<string, Located> {
 }
 
 /**
- * Every item the stage draws, by id, as the engines lay them out: the document's own items, or
+ * Every item the canvas draws, by id, as the engines lay them out: the document's own items, or
  * with instances expanded (`expand`, ids like `card-1/label`) when it has any.
  */
 export function drawnNodes(doc: PenDocument): Map<string, PenNode> {

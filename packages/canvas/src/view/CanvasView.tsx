@@ -118,7 +118,7 @@ export type CanvasViewProps = {
 	 * what it knows of its file (`item-slot.tsx`, `editor.tsx`).
 	 */
 	frame: Component<ItemSlotProps>;
-	/** Where the picture of a board or a card comes from, for the sheet that draws every one not awake. */
+	/** Where the picture of a card comes from, for the sheet that draws every one not awake. */
 	shots: () => CanvasShots;
 	/**
 	 * Comment on a card or on drawn items, from the button in a bar or a pill: `path` is the card
@@ -164,7 +164,7 @@ export type CanvasViewProps = {
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
 	onTool?: (tool: "select") => void;
 	/**
-	 * A link on a card or in the drawing pointing at a board or card of the deck — `true` once the
+	 * A link on a card or in the drawing pointing at a card of the deck — `true` once the
 	 * deck has opened it. `false` is a path this deck does not hold, which the app has already said.
 	 */
 	onOpenPage?: (path: string, from: string) => boolean;

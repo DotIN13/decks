@@ -110,7 +110,7 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 	let value: unknown;
 	try {
 		value = runViewCall(message.call, {
-			boards: () => state.pages,
+			cards: () => state.pages,
 			viewport: () => {
 				const stage = document.querySelector("iframe.canvas-frame");
 				return { width: stage?.clientWidth ?? 0, height: stage?.clientHeight ?? 0 };

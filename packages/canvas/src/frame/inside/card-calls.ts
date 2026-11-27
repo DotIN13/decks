@@ -27,7 +27,7 @@ interface CardCallDeps {
 	canvas: string;
 	camera(): Camera;
 	move(camera: Camera, glide?: number): void;
-	/** Frame these items, cards or boards, by id or path. */
+	/** Frame these items or cards, by id or path. */
 	focus(targets: string[]): void;
 	viewport(): { width: number; height: number };
 	reload(path: string): void;

@@ -1,6 +1,6 @@
 /**
  * What the browser checks and the measuring scripts reach from outside the canvas, in one place and
- * with one type each: the knobs they set (before the stage opens, or during a run) and the probes
+ * with one type each: the knobs they set (before the canvas opens, or during a run) and the probes
  * the canvas offers them. Nothing in the canvas reads a probe, and nothing outside sets one; a knob
  * is the other way round. Both live on `globalThis` as `__decksKnobs` and `__decksProbes`, so a
  * check reaches them with `page.evaluate` and a script with the console.
@@ -9,7 +9,7 @@
  * is kept: the object found on `globalThis` is read into the defaults, then replaced by `knobs`.
  */
 
-/** What the stage last did, for the checks and the crash recorder: the sheet's counters, and the engine's. */
+/** What the canvas last did, for the checks and the crash recorder: the sheet's counters, and the engine's. */
 export type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tiles?: number; pixelTiles?: number; sharpAt?: number; settledAt?: number };
 
 export interface Knobs {
@@ -37,7 +37,7 @@ export interface Knobs {
 	picturesPerFrame?: number | undefined;
 	/** Set to an array, each glide frame's main-thread cost in ms is pushed onto it. */
 	glideCost?: number[] | undefined;
-	/** Set to an array, every step of the stage's finger pool is pushed onto it. */
+	/** Set to an array, every step of the canvas's finger pool is pushed onto it. */
 	touchLog?: unknown[] | undefined;
 }
 
@@ -50,7 +50,7 @@ export interface Probes {
 	cardLists: number;
 	/** How many surfaces were made for each card, and how many times each mounted its file. */
 	made: Record<string, { surfaces: number; mounts: number }>;
-	/** The stage engine itself (`render/engine.ts`, `CanvasEngine`). */
+	/** The canvas engine itself (`render/engine.ts`, `CanvasEngine`). */
 	rust?: unknown;
 	/** The engine's statistics, and what a drag carries as pictures. */
 	engine?: { stats(): Record<string, unknown>; readonly carried: { paths: Set<string> } & Record<string, unknown> } | undefined;

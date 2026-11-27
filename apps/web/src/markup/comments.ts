@@ -41,10 +41,10 @@ type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 function isComment(value: unknown): value is CardComment {
 	if (!value || typeof value !== "object") return false;
-	const { id, board, quote, text, at, component } = value as Record<string, unknown>;
+	const { id, card, quote, text, at, component } = value as Record<string, unknown>;
 	return (
 		typeof id === "string" &&
-		typeof board === "string" &&
+		typeof card === "string" &&
 		typeof quote === "string" &&
 		typeof text === "string" &&
 		typeof at === "number" &&

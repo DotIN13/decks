@@ -35,7 +35,7 @@ export function commentName(comment: WaitingComment, titleOf: TitleOf = none, it
 	const items = comment.items ?? [];
 	if (items.length > 1) return `${items.length} items`;
 	if (items.length === 1) return itemName(items[0]!) ?? items[0]!;
-	return titleOf(comment.board) ?? pathName(comment.board);
+	return titleOf(comment.card) ?? pathName(comment.card);
 }
 
 /**
@@ -61,7 +61,7 @@ export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleO
 	// Where on it, never its name again: the tooltip and the card name it already.
 	const canvas = comment.from === "canvas";
 	const source = drawn
-		? (canvas ? m.composer_pill_canvas_on : m.composer_pill_yours_on)({ name: pathName(comment.board.replace(/\/canvas\.pen$/, "")) })
+		? (canvas ? m.composer_pill_canvas_on : m.composer_pill_yours_on)({ name: pathName(comment.card.replace(/\/canvas\.pen$/, "")) })
 		: comment.component
 			? (canvas ? m.composer_pill_canvas_in : m.composer_pill_yours_in)({ component: comment.component })
 			: canvas
@@ -123,7 +123,7 @@ export function messageParts(draft: Draft, comments: readonly WaitingComment[], 
 				label: commentPill(comment, names.titleOf, names.itemName).label,
 				...(comment.quote ? { quote: comment.quote } : {}),
 				...(comment.text ? { note: comment.text } : {}),
-				path: comment.board,
+				path: comment.card,
 				...(comment.items?.length ? { items: [...comment.items] } : {}),
 				...(comment.component ? { component: comment.component } : {}),
 				exact: commentItem(comment, n),
@@ -149,7 +149,7 @@ export function messageParts(draft: Draft, comments: readonly WaitingComment[], 
 function partComment(part: MessageMention): WaitingComment {
 	return {
 		id: part.id,
-		board: part.path ?? "",
+		card: part.path ?? "",
 		quote: part.quote ?? "",
 		text: part.note ?? "",
 		at: 0,
@@ -198,10 +198,10 @@ const HEADS: Array<[RegExp, (match: RegExpExecArray) => number]> = [
 function readEntry(lines: string[], n: number): WaitingComment {
 	const first = lines[0]!.slice(`${n}. `.length);
 	const rest = lines.slice(1).map((line) => line.slice(3));
-	const comment: WaitingComment = { id: `sent-${n}`, board: first, quote: "", text: "", at: 0 };
+	const comment: WaitingComment = { id: `sent-${n}`, card: first, quote: "", text: "", at: 0 };
 	const drawn = /^on (.+?), items? ((?:"[^"]*"(?:, )?)+)(?: \("([\s\S]*)"\))?$/.exec(first);
 	if (drawn) {
-		comment.board = drawn[1]!;
+		comment.card = drawn[1]!;
 		comment.items = [...drawn[2]!.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
 		comment.quote = drawn[3] ?? "";
 	} else {
@@ -210,7 +210,7 @@ function readEntry(lines: string[], n: number): WaitingComment {
 		if (whole) where = where.slice(0, -whole.length);
 		else if (rest[0]?.startsWith("> ")) comment.quote = rest.shift()!.slice(2);
 		const inside = /^(.*), in #(\S+)$/.exec(where);
-		comment.board = inside ? inside[1]! : where;
+		comment.card = inside ? inside[1]! : where;
 		if (inside) comment.component = inside[2]!;
 	}
 	comment.text = rest.join("\n");

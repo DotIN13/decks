@@ -22,14 +22,14 @@ import { Properties } from "./Properties.tsx";
  * The drawing's controls, in edit mode: a column of tools and a properties panel.
  *
  * **The tools** are a column on the canvas's left edge, halfway down, with undo and redo under
- * them. They add to the stage — shapes, icons, a frame, a note, a card, words, arrows — and are the
- * only tools there are: the ones that inserted components into a board are gone. They are always
- * there while editing, so they stand where no board's title bar is framed (`camera/insets.ts` on
+ * them. They add to the canvas — shapes, icons, a frame, a note, a card, words, arrows — and are the
+ * only tools there are: the ones that inserted components into a card are gone. They are always
+ * there while editing, so they stand where no card's title bar is framed (`camera/insets.ts` on
  * what may float over the canvas and what may not). Shapes and icons are chosen first, in the
  * insert panel beside the column (`Insert.tsx`), which arms the tool for the next press.
  *
  * **What the selection is** — every property it has, its place, its order, a copy and a delete — is
- * the properties panel (`Properties.tsx`), in the board inspector's corner, only while something in
+ * the properties panel (`Properties.tsx`), in the card inspector's corner, only while something in
  * the drawing is selected. Every control sends a pen operation, the same one an agent would.
  */
 export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: () => string; key?: string; after?: boolean; panel?: "shapes" | "icons" }> = [

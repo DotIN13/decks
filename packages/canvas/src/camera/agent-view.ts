@@ -44,7 +44,7 @@ export interface AgentView {
  *    saved camera can be pointing at empty canvas by the time you come back — and a view of
  *    nothing that *looks* like a view of something is worse than a fresh fit.
  *
- * `playing` is what the agent has on the canvas; `boards` is the deck, needed to turn those
+ * `playing` is what the agent has on the canvas; `cards` is the deck, needed to turn those
  * paths into boxes. A path in `playing` that the deck no longer has is ignored throughout —
  * a deleted card can sit in a remembered in-play set.
  *
@@ -56,11 +56,11 @@ export interface AgentView {
 export function viewOnSwitch(input: {
 	view: AgentView | undefined;
 	playing: string[];
-	boards: Page[];
+	cards: Page[];
 	viewport: { width: number; height: number };
 	region: { x: number; y: number; width: number; height: number };
 }): Camera | undefined {
-	const known = new Map(input.boards.map((card) => [card.path, card]));
+	const known = new Map(input.cards.map((card) => [card.path, card]));
 	const live = input.playing.filter((path) => known.has(path));
 
 	// 1 · nothing to look at.

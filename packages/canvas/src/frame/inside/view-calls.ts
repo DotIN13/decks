@@ -36,7 +36,7 @@ export function createViewCalls(d: ViewCallsNeeds) {
 		let moved: { camera: Camera; selected?: string } | undefined;
 		try {
 			value = runViewCall(call, {
-				boards: () => untrack(d.pages) as Page[],
+				cards: () => untrack(d.pages) as Page[],
 				viewport: () => ({ width: innerWidth, height: innerHeight }),
 				focused: () => untrack(d.agent),
 				canvasOnScreen: () => d.start.canvas.name,

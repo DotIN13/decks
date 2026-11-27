@@ -40,7 +40,7 @@ export function createCardKeys(d: CardKeysNeeds) {
 	function onKeyDown(event: KeyboardEvent) {
 		/*
 		 * Home and End move the caret to the line's start and end, Shift extending the selection. On a Mac
-		 * they scroll the nearest scroll area instead, which is now the stage (`camera/scroll-area.ts`):
+		 * they scroll the nearest scroll area instead, which is now the canvas (`camera/scroll-area.ts`):
 		 * Home in a card sent the canvas some 110,000 units up. The note editor does the same itself.
 		 */
 		if ((event.key === "Home" || event.key === "End") && !event.metaKey && !event.ctrlKey && !event.altKey) {
