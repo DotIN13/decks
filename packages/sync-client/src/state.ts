@@ -95,9 +95,6 @@ export const writeFileSync = ((file: Parameters<typeof writeFileRaw>[0], data: s
 	writeFileRaw(file, data, options);
 }) as typeof writeFileRaw;
 
-/** Files bigger than this are not synced, and are listed in `skipped`. */
-export const MAX_BYTES = 50 * 1024 * 1024;
-
 /** Whether a canvas's name here is a friend's, under shared/canvases/. */
 export function isShared(name: string): boolean {
 	return sharedParts(name) !== undefined;
