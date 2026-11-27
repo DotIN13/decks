@@ -6,7 +6,7 @@ import type { Page } from "@decks/protocol";
 import type { createEditor } from "../../view/editor.tsx";
 import { passless, passOf, setCanvasHost, withPass } from "../../base/host.ts";
 import { drawing } from "../../ink/ink.ts";
-import { canvasBox } from "../../camera/insets.ts";
+import { fitBox } from "../../camera/insets.ts";
 import { fitInto } from "../../camera/camera.ts";
 import { placedItems } from "../../model/boxes.ts";
 import { cardCalls } from "./card-calls.ts";
@@ -40,7 +40,7 @@ const focusOn = (ctx: FrameContext, targets: string[]) => {
 		.filter((box): box is NonNullable<typeof box> => !!box);
 	if (!boxes.length) throw new Error(`Nothing on this canvas is ${targets.join(", ")}.`);
 	const view = { width: innerWidth, height: innerHeight };
-	handle.glide(fitInto(boxes, view, canvasBox(view)), 400);
+	handle.glide(fitInto(boxes, view, fitBox(view)), 400);
 };
 
 /**

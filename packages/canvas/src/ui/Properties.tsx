@@ -100,7 +100,7 @@ export function Properties(props: PropertiesProps) {
 	/* It stands aside while a card is typed into, whose toolbar is its panel then (`penTyping`). */
 	return (
 		<Show when={selected().length > 0 && !penTyping() && (!COARSE || propsOpen())}>
-			<aside class="panel-float props-panel" aria-label={m.canvas_props_panel()} data-props data-sheet={COARSE && narrow() ? "true" : undefined} data-popover={COARSE && !narrow() && anchor() ? "true" : undefined} style={COARSE && !narrow() && anchor() ? { left: `${anchor()!.left}px`, top: `${anchor()!.top}px`, right: "auto" } : undefined}>
+			<aside class="panel-float props-panel" aria-label={m.canvas_props_panel()} data-props data-fit-clear={COARSE ? undefined : "right"} data-sheet={COARSE && narrow() ? "true" : undefined} data-popover={COARSE && !narrow() && anchor() ? "true" : undefined} style={COARSE && !narrow() && anchor() ? { left: `${anchor()!.left}px`, top: `${anchor()!.top}px`, right: "auto" } : undefined}>
 				<header class="props-head">
 					<span class="props-kind" aria-hidden="true">
 						<Icon of={single() ? KIND_ICON[kindOf(single()!)] : Layers} size={14} />

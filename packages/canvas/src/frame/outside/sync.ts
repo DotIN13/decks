@@ -2,7 +2,7 @@ import type { Accessor } from "solid-js";
 import type { Camera } from "@decks/protocol";
 import { createEffect, on, onCleanup } from "solid-js";
 import type { EditorState } from "../../view/types.ts";
-import { insets } from "../../camera/insets.ts";
+import { fitClear, insets } from "../../camera/insets.ts";
 import { type PageEnd } from "../protocol.ts";
 import { type FramedEditorOptions } from "./host.tsx";
 
@@ -45,7 +45,8 @@ export function createSync(d: SyncNeeds) {
 		createEffect(() => {
 			const page = d.end();
 			const covered = insets();
-			if (page) page.emit("look", { insets: covered });
+			const clear = fitClear();
+			if (page) page.emit("look", { insets: covered, fitClear: clear });
 		});
 		createEffect(
 			on(

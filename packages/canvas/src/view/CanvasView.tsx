@@ -3,7 +3,7 @@ import { m } from "@decks/i18n";
 import type { Page, Camera } from "@decks/protocol";
 import { Show, createEffect, type Component, createMemo, createSignal, untrack } from "solid-js";
 import { boxOf, fitInto, toWorld, type Viewport } from "../camera/camera.ts";
-import { canvasBox } from "../camera/insets.ts";
+import { fitBox } from "../camera/insets.ts";
 import { viewPoint } from "../camera/coords.ts";
 import type { ItemSlotProps } from "../items/item-slot-props.ts";
 import type { DocEdits } from "../model/drawing.ts";
@@ -209,7 +209,7 @@ export function CanvasView(props: CanvasViewProps) {
 	 * `camera/insets.ts` is the only thing that knows how much that is.
 	 */
 	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
-		fitInto(boxes, view(), canvasBox(view()));
+		fitInto(boxes, view(), fitBox(view()));
 
 	/** A hold's menu, open at the finger (`ui/HoldMenu.tsx`): the items held, or none for bare canvas. */
 	const [holdMenu, setHoldMenu] = createSignal<{ ids: string[]; at: { x: number; y: number }; stage: { x: number; y: number } } | undefined>();

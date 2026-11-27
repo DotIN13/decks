@@ -4,7 +4,7 @@ import { createEffect, createMemo, createRoot, createSignal, on, untrack } from 
 import { fitInto, frames } from "../camera/camera.ts";
 import { topBoxes } from "../model/boxes.ts";
 import { createAgentViews } from "../camera/agent-views.ts";
-import { canvasBox } from "../camera/insets.ts";
+import { fitBox } from "../camera/insets.ts";
 import type { CanvasEngine } from "../render/engine.ts";
 import { createDrawing } from "../model/drawing.ts";
 import { canvasMeasure } from "../render/measure.ts";
@@ -21,7 +21,7 @@ import { createEditorCamera } from "./editor-camera.ts";
 
 /** A camera that shows everything on the drawing, in a host this big. */
 export function fitAll(doc: PenDocument, view: { width: number; height: number }, look: "light" | "dark" = "light"): Camera {
-	return fitInto(topBoxes(doc, look), view, canvasBox(view));
+	return fitInto(topBoxes(doc, look), view, fitBox(view));
 }
 
 

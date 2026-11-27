@@ -47,6 +47,33 @@ const [insets, setInsets] = createSignal<Insets>(ZERO);
 export { insets };
 
 /**
+ * What a fit keeps clear of besides the insets: the chrome that floats over the canvas's edge (the tool
+ * column, the composer, the properties panel), declared `data-fit-clear="left|right|bottom|top"`. They
+ * are not insets, by the rule above: the canvas may sit under them, and the dock does not move for them.
+ * But Fit frames the drawing, and framed under them it read as cut off ("A heading text" showed as
+ * "heading text"), so a fit keeps out from under them (`fitBox`).
+ */
+const [fitClear, setFitClear] = createSignal<Insets>(ZERO);
+export { fitClear };
+
+/** Where a fit frames into: the canvas's box, and clear of the floating chrome at its edges too. */
+export function fitBox(view: { width: number; height: number }) {
+	const box = canvasBox(view);
+	const i = insets();
+	const c = fitClear();
+	const left = Math.max(0, c.left - i.left);
+	const right = Math.max(0, c.right - i.right);
+	const top = Math.max(0, c.top - i.top);
+	const bottom = Math.max(0, c.bottom - i.bottom);
+	return { x: box.x + left, y: box.y + top, width: Math.max(0, box.width - left - right), height: Math.max(0, box.height - top - bottom) };
+}
+
+/** Told rather than measured, in the canvas frame (`look.fitClear`), as `useInsets`. */
+export function useFitClear(next: Insets): void {
+	setFitClear(next);
+}
+
+/**
  * The canvas's own width and height: the window, minus the chrome standing beside it.
  *
  * What `fit` should frame into, and what the dock centres on — a bar centred on the window
@@ -117,12 +144,25 @@ export function insetsOnly(targets: (() => readonly HTMLElement[]) | undefined):
  * text tool. Measured, like everything else here, rather than stated beside a stylesheet.
  * `band` is that span as last measured, kept by the watcher.
  */
+/** How far a surface at one edge reaches into the window, by its layout box (as `measureInsets` reads them). */
+function measureEdge(box: HTMLElement, edge: keyof Insets, view: { width: number; height: number }, into: Insets): void {
+	const rect = box.getBoundingClientRect();
+	if (rect.width === 0 || rect.height === 0) return;
+	if (edge === "left") into.left = Math.max(into.left, rect.right);
+	if (edge === "right") into.right = Math.max(into.right, view.width - rect.left);
+	if (edge === "top") into.top = Math.max(into.top, rect.bottom);
+	if (edge === "bottom") into.bottom = Math.max(into.bottom, view.height - rect.top);
+}
+
 function measureInsets(tracked: ReadonlySet<Element>, band: { left: number; right: number }): void {
 	const view = { width: window.innerWidth, height: window.innerHeight };
 	const next: Insets = { ...ZERO };
 	let bandLeft = 0;
 	let bandRight = view.width;
+	const clear: Insets = { ...ZERO };
 	for (const el of tracked) {
+		const floats = (el as HTMLElement).dataset.fitClear as keyof Insets | undefined;
+		if (floats) measureEdge(el as HTMLElement, floats, view, clear);
 		const edge = (el as HTMLElement).dataset.inset as keyof Insets | undefined;
 		if (!edge) continue;
 		/*
@@ -167,6 +207,8 @@ function measureInsets(tracked: ReadonlySet<Element>, band: { left: number; righ
 			else bandRight = Math.min(bandRight, box.offsetLeft);
 		}
 	}
+	const wasClear = fitClear();
+	if (wasClear.left !== clear.left || wasClear.right !== clear.right || wasClear.top !== clear.top || wasClear.bottom !== clear.bottom) setFitClear(clear);
 	bandLeft = Math.max(bandLeft, next.left);
 	bandRight = Math.max(bandLeft, Math.min(bandRight, view.width - next.right));
 	const now = insets();
@@ -204,7 +246,7 @@ export function watchInsets(root: HTMLElement = document.body): void {
 	const measure = () => measureInsets(tracked, band);
 
 	const sync = () => {
-		const found = new Set(root.querySelectorAll("[data-inset]"));
+		const found = new Set(root.querySelectorAll("[data-inset], [data-fit-clear]"));
 		for (const el of tracked) {
 			if (!found.has(el)) {
 				sizes.unobserve(el);
@@ -250,7 +292,7 @@ export function watchInsets(root: HTMLElement = document.body): void {
 	 * measuring reads layout, which during a board drag (guides, handles, a board's move) was a
 	 * forced layout on every frame, 10 ms each.
 	 */
-	const isChrome = (node: Node) => node instanceof Element && (node.hasAttribute("data-inset") || node.querySelector("[data-inset]") !== null);
+	const isChrome = (node: Node) => node instanceof Element && (node.hasAttribute("data-inset") || node.hasAttribute("data-fit-clear") || node.querySelector("[data-inset], [data-fit-clear]") !== null);
 	const tree = new MutationObserver((records) => {
 		for (const record of records) {
 			if (record.type === "attributes" || [...record.addedNodes].some(isChrome) || [...record.removedNodes].some(isChrome)) {
@@ -259,7 +301,7 @@ export function watchInsets(root: HTMLElement = document.body): void {
 			}
 		}
 	});
-	tree.observe(root, { childList: true, subtree: true, attributeFilter: ["data-inset"] });
+	tree.observe(root, { childList: true, subtree: true, attributeFilter: ["data-inset", "data-fit-clear"] });
 	window.addEventListener("resize", resized);
 	// The first reading is taken at once: the camera's first fit is waiting on it.
 	sync();

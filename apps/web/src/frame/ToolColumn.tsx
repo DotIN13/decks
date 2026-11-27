@@ -356,7 +356,7 @@ export function ToolColumn(props: {
 
 	return (
 		<>
-			<div ref={column} class="pen-tools float v3-tools" data-row={props.row ? "true" : undefined} role="toolbar" aria-orientation={props.row ? "horizontal" : "vertical"} aria-label={m.frame_tools()}>
+			<div ref={column} class="pen-tools float v3-tools" data-fit-clear={props.row ? undefined : "left"} data-row={props.row ? "true" : undefined} role="toolbar" aria-orientation={props.row ? "horizontal" : "vertical"} aria-label={m.frame_tools()}>
 				<span ref={mark} class="v3-tool-mark" aria-hidden="true" />
 				<div ref={grip} class="v3-grip" title={m.frame_tools_grip()} aria-hidden="true">
 					<i />

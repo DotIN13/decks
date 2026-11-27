@@ -1,7 +1,7 @@
 import type { Camera } from "@decks/protocol";
 import { untrack } from "solid-js";
 import type { EditorState } from "../../view/types.ts";
-import { insets } from "../../camera/insets.ts";
+import { fitClear, insets } from "../../camera/insets.ts";
 import { awaitHello, renewPass, sendStart } from "@decks/frame";
 import { PROTOCOL, peer, type PageEnd, type Start } from "../protocol.ts";
 import { type CanvasPass, type FramedEditorOptions, } from "./host.tsx";
@@ -52,7 +52,7 @@ export function createStart(d: StartNeeds) {
 				files: { base: pass.files, expires: pass.expires },
 				pictures: pass.pictures,
 				...(pass.imports ? { imports: pass.imports } : {}),
-				look: { dark: d.darkNow, mode: d.modeNow, readOnly: d.options.readOnly === true, toolbar: d.options.toolbar !== false, insets: untrack(insets), ...(d.options.onComment ? { pageComments: true } : {}), ...(d.options.frame.openTab ? { pageTabs: true } : {}), ...(d.options.pageTools ? { pageTools: true, ...(d.options.pageKeys ? { pageKeys: [...d.options.pageKeys] } : {}), ...(d.options.pageKeysFirst ? { pageKeysFirst: [...d.options.pageKeysFirst] } : {}) } : {}), ...(untrack(() => d.options.frame.agents?.()) ? { agents: untrack(() => d.options.frame.agents!())! } : {}), ...(untrack(() => d.options.frame.focused?.()) ? { agent: untrack(() => d.options.frame.focused!())! } : {}) },
+				look: { dark: d.darkNow, mode: d.modeNow, readOnly: d.options.readOnly === true, toolbar: d.options.toolbar !== false, insets: untrack(insets), fitClear: untrack(fitClear), ...(d.options.onComment ? { pageComments: true } : {}), ...(d.options.frame.openTab ? { pageTabs: true } : {}), ...(d.options.pageTools ? { pageTools: true, ...(d.options.pageKeys ? { pageKeys: [...d.options.pageKeys] } : {}), ...(d.options.pageKeysFirst ? { pageKeysFirst: [...d.options.pageKeysFirst] } : {}) } : {}), ...(untrack(() => d.options.frame.agents?.()) ? { agents: untrack(() => d.options.frame.agents!())! } : {}), ...(untrack(() => d.options.frame.focused?.()) ? { agent: untrack(() => d.options.frame.focused!())! } : {}) },
 				camera: d.localCamera,
 				...(pen?.writer ? { writer: pen.writer } : {}),
 				stored,

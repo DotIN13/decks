@@ -33,7 +33,7 @@ export function DockBar(props: { parts: Parts }) {
 	const { barText, setBarText, agentName, barContext, sendFromBar } = bar;
 	const { titleOf, itemName, showPill } = pills;
 	return (
-			<div class="dock" ref={dock.watchDock} data-under={underSheet() ? "true" : undefined}>
+			<div class="dock" ref={dock.watchDock} data-fit-clear="bottom" data-under={underSheet() ? "true" : undefined}>
 				{/* Only drawn while the bar is put away behind the right edge (a hard throw
 				    at it, `float.ts`): the one part of it left on screen, and the way back. */}
 				<button type="button" class="stowtab" data-stowtab aria-label={m.app_stow_back()} title={m.app_stow_back()} onClick={() => dock.unstow()}>

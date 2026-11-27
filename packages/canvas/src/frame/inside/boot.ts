@@ -4,7 +4,7 @@ import type { Page, Camera } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import type { Editor, CanvasComment } from "../../view/types.ts";
 import type { FrameChromeView, ViewOffer } from "../chrome.ts";
-import { useInsets } from "../../camera/insets.ts";
+import { useFitClear, useInsets } from "../../camera/insets.ts";
 import { isNews } from "../../items/news.ts";
 import { pagesOf } from "../../model/drawing.ts";
 import { pageItems } from "../../model/boxes.ts";
@@ -23,6 +23,12 @@ import { giveDeckImports } from "../../items/card.ts";
  * is put in it as soon as it is made (`made`), and everything that reads `handle()` runs after.
  */
 export type FrameContext = Awaited<ReturnType<typeof openFrame>>;
+
+/** What the page's chrome covers, as it said when the frame opened: the insets, and what a fit keeps clear of. */
+function lookCovered(look: { insets?: Parameters<typeof useInsets>[0]; fitClear?: Parameters<typeof useFitClear>[0] }): void {
+	if (look.insets) useInsets(look.insets);
+	if (look.fitClear) useFitClear(look.fitClear);
+}
 
 export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, chrome: FrameChromeView | undefined) {
 	/*
@@ -126,7 +132,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 			setPages(now.map((page) => ({ ...page, ...boxes.get(page.path)! })));
 	}
 	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
-	if (start.look.insets) useInsets(start.look.insets);
+	lookCovered(start.look);
 	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
 	/** Each agent's name and colour, from the page: what is new glows in its writer's colour. */
 	const [agents, setAgents] = createSignal<Record<string, { name: string; color: string }>>(start.look.agents ?? {});

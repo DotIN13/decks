@@ -5,7 +5,7 @@ import { untrack } from "solid-js";
 import { touchedBy } from "./marks.ts";
 import type { Camera } from "@decks/protocol";
 import { setDrawing } from "../../ink/ink.ts";
-import { useInsets } from "../../camera/insets.ts";
+import { useFitClear, useInsets } from "../../camera/insets.ts";
 import { drawingFollower } from "./backend.ts";
 import { installClipboard, sayer } from "./clipboard.ts";
 import type { FrameContext } from "./boot.ts";
@@ -127,6 +127,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	end.on("look", (data) => {
 		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);
 		if (data.insets) useInsets(data.insets);
+		if (data.fitClear) useFitClear(data.fitClear);
 		if (data.agents) ctx.setAgents(data.agents);
 		if (data.dock !== undefined) {
 			ctx.setDock(data.dock);
