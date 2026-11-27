@@ -456,6 +456,16 @@ export const VERBS: readonly Verb[] = [
 		result: obj({ delivered: bool(), turn: lit("running", "new", "queued"), position: opt(num()), note: opt(str()) }),
 	},
 	{
+		name: "agent.wait",
+		card: "page",
+		group: "agent",
+		...agentsRead,
+		summary:
+			"Wait until an agent's work is done: the turn that took the work handed to it has ended, nothing is queued for it, and it stays idle a moment. Answers at once when that is already so; with `timedOut: true` after `timeout` seconds (600 unless said, at most 3600). `reply` is its last message. For a test or a hand-off whose answer you need before going on; the turn's own end wakes it, so there is no polling.",
+		params: [p("name", str()), o("options", obj({ timeout: opt(num()) }))],
+		result: obj({ name: str(), state: str(), reply: str(), waited: num(), timedOut: bool() }),
+	},
+	{
 		name: "agent.queue",
 		card: "page",
 		group: "agent",

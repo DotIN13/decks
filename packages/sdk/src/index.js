@@ -88,6 +88,7 @@ export const VERBS = [
 	["agent.list",["options?"]],
 	["agent.get",["name"]],
 	["agent.send",["name","message"]],
+	["agent.wait",["name","options?"]],
 	["agent.queue",["name","work"]],
 	["agent.create",["spec"]],
 	["view.goto",["canvas"]],

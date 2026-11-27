@@ -374,6 +374,14 @@ export interface Verbs {
 		 */
 		send(name: string, message: { task: string; cards?: string[] }): Promise<{ delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }>;
 		/**
+		 * Wait until an agent's work is done: the turn that took the work handed to it has ended, nothing
+		 * is queued for it, and it stays idle a moment. Answers at once when that is already so; with
+		 * `timedOut: true` after `timeout` seconds (600 unless said, at most 3600). `reply` is its last
+		 * message. For a test or a hand-off whose answer you need before going on; the turn's own end wakes
+		 * it, so there is no polling.
+		 */
+		wait(name: string, options?: { timeout?: number }): Promise<{ name: string; state: string; reply: string; waited: number; timedOut: boolean }>;
+		/**
 		 * Put work in the agent's queue, taken up after the turn it is running. Returns at once; with
 		 * `reply: true` its report comes back to you.
 		 */

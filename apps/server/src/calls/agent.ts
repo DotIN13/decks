@@ -107,6 +107,14 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 				if (answer.note) notes.push(answer.note);
 				return answer;
 			},
+			wait: async (name: string, options?: { timeout?: number }) => {
+				const to = find(name);
+				if (!agent.wait) throw new Error("This caller cannot wait for agents.");
+				const seconds = Math.min(3600, Math.max(1, Number(options?.timeout ?? 600) || 600));
+				const answer = await agent.wait(to.id, seconds * 1000);
+				if (answer.timedOut) notes.push(`${answer.name} is still ${answer.state} after ${seconds} s; wait again, or look at its chat.`);
+				return answer;
+			},
 			queue: async (name: string, work: { task: string; cards?: string[]; reply?: boolean }) => {
 				if (!work?.task?.trim()) throw new Error("Queued work needs a task: what to do.");
 				const to = find(name);

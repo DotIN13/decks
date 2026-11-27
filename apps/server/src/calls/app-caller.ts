@@ -90,6 +90,7 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | 
 		// The sender is the conversation: a reply has to find somebody to land in, and an app has no inbox.
 		send: (target, spec) => host.agents.send(conversation.id, target, spec),
 		deliver: (target, spec) => host.agents.deliver(conversation.id, target, spec),
+		wait: (target, timeoutMs) => host.agents.wait(target, timeoutMs),
 		// An agent an app asks for is made for the conversation, as a send is: on its runtime, account and workspace unless the call says otherwise.
 		create: (spec) => host.agents.createFor(conversation.id, spec),
 		// The app's canvas: the conversation's when it shows the app, else any that does.

@@ -104,6 +104,8 @@ export interface AgentHooks {
 	here?(): string | undefined;
 	/** Deliver a message now: steer the running turn, start one, or queue it (`agent.send`). */
 	deliver?(target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
+	/** Wait until another agent's work is done (`agent.wait`): its turn over, nothing queued. */
+	wait?(target: string, timeoutMs: number): Promise<{ name: string; state: AgentState; reply: string; waited: number; timedOut: boolean }>;
 	/** Make another canvas this agent's home (`agent.update({ canvas })`). */
 	setHome?(name: string): void;
 }

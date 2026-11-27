@@ -60,6 +60,11 @@ export class DeckAgent {
 	 * here and not left to a runtime, so every runtime behaves the same.
 	 */
 	private pending: string[] = [];
+	/** When work last reached this agent, and when its last turn ended: what `waitTurn` reads. */
+	private askedAt = 0;
+	private idleAt = 0;
+	/** Who waits for this agent's turn to end (`agent.wait`). */
+	private idleWaiters: Array<() => void> = [];
 
 	constructor(
 		private readonly deck: Deck,
@@ -87,6 +92,7 @@ export class DeckAgent {
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
 			/** Deliver now (`agent.send`); optional so a host with no registry can leave it out. */
 			deliver?(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
+			wait?(target: string, timeoutMs: number): Promise<{ name: string; state: AgentState; reply: string; waited: number; timedOut: boolean }>;
 			/** Make an agent, idle, for a send to follow. Optional: a host without a registry has none. */
 			create?(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string; kind?: AgentKind; model?: string; thinking?: string; mode?: string; canvas?: string }>;
 			/**
@@ -301,8 +307,11 @@ export class DeckAgent {
 				sayRow: () => this.sayRow(),
 				stateChanged: (now, before) => {
 					if ((before === "idle") !== (now === "idle")) host.working?.(this.id, now !== "idle");
-					if (now === "idle") this.turns.wentIdle();
-					else this.turns.wentBusy();
+					if (now === "idle") {
+						this.turns.wentIdle();
+						this.idleAt = Date.now();
+						for (const wake of this.idleWaiters.splice(0)) wake();
+					} else this.turns.wentBusy();
 				},
 				acted: (event) => host.act?.(this.id, { kind: "tool", event }),
 				tool: () => this.stageTool(),
@@ -444,6 +453,10 @@ export class DeckAgent {
 				if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 				return this.host.deliver(this.id, target, spec);
 			},
+			wait: (target: string, timeoutMs: number) => {
+				if (!this.host.wait) throw new Error("This deck cannot wait for agents.");
+				return this.host.wait(target, timeoutMs);
+			},
 		};
 	}
 
@@ -564,6 +577,10 @@ export class DeckAgent {
 					if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 					return this.host.deliver(PERSON, target, spec);
 				},
+				wait: (target: string, timeoutMs: number) => {
+					if (!this.host.wait) throw new Error("This deck cannot wait for agents.");
+					return this.host.wait(target, timeoutMs);
+				},
 			},
 			port: this.host.port,
 		});
@@ -576,6 +593,7 @@ export class DeckAgent {
 	 * (`looking-at.ts`); the agent is told in a line put before the words, with the other notes.
 	 */
 	async prompt(text: string, parts?: MessagePart[], at?: LookingAt): Promise<void> {
+		this.askedAt = Date.now();
 		// Before anything is appended: a restored chat's stored rows belong under the new message, not after it.
 		this.conversation.window();
 		// An outside agent has no runtime to prompt: the words wait in its inbox (`Inbox.leave`), with where they were written. A slash command means nothing to it.
@@ -788,6 +806,38 @@ export class DeckAgent {
 	/** The name and colour a cursor or a mark for this agent is drawn with (`agents/acts.ts`). */
 	who(): { name: string; color: string } {
 		return { name: this.identity.name, color: this.identity.color };
+	}
+
+	/** Work has just been handed to this agent: a wait from now on waits for it, even before its turn starts. */
+	noteAsked(): void {
+		this.askedAt = Date.now();
+	}
+
+	/**
+	 * Wait until the work last handed to this agent is done: its turn has ended after it was last
+	 * asked, nothing is queued for it, and it stays idle a moment (a queued task starts right after
+	 * a turn ends). Answers at once when that is already so, and with `timedOut` after `timeoutMs`.
+	 *
+	 * What a test or another agent used to do by polling the agent's state in a loop, which missed
+	 * short turns and read a state that had not caught up; the turn's own end now wakes it.
+	 */
+	async waitTurn(timeoutMs: number): Promise<{ state: AgentState; reply: string; waited: number; timedOut: boolean }> {
+		const started = Date.now();
+		const settled = () => this.chat().state === "idle" && this.turns.queued === 0 && this.idleAt >= this.askedAt;
+		const answer = (timedOut: boolean) => ({ state: this.chat().state, reply: this.conversation.translator.lastAssistantText(), waited: Math.round((Date.now() - started) / 1000), timedOut });
+		while (Date.now() - started < timeoutMs) {
+			if (settled()) {
+				// A moment of quiet, so a queued task or a follow-up the runtime starts on its own counts.
+				await new Promise((done) => setTimeout(done, 750));
+				if (settled()) return answer(false);
+				continue;
+			}
+			await new Promise<void>((done) => {
+				const timer = setTimeout(done, Math.max(0, timeoutMs - (Date.now() - started)));
+				this.idleWaiters.push(() => { clearTimeout(timer); done(); });
+			});
+		}
+		return answer(true);
 	}
 
 	chat(): AgentChat {
