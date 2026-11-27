@@ -41,7 +41,7 @@ export interface OpencodeServerSpec {
 	config: { instructions?: string[] };
 }
 
-export interface OpencodeServerHandle {
+interface OpencodeServerHandle {
 	/** The URL the server announced, which is not guessed — see `startServer`. */
 	url: string;
 	/** The single token the shared server authenticates with; the tool sends it every call. */

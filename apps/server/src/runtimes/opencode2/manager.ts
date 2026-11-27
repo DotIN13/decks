@@ -34,7 +34,7 @@ interface Opencode2ServerSpec {
 	config: { plugins?: string[]; skills?: string[] };
 }
 
-export interface Opencode2ServerHandle {
+interface Opencode2ServerHandle {
 	/** The URL the server announced. */
 	url: string;
 	/** The server's secret: its password, and the token its tools carry back to Decks. */

@@ -2,7 +2,7 @@
 	"counts": {
 		"files over 1,000 lines": 7,
 		"functions over 150 lines": 42,
-		"classes over 30 methods": 10,
+		"classes over 30 methods": 8,
 		"server folder pairs that import each other": 12,
 		"imports across packages by relative path": 0,
 		"\"one release\" notes": 0,
@@ -65,8 +65,6 @@
 		"apps/server/src/pictures/service.ts: PictureService": 36,
 		"apps/server/src/runtimes/claude/accounts.ts: ClaudeAccounts": 47,
 		"apps/server/src/runtimes/claude/backend.ts: ClaudeBackend": 44,
-		"apps/server/src/runtimes/opencode/backend.ts: OpencodeBackend": 32,
-		"apps/server/src/runtimes/opencode2/backend.ts: Opencode2Backend": 38,
 		"packages/docs/src/page/gview.ts: GoogleView": 73,
 		"packages/docs/src/page/live.ts: LiveEditor": 47,
 		"packages/sync-client/src/sync.ts: HarnessSync": 62
