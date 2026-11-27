@@ -92,6 +92,15 @@ export function toItem(node: Record<string, unknown>): Record<string, unknown> {
  * Where an item would land, worked out on a copy that is not kept (`land.ts`). An item put at the top of
  * the drawing changes only the top list, so a copy of that list is enough; anything else copies it all.
  */
+/**
+ * A value made the first time it is asked for, then kept: in a batch, the canvas laid out as the earlier
+ * ops left it, only for an op that places something; an update or a delete does not lay 7,000 items out.
+ */
+function once<T>(make: () => T): () => T {
+	let made: { value: T } | undefined;
+	return () => (made ??= { value: make() }).value;
+}
+
 function preview(doc: PenDocument, more: Op[], theme: ReturnType<typeof baseTheme>, measure: Parameters<typeof apply>[2]["measure"]): PenDocument {
 	return more.every((one) => one.op === "insert" && !one.parent)
 		? apply({ ...doc, children: [...doc.children] }, more, { theme, measure, scratch: true }).doc
@@ -276,7 +285,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		ops.forEach((op, index) => {
 			const where = ops.length > 1 ? `Op ${index + 1} (${op?.op ?? "?"}): ` : "";
 			try {
-				const placed = surface.layout(doc);
+				const placed = once(() => surface.layout(doc));
 				let pen: Op;
 				// pen.dev's own form (what the canvas editor sends): taken as it is, with a board's path for an id.
 				const raw = op as unknown as Record<string, unknown>;
@@ -300,11 +309,11 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							const there = [...walk(doc.children)].find((one) => boardOf(one) === path || boardOf(one) === ownOn(path));
 							if (there) throw new Error(`${path} is already on this canvas, as ${there.id}: move it with decks canvas move.`);
 						}
-						const box = placeOf(doc, placed, op);
+						const box = placeOf(doc, placed(), op);
 						pen = landNew(
 							on(),
 							{ op: "insert", node: node as Op extends { node: infer N } ? N : never, ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(op.index !== undefined ? { index: op.index } : {}), ...(box ? { box } : {}) } as Op & { box?: { x1: number; y1: number } },
-							{ label: path ?? (typeof node.id === "string" ? node.id : "the new item"), top: op.parent === undefined || op.parent === null, way: op.beside ? "right" : op.below ? "down" : undefined, placed },
+							{ label: path ?? (typeof node.id === "string" ? node.id : "the new item"), top: op.parent === undefined || op.parent === null, way: op.beside ? "right" : op.below ? "down" : undefined, placed: placed() },
 						);
 						break;
 					}
@@ -362,11 +371,11 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					}
 					case "move": {
 						const id = idIn(doc, op.id);
-						const box = placeOf(doc, placed, op);
+						const box = placeOf(doc, placed(), op);
 						pen = { op: "move", id, ...(op.parent !== undefined ? { parent: op.parent === null ? null : idIn(doc, op.parent, "parent") } : {}), ...(op.index !== undefined ? { index: op.index } : {}), ...(box ? { box } : {}) };
 						// Moved beside or below another at the top level: aimed there, then on past what is in the way, as an insert is.
 						const moving = doc.children.find((one) => one.id === id);
-						if (box && moving && (op.parent === undefined || op.parent === null) && (op.beside || op.below)) pen = landItem(on(), pen as Op & { box?: { x1: number; y1: number } }, id, boardOf(moving) ?? id, op.beside ? "right" : "down", placed, id);
+						if (box && moving && (op.parent === undefined || op.parent === null) && (op.beside || op.below)) pen = landItem(on(), pen as Op & { box?: { x1: number; y1: number } }, id, boardOf(moving) ?? id, op.beside ? "right" : "down", placed(), id);
 						break;
 					}
 					case "copy": {
