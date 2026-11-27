@@ -40,12 +40,18 @@ export interface OpResult {
 interface ApplyOptions {
 	theme: ThemeState;
 	measure?: MeasureText;
+	/**
+	 * `doc` is already the caller's own copy, to change in place: no copy of the whole drawing first. For
+	 * a caller working out a batch op by op on a scratch document (`calls/canvas.ts`), where a copy per
+	 * op was most of a batch's time. A failed op leaves it half changed, so it is only for a scratch copy.
+	 */
+	scratch?: boolean;
 }
 
-/** Apply `ops` to a copy of `doc`; the copy is returned only if every one succeeded. */
+/** Apply `ops` to a copy of `doc` (or to `doc` itself when it is a scratch copy); returned only if every one succeeded. */
 export function apply(doc: PenDocument, ops: readonly Op[], options: ApplyOptions): { doc: PenDocument; results: OpResult[] } {
 	if (!Array.isArray(ops)) throw new PenError("Edits are a list: [{ op: \"insert\", node: { type: \"note\", content: \"…\" } }].");
-	const next = clone(doc);
+	const next = options.scratch ? doc : clone(doc);
 	const results: OpResult[] = [];
 	ops.forEach((op, i) => {
 		try {

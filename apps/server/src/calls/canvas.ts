@@ -1,7 +1,7 @@
 import { copySharedCanvas } from "../canvas/copy-shared.ts";
 import { canvasOfPath } from "./move-home.ts";
 import { basename, dirname } from "node:path";
-import { apply, ARROW, baseTheme, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { apply, ARROW, baseTheme, clone, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../canvas/canvas-files.ts";
 import { boardOf, CARD_ITEM, type ReadMore } from "../canvas/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
@@ -86,6 +86,16 @@ export function toItem(node: Record<string, unknown>): Record<string, unknown> {
 		return { type: "card", ...rest, card: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
 	}
 	return { ...node, ...(children ? { children } : {}) };
+}
+
+/**
+ * Where an item would land, worked out on a copy that is not kept (`land.ts`). An item put at the top of
+ * the drawing changes only the top list, so a copy of that list is enough; anything else copies it all.
+ */
+function preview(doc: PenDocument, more: Op[], theme: ReturnType<typeof baseTheme>, measure: Parameters<typeof apply>[2]["measure"]): PenDocument {
+	return more.every((one) => one.op === "insert" && !one.parent)
+		? apply({ ...doc, children: [...doc.children] }, more, { theme, measure, scratch: true }).doc
+		: apply(doc, more, { theme, measure }).doc;
 }
 
 export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
@@ -241,7 +251,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		const surface = surfaceOf(target);
 		const frame = target.frame;
 		onCanvas = target.canvas;
-		let doc = surface.doc;
+		let doc = clone(surface.doc); // a scratch copy, changed in place op by op (a copy per op was most of a batch)
 		const theme = baseTheme(doc, "light");
 		const penOps: Op[] = [];
 		const sized: Array<{ path: string; w?: number; h?: number }> = [];
@@ -251,7 +261,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		const warned: string[] = [];
 		const typeOf = (id: string) => [...walk(doc.children)].find((one) => one.id === id)?.type;
 		/** The canvas as the earlier ops left it, for placing an item there (`land.ts`: aim, then step clear). */
-		const on = (): Landing => ({ doc, layout: surface.layout, apply: (more) => apply(doc, more, { theme, measure }).doc, said: placedFor });
+		const on = (): Landing => ({ doc, layout: surface.layout, apply: (more) => preview(doc, more, theme, measure), said: placedFor });
 		const warn = (pen: Op) => {
 			const said =
 				pen.op === "insert" || pen.op === "replace"
@@ -277,7 +287,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					if (given.node && ["card", "app", "document", "board"].includes(String((given.node as { type?: unknown }).type))) given.node = fromItem(given.node, ids(doc), frame);
 					pen = given as unknown as Op;
 					warn(pen);
-					doc = apply(doc, [pen], { theme, measure }).doc;
+					doc = apply(doc, [pen], { theme, measure, scratch: true }).doc;
 					penOps.push(pen);
 					return;
 				}
@@ -379,7 +389,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						throw new Error(`there is no op "${(op as { op?: unknown })?.op}": insert, update, replace, delete, move, copy or variables.`);
 				}
 				warn(pen);
-				doc = apply(doc, [pen], { theme, measure }).doc;
+				doc = apply(doc, [pen], { theme, measure, scratch: true }).doc;
 				penOps.push(pen);
 			} catch (error) {
 				throw new Error(`${where}${error instanceof Error ? error.message : String(error)}${ops.length > 1 ? " Nothing was changed." : ""}`);
