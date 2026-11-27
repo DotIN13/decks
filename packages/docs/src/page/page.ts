@@ -1,9 +1,6 @@
-import type { DocClientMessage, DocServerMessage, DocVersion, Splice } from "../index.ts";
+import type { DocClientMessage, DocServerMessage, Splice } from "../index.ts";
 import { DocSync } from "../client.ts";
-import { spliceDiff } from "../merge.ts";
-import type { DocSync as Sync } from "../client.ts";
-import { docxBlocks, readParagraph } from "./blocks.ts";
-import { findMarks, marksOf, shiftMarks, type Mark } from "./marks.ts";
+import { findMarks, marksOf, shiftMarks } from "./marks.ts";
 import { LiveEditor } from "./live.ts";
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
@@ -12,10 +9,11 @@ import { pageDom, type PageContext, type PageHooks, type View } from "./context.
 import { addStyle } from "./style.ts";
 import { mountGit } from "./git.ts";
 import { mountGoogle } from "./google.ts";
+import { mountHistory } from "./history.ts";
 import { mountPdf } from "./pdf.ts";
 import { mountSource } from "./source.ts";
 import { mountTools } from "./tools.ts";
-import { base, clip, dir, el, iconButton, initial, svg, when, whoOf } from "./ui.ts";
+import { base, clip, dir, el, iconButton, initial, svg, whoOf } from "./ui.ts";
 
 /**
  * `@decks/docs/page`: a document drawn as a page you type into, in plain DOM.
@@ -70,16 +68,11 @@ interface GComment {
 export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPage {
 	addStyle();
 	const dom = pageDom(host, options.path);
-	const { name, status, changesButton, commentsButton, pdfButton, sourceButton, historyButton, tools, main, scroll, text, panel, banner, old, pill } = dom;
+	const { name, status, changesButton, commentsButton, pdfButton, sourceButton, historyButton, main, scroll, text, panel, old, pill } = dom;
 
 	/** A Google Doc's open comments, from Drive, or why they cannot be shown. */
 	let comments: GComment[] = [];
 	let commentsError = "";
-	let versions: DocVersion[] = [];
-	/** The kept version being looked at, instead of the page as it is now. */
-	let viewing: { sha: string; at?: number; text: string; editor?: LiveEditor } | undefined;
-	/** The History row last pressed: one text kept twice has one id, so the row says which time is meant. */
-	let picked: { sha: string; at: number } | undefined;
 	const urls = new Map<string, Promise<string | undefined>>();
 	const pictures = new Map<string, Promise<string | undefined>>();
 	const near = (src: string) => (src.startsWith("/") ? src : `${dir(sync.path)}/${decodeURI(src)}`);
@@ -162,7 +155,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	scroll.append(live.root, reading.root, gview.root, old);
 	reading.root.hidden = true;
 	gview.root.hidden = true;
-	const cleanups = [mountTools(ctx), mountSource(ctx), mountPdf(ctx), mountGit(ctx), mountGoogle(ctx)];
+	const cleanups = [mountTools(ctx), mountSource(ctx), mountPdf(ctx), mountGit(ctx), mountGoogle(ctx), mountHistory(ctx)];
 	const { isGoogle, isWord, isTex } = ctx;
 
 	// --- what changed ---------------------------------------------------------------------
@@ -238,7 +231,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		historyButton.setAttribute("aria-pressed", String(ctx.view === "history"));
 		commentsButton.setAttribute("aria-pressed", String(ctx.view === "comments"));
 		panel.hidden = ctx.view === "none";
-		if (ctx.view !== "history" && viewing) closeVersion();
+		if (ctx.view !== "history") ctx.hooks.closeVersion();
 		if (ctx.view === "changes") drawChanges();
 		if (ctx.view === "comments") drawComments();
 		if (ctx.view === "history") {
@@ -416,7 +409,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	function showPill(target: HTMLElement): void {
 		const id = target.dataset.change!;
 		const change = sync.changes.find((c) => c.id === id);
-		if (!change || sync.readOnly || viewing) return;
+		if (!change || sync.readOnly || ctx.hooks.isViewing()) return;
 		clearTimeout(pillTimer);
 		if (pillFor !== id) {
 			pillFor = id;
@@ -459,110 +452,10 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	pill.addEventListener("mouseleave", () => hidePill());
 	scroll.addEventListener("scroll", () => hidePill(true));
 
-	// --- history: looking at a kept version ------------------------------------------------------
-
-	function drawHistory(): void {
-		panel.replaceChildren(header(m.docs_history()));
-		if (versions.length === 0) panel.append(el("p", { class: "dp-empty" }, m.docs_no_versions()));
-		const today = new Date().toDateString();
-		for (const [i, version] of [...versions].reverse().entries()) {
-			const date = new Date(version.at);
-			const item = el("div", { class: i === 0 ? "dp-time t-latest" : "dp-time", "aria-current": String(viewing?.sha === version.sha && viewing.at === version.at), title: m.docs_show_version() });
-			const label = el("span", { class: "t-when" }, date.toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit", second: "2-digit" }));
-			if (date.toDateString() !== today) label.append(el("small", {}, date.toLocaleDateString(getLocale(), { month: "short", day: "numeric" })));
-			item.append(label);
-			if (!sync.readOnly) {
-				const restore = iconButton("restore", m.docs_restore_version(), "dp-ib dp-sm");
-				restore.onclick = (event) => (event.stopPropagation(), restoreTo(version.sha));
-				item.append(restore);
-			}
-			item.onclick = () => {
-				if (viewing?.sha === version.sha && viewing.at === version.at) return closeVersion();
-				picked = { sha: version.sha, at: version.at };
-				sync.version(version.sha);
-			};
-			panel.append(item);
-		}
-	}
-
-	function restoreTo(sha: string): void {
-		sync.restore(sha);
-		closeVersion();
-	}
-
-	function openVersion(sha: string, at: number | undefined, source: string): void {
-		closeVersion(false);
-		viewing = { sha, ...(at ? { at } : {}), text: source };
-		const word = isWord();
-		live.root.hidden = true;
-		reading.root.hidden = true;
-		gview.root.hidden = true;
-		text.hidden = true;
-		tools.hidden = true;
-		if (isGoogle()) {
-			// A Doc's version reads as its words; its styles are Google's, in Google's own version history.
-			old.replaceChildren(...GoogleView.plain(source).split("\n").map((line) => el("p", {}, line)));
-			old.hidden = false;
-		} else if (word) {
-			// A Word version reads as its paragraphs' words.
-			old.replaceChildren(...docxBlocks(source).filter((b) => b.kind === "text").map((b) => el("p", {}, readParagraph(source.slice(b.start, b.end)).text)));
-			old.hidden = false;
-		} else {
-			// What differs from now is highlighted: the words Restore would bring back.
-			const diff = spliceDiff(sync.text, source);
-			const marks2: Mark[] = [];
-			// Splices in source order: each one's place holds in the version's text.
-			for (const s of diff) {
-				if (s.text) marks2.push({ change: "then", kind: "ins", start: s.at, end: s.at + s.text.length });
-				else marks2.push({ change: "then", kind: "del", at: s.at, text: s.before });
-			}
-			const stub = { text: source, readOnly: true, ready: true, path: sync.path, format: sync.format } as unknown as Sync;
-			const editor = new LiveEditor(stub, { ...(options.math ? { math: options.math } : {}), marks: () => marks2, changes: () => [] });
-			editor.root.dataset.preview = "";
-			editor.root.toggleAttribute("data-tex", isTex());
-			editor.reset();
-			viewing.editor = editor;
-			live.root.after(editor.root);
-		}
-		const restore = el("button", { type: "button", class: "dp-btn dp-sm dp-primary" }, m.docs_restore());
-		const back = iconButton("x", m.docs_back_to_now(), "dp-ib dp-sm");
-		restore.onclick = () => restoreTo(sha);
-		back.onclick = () => closeVersion();
-		const icon = el("span");
-		icon.innerHTML = svg("clock");
-		banner.replaceChildren(icon.firstElementChild!, el("b", {}, at ? when(at) : m.docs_earlier_version()), el("span", { class: "dp-spacer" }), ...(sync.readOnly ? [] : [restore]), back);
-		banner.hidden = false;
-		scroll.scrollTop = 0;
-		if (ctx.view === "history") drawHistory();
-	}
-
-	function closeVersion(redraw = true): void {
-		if (!viewing) return;
-		viewing.editor?.destroy();
-		viewing.editor?.root.remove();
-		viewing = undefined;
-		banner.hidden = true;
-		old.hidden = true;
-		if (redraw) {
-			const word = isWord();
-			const google = isGoogle();
-			live.root.hidden = ctx.mode !== "page" || word || google;
-			reading.root.hidden = ctx.mode !== "page" || !word;
-			gview.root.hidden = ctx.mode !== "page" || !google;
-			text.hidden = ctx.mode !== "source";
-			tools.hidden = ctx.mode !== "page" || word || sync.readOnly || !sync.ready;
-			if (ctx.view === "history") drawHistory();
-		}
-	}
-
 	historyButton.onclick = () => show("history");
 	commentsButton.onclick = () => show("comments");
 	changesButton.onclick = () => show("changes");
 
-	ctx.on("doc.versions", (message) => {
-		versions = message.versions;
-		if (ctx.view === "history") drawHistory();
-	});
 	ctx.on("doc.gdoc", () => gview.setComments(comments));
 	ctx.on("doc.gcomments", (message) => {
 		comments = message.comments as GComment[];
@@ -570,17 +463,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		gview.setComments(comments);
 		drawCommentsButton();
 		if (ctx.view === "comments") drawComments();
-	});
-	ctx.on("doc.version", (message) => {
-		if (message.text !== undefined) openVersion(message.sha, picked?.sha === message.sha ? picked.at : message.at, message.text);
-		else if (message.error) {
-			status.dataset.state = "error";
-			status.textContent = message.error;
-		}
-	});
-	// A restore or someone's edit while looking at a version: the History list grows.
-	ctx.on("doc.changed", (message) => {
-		if (ctx.view === "history" && !message.client) sync.versions();
 	});
 	Object.assign(ctx.hooks, {
 		updated,
@@ -593,8 +475,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		drawComments,
 		drawCommentsButton,
 		newComment,
-		isViewing: () => !!viewing,
-		closeVersion: () => closeVersion(),
 	} satisfies Partial<PageHooks>);
 
 	const stop = options.listen((message) => {
@@ -619,7 +499,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			for (const cleanup of cleanups) cleanup();
 			reading.destroy();
 			live.destroy();
-			viewing?.editor?.destroy();
 			sync.close();
 			stop();
 			for (const url of urls.values()) void url.then((u) => u && URL.revokeObjectURL(u));

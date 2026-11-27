@@ -81,9 +81,9 @@ export interface PageHooks {
 	drawCommentsButton(): void;
 	/** `page.ts`: start a comment on the selected words. */
 	newComment(): void;
-	/** `page.ts`: whether a kept version is shown instead of the page. */
+	/** `history.ts`: whether a kept version is shown instead of the page. */
 	isViewing(): boolean;
-	/** `page.ts`: back from a kept version to the page as it is now. */
+	/** `history.ts`: back from a kept version to the page as it is now. */
 	closeVersion(): void;
 	/** `pdf.ts`: typeset again once typing has paused, when the PDF is open. */
 	compileSoon(): void;
