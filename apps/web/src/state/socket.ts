@@ -4,6 +4,7 @@ import { BundleBackend } from "../connections/bundle.ts";
 import { active, lineUrl, socketToken } from "../connections/connection.ts";
 import { sessionStale } from "../lib/session.ts";
 import { m } from "@decks/i18n";
+import { working } from "./notices.ts";
 
 /**
  * The one connection to the harness: the line (`/api/v1/socket`), the same socket the canvas frame
@@ -155,9 +156,31 @@ let live: Line | undefined;
 /** Open the line. Called once, from the app's mount; `onUp` runs whenever it comes up, a reconnect included. */
 export function start(onUp: () => void): Line {
 	live = connect((up) => {
+		saidDown(up);
 		if (up) onUp();
 	});
 	return live;
+}
+
+/*
+ * A lost connection, said. Offline for 11 s in the UI review, the composer cleared and nothing said
+ * so: the message went once the line came back. Down for more than a moment (a blip is not news), a
+ * notice stays until the line is up again, and says that what is sent meanwhile waits.
+ */
+let downNotice: ReturnType<typeof working> | undefined;
+let downTimer: ReturnType<typeof setTimeout> | undefined;
+function saidDown(up: boolean): void {
+	if (!up) {
+		downTimer ??= setTimeout(() => {
+			downTimer = undefined;
+			downNotice ??= working(m.app_offline());
+		}, 1500);
+		return;
+	}
+	clearTimeout(downTimer);
+	downTimer = undefined;
+	downNotice?.done(m.app_back_online());
+	downNotice = undefined;
 }
 
 /** The canvas on screen and the agent the person is talking to, named by App: what a call acts on unless it says otherwise (`X-Decks-Stage`, `X-Decks-Agent`). */

@@ -679,6 +679,13 @@ export const agents_ws_named: ((inputs?: Agents_Ws_NamedInputs, options?: { loca
 /**
 * | output |
 * | --- |
+* | "Connected again." |
+*
+*/
+export const app_back_online: ((inputs?: App_Back_OnlineInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<App_Back_OnlineInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Cancel" |
 *
 */
@@ -802,6 +809,13 @@ export const app_not_on_canvas: ((inputs?: App_Not_On_CanvasInputs, options?: { 
 *
 */
 export const app_notes_not_built: ((inputs?: App_Notes_Not_BuiltInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<App_Notes_Not_BuiltInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Reconnecting… What you send now waits, and goes when the connection is back." |
+*
+*/
+export const app_offline: ((inputs?: App_OfflineInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<App_OfflineInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
 * | --- |
@@ -11063,6 +11077,7 @@ export type Agents_Ws_CreateInputs = {};
 export type Agents_Ws_Name_LabelInputs = {};
 export type Agents_Ws_Name_PlaceholderInputs = {};
 export type Agents_Ws_NamedInputs = {};
+export type App_Back_OnlineInputs = {};
 export type App_CancelInputs = {};
 export type App_Clear_CanvasInputs = {};
 export type App_Clear_Canvas_Ask_BodyInputs = {};
@@ -11081,6 +11096,7 @@ export type App_GoInputs = {};
 export type App_No_Card_AtInputs = { path: NonNullable<unknown> };
 export type App_Not_On_CanvasInputs = {};
 export type App_Notes_Not_BuiltInputs = {};
+export type App_OfflineInputs = {};
 export type App_OpenInputs = {};
 export type App_Open_TabInputs = {};
 export type App_Own_CopyInputs = { name: NonNullable<unknown> };

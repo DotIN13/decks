@@ -96,6 +96,7 @@
 /** @typedef {{}} Agents_Ws_Name_LabelInputs */
 /** @typedef {{}} Agents_Ws_Name_PlaceholderInputs */
 /** @typedef {{}} Agents_Ws_NamedInputs */
+/** @typedef {{}} App_Back_OnlineInputs */
 /** @typedef {{}} App_CancelInputs */
 /** @typedef {{}} App_Clear_CanvasInputs */
 /** @typedef {{}} App_Clear_Canvas_Ask_BodyInputs */
@@ -114,6 +115,7 @@
 /** @typedef {{ path: NonNullable<unknown> }} App_No_Card_AtInputs */
 /** @typedef {{}} App_Not_On_CanvasInputs */
 /** @typedef {{}} App_Notes_Not_BuiltInputs */
+/** @typedef {{}} App_OfflineInputs */
 /** @typedef {{}} App_OpenInputs */
 /** @typedef {{}} App_Open_TabInputs */
 /** @typedef {{ name: NonNullable<unknown> }} App_Own_CopyInputs */
@@ -1948,6 +1950,10 @@ export const agents_ws_named = /** @type {(inputs: Agents_Ws_NamedInputs) => Loc
 	return /** @type {LocalizedString} */ (`名为`)
 };
 
+export const app_back_online = /** @type {(inputs: App_Back_OnlineInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`已重新连接。`)
+};
+
 export const app_cancel = /** @type {(inputs: App_CancelInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`取消`)
 };
@@ -2018,6 +2024,10 @@ export const app_not_on_canvas = /** @type {(inputs: App_Not_On_CanvasInputs) =>
 
 export const app_notes_not_built = /** @type {(inputs: App_Notes_Not_BuiltInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`组件备注尚未实现。`)
+};
+
+export const app_offline = /** @type {(inputs: App_OfflineInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`正在重新连接… 现在发送的内容会等待，连接恢复后发出。`)
 };
 
 export const app_open = /** @type {(inputs: App_OpenInputs) => LocalizedString} */ () => {

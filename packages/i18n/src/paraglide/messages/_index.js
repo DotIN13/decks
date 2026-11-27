@@ -98,6 +98,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Agents_Ws_Name_LabelInputs */
 /** @typedef {{}} Agents_Ws_Name_PlaceholderInputs */
 /** @typedef {{}} Agents_Ws_NamedInputs */
+/** @typedef {{}} App_Back_OnlineInputs */
 /** @typedef {{}} App_CancelInputs */
 /** @typedef {{}} App_Clear_CanvasInputs */
 /** @typedef {{}} App_Clear_Canvas_Ask_BodyInputs */
@@ -116,6 +117,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ path: NonNullable<unknown> }} App_No_Card_AtInputs */
 /** @typedef {{}} App_Not_On_CanvasInputs */
 /** @typedef {{}} App_Notes_Not_BuiltInputs */
+/** @typedef {{}} App_OfflineInputs */
 /** @typedef {{}} App_OpenInputs */
 /** @typedef {{}} App_Open_TabInputs */
 /** @typedef {{ name: NonNullable<unknown> }} App_Own_CopyInputs */
@@ -2918,6 +2920,20 @@ export const agents_ws_named = /** @type {((inputs?: Agents_Ws_NamedInputs, opti
 /**
 * | output |
 * | --- |
+* | "Connected again." |
+*
+* @param {App_Back_OnlineInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const app_back_online = /** @type {((inputs?: App_Back_OnlineInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<App_Back_OnlineInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.app_back_online(inputs)
+	return __en.app_back_online(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Cancel" |
 *
 * @param {App_CancelInputs} inputs
@@ -3166,6 +3182,20 @@ export const app_notes_not_built = /** @type {((inputs?: App_Notes_Not_BuiltInpu
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.app_notes_not_built(inputs)
 	return __en.app_notes_not_built(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Reconnecting… What you send now waits, and goes when the connection is back." |
+*
+* @param {App_OfflineInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const app_offline = /** @type {((inputs?: App_OfflineInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<App_OfflineInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.app_offline(inputs)
+	return __en.app_offline(inputs)
 });
 /**
 * | output |
