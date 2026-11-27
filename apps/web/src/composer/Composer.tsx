@@ -2,12 +2,9 @@ import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, Sla
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Mic from "lucide-solid/icons/mic";
 import Paperclip from "lucide-solid/icons/paperclip";
-import Pencil from "lucide-solid/icons/pencil";
 import X from "lucide-solid/icons/x";
 import Square from "lucide-solid/icons/square";
 import Check from "lucide-solid/icons/check";
-import ChevronDown from "lucide-solid/icons/chevron-down";
-import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
 import { Icon, ScribbleCatch } from "@decks/ui";
 import { m } from "@decks/i18n";
@@ -23,7 +20,9 @@ import { parkedDrafts, reconcilePills } from "./parked.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { ContextDial } from "./ContextDial.tsx";
 import { filterCommands, SlashMenu } from "./SlashMenu.tsx";
-import { filterMentionables, MentionMenu, type Mentionable } from "./MentionMenu.tsx";
+import { MentionMenu, type Mentionable } from "./MentionMenu.tsx";
+import { createMentionCompletion } from "./mention-completion.ts";
+import { QueueCard } from "./QueueCard.tsx";
 import { Recipient, type RecipientProps } from "./Recipient.tsx";
 
 
@@ -322,46 +321,9 @@ export function Composer(props: {
 		field?.focus();
 	};
 
+	/* The `@` completion under the caret (`mention-completion.ts`), shut while the command menu is up. */
+	const mention = createMentionCompletion({ text, nodes, put, field: () => field, mentionables: () => props.mentionables, commandsOpen: menuOpen });
 	/** Whether there is anything to send. Also what decides send against stop, below. */
-	/*
-	 * The `@` completion: the word at the caret, when it starts with an @ that begins a word.
-	 *
-	 * Reads the caret rather than the end of the text, so a name can be completed in the
-	 * middle of a line. Escape puts the query away without clearing the draft, which is what
-	 * Escape otherwise does here; typing on changes the query and brings the list back.
-	 */
-	const [caret, setCaret] = createSignal(0);
-	const [dismissed, setDismissed] = createSignal<string | null>(null);
-	const AT = /(^|\s)@([A-Za-z0-9_-]*)$/;
-	const atQuery = createMemo(() => {
-		const match = AT.exec(text().slice(0, caret()));
-		return match ? match[2]! : null;
-	});
-	const atMatches = createMemo(() => {
-		const query = atQuery();
-		if (query === null || !props.mentionables?.length || dismissed() === query) return [];
-		return filterMentionables(props.mentionables, query);
-	});
-	const atOpen = createMemo(() => atMatches().length > 0 && !menuOpen());
-	const [atIndex, setAtIndex] = createSignal(0);
-	createEffect(() => {
-		atMatches();
-		setAtIndex(0);
-	});
-	const pickMention = (one: Mentionable) => {
-		const query = atQuery() ?? "";
-		const whole = text();
-		const at = caret() - query.length - 1;
-		if (nodes().every((node) => node.type === "text") && at >= 0) {
-			const after = whole.slice(caret());
-			put(textDraft(`${whole.slice(0, at)}@${one.name}${after.startsWith(" ") ? "" : " "}${after}`));
-		} else {
-			// Pills in the draft: the field's own insert keeps them, at the cost of the typed fragment staying.
-			field?.insertText(`@${one.name}`);
-		}
-		setDismissed(null);
-		field?.focus();
-	};
 	const sendable = () => !draftIsEmpty(nodes());
 
 	/*
@@ -459,13 +421,7 @@ export function Composer(props: {
 	};
 
 	const send = (queue = false) => {
-		if (atOpen()) {
-			const chosen = atMatches()[atIndex()] ?? atMatches()[0];
-			if (chosen) {
-				pickMention(chosen);
-				return;
-			}
-		}
+		if (mention.complete()) return;
 		// Enter with a command menu open completes the highlighted row instead of sending
 		// the fragment — "/lo" Enter is "login", not an unknown command. A name typed out
 		// in full ranks itself first, so Enter on it completes to itself and the space
@@ -514,8 +470,6 @@ export function Composer(props: {
 	let endedAt = 0;
 	const imeOwns = (event: KeyboardEvent) => event.isComposing || event.keyCode === 229 || composing || Date.now() - endedAt < 50;
 
-	/** The queue card folded to its head, which then names the next line. */
-	const [queueFolded, setQueueFolded] = createSignal(false);
 	/** Who the line goes to, for the placeholder and the queue's head. */
 	const recipientName = () => {
 		const dest = props.recipient?.dest;
@@ -536,13 +490,13 @@ export function Composer(props: {
 		 */
 		<section class="relative flex w-auto transform-none flex-col gap-1.5" ref={(el) => (stack = el)}>
 			<ScribbleCatch target={() => stack?.querySelector<HTMLElement>("[data-slot='composer-input']") ?? undefined} append={(text) => field?.appendWords(text)} />
-			<Show when={atOpen()}>
+			<Show when={mention.open()}>
 				<MentionMenu
-					matches={atMatches()}
+					matches={mention.matches()}
 					identities={props.recipient?.identities ?? {}}
-					activeIndex={atIndex()}
-					onHover={setAtIndex}
-					onPick={pickMention}
+					activeIndex={mention.index()}
+					onHover={mention.setIndex}
+					onPick={mention.pick}
 				/>
 			</Show>
 			<Show when={menuOpen()}>
@@ -555,66 +509,15 @@ export function Composer(props: {
 				/>
 			</Show>
 
-			{/* What you queued with Ctrl+Enter, on top of the box: sent one per turn as each ends. */}
-			<Show when={props.queued?.items.length ? props.queued : undefined}>
-				{(queued) => (
-					<div class="composer-queue" role="list" aria-label={m.composer_queue_label()} data-folded={queueFolded() ? "true" : undefined}>
-						<div class="composer-queue-head">
-							<button type="button" class="v3-icon composer-queue-fold" aria-expanded={!queueFolded()} title={queueFolded() ? m.composer_queue_show() : m.composer_queue_fold()} aria-label={queueFolded() ? m.composer_queue_show() : m.composer_queue_fold()} onClick={() => setQueueFolded(!queueFolded())}>
-								<Icon of={queueFolded() ? ChevronRight : ChevronDown} size={14} />
-							</button>
-							<span class="composer-queue-title">
-								{m.composer_queue_title({ count: queued().items.length, name: recipientName() })}
-							</span>
-							<span class="composer-queue-note truncate">{queued().held ? m.composer_queue_held() : queueFolded() ? m.composer_queue_next({ text: queued().items[0]?.text ?? "" }) : m.composer_queue_one_per_turn()}</span>
-							<span class="flex-1" />
-							<button
-								type="button"
-								class="composer-queue-release"
-								title={queued().held ? m.composer_queue_release_held() : m.composer_queue_release_all()}
-								onClick={() => {
-									if (queued().held) return props.onQueueAction?.("release");
-									for (const item of queued().items) props.onQueueAction?.("send", item.id);
-								}}
-							>
-								{m.composer_queue_send_all()}
-							</button>
-						</div>
-						{/* Folded by its height, so the rows slide shut rather than vanish (`styles/v3.css`). */}
-						<div class="composer-queue-body" aria-hidden={queueFolded()}><div>
-						<For each={queued().items}>
-							{(item, index) => (
-								<div class="composer-queue-row" role="listitem" data-item={item.id}>
-									<span class="composer-queue-n">{index() + 1}</span>
-									<span class="composer-queue-text" title={item.text}>
-										{item.text}
-									</span>
-									<button
-										type="button"
-										class="icon-button"
-										aria-label={m.composer_queue_edit()}
-										title={m.composer_queue_edit_title()}
-										onClick={() => {
-											props.onQueueAction?.("remove", item.id);
-											put([...nodes(), { type: "text", text: (draftIsEmpty(nodes()) ? "" : " ") + item.text }]);
-											field?.focus();
-										}}
-									>
-										<Icon of={Pencil} size={14} />
-									</button>
-									<button type="button" class="icon-button" aria-label={m.composer_queue_send_now()} title={m.composer_queue_send_now_title()} onClick={() => props.onQueueAction?.("send", item.id)}>
-										<Icon of={ArrowUp} size={14} />
-									</button>
-									<button type="button" class="icon-button" aria-label={m.composer_queue_remove()} title={m.composer_queue_remove()} onClick={() => props.onQueueAction?.("remove", item.id)}>
-										<Icon of={X} size={14} />
-									</button>
-								</div>
-							)}
-						</For>
-						</div></div>
-					</div>
-				)}
-			</Show>
+			<QueueCard
+				queued={props.queued}
+				onQueueAction={props.onQueueAction}
+				recipientName={recipientName()}
+				onEdit={(words) => {
+					put([...nodes(), { type: "text", text: (draftIsEmpty(nodes()) ? "" : " ") + words }]);
+					field?.focus();
+				}}
+			/>
 
 			{/* 10 / 10 / 8: the bottom is short because the controls row has its own gap to
 			    the text above it, and 10 under a 26px button reads as a hole. */}
@@ -667,7 +570,7 @@ export function Composer(props: {
 						const gone = (props.comments ?? []).filter((comment) => !here.has(comment.id)).map((comment) => comment.id);
 						if (gone.length > 0) props.onCommentsGone?.(gone);
 					}}
-					onCaret={setCaret}
+					onCaret={mention.setCaret}
 					onComposing={(now) => {
 						composing = now;
 						if (!now) endedAt = Date.now();
@@ -676,29 +579,7 @@ export function Composer(props: {
 						// Every branch below is destructive — one moves a selection, one clears
 						// the draft, one sends it — so all of them ask the input method first.
 						if (imeOwns(event)) return;
-						if (atOpen()) {
-							const length = atMatches().length;
-							if (event.key === "ArrowDown") {
-								event.preventDefault();
-								setAtIndex((at) => (at + 1) % length);
-								return;
-							}
-							if (event.key === "ArrowUp") {
-								event.preventDefault();
-								setAtIndex((at) => (at - 1 + length) % length);
-								return;
-							}
-							if (event.key === "Tab") {
-								event.preventDefault();
-								pickMention(atMatches()[atIndex()] ?? atMatches()[0]!);
-								return;
-							}
-							if (event.key === "Escape") {
-								event.preventDefault();
-								setDismissed(atQuery());
-								return;
-							}
-						}
+						if (mention.keyDown(event)) return;
 						/*
 						 * While the menu is up it owns the arrows and Tab. Wrapping rather than
 						 * stopping at the ends: a fifty-row list is one ArrowUp away from its own
@@ -877,7 +758,7 @@ export function Composer(props: {
 			 * dropping it on a touchscreen is unchanged, because the dial goes to `⋯` there.
 			 */}
 			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden" hidden>
-				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} busy={props.busy && !!props.onQueue} />
+				<Hints menuOpen={menuOpen() || mention.open()} mentions={Boolean(props.mentionables?.length)} busy={props.busy && !!props.onQueue} />
 				<span class="flex-1" />
 				{/* The dial moved into the controls row (v3): this row stays for the hints only. */}
 			</div>
