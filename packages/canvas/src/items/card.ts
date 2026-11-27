@@ -1,5 +1,6 @@
 import { readingOfCard } from "./card-reading.ts";
 import { freshAddress, passless } from "../base/host.ts";
+import { loadCardModule } from "./card-modules.ts";
 /**
  * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
  * frame of its own.
@@ -768,7 +769,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 				if (controller.signal.aborted) return;
 				const address = script.src ?? `${base}.m${script.n}.js`;
 				try {
-					const module = await importOnce<{ default?: (card: CardContext) => CardCleanup | Promise<CardCleanup> }>(address);
+					// Its own script without a module left behind per version (`card-modules.ts`); one it names by address, imported.
+					const module = (script.src ? await importOnce(address) : await loadCardModule(source.path, address, passless(base))) as { default?: (card: CardContext) => CardCleanup | Promise<CardCleanup> };
 					if (controller.signal.aborted || typeof module.default !== "function") continue;
 					const done = await module.default(context);
 					if (typeof done === "function") {
