@@ -90,7 +90,7 @@ export class CardService {
 	 * agent's `decks.canvas.insert` or `decks.agent.claim` touches no file and the file's time would be somebody else's.
 	 */
 	wrote(path: string, who: string, now = Date.now()): void {
-		const board = this.deck.board(path);
+		const board = this.deck.card(path);
 		if (!board) return;
 		const changed = this.authors.say(path, who, now);
 		if (board.lastWrittenBy === who && board.namedAt === now && !changed) return;
@@ -113,7 +113,7 @@ export class CardService {
 	 * would stay news for ever.
 	 */
 	seen(path: string, now = Date.now()): void {
-		const board = this.deck.board(path);
+		const board = this.deck.card(path);
 		if (!board) return;
 		const last = Math.max(board.modifiedAt ?? 0, board.namedAt ?? 0);
 		if ((board.seenAt ?? 0) >= last) return;
@@ -127,13 +127,13 @@ export class CardService {
 	/** Put the stored bylines back on the deck's records: the loader re-describes boards from disk and knows no authors. */
 	restamp(): void {
 		for (const [path, author] of this.authors.entries()) {
-			const board = this.deck.board(path);
+			const board = this.deck.card(path);
 			if (!board) continue;
 			board.lastWrittenBy = author.who;
 			if (author.at > 0) board.namedAt = author.at;
 		}
 		for (const [path, at] of this.seenAt.entries()) {
-			const board = this.deck.board(path);
+			const board = this.deck.card(path);
 			if (board) board.seenAt = at;
 		}
 	}
@@ -255,7 +255,7 @@ export class CardService {
 	 * that caller sends one dimension.
 	 */
 	resize(path: string, size: { w?: number; h?: number }): Page {
-		const board = this.deck.board(path);
+		const board = this.deck.card(path);
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
@@ -326,7 +326,7 @@ export class CardService {
 	 * in a log they do not have.
 	 */
 	deleteBoard(path: string, reply: (message: ServerMessage) => void): void {
-		if (!this.deck.board(path)) {
+		if (!this.deck.card(path)) {
 			reply({ type: "harness.notice", level: "warn", text: `There is no board at ${path} to delete.` });
 			return;
 		}
@@ -369,7 +369,7 @@ export class CardService {
 			? file.slice(this.deck.path.length).replace(/^\/+/, "")
 			: file.replace(/^\.\//, "");
 		const normalized = relative.split("\\").join("/");
-		return this.deck.board(normalized) ? normalized : undefined;
+		return this.deck.card(normalized) ? normalized : undefined;
 	}
 
 	/**
@@ -392,7 +392,7 @@ export class CardService {
 		const recorded = agent.revisionsAt(entryId);
 		const when = agent.timeline().find((entry) => entry.id === entryId)?.at ?? Date.now();
 		const at: Record<string, string> = {};
-		for (const board of this.deck.boards) {
+		for (const board of this.deck.cards) {
 			const sha = recorded[board.path] ?? this.revisions.at(board.path, when);
 			if (sha) at[board.path] = sha;
 		}

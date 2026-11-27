@@ -51,8 +51,8 @@ test("a rename moves the folder and re-points the boards kept in it, keeping the
 		assert.deepEqual(after.map((one) => one.path), ["canvases/launch-plan/cards/plan/index.html"]);
 		assert.deepEqual(after.map((one) => one.id), before.map((one) => one.id));
 		assert.ok(existsSync(join(deckPath, "canvases", "launch-plan", "cards", "plan", "index.html")));
-		assert.ok(deck.board("canvases/launch-plan/cards/plan/index.html"));
-		assert.ok(!deck.board("canvases/deploy-copy/cards/plan/index.html"));
+		assert.ok(deck.card("canvases/launch-plan/cards/plan/index.html"));
+		assert.ok(!deck.card("canvases/deploy-copy/cards/plan/index.html"));
 		assert.throws(() => renameStage(context, "launch-plan", "deploy"), /already exists/);
 		assert.throws(() => renameStage(context, "launch-plan", "!!!"), /letter or a number/);
 	} finally {
@@ -66,7 +66,7 @@ test("a delete takes the stage and the boards kept in its folder, and never the 
 		deleteCanvas(context, "deploy-copy");
 		assert.ok(!pens.names().includes("deploy-copy"));
 		assert.ok(!existsSync(join(deckPath, "canvases", "deploy-copy")));
-		assert.ok(!deck.board("canvases/deploy-copy/cards/plan/index.html"));
+		assert.ok(!deck.card("canvases/deploy-copy/cards/plan/index.html"));
 		deleteCanvas(context, "deploy");
 		assert.equal(readFileSync(join(deckPath, "canvases", "t", "cards", "plan", "index.html"), "utf8"), "<title>Plan</title>PLAN");
 	} finally {

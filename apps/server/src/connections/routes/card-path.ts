@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import type { Router } from "express";
 import { unstampCard } from "@decks/card-host";
 import { LIB_FOREVER, libVersion, splitLibVersion } from "../../deck/lib-version.ts";
-import { normalizeBoardPath } from "../../deck/schema.ts";
+import { normalizeCardPath } from "../../deck/schema.ts";
 import { NotFound, PathRefused, resolveServed } from "../../deck/roots.ts";
 import { canvasOfPath, isCardPath, isSharedCanvas, servedAs } from "@decks/hub/layout";
 import { assetHeaders, boardHeaders } from "../../files/serve.ts";
@@ -46,7 +46,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 			// `?raw=1` is the card's file as it is, for the editor; without it a card is its page.
 			const raw = req.query.raw !== undefined;
-			const card = raw ? undefined : app.deck.board(normalizeBoardPath(requested));
+			const card = raw ? undefined : app.deck.card(normalizeCardPath(requested));
 			if (await cardPageAnswer(app, asked, requested, target, card, raw, res)) return;
 			await assetAnswer(target, res);
 		}),

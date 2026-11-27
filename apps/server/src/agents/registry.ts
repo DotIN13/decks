@@ -425,7 +425,7 @@ export class Registry {
 
 	/** A record from the shared-canvas days, made the chat's own (`old-records.ts`). */
 	private fromCanvas(record: AgentRecord): AgentRecord {
-		return fromSharedCanvas(record, this.deck.path, (path) => !!this.deck.board(path), (next) => this.store.writeRecord(next));
+		return fromSharedCanvas(record, this.deck.path, (path) => !!this.deck.card(path), (next) => this.store.writeRecord(next));
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {
@@ -641,7 +641,7 @@ export class Registry {
 	deliver(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
 		const from = this.sender(fromId);
 		const to = this.resolve(target);
-		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
+		const handed = (spec.boards ?? []).filter((path) => this.deck.card(path));
 		to.waits.asked();
 		const answer = to.turns.deliver({ ...from, task: spec.task.trim(), boards: handed, at: Date.now() });
 		this.publish();
@@ -674,7 +674,7 @@ export class Registry {
 		// Only boards that exist, and no context change on the receiver: what it is holding is
 		// its own decision, and a sender that could rewrite it would be a sender that can take
 		// somebody's canvas away. The source rides in the briefing instead.
-		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
+		const handed = (spec.boards ?? []).filter((path) => this.deck.card(path));
 		to.waits.asked();
 		const position = to.turns.enqueue({
 			...from,

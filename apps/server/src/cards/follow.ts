@@ -101,7 +101,7 @@ export function followDeck(of: FollowHost): () => void {
 				of.send({ type: "deck.changed", deck: of.state() });
 				return;
 			}
-			if (change.kind === "board") {
+			if (change.kind === "card") {
 				/*
 				 * Named, and not changed: its file and its folder are what they were when it was last read. A
 				 * copy of the deck's folder made by cloning names every file in it this way, and a card for each

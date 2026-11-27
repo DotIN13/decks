@@ -268,11 +268,11 @@ export class App {
 			awaitExtent: (path, rev, ms, at) => this.boards.awaitExtent(path, rev, ms, at),
 			reading: (path, rev) => this.boards.reading(path, rev),
 			views: async (path) => {
-				const board = this.deck.board(path);
+				const board = this.deck.card(path);
 				return board ? this.thumbs.views(board) : undefined;
 			},
 			measureAway: async (path, w) => {
-				const board = this.deck.board(path);
+				const board = this.deck.card(path);
 				return board && this.stage.shots ? this.stage.shots.measure(w === undefined ? board : { ...board, w }) : undefined;
 			},
 			call: (call, timeoutMs) => this.pageCalls.ask(call, timeoutMs),
@@ -373,7 +373,7 @@ export class App {
 		this.thumbs = new PictureService({
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
-			boards: () => this.deck.boards,
+			boards: () => this.deck.cards,
 			apps: () => this.apps.list().map((one) => one.name),
 			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.cards.boards(name).map((one) => one.path))),
 			// Its own reads of the harness, on a pass it makes for no canvas (`auth/guard.ts`, `harnessReads`).
@@ -397,7 +397,7 @@ export class App {
 		 */
 		this.nativeShots = new NativeShots({
 			cardPicture: (path, scheme, px) => {
-				const board = deck.board(path);
+				const board = deck.card(path);
 				if (!board) return { why: `there is no card ${path}` };
 				const size = SMALL_WIDTHS.find((width) => px <= width) ?? "whole";
 				for (const want of size === "whole" ? (["whole"] as const) : [size, "whole" as const]) {
@@ -422,7 +422,7 @@ export class App {
 		});
 		this.stage.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
 		this.stage.boardPicture = async (path, scheme) => {
-			const board = deck.board(path);
+			const board = deck.card(path);
 			if (!board) throw new Error(`There is no board ${path}.`);
 			return readFileSync(await this.thumbs.get(board, scheme, () => false));
 		};

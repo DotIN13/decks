@@ -89,12 +89,12 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		/* Who a move was written for, so a test can read back *whose* canvas it landed on. */
 		place: (agentId, path, x, y) => {
 			moved.push({ agentId, path, x, y });
-			return deck.board(path);
+			return deck.card(path);
 		},
 		broadcast: () => {},
 		camera: () => camera,
 		agents: () => others,
-		...(options.stageful ? { boards: () => deck.boards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
+		...(options.stageful ? { boards: () => deck.cards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
 	});
 
 	// The agent in these tests works on its canvas, "ada", and its calls name it (`names-canvas.test-helper.ts`).
@@ -143,7 +143,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** Put a board on the agent's canvas ("ada") at its file's size: `canvas.fit` measures at the width it has there. */
 	const hold = (path: string) => {
 		const pens = withPens();
-		const board = deck.refresh(path) ?? deck.board(path);
+		const board = deck.refresh(path) ?? deck.card(path);
 		if (!board) throw new Error(`no board at ${path}`);
 		pens.cards.placeBoards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
 	};
@@ -301,7 +301,7 @@ test("a card is the agent's once it is named: card.create, canvas.fit and agent.
 	assert.equal(read.isError, false, read.text);
 	assert.deepEqual(worked, []);
 
-	const rev = deck.board("canvases/ada/cards/two/index.html")!.rev;
+	const rev = deck.card("canvases/ada/cards/two/index.html")!.rev;
 	extents.set("canvases/ada/cards/two/index.html", { rev, w: 900, h: 1200 });
 	hold("canvases/ada/cards/two/index.html");
 	const fitted = await runCode(tool, `return await stage.canvas.fit("canvases/ada/cards/two/index.html")`);
@@ -352,13 +352,13 @@ test("agent.list carries what each one is working on, and what is waiting for th
  */
 test("a person's resize writes the meta and the deck agrees immediately", async () => {
 	const { tool, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const before = deck.board(PLAN);
+	const before = deck.card(PLAN);
 	assert.equal(before?.w, 1000, "the default width, since this board's file says nothing");
 
 	const result = await tool.gesture("resize", [PLAN, { w: 1600, h: 1100 }]);
 	assert.equal(result.ok, true, result.error);
 	assert.equal((result.value as { w: number }).w, 1600);
-	assert.equal(deck.board(PLAN)?.h, 1100);
+	assert.equal(deck.card(PLAN)?.h, 1100);
 
 	const onlyHeight = await tool.gesture("resize", [PLAN, { h: 900 }]);
 	assert.deepEqual([(onlyHeight.value as { w: number }).w, (onlyHeight.value as { h: number }).h], [1600, 900], "the dimension that was not named is kept");
@@ -391,7 +391,7 @@ test("fit measures a board no canvas is showing in the server's own browser", as
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(asked, [PLAN]);
-	assert.equal(deck.board(PLAN)?.h, 612, "the document's own height, with no margin added");
+	assert.equal(deck.card(PLAN)?.h, 612, "the document's own height, with no margin added");
 	assert.match(result.text, /90 words/, "and the reading it took is the one fit reports");
 	cleanup();
 });
@@ -415,7 +415,7 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 	// Placed on narrow, the board is narrow's own copy, a card (`canvas/copy-in.ts`): that copy is what is fitted.
 	const copy = pens.cards.copyOf("narrow", PLAN);
 	assert.equal(copy, "canvases/narrow/cards/plan/index.html");
-	assert.deepEqual([deck.board(copy)?.w, deck.board(copy)?.h], [640, 812], "both numbers go to the copy's file");
+	assert.deepEqual([deck.card(copy)?.w, deck.card(copy)?.h], [640, 812], "both numbers go to the copy's file");
 	const narrow = pens.cards.boards("narrow").find((one) => one.path === copy)!;
 	assert.deepEqual([narrow.w, narrow.h], [640, 812], "and to the canvas it was fitted on");
 	const still = pens.cards.boards("ada").find((one) => one.path === PLAN)!;
@@ -438,13 +438,13 @@ test("fit says what to do when the board is not on the canvas, rather than picki
 
 test("fit takes the height from the content and leaves the width alone", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const board = deck.board(PLAN);
+	const board = deck.card(PLAN);
 	assert.equal(board?.w, 1000, "a board that says nothing about itself gets the default");
 	extents.set(PLAN, { rev: board!.rev, w: 700, h: 1400 });
 
 	hold(PLAN);
 	await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
-	const fitted = deck.board(PLAN);
+	const fitted = deck.card(PLAN);
 	assert.equal(fitted?.h, 1448, "the content, plus the margin its components start at");
 	/*
 	 * The change this test exists for. `fit` used to take the width too, in two passes, which made
@@ -466,7 +466,7 @@ test("fit takes the height from the content and leaves the width alone", async (
 test("a board that ends in its own padding is fitted exactly, with no margin to scroll", async () => {
 	const { tool, hold, deck, extents, write, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	write("canvases/ada/cards/page/index.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board"><div class="doc" data-id="doc"></div></body>`);
-	const page = deck.board("canvases/ada/cards/page/index.html");
+	const page = deck.card("canvases/ada/cards/page/index.html");
 	assert.ok(page);
 	extents.set("canvases/ada/cards/page/index.html", { rev: page!.rev, w: 956, h: 604, page: 604 });
 
@@ -476,11 +476,11 @@ test("a board that ends in its own padding is fitted exactly, with no margin to 
 	// two are the pair that has to agree. 604 + a margin is the document that scrolled.
 	assert.match(read("canvases/ada/cards/page/index.html"), /"h":604/, "the measurement, and nothing added to it");
 	// A reading whose page is shorter than its height (from an older frame) still gets the margin.
-	const plan = deck.board(PLAN);
+	const plan = deck.card(PLAN);
 	extents.set(PLAN, { rev: plan!.rev, w: 700, h: 1400, page: 900 });
 	hold(PLAN);
 	await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
-	assert.equal(deck.board(PLAN)?.h, 1448);
+	assert.equal(deck.card(PLAN)?.h, 1448);
 	cleanup();
 });
 
@@ -498,7 +498,7 @@ test("fit says when a view is taller than the board, not only when it is long", 
 		views: [{ label: "Where it lives", h: 667, overflowX: 0 }],
 		errors: [],
 	});
-	const board = deck.board(PLAN);
+	const board = deck.card(PLAN);
 	extents.set(PLAN, { rev: board!.rev, w: 956, h: 542, words: 120 });
 
 	hold(PLAN);
@@ -510,13 +510,13 @@ test("fit says when a view is taller than the board, not only when it is long", 
 
 test("fit still grows the height past a board its content has outgrown", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const board = deck.board(PLAN);
+	const board = deck.card(PLAN);
 	extents.set(PLAN, { rev: board!.rev, w: 1300, h: 600 });
 
 	hold(PLAN);
 	await runCode(tool, `return await stage.canvas.fit("${PLAN}", { margin: 0 })`);
-	assert.equal(deck.board(PLAN)?.w, 1000, "the width is not what grew");
-	assert.equal(deck.board(PLAN)?.h, 600);
+	assert.equal(deck.card(PLAN)?.w, 1000, "the width is not what grew");
+	assert.equal(deck.card(PLAN)?.h, 600);
 	cleanup();
 });
 
@@ -527,13 +527,13 @@ test("fit still grows the height past a board its content has outgrown", async (
  */
 test("a fit of a wide board leaves it wide and says nothing about width", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	const board = deck.board(PLAN);
+	const board = deck.card(PLAN);
 	extents.set(PLAN, { rev: board!.rev, w: 1900, h: 600 });
 
 	hold(PLAN);
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { margin: 0 })`);
-	assert.equal(deck.board(PLAN)?.w, 1000, "the width the board has, not the content's");
-	assert.equal(deck.board(PLAN)?.h, 600);
+	assert.equal(deck.card(PLAN)?.w, 1000, "the width the board has, not the content's");
+	assert.equal(deck.card(PLAN)?.h, 600);
 	assert.equal(/came out \d+ wide/.test(result.text), false, result.text);
 	cleanup();
 });

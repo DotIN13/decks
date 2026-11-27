@@ -22,7 +22,7 @@ export interface OnCanvas {
 export function boardsOn(pens: CanvasPens, deck: Deck, name: string): OnCanvas[] {
 	if (!pens.has(name)) return [];
 	try {
-		return pens.cards.boards(name).filter((one) => deck.board(one.path));
+		return pens.cards.boards(name).filter((one) => deck.card(one.path));
 	} catch {
 		return [];
 	}
@@ -54,7 +54,7 @@ export function putOn(
 	const on = boardsOn(pens, deck, name);
 	const present = new Set(on.map((one) => one.path));
 	// A copy a canvas has just made of a board (`CanvasPens.ownPath`) is read now, before the watcher finds it.
-	const joining = paths.filter((path, index) => paths.indexOf(path) === index && !present.has(path) && (deck.board(path) ?? deck.refresh(path)));
+	const joining = paths.filter((path, index) => paths.indexOf(path) === index && !present.has(path) && (deck.card(path) ?? deck.refresh(path)));
 	if (joining.length === 0) return [];
 	const known: Record<string, { x: number; y: number }> = { ...(options.remembered ?? {}) };
 	const sizes: Record<string, { w: number; h: number }> = {};
@@ -69,14 +69,14 @@ export function putOn(
 		playing: on.map((one) => one.path),
 		places: known,
 		size: (path) => {
-			const board = deck.board(path);
+			const board = deck.card(path);
 			return sizes[path] ?? (board ? { w: board.w, h: board.h } : undefined);
 		},
 		drawn: drawnOn(pens, name),
 	});
 	const placing: BoardSpot[] = [];
 	for (const path of joining) {
-		const board = deck.board(path);
+		const board = deck.card(path);
 		const spot = spots[path] ?? known[path];
 		if (board && spot) placing.push({ path, x: spot.x, y: spot.y, w: board.w, h: board.h, title: board.title });
 	}

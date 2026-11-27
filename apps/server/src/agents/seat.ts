@@ -322,7 +322,7 @@ export class Seat {
 	 */
 	stageDeleted(name: string): void {
 		if (this.folder !== name) return;
-		const gone = (path: string) => !this.of.deck.board(path);
+		const gone = (path: string) => !this.of.deck.card(path);
 		this.held = this.held.filter((path) => !gone(path));
 		for (const path of Object.keys(this.places)) if (gone(path)) delete this.places[path];
 		this.folder = undefined;
@@ -379,7 +379,7 @@ export class Seat {
 				playing: this.loosePlaying.filter((path) => this.places[path]),
 				places: this.places,
 				size: (path) => {
-					const board = this.of.deck.board(path);
+					const board = this.of.deck.card(path);
 					return board ? { w: board.w, h: board.h } : undefined;
 				},
 			});

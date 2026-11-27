@@ -55,7 +55,7 @@ test("a file request resolves relative to the board that asked", () => {
 	const roots = resolveRoots(deck, [{ path: shared, writable: false }]);
 
 	// `../../shared/report.html` from `boards/sources.html` means what it would
-	// mean in an <img src> on that board: up out of `boards/`, up out of the deck,
+	// mean in an <img src> on that card: up out of `boards/`, up out of the deck,
 	// then down into the sibling directory a root declared.
 	assert.equal(
 		resolveFileRequest(roots, { path: "../../shared/report.html", from: "boards/sources.html" }),

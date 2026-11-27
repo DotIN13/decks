@@ -1,4 +1,4 @@
-import { normalizeBoardPath } from "../../deck/schema.ts";
+import { normalizeCardPath } from "../../deck/schema.ts";
 import { UploadRefused } from "../../files/upload.ts";
 import { boardOnCanvas } from "../../calls/canvas-frame.ts";
 import { runVerb } from "../../calls/run.ts";
@@ -71,8 +71,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 	api.get(
 		"/thumb/*path",
 		asyncRoute(async (req, res) => {
-			const asked = normalizeBoardPath(wildcard(req));
-			const board = app.deck.board(asked) ?? appPage(asked, req) ?? docPage(asked);
+			const asked = normalizeCardPath(wildcard(req));
+			const board = app.deck.card(asked) ?? appPage(asked, req) ?? docPage(asked);
 			if (!board) {
 				res.status(404).end();
 				return;
@@ -198,7 +198,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const { bytes } = await buildBundle({
 				deckPath: app.deck.path,
 				deckName: app.deck.name,
-				board: (path) => app.deck.board(path),
+				board: (path) => app.deck.card(path),
 				stage: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.cards.boards(name) },
 				picture: async (board, scheme) => {
 					const near = app.thumbs.nearest(board, scheme, "whole");
@@ -233,7 +233,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 		 * when it was read), at its place on this drawing: what the canvas frame shows them from.
 		 */
 		const cards = pens.cards.boards(name).flatMap(({ path, x, y, w, h }) => {
-			const board = app.deck.board(path);
+			const board = app.deck.card(path);
 			return board ? [{ ...board, x, y, w, h }] : [];
 		});
 // Squeezed: a frame reads this whole each time it starts, and a large canvas's is most of a megabyte as it stands.
@@ -319,8 +319,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 			// The person's, in a Decks tab or a terminal, a paired front end's (Studio), or a canvas frame's for a card on its canvas.
 			const principal = req.principal;
 			if (!actsAsPerson(principal) && principal?.kind !== "canvas") throw new UploadRefused("Only the person, a front end paired with this harness, or a canvas frame sends this.", 403);
-			const path = normalizeBoardPath(typeof req.query.path === "string" ? req.query.path : "");
-			if (!app.deck.board(path)) {
+			const path = normalizeCardPath(typeof req.query.path === "string" ? req.query.path : "");
+			if (!app.deck.card(path)) {
 				res.status(404).type("text").send("No such board.");
 				return;
 			}

@@ -19,7 +19,7 @@ function deck(): string {
 	return root;
 }
 
-function board(w: number): string {
+function card(w: number): string {
 	return `<!doctype html><html><head><title>A</title><meta name="board" content='{"w":${w},"h":600}'></head><body class="board"></body></html>`;
 }
 
@@ -59,17 +59,17 @@ async function watching(root: string, changes: DeckChange[]): Promise<() => void
 	return stop;
 }
 
-const boards = (changes: DeckChange[]) => changes.filter((c) => c.kind === "board").map((c) => c.path);
+const boards = (changes: DeckChange[]) => changes.filter((c) => c.kind === "card").map((c) => c.path);
 
 test("an in-place write to a board is reported as that board", async () => {
 	const root = deck();
 	const file = join(root, "canvases", "t", "cards", "a", "index.html");
-	put(file, board(800));
+	put(file, card(800));
 
 	const changes: DeckChange[] = [];
 	const stop = await watching(root, changes);
 	try {
-		put(file, board(860));
+		put(file, card(860));
 		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/a/index.html")));
 	} finally {
 		stop();
@@ -81,25 +81,25 @@ test("an in-place write to a board is reported as that board", async () => {
  * The regression this file exists for.
  *
  * A save that replaces the file — every atomic editor, `sed -i`, `git checkout` — used to
- * be the last event that board ever produced: the recursive watcher stayed armed on the
+ * be the last event that card ever produced: the recursive watcher stayed armed on the
  * replaced inode, and the rename it did report named the temp file. So the interesting
  * assertion is not that the rename is noticed but that the *next ordinary write* still is.
  */
 test("a board is still heard after a rename replaces its file", async () => {
 	const root = deck();
 	const file = join(root, "canvases", "t", "cards", "a", "index.html");
-	put(file, board(800));
+	put(file, card(800));
 
 	const changes: DeckChange[] = [];
 	const stop = await watching(root, changes);
 	try {
 		const temp = join(root, "boards", ".tmp-a");
-		put(temp, board(860));
+		put(temp, card(860));
 		renameSync(temp, file);
 		assert.ok(await until(changes, (seen) => seen.some((c) => c.kind === "rescan")), "a rename asks for a rescan");
 
 		changes.length = 0;
-		put(file, board(920));
+		put(file, card(920));
 		assert.ok(
 			await until(changes, (seen) => boards(seen).includes("canvases/t/cards/a/index.html") || seen.some((c) => c.kind === "rescan")),
 			"the write after the rename is still heard",
@@ -118,8 +118,8 @@ test("the revision store is not watched, or every save would loop", async () => 
 	const stop = await watching(root, changes);
 	try {
 		put(join(root, ".decks", "revisions", "index.json"), "{}");
-		put(join(root, "canvases", "t", "cards", "b", "index.html"), board(800));
-		// The board is the thing that proves the watcher was listening at all; under load the watcher may
+		put(join(root, "canvases", "t", "cards", "b", "index.html"), card(800));
+		// The card is the thing that proves the watcher was listening at all; under load the watcher may
 		// say "look at everything" (a rescan) instead, as in the test above.
 		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/b/index.html") || seen.some((c) => c.kind === "rescan")));
 		assert.deepEqual(
@@ -138,7 +138,7 @@ test("nothing is reported after the watch is stopped", async () => {
 	const changes: DeckChange[] = [];
 	const stop = watchDeck(root, (change) => changes.push(change), 20);
 	stop();
-	put(join(root, "canvases", "t", "cards", "c", "index.html"), board(800));
+	put(join(root, "canvases", "t", "cards", "c", "index.html"), card(800));
 	await new Promise((resolve) => setTimeout(resolve, 300));
 	assert.deepEqual(changes, []);
 	rmSync(root, { recursive: true, force: true });

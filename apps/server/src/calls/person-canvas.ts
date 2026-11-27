@@ -129,7 +129,7 @@ export function canvasTable(host: CanvasTableHost): PersonVerbs {
 		"view.remember": async ([camera, options]) => {
 			const asked = (options ?? {}) as { agent?: string; canvas?: string; device?: string };
 			if (!agents.get(String(asked.agent))) return;
-			host.cameras.report(String(asked.agent), camera as never, { stage: asked.canvas, device: asked.device });
+			host.cameras.report(String(asked.agent), camera as never, { canvas: asked.canvas, device: asked.device });
 		},
 	};
 }

@@ -647,7 +647,7 @@ export class DeckAgent {
 	async run(text: string): Promise<{ report: string; boards: string[] }> {
 		this.worked = new Set();
 		await this.prompt(text);
-		const boards = [...this.worked].filter((path) => this.deck.board(path));
+		const boards = [...this.worked].filter((path) => this.deck.card(path));
 		return { report: this.conversation.translator.lastAssistantText(), boards };
 	}
 
@@ -656,7 +656,7 @@ export class DeckAgent {
 	 * what this turn did. The stage tool calls this; nothing reads authorship off the disk.
 	 */
 	workedOn(path: string): void {
-		if (!this.deck.board(path)) return;
+		if (!this.deck.card(path)) return;
 		this.worked.add(path);
 		this.host.wrote?.(path, this.id);
 	}

@@ -8,8 +8,8 @@ import { dirname, join } from "node:path";
  * Most changes of shape are moved once, when the deck opens, by a migration chosen by the deck's
  * version (`migrations/index.ts`). Three older ones were never moves: the running code reads the old
  * shape when it meets it and writes the new one back. They are the places an old `deck.json` laid its
- * boards out in (`oldBoardPlaces`, below), an agent's record that names a shared canvas, and an
- * agent's record that lists its own boards (`agents/old-records.ts`).
+ * cards out in (`oldCardPlaces`, below), an agent's record that names a shared canvas, and an
+ * agent's record that lists its own cards (`agents/old-records.ts`).
  *
  * Those readers used to run in every deck on every start. Now they run by the deck's version too: a
  * deck opened from below 0.1.0 is marked in `.decks/migrations.json` (`"old-shapes": { opened }`),
@@ -64,17 +64,17 @@ export function closeOldShapes(deck: string, now: Date = new Date()): void {
 }
 
 /**
- * 2026-09-16: where a board sits belongs to a canvas, not to `deck.json`.
+ * 2026-09-16: where a card sits belongs to a canvas, not to `deck.json`.
  *
  * Older files kept a `boards` map of `{ x, y, w, h }`. Its `x`/`y` are read once more, as the places
- * a canvas starts from (`deck/loader.ts` hands them to the first canvas that draws the board), and
- * the map is dropped on the next write of `deck.json` (`deck/schema.ts`). A size is the board's own
+ * a canvas starts from (`deck/loader.ts` hands them to the first canvas that draws the card), and
+ * the map is dropped on the next write of `deck.json` (`deck/schema.ts`). A size is the card's own
  * file's business now, so `w`/`h` are ignored.
  */
-export function oldBoardPlaces(boards: unknown, normalize: (path: string) => string, warnings: string[]): Record<string, { x: number; y: number }> {
+export function oldCardPlaces(cards: unknown, normalize: (path: string) => string, warnings: string[]): Record<string, { x: number; y: number }> {
 	const places: Record<string, { x: number; y: number }> = {};
-	if (!boards || typeof boards !== "object" || Array.isArray(boards)) return places;
-	for (const [path, value] of Object.entries(boards as Record<string, unknown>)) {
+	if (!cards || typeof cards !== "object" || Array.isArray(cards)) return places;
+	for (const [path, value] of Object.entries(cards as Record<string, unknown>)) {
 		const at = value as { x?: unknown; y?: unknown } | null;
 		const x = Number(at?.x);
 		const y = Number(at?.y);

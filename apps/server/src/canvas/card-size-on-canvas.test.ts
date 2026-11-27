@@ -54,7 +54,7 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		await settle();
 		const item = app.pens.cards.boards(one.seat.stageName()!).find((board) => board.path === mine);
 		assert.deepEqual([item?.w, item?.h], [900, 520], "and the stage file holds it");
-		assert.equal(app.deck.board(mine)?.h, 400, "while the board's own file is as its agent wrote it");
+		assert.equal(app.deck.card(mine)?.h, 400, "while the board's own file is as its agent wrote it");
 
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
 		two.seat.newStage("Another canvas");
@@ -124,7 +124,7 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 		await settle();
 		assert.deepEqual([on(first)?.x, on(first)?.y, on(first)?.h], [4000, 3000, 777], "the named canvas takes the move and the size");
 		assert.deepEqual([on(second)?.x, on(second)?.y, on(second)?.h], [before.x, before.y, before.h], "the focused agent's canvas is untouched");
-		assert.equal(app.deck.board(shown)?.h, 777, "the drag writes the board's own file, as a fit does");
+		assert.equal(app.deck.card(shown)?.h, 777, "the drag writes the board's own file, as a fit does");
 
 		await person(app, first, "card.hide", [shown]);
 		await settle();

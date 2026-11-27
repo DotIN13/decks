@@ -2,11 +2,11 @@ import { existsSync, readdirSync, statSync, watch, type FSWatcher } from "node:f
 import { cardFolders } from "./card-folders.ts";
 import { cardOf } from "@decks/hub/layout";
 import { basename, join } from "node:path";
-import { normalizeBoardPath } from "./schema.ts";
+import { normalizeCardPath } from "./schema.ts";
 
 export type DeckChange =
 	| { kind: "deck" }
-	| { kind: "board"; path: string }
+	| { kind: "card"; path: string }
 	| { kind: "asset"; path: string }
 	/**
 	 * "Stop trusting what you were told and look." Sent when a file under the deck was
@@ -28,14 +28,14 @@ export function ignored(path: string): boolean {
  *
  * A single save fires several events — an editor writes a temp file and renames,
  * an agent's `write` truncates then writes — so every path waits out a short
- * quiet period before it is reported. Without that, a board reloads three times
+ * quiet period before it is reported. Without that, a card reloads three times
  * per keystroke of the agent's and the flicker is the first thing anyone notices.
  *
  * **A replaced file gets a second answer as well**, and that is the interesting part. The
  * recursive watcher arms itself against the files it has seen, so a save that replaces a
- * board's inode — `sed -i`, `vim`, `git checkout`, any atomic write — is the *last* event
- * that board ever produces: the arm points at an inode nobody will write to again, and
- * the board goes quiet forever while its file carries on changing. That is worse than a
+ * card's inode — `sed -i`, `vim`, `git checkout`, any atomic write — is the *last* event
+ * that card ever produces: the arm points at an inode nobody will write to again, and
+ * the card goes quiet forever while its file carries on changing. That is worse than a
  * missed event, because nothing looks wrong.
  *
  * The trigger is the **inode**, not the event type, and that is not fussiness: the same
@@ -44,7 +44,7 @@ export function ignored(path: string): boolean {
  * whose inode is not the one it had a moment ago means whatever we were holding is stale,
  * whatever we were told it was called. Then the watcher is replaced outright and the deck
  * is asked to re-read itself — debounced, because a `git checkout` is a thousand of these
- * and one re-arm covers all of them, and cheap, because the re-read is a `stat` per board
+ * and one re-arm covers all of them, and cheap, because the re-read is a `stat` per card
  * (`Deck.resync`).
  */
 export function watchDeck(root: string, onChange: (change: DeckChange) => void, quietMs = 80): () => void {
@@ -57,12 +57,12 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 	const inodes = new Map<string, number>();
 
 	/**
-	 * Learn the inode of every board *before* the first event, so the very first save can
+	 * Learn the inode of every card *before* the first event, so the very first save can
 	 * be recognised as a replacement.
 	 *
 	 * Only the cards' folders, and that is the whole of the judgement: it is the set whose silence
-	 * costs something (a board that stops tracking its file looks fine and is wrong), it
-	 * is bounded by the number of boards, and it is walked again on every re-arm. An
+	 * costs something (a card that stops tracking its file looks fine and is wrong), it
+	 * is bounded by the number of cards, and it is walked again on every re-arm. An
 	 * assets directory can hold ten thousand files and none of them has a record here to
 	 * go stale.
 	 */
@@ -123,11 +123,11 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				if (replaced(path)) rearm();
 				// On a Mac the watcher also names the folders whose contents changed (and the deck's
 				// own folder); they are not files anyone edited, and reporting one as an asset sent a
-				// change for `boards` with every board save.
+				// change for `boards` with every card save.
 				if (isFolder(path) || isRootItself(path)) return;
 				if (path === "deck.json") onChange({ kind: "deck" });
 				// Anything in a card's folder is the card's: its `chart.js` changing is the card changing.
-				else if (cardOf(path)) onChange({ kind: "board", path: cardOf(path)! });
+				else if (cardOf(path)) onChange({ kind: "card", path: cardOf(path)! });
 				else onChange({ kind: "asset", path });
 			}, quietMs),
 		);
@@ -160,7 +160,7 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 					rearm();
 					return;
 				}
-				const path = normalizeBoardPath(filename.toString());
+				const path = normalizeCardPath(filename.toString());
 				if (ignored(path)) return;
 				// A rename is *sometimes* how a replacement announces itself, and the
 				// cheapest half of the answer; `replaced()` in `report` is the other half.

@@ -43,10 +43,10 @@ export function lookingLine(at: LookingAt, names: LookingNames): string {
 }
 
 /** The line, by the names a deck has now: its canvases' titles, its cards' titles, and the canvas the chat's camera is on. */
-export function lookingLineIn(at: LookingAt, deck: { board(path: string): { title?: string } | undefined }, pens: { has(name: string): boolean; titleOf(name: string): string } | undefined, behind: string | undefined): string {
+export function lookingLineIn(at: LookingAt, deck: { card(path: string): { title?: string } | undefined }, pens: { has(name: string): boolean; titleOf(name: string): string } | undefined, behind: string | undefined): string {
 	return lookingLine(at, {
 		canvasTitle: (name) => (pens?.has(name) ? pens.titleOf(name) : undefined),
-		cardTitle: (path) => deck.board(path)?.title || undefined,
+		cardTitle: (path) => deck.card(path)?.title || undefined,
 		behind: () => behind,
 	});
 }

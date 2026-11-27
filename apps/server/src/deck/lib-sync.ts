@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 /**
  * Bring a deck's `lib/` up to the primitives this build ships (DESIGN §2).
  *
- * `lib/` is a *copy* — that is the point of it, and not negotiable: a board is a
+ * `lib/` is a *copy* — that is the point of it, and not negotiable: a card is a
  * standalone document, so its stylesheet and its runtime have to be files sitting
  * beside it rather than a route this server serves. But a copy made once at
  * `Deck.create` and never touched again is a deck frozen at the version of Decks
@@ -15,7 +15,7 @@ import { join, relative } from "node:path";
  * application's directory rather than the user's.
  *
  * **Content-compared, not copied wholesale.** A restart that changes nothing must
- * write nothing — 82 files landing on disk would wake the watcher, and every board
+ * write nothing — 82 files landing on disk would wake the watcher, and every card
  * on the canvas would reload for no reason (`App.watch`, the `asset` case). So a
  * file is written only when its bytes actually differ, which makes the ordinary
  * restart a read-only operation and the summary below honestly empty.
@@ -24,7 +24,7 @@ import { join, relative } from "node:path";
  * is the one that can delete something a person put there. It earns its keep: the
  * vendored libraries rename files between versions (pdf.js moved its decoders into
  * `wasm/`), and a `pdf.worker.min.mjs` left over from an older pdf.js beside a
- * newer `pdf.min.mjs` is not a tidiness problem — it is a board that fails to open
+ * newer `pdf.min.mjs` is not a tidiness problem — it is a card that fails to open
  * a paper with a version-mismatch error nobody can place. Every removal is logged
  * by the caller for that reason. `lib/` is documented as managed, and a file of
  * your own belongs in `assets/`.
@@ -88,7 +88,7 @@ function copyChanged(from: string, to: string, deckLib: string, result: LibSync)
  * Not an mtime comparison, which is the usual shortcut and wrong here: a fresh
  * clone, an `npm ci` or a `cp -r` of a data directory all rewrite mtimes without
  * changing a byte, and each would then rewrite the whole of `lib/` and reload every
- * board on screen. Reading 9MB twice at startup is cheaper than being wrong about
+ * card on screen. Reading 9MB twice at startup is cheaper than being wrong about
  * that, and the size check means the read almost never happens.
  */
 function identical(target: string, bytes: Buffer): boolean {

@@ -3,15 +3,15 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * A board's runtime, cached by the browser for as long as it does not change.
+ * A card's runtime, cached by the browser for as long as it does not change.
  *
- * Every board asks for `../lib/board.css` and `../lib/board.js`, and through them the theme, four
+ * Every card asks for `../lib/board.css` and `../lib/board.js`, and through them the theme, four
  * fonts and the maths library. Served `no-cache`, each new page asked again for every one of them,
  * and each answer was a "not modified" that first waited for one of the browser's six connections to
- * the server: about 200 ms of a zoom in, before a single board could show. Cached outright, a deploy
+ * the server: about 200 ms of a zoom in, before a single card could show. Cached outright, a deploy
  * that changes `board.js` would go unseen.
  *
- * So the address carries the version. A board is served with its references to `lib/` rewritten to
+ * So the address carries the version. A card is served with its references to `lib/` rewritten to
  * `lib/~<version>/`, where the version is a hash of what `lib/` holds; an address with the current
  * version is cached for a year, and a new `lib/` is a new address. `board.js` finds its libraries
  * beside itself, so they come from the same versioned address. The file on disk is never changed:
@@ -53,9 +53,9 @@ export function libVersion(deckPath: string, now = Date.now()): string {
 }
 
 /**
- * A board's markup with its `href` and `src` references into `lib/` given the version: the relative
- * `../lib/` a board writes, at any depth, and the absolute `/api/lib/` a page outside `/api/card/` uses. Only
- * attributes are touched, so a board that shows `href="../lib/board.css"` as text, escaped, keeps it.
+ * A card's markup with its `href` and `src` references into `lib/` given the version: the relative
+ * `../lib/` a card writes, at any depth, and the absolute `/api/lib/` a page outside `/api/card/` uses. Only
+ * attributes are touched, so a card that shows `href="../lib/board.css"` as text, escaped, keeps it.
  */
 export function versionLibRefs(html: string, version: string): string {
 	return html.replace(/(\b(?:href|src)\s*=\s*["'])((?:\.\.\/)+lib\/|\/api\/lib\/)(?!~)/gi, `$1$2~${version}/`);

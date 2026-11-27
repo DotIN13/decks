@@ -180,12 +180,12 @@ export class CanvasService {
 
 	/** A card as its file has it, not as a canvas places it. */
 	fileBoard(path: string): Page | undefined {
-		return this.deck.board(path);
+		return this.deck.card(path);
 	}
 
 	/** Every board file in the deck, as its file has it, placed anywhere or nowhere. */
 	allBoards(): Page[] {
-		return [...this.deck.boards];
+		return [...this.deck.cards];
 	}
 
 	/** Say who last wrote a board: `you` for the person's own resize. */
@@ -227,7 +227,7 @@ export class CanvasService {
 		 * became per stage — so returning `deck.boards` here for a real app would tell every agent that
 		 * every board is at the origin, which is worse than saying nothing.
 		 */
-		return (this.host.boards?.(agentId) ?? this.deck.boards).map((board) => {
+		return (this.host.boards?.(agentId) ?? this.deck.cards).map((board) => {
 			// A measurement of an older revision is left off rather than reported: it is a
 			// number, and a number gets believed.
 			const content = this.host.extent(board.path, board.rev);
@@ -255,7 +255,7 @@ export class CanvasService {
 
 	/** Where Playwright should point to look at a card, under `/api/card/`. */
 	url(path: string, port: number): string {
-		const board = this.deck.board(path);
+		const board = this.deck.card(path);
 		const rev = board ? `?rev=${board.rev}` : "";
 		const encoded = path.split("/").map(encodeURIComponent).join("/");
 		return `http://127.0.0.1:${port}/api/card/${encoded}${rev}`;
@@ -296,7 +296,7 @@ export class CanvasService {
 	 * be a change the canvas does not know about.
 	 */
 	resize(path: string, size: { w?: number; h?: number }): Page {
-		const board = this.deck.board(path);
+		const board = this.deck.card(path);
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
@@ -323,7 +323,7 @@ export class CanvasService {
 		// The record first: an agent calls this straight after writing the content, and
 		// the revision we wait for a measurement of has to be the one now on disk.
 		this.deck.refresh(path);
-		const board = this.deck.board(path);
+		const board = this.deck.card(path);
 		if (!board) throw new Error(`No such board: ${path}`);
 
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
@@ -448,7 +448,7 @@ export class CanvasService {
 		options: { fit?: "board" | "all"; highlight?: string; animate?: boolean; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }>; stage?: string; timeoutMs?: number } = {},
 	): Promise<{ shown: string[]; deferred?: string }> {
 		for (const path of paths) {
-			if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
+			if (!this.deck.card(path)) throw new Error(`No such board: ${path}`);
 		}
 		/*
 		 * Drawn items travel as boxes rather than as ids, because where an item *is* is a
@@ -477,7 +477,7 @@ export class CanvasService {
 	 * canvas it shows), so the answer is a count rather than a guess.
 	 */
 	async reloadEverywhere(agentId: string, path: string, stage?: string): Promise<number> {
-		if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
+		if (!this.deck.card(path)) throw new Error(`No such board: ${path}`);
 		if (!this.host.connected()) return 0;
 		const call = { op: "reload" as const, agentId, args: { path, count: true, ...(stage ? { stage } : {}) } };
 		const answers = this.host.callAll ? await this.host.callAll(call, 1500) : [await this.host.call(call, 1500)];

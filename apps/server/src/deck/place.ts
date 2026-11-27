@@ -1,25 +1,25 @@
 /**
- * Where a board goes when nobody said where.
+ * Where a card goes when nobody said where.
  *
- * One rule, in one place, because the app has five ways for a board to arrive on a stage —
- * an agent's `decks.canvas.insert`, the ＋ in the corner, a board picked out of the
+ * One rule, in one place, because the app has five ways for a card to arrive on a canvas —
+ * an agent's `decks.canvas.insert`, the ＋ in the corner, a card picked out of the
  * panel, the shared-Chrome card — and each of them used to fall through to the deck's own auto-layout, which
- * put a new board below every board the stage had ever had a place for: a column a million
+ * put a new card below every card the canvas had ever had a place for: a column a million
  * pixels tall.
  *
- * The rule here is: **a board joins the stage beside the stage's newest board, stepping on to the
- * right past every board and drawn item in the way** (`@decks/deck-kit`, aim then step clear). The first board on an
- * empty stage goes at the origin.
+ * The rule here is: **a card joins the canvas beside the canvas's newest card, stepping on to the
+ * right past every card and drawn item in the way** (`@decks/deck-kit`, aim then step clear). The first card on an
+ * empty canvas goes at the origin.
  *
- * **It reads what is on the stage, and nothing about who is watching.** The anchor used to be the
+ * **It reads what is on the canvas, and nothing about who is watching.** The anchor used to be the
  * middle of the camera, and that broke twice: first a view of another canvas, then the view of
- * whichever browser panned last, on any stage. Both times boards landed tens of thousands of
- * pixels from their own. A stage's contents are the same for every viewer, so the answer is too, and no
+ * whichever browser panned last, on any canvas. Both times cards landed tens of thousands of
+ * pixels from their own. A canvas's contents are the same for every viewer, so the answer is too, and no
  * camera is taken as input anywhere in this file. Keep it that way: arriving where the person is
- * looking is the camera's job (`decks.view.focus` moves it onto the board), not the placement's.
+ * looking is the camera's job (`decks.view.focus` moves it onto the card), not the placement's.
  *
  * Nothing here reads or writes state. The caller is `agents/session.ts`, which owns the places,
- * the list of what is on the stage and the drawing around it.
+ * the list of what is on the canvas and the drawing around it.
  */
 
 import { GAP, placeBy, stepClear } from "@decks/deck-kit";
@@ -31,7 +31,7 @@ export interface Box {
 	h: number;
 }
 
-/** Space left between boards. The same number `deck/loader.ts` lays its fallback rows on. */
+/** Space left between cards. The same number `deck/loader.ts` lays its fallback rows on. */
 export const GUTTER = GAP;
 
 const touching = (a: Box, b: Box, gap: number): boolean =>
@@ -48,13 +48,13 @@ export function bounds(boxes: readonly Box[]): Box | undefined {
 }
 
 /**
- * Where a board joins a stage: aimed just right of the stage's newest board, top edges level, then
+ * Where a card joins a canvas: aimed just right of the canvas's newest card, top edges level, then
  * on to the right past whatever is in the way (`@decks/deck-kit`, `stepClear`), so a row of
- * newcomers stays a row. With nothing on the stage, the origin.
+ * newcomers stays a row. With nothing on the canvas, the origin.
  *
- * `newest` is the board last put on the stage, not the right-hand end of all of them: "beside
- * the board you were just shown" is the near that matters, and a row that has wrapped back or a
- * board dragged away should not drag every newcomer to the far edge.
+ * `newest` is the card last put on the canvas, not the right-hand end of all of them: "beside
+ * the card you were just shown" is the near that matters, and a row that has wrapped back or a
+ * card dragged away should not drag every newcomer to the far edge.
  */
 export function joinSpot(size: { w: number; h: number }, newest: Box | undefined, occupied: readonly Box[]): { x: number; y: number } {
 	const aim = newest ? placeBy(newest, "beside") : { x1: 0, y1: 0 };
@@ -63,18 +63,18 @@ export function joinSpot(size: { w: number; h: number }, newest: Box | undefined
 }
 
 /**
- * Is the place a board already has near enough to keep when it joins the canvas?
+ * Is the place a card already has near enough to keep when it joins the canvas?
  *
- * Yes when it sits within a board's length of the boards on the stage — which is what makes hiding a board and playing it again put it back
- * in its own hole rather than at the end of the row. No when it is neither: that is a board still
+ * Yes when it sits within a card's length of the cards on the canvas — which is what makes hiding a card and playing it again put it back
+ * in its own hole rather than at the end of the row. No when it is neither: that is a card still
  * carrying a place from the old deck-wide auto-layout, arriving a million pixels from anything.
  *
  * **An empty canvas keeps it too**, which is the case that has to be argued for rather than
  * assumed. There is nothing there to be near and so nothing to be far from, and a place is
  * somebody's decision — a drag, a drop, a deck laid out on purpose. Moving it here was worse than
- * useless: clearing the stage and playing one board back moved it, and every arrangement was one
+ * useless: clearing the canvas and playing one card back moved it, and every arrangement was one
  * clear-and-replay from being rebuilt. Nothing is lost by keeping it, because the camera arrives
- * on a board you asked for.
+ * on a card you asked for.
  */
 export function keepsPlace(box: Box, onCanvas: readonly Box[]): boolean {
 	const cluster = bounds(onCanvas);
@@ -84,14 +84,14 @@ export function keepsPlace(box: Box, onCanvas: readonly Box[]): boolean {
 }
 
 /**
- * The places a set of boards joining a canvas should take, and only the ones that need one.
+ * The places a set of cards joining a canvas should take, and only the ones that need one.
  *
- * The three cases in order: a board with no place gets the nearest open slot beside the stage's
- * newest board; a board whose place is near the boards already on the stage keeps it; a board
+ * The three cases in order: a card with no place gets the nearest open slot beside the canvas's
+ * newest card; a card whose place is near the cards already on the canvas keeps it; a card
  * whose place is far from all of them is placed again. What is returned is the new spots,
- * so the caller writes them into the agent's stage.
+ * so the caller writes them into the agent's canvas.
  *
- * Pure, so the rule is tested apart from the stage that uses it.
+ * Pure, so the rule is tested apart from the canvas that uses it.
  */
 export function joinPlaces(options: {
 	wanted: readonly string[];
@@ -99,12 +99,12 @@ export function joinPlaces(options: {
 	places: Readonly<Record<string, { x: number; y: number }>>;
 	size: (path: string) => { w: number; h: number } | undefined;
 	/**
-	 * What else is drawn on the stage (notes, shapes, frames, text), which a board must not land
-	 * on either. Boards themselves come from `places`.
+	 * What else is drawn on the canvas (notes, shapes, frames, text), which a card must not land
+	 * on either. Cards themselves come from `places`.
 	 */
 	drawn?: readonly Box[];
 	/**
-	 * Where the caller said a joining board goes, top-left corner. Taken as given, near or far,
+	 * Where the caller said a joining card goes, top-left corner. Taken as given, near or far,
 	 * clear or not: an agent that names a place has decided, and saying what it sits on is the
 	 * tool's job (`calls/tool.ts`), not a reason to move it here.
 	 */
@@ -124,10 +124,10 @@ export function joinPlaces(options: {
 		.map(boxOf)
 		.filter((box): box is Box => box !== undefined);
 	/*
-	 * What a newcomer has to keep clear of: the boards on the canvas, and any board that is merely
+	 * What a newcomer has to keep clear of: the cards on the canvas, and any card that is merely
 	 * *near* — placed, hidden, and close enough that playing it again would put it back where it
 	 * is. Everything else is filtered out by the same test, which keeps this cheap on a canvas that
-	 * still carries a place for hundreds of boards.
+	 * still carries a place for hundreds of cards.
 	 */
 	const occupied = [...onCanvas, ...drawn];
 	for (const path of Object.keys(places)) {
@@ -135,7 +135,7 @@ export function joinPlaces(options: {
 		const box = boxOf(path);
 		if (box && keepsPlace(box, onCanvas)) occupied.push(box);
 	}
-	/* The named places first, so the boards placed for themselves keep clear of them. */
+	/* The named places first, so the cards placed for themselves keep clear of them. */
 	for (const path of joining) {
 		const dimensions = size(path);
 		const named = at[path];

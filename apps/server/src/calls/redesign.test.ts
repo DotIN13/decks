@@ -91,7 +91,7 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 		const a = `canvases/${here.name}/cards/a/index.html`;
 		const b = `canvases/${here.name}/cards/b/index.html`;
 		assert.equal(put.card, a);
-		assert.ok(app.deck.board("canvases/t/cards/a/index.html"), "the other canvas keeps its own");
+		assert.ok(app.deck.card("canvases/t/cards/a/index.html"), "the other canvas keeps its own");
 		assert.deepEqual(put.box, { x1: 0, y1: 0, x2: 900, y2: 400 });
 		const file = JSON.parse(readFileSync(join(deck, "canvases", here.name, "canvas.pen"), "utf8"));
 		const node = file.children.find((one: { id: string }) => one.id === put.id);
@@ -121,7 +121,7 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 
 		const gone = (await must("canvas.delete", [b])).value;
 		assert.equal(gone.deleted, b);
-		assert.ok(app.deck.board(b), "a board's file stays in the deck");
+		assert.ok(app.deck.card(b), "a board's file stays in the deck");
 		assert.deepEqual((await must("card.canvases", [a])).value.map((one: { canvas: string }) => one.canvas), [here.name], "a canvas's card is on that canvas, and only there");
 		assert.deepEqual((await must("card.canvases", ["canvases/t/cards/a/index.html"])).value, [], "the card it was copied from is on no canvas, and says so");
 		assert.deepEqual((await must("card.canvases", [b])).value, []);

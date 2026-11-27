@@ -51,7 +51,7 @@ test("a place is kept when it is beside the stage's boards, and dropped when it 
 	const size = { w: 1000, h: 800 };
 	assert.equal(keepsPlace({ x: 1160, y: 0, ...size }, onCanvas), true, "one board along");
 	assert.equal(keepsPlace({ x: 0, y: 900_000, ...size }, onCanvas), false, "the old deck-wide column");
-	// Nothing on the stage is nothing to be far from, and a place is somebody's decision.
+	// Nothing on the canvas is nothing to be far from, and a place is somebody's decision.
 	assert.equal(keepsPlace({ x: 0, y: 900_000, ...size }, []), true, "the first board back on an empty stage");
 });
 

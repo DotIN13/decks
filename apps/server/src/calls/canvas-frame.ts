@@ -78,7 +78,7 @@ export function refusedForCanvas(app: Pick<CallsHost, "stage">, verb: string, ar
  * and a canvas frame speaks only of cards on its own canvas; the person and a paired site of any.
  */
 export function cardRefusedFor(app: Pick<CallsHost, "deck" | "stage">, principal: Principal | undefined, path: string): { status: number; error: string } | undefined {
-	if (!path || !app.deck.board(path)) return { status: 404, error: `There is no card or board at ${path || "that path"}.` };
+	if (!path || !app.deck.card(path)) return { status: 404, error: `There is no card or board at ${path || "that path"}.` };
 	if (actsAsPerson(principal)) return undefined;
 	if (principal?.kind === "canvas" && boardOnCanvas(app, path, principal.canvas)) return undefined;
 	return { status: 403, error: `${path} is not on this canvas.` };
