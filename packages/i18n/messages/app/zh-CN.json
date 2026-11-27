@@ -13,7 +13,6 @@
 	"app_open_tab": "打开标签页",
 	"app_stow_back": "显示输入框",
 	"app_own_copy": "{name} 是你自己的副本：可以随意修改，不会改动对方的版本。",
-	"app_clear_canvas": "移除所有卡片…",
 	"app_dark_mode": "深色模式",
 	"app_shortcuts": "快捷键",
 	"app_settings": "设置",
@@ -30,9 +29,6 @@
 	"app_dest_to": "发给 {name}",
 	"app_dest_none": "无智能体",
 	"app_server_answered": "服务器返回了 {status}",
-	"app_clear_canvas_ask_title": "从此画布移除全部 {count} 张卡片？",
-	"app_clear_canvas_ask_body": "卡片会从画布上移除，它们的文件夹仍保留在牌组中，绘图也保留。",
-	"app_clear_canvas_ask_yes": "移除卡片",
 	"app_offline": "正在重新连接… 现在发送的内容会等待，连接恢复后发出。",
 	"app_back_online": "已重新连接。"
 }

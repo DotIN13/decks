@@ -125,6 +125,5 @@
 	"composer_pill_yours_in": "Your comment, #{component}",
 	"composer_pill_file": "File, in the deck as {path}",
 	"composer_pill_item": "On the canvas, a drawn item",
-	"composer_pill_card": "On the canvas, a board or card: {path}",
-	"composer_context_short": "{percent} context"
+	"composer_pill_card": "On the canvas, a board or card: {path}"
 }

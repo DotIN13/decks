@@ -98,10 +98,6 @@
 /** @typedef {{}} Agents_Ws_NamedInputs */
 /** @typedef {{}} App_Back_OnlineInputs */
 /** @typedef {{}} App_CancelInputs */
-/** @typedef {{}} App_Clear_CanvasInputs */
-/** @typedef {{}} App_Clear_Canvas_Ask_BodyInputs */
-/** @typedef {{ count: NonNullable<unknown> }} App_Clear_Canvas_Ask_TitleInputs */
-/** @typedef {{}} App_Clear_Canvas_Ask_YesInputs */
 /** @typedef {{}} App_Dark_ModeInputs */
 /** @typedef {{}} App_DeleteInputs */
 /** @typedef {{ folder: NonNullable<unknown> }} App_Delete_App_BodyInputs */
@@ -729,7 +725,6 @@
 /** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_DialInputs */
 /** @typedef {{}} Composer_Context_LabelInputs */
 /** @typedef {{}} Composer_Context_SessionInputs */
-/** @typedef {{ percent: NonNullable<unknown> }} Composer_Context_ShortInputs */
 /** @typedef {{}} Composer_Context_UsageInputs */
 /** @typedef {{}} Composer_Context_UsedInputs */
 /** @typedef {{}} Composer_Context_WindowInputs */
@@ -1979,22 +1974,6 @@ export const app_back_online = /** @type {(inputs: App_Back_OnlineInputs) => Loc
 
 export const app_cancel = /** @type {(inputs: App_CancelInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Cancel`)
-};
-
-export const app_clear_canvas = /** @type {(inputs: App_Clear_CanvasInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Remove all cards…`)
-};
-
-export const app_clear_canvas_ask_body = /** @type {(inputs: App_Clear_Canvas_Ask_BodyInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`The cards come off the canvas. Their folders stay in the deck, and the drawing stays.`)
-};
-
-export const app_clear_canvas_ask_title = /** @type {(inputs: App_Clear_Canvas_Ask_TitleInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`Remove all ${i?.count} cards from this canvas?`)
-};
-
-export const app_clear_canvas_ask_yes = /** @type {(inputs: App_Clear_Canvas_Ask_YesInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Remove cards`)
 };
 
 export const app_dark_mode = /** @type {(inputs: App_Dark_ModeInputs) => LocalizedString} */ () => {
@@ -4527,10 +4506,6 @@ export const composer_context_label = /** @type {(inputs: Composer_Context_Label
 
 export const composer_context_session = /** @type {(inputs: Composer_Context_SessionInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`This session`)
-};
-
-export const composer_context_short = /** @type {(inputs: Composer_Context_ShortInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`${i?.percent} context`)
 };
 
 export const composer_context_usage = /** @type {(inputs: Composer_Context_UsageInputs) => LocalizedString} */ () => {

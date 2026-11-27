@@ -3,6 +3,7 @@ import { Show } from "solid-js";
 import { Popover } from "@decks/ui";
 import { formatNumber, m } from "@decks/i18n";
 import { ContextSummary } from "./ContextSummary.tsx";
+import { ContextRing } from "../shell/ContextRing.tsx";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 
 /**
@@ -14,7 +15,7 @@ import { contextLevel, contextPercent } from "../lib/context-usage.ts";
  * model and the send button competed with both for a glance it does not deserve, and it
  * only lived there because there was no second row for it to live in.
  *
- * Ambient rather than alarming: a small bar that fills as the conversation grows, amber
+ * Ambient rather than alarming: a small ring that fills as the conversation grows, amber
  * over 70% and red over 85%, which are the two points where the next long turn is the one
  * that gets truncated. Pressing it opens the numbers behind it.
  */
@@ -59,12 +60,11 @@ export function ContextDial(props: {
 								aria-label={m.composer_context_dial({ percent: formatNumber(Math.round(value()) / 100, { style: "percent" }) })}
 								onClick={api.toggle}
 							>
-								{/* A bar, not a ring: a part-filled ring beside Send read as a loading
-								    spinner (UI review). The word says what it measures. */}
-								<span class="dial-bar" aria-hidden="true">
-									<i style={{ width: `${Math.min(100, Math.max(2, value()))}%` }} />
-								</span>
-								{m.composer_context_short({ percent: formatNumber(Math.round(value()) / 100, { style: "percent" }) })}
+								{/* The ring is `shell/ContextRing.tsx`, shared with the `⋯` row on a
+								    touchscreen — it was written out in both and the two drifted apart on
+								    the radius. */}
+								<ContextRing usage={props.usage} size={16} />
+								{formatNumber(Math.round(value()) / 100, { style: "percent" })}
 							</button>
 						);
 					}}

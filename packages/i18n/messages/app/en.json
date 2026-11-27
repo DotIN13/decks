@@ -13,7 +13,6 @@
 	"app_open_tab": "Open a tab",
 	"app_stow_back": "Bring the input bar back",
 	"app_own_copy": "{name} is your own copy: change it as you like. It never changes theirs.",
-	"app_clear_canvas": "Remove all cards…",
 	"app_dark_mode": "Dark mode",
 	"app_shortcuts": "Shortcuts",
 	"app_settings": "Settings",
@@ -30,9 +29,6 @@
 	"app_dest_to": "to {name}",
 	"app_dest_none": "no agent",
 	"app_server_answered": "the server answered {status}",
-	"app_clear_canvas_ask_title": "Remove all {count} cards from this canvas?",
-	"app_clear_canvas_ask_body": "The cards come off the canvas. Their folders stay in the deck, and the drawing stays.",
-	"app_clear_canvas_ask_yes": "Remove cards",
 	"app_offline": "Reconnecting… What you send now waits, and goes when the connection is back.",
 	"app_back_online": "Connected again."
 }

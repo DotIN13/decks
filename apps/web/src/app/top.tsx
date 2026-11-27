@@ -31,14 +31,14 @@ import { canvasOnScreen, front, onCanvas } from "../tabs/tabs.ts";
  * a card, a document or an app in front the right end also holds what that tab offers (`TabActs`).
  */
 export function Top(props: { parts: Parts }) {
-	const { layout, present, stagePages, canvasHost } = props.parts;
+	const { layout, present, canvasHost } = props.parts;
 	const phone = layout.phone;
 	/** A phone's or a tablet's bar (`tabs/budget.ts`): the chip names the tab in front, the tabs are one count, and the + is in ⋯. */
 	const touch = () => touchTop(phone());
 	/** What a touch bar's chip says: the tab in front, whatever its kind. (A desktop's bar has a row of tabs and no chip of its own.) */
 	const shownTitle = () => (touch() && !onCanvas() ? (kindOf(front().kind)?.title(front()) ?? front().target) : canvasOnScreen()?.title);
 	/** The ⋯ menu: on a touch bar it also opens a tab, which the bar has no + for. */
-	const more = () => [...(touch() ? [{ label: m.app_open_tab(), icon: Plus, onPick: openPlus }] : []), ...moreItems(stagePages)];
+	const more = () => [...(touch() ? [{ label: m.app_open_tab(), icon: Plus, onPick: openPlus }] : []), ...moreItems()];
 	/** The agents whose canvas is the one on screen: the faces in the top-right bar. */
 	const hereAgents = createMemo(() => {
 		const stage = canvasOnScreen()?.name;
