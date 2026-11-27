@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, renameSync, statSync, watch, type FSWatcher } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { applyEdits, diff, parse, serialize, type PenDocument, type PenEdit } from "@decks/pen";
@@ -6,8 +5,9 @@ import { canvasFolder, ownerFolderBase, plainSegment, SHARED_CANVASES, sharedNam
 import { Bases } from "./bases.ts";
 import { SyncScheduler } from "./scheduler.ts";
 import { FileSync } from "./file-sync.ts";
+import { PictureSync, THUMBS } from "./picture-sync.ts";
 import { StudioTransport, type PresenceMessage } from "./transport.ts";
-import { RECHECK_MS, sha256 as hashOf } from "./hash-cache.ts";
+import { RECHECK_MS } from "./hash-cache.ts";
 import { cost, folderOf, isShared, readFileSync, SyncStore, writeFileSync, type CanvasState, type SyncOptions } from "./state.ts";
 
 import { LiveEvent, type SyncProgress, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
@@ -62,11 +62,9 @@ export class HarnessSync {
 	private readonly scheduler: SyncScheduler;
 	private readonly transport: StudioTransport;
 	private readonly files: FileSync;
+	private readonly pictures: PictureSync;
 	private watchers: FSWatcher[] = [];
 	readonly skipped = new Set<string>();
-	/** Canvases whose drawing changed since their picture was last taken, and when each was taken. */
-	private pictureDue = new Set<string>();
-	private pictureAt = new Map<string, number>();
 	readonly conflicts: string[] = [];
 
 	// ---- what a targeted pass has to do ----
@@ -88,15 +86,13 @@ export class HarnessSync {
 	private changesRoute = true;
 	/** Canvases Studio refused to take up, so each refusal is logged once. */
 	private refused = new Set<string>();
-	/** Which canvas a board picture in `.decks/thumbs` belongs to, by its file name's prefix. */
-	private thumbOwner = new Map<string, string>();
-
 	constructor(private readonly o: SyncOptions) {
 		this.bases = new Bases(join(o.deck, ".decks", "sync"));
 		this.store = new SyncStore(o.deck, o.studio, this.bases);
 		this.scheduler = new SyncScheduler({ log: (line) => this.log(line), progress: o.progress, hashes: this.store.hashes, skipped: this.skipped, resume: () => void this.sync(), targeted: () => this.targeted() });
 		this.transport = new StudioTransport(o, (line) => this.log(line), this.store, this.bases, this.scheduler);
 		this.files = new FileSync(o, (line) => this.log(line), this.store, this.transport, this.scheduler, this.skipped, this.conflicts);
+		this.pictures = new PictureSync(o, (line) => this.log(line), this.store, this.transport, this.scheduler, this.files);
 	}
 
 	private log(line: string) {
@@ -169,10 +165,10 @@ export class HarnessSync {
 			if (files.has(name)) {
 				this.files.plan([[name, c]]);
 				const remote = await this.files.syncCanvasFiles(name, c, false);
-				if (remote && c.role !== "view") await this.syncPictures(name, s.id, remote);
-			} else if (pictures.has(name) && c.role !== "view") await this.syncPictures(name, s.id);
+				if (remote && c.role !== "view") await this.pictures.syncPictures(name, s.id, remote);
+			} else if (pictures.has(name) && c.role !== "view") await this.pictures.syncPictures(name, s.id);
 		}
-		await this.syncCanvasPictures();
+		await this.pictures.syncCanvasPictures();
 		this.store.save();
 	}
 
@@ -270,7 +266,7 @@ export class HarnessSync {
 			this.writePen(name, this.bases.of(canvas.id)!.text, { text });
 			this.writeMeta(name, { studio: canvas.id });
 			known.add(canvas.id);
-			this.pictureDue.add(name);
+			this.pictures.want(name);
 			this.log(`uploaded canvas ${name}${mine ? ` (a copy of ${mine.name}, now its own canvas)` : ""}`);
 		}
 		remote = (await this.transport.call("GET", "/sync/v1/canvases")).canvases;
@@ -329,15 +325,15 @@ export class HarnessSync {
 			this.scheduler.say({ canvases: { done: this.scheduler.told.canvases.done + 1, total: synced.length } });
 			if (!remote) continue;
 			lists.set(name, remote);
-			if (c.role !== "view" && !remote.has(`${PICTURES}/canvas.light.jpg`)) this.pictureDue.add(name);
+			if (c.role !== "view" && !remote.has(`${PICTURES}/canvas.light.jpg`)) this.pictures.want(name);
 		}
-		await this.syncCanvasPictures();
+		await this.pictures.syncCanvasPictures();
 		for (const [name, c] of synced) {
 			const s = this.store.state.canvases[name];
 			const remote = lists.get(name);
-			if (s && remote && c.role !== "view" && !this.scheduler.holding("files")) await this.syncPictures(name, s.id, remote);
+			if (s && remote && c.role !== "view" && !this.scheduler.holding("files")) await this.pictures.syncPictures(name, s.id, remote);
 		}
-		await this.syncCanvasPictures();
+		await this.pictures.syncCanvasPictures();
 	}
 
 	/** The Studio id a folder's `canvas.json` carries, or undefined. */
@@ -362,7 +358,7 @@ export class HarnessSync {
 		this.writeMeta(name, { studio: id });
 		known.add(id);
 		this.adopted.add(name);
-		this.pictureDue.add(name);
+		this.pictures.want(name);
 		this.log(`canvas ${name} ${why}: what is here and not there is merged into it`);
 	}
 
@@ -430,7 +426,7 @@ export class HarnessSync {
 		if (this.adopted.delete(name)) edits = edits.filter((e) => e.op !== "remove");
 		let next: { doc: PenDocument; rev: number } | undefined;
 		if (edits.length && remote.role !== "view") {
-			this.pictureDue.add(name);
+			this.pictures.want(name);
 			const r = await this.transport.postEdits(s.id, { base: s.rev, edits, client: this.transport.me });
 			if (!r) return;
 			if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
@@ -442,7 +438,7 @@ export class HarnessSync {
 			}
 		} else if (edits.length || (this.latest.get(s.id) ?? s.rev) > s.rev || this.inbox.get(s.id)?.length) {
 			next = await this.changesSince(s, base.doc);
-			if (next) this.pictureDue.add(name);
+			if (next) this.pictures.want(name);
 		}
 		if (!next) {
 			// Nothing to do, and the file is what was agreed: not read again until it changes.
@@ -579,85 +575,6 @@ export class HarnessSync {
 		writeFileSync(file, `${JSON.stringify(next, null, "\t")}\n`);
 	}
 
-	/**
-	 * A picture of each canvas whose drawing changed, taken by this harness's own `canvas.screenshot`
-	 * (native, a few milliseconds), for its card in Studio. At most one a minute per canvas; a canvas
-	 * Studio has no picture of yet is taken first.
-	 */
-	private async syncCanvasPictures() {
-		const started = performance.now();
-		try {
-			await this.takeCanvasPictures();
-		} finally {
-			cost.pictureMs += performance.now() - started;
-		}
-	}
-
-	private async takeCanvasPictures() {
-		if (!this.o.harness) return;
-		for (const name of [...this.pictureDue]) {
-			// Studio asked for a wait: the pictures stay due, taken when it is over.
-			if (this.scheduler.holding("files")) return;
-			const s = this.store.state.canvases[name];
-			if (!s || Date.now() - (this.pictureAt.get(name) ?? 0) < 60_000) continue;
-			this.pictureDue.delete(name);
-			this.pictureAt.set(name, Date.now());
-			try {
-				const res = await fetch(new URL("/api/v1/canvas.screenshot", this.o.harness), {
-					method: "POST",
-					headers: { "Content-Type": "application/json", ...(this.o.harnessToken ? { Authorization: `Bearer ${this.o.harnessToken()}` } : {}) },
-					body: JSON.stringify({ args: [{ canvas: name, format: "jpeg", scheme: "light" }] }),
-				});
-				const shot = (await res.json()) as { ok?: boolean; value?: { file?: string } };
-				if (!shot.ok || !shot.value?.file) continue;
-				const file = shot.value.file.startsWith("/") ? shot.value.file : join(this.o.deck, shot.value.file);
-				const bytes = readFileSync(file);
-				const sent = await this.transport.upload(name, s.id, `${PICTURES}/canvas.light.jpg`, bytes, hashOf(bytes));
-				if (!sent && this.scheduler.holding("files")) {
-					this.pictureDue.add(name);
-					this.pictureAt.delete(name);
-				}
-			} catch (error) {
-				this.log(`no picture of canvas ${name}: ${(error as Error).message}`);
-			}
-		}
-	}
-
-	/**
-	 * Each card's newest picture, so Studio can draw it when the card is not live: the whole one when
-	 * the harness has taken it, else its widest rung (800, then 480, which every card on a canvas has).
-	 */
-	private async syncPictures(name: string, id: string, remote?: Map<string, SyncFile>) {
-		const there = remote ?? new Map<string, SyncFile>(((await this.transport.call("GET", `/sync/v1/canvases/${id}/files`)).files as SyncFile[]).map((f) => [f.path, f]));
-		if (!there.has(`${PICTURES}/canvas.light.jpg`)) this.pictureDue.add(name);
-		const dir = join(this.o.deck, ".decks", "thumbs");
-		if (!existsSync(dir)) return;
-		const thumbs = readdirSync(dir);
-		const folder = canvasFolder(name);
-		for (const path of this.files.bundle(name).keys()) {
-			if (!/^cards\/[^/]+\/index\.html$/.test(path) && !/^boards\/.+\.html$/.test(path)) continue;
-			const prefix = createHash("sha1").update(`${folder}/${path}`).digest("hex").slice(0, 16);
-			this.thumbOwner.set(prefix, name);
-			for (const scheme of ["light", "dark"]) {
-				const re = new RegExp(`^${prefix}-(\\d+)-${scheme}-\\d+-whole(?:-w(800|480))?-l\\d+\\.webp$`);
-				const found = thumbs.flatMap((t) => {
-					const m = re.exec(t);
-					return m ? [{ t, rev: m[1]!, width: m[2] ? Number(m[2]) : Number.POSITIVE_INFINITY, at: statSync(join(dir, t)).mtimeMs }] : [];
-				});
-				if (found.length === 0) continue;
-				// The newest revision's, its widest.
-				const rev = found.reduce((a, b) => (b.at > a.at ? b : a)).rev;
-				const newest = found.filter((one) => one.rev === rev).sort((a, b) => b.width - a.width)[0]!;
-				const target = `${PICTURES}/${path}.${scheme}.webp`;
-				const full = join(dir, newest.t);
-				const got = this.store.hashes.hash(full);
-				if (!got || there.get(target)?.hash === got.hash) continue;
-				await this.transport.upload(name, id, target, got.bytes ?? readFileSync(full), got.hash);
-				if (this.scheduler.holding("files")) return;
-			}
-		}
-	}
-
 	// ---- edits made here, sent as they are logged ----
 
 	/**
@@ -693,7 +610,7 @@ export class HarnessSync {
 			return;
 		}
 		const edits = queued.flat();
-		this.pictureDue.add(name);
+		this.pictures.want(name);
 		const r = await this.transport.postEdits(s.id, { base: s.rev, edits, client: this.transport.me });
 		// Held: the file holds them, and the pass after the wait compares it (`syncCanvas`).
 		if (!r) return void this.scheduler.dirtyPens.add(name);
@@ -781,7 +698,7 @@ export class HarnessSync {
 			name = sharedName(parts[0]!, parts[1]!);
 			rest = parts.slice(2);
 		} else if (top === THUMBS) {
-			const owner = this.thumbOwner.get(parts[0]!.slice(0, 16));
+			const owner = this.pictures.ownerOfThumb(parts[0]!.slice(0, 16));
 			if (owner) {
 				this.scheduler.dirtyPictures.add(owner);
 				this.scheduler.soon(1000);
@@ -839,9 +756,6 @@ export class HarnessSync {
 		return this.scheduler.progress();
 	}
 }
-
-/** Card pictures the harness keeps, watched so a new one goes up with its canvas. */
-const THUMBS = ".decks/thumbs";
 
 /**
  * Edits applied as far as they fit: an insert of an item already there, or an edit to one gone, is

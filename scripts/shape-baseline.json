@@ -2,7 +2,7 @@
 	"counts": {
 		"files over 1,000 lines": 6,
 		"functions over 150 lines": 42,
-		"classes over 30 methods": 10,
+		"classes over 30 methods": 9,
 		"server folder pairs that import each other": 12,
 		"imports across packages by relative path": 0,
 		"\"one release\" notes": 0,
@@ -67,8 +67,7 @@
 		"apps/server/src/runtimes/opencode/backend.ts: OpencodeBackend": 32,
 		"apps/server/src/runtimes/opencode2/backend.ts: Opencode2Backend": 38,
 		"packages/docs/src/page/gview.ts: GoogleView": 73,
-		"packages/docs/src/page/live.ts: LiveEditor": 47,
-		"packages/sync-client/src/sync.ts: HarnessSync": 32
+		"packages/docs/src/page/live.ts: LiveEditor": 47
 	},
 	"upward": [
 		"apps/server/src/agents/backend.ts -> apps/server/src/calls/tool.ts",
