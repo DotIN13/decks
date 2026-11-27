@@ -1,16 +1,23 @@
-import { createHash } from "node:crypto";
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync as readFileRaw, renameSync, rmSync, statSync, writeFileSync as writeFileRaw, watch, type FSWatcher } from "node:fs";
-import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
-import { applyEdits, diff, parse, serialize, type PenDocument, type PenEdit } from "@decks/pen";
-import WebSocket from "ws";
-import { canvasFolder, ownerFolderBase, plainSegment, servedAs, SHARED_CANVASES, sharedName, sharedParts } from "@decks/hub/layout";
-import { HashCache, RECHECK_MS, sha256 as hashOf } from "./hash-cache.ts";
-
-import { LiveEvent, OWN_PARTS, type SyncProgress, type TokenGiven, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
+import { join } from "node:path";
+import type { PenEdit } from "@decks/pen";
+import { PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type LiveEvent, type SyncCanvas, type SyncFile, type SyncProgress } from "@decks/sync-protocol";
+import { Bases } from "./bases.ts";
+import { CanvasSync } from "./canvas-sync.ts";
+import { FileSync } from "./file-sync.ts";
+import { RECHECK_MS } from "./hash-cache.ts";
+import { PictureSync } from "./picture-sync.ts";
+import { SyncScheduler } from "./scheduler.ts";
+import { SyncStore, type SyncOptions } from "./state.ts";
+import { StudioTransport, type PresenceMessage } from "./transport.ts";
+import { FolderWatch } from "./watch.ts";
 
 // The rules a harness checks what a service sends against, from @decks/sync-protocol.
 export { safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking };
-const MIRRORED: readonly string[] = MIRRORED_PARTS;
+export type { SyncOptions };
+export { conflictName, landingFor } from "./file-sync.ts";
+
+/** The backstop: a pass over every canvas this often, besides the targeted ones. */
+export const FULL_PASS_MS = 5 * 60_000;
 
 /**
  * Keeps this harness's canvases and Decks Studio in step, once Studio has given it an API key.
@@ -47,705 +54,112 @@ const MIRRORED: readonly string[] = MIRRORED_PARTS;
  * file both sides have, differently, with no version agreed on, is a conflict: Studio's copy stays
  * current, this one is kept beside it as `<name>.conflict-<when>.<ext>` and goes up like any file,
  * so both are seen everywhere and a person chooses.
+ *
+ * This class is the front: it builds the parts and runs the passes over them. Each part keeps its
+ * own subject and its own fields — `StudioTransport` (every call to Studio and the live socket),
+ * `SyncScheduler` (the queue, Studio's waits, the progress), `CanvasSync` (the drawings),
+ * `FileSync` (the files), `PictureSync` (the pictures) and `FolderWatch` (the folder) — shares the
+ * options and the stored state (`state.ts`), and reaches the others only through what they offer.
  */
-export interface SyncOptions {
-	deck: string;
-	studio: string;
-	key: string;
-	log?: (line: string) => void;
-	/**
-	 * This harness's own address (`http://127.0.0.1:4329`), for a picture of each canvas: Studio
-	 * shows it on the canvas's card. Absent: no canvas pictures, only cards'.
-	 */
-	harness?: string;
-	/** A person token for this harness, read per call: what its screenshot call carries (`auth/guard.ts`). */
-	harnessToken?: () => string;
-	/**
-	 * This harness's apps (`apps/service.ts`), told to Studio so it can list them beside the
-	 * canvases. Absent: nothing is told.
-	 */
-	inventory?: () => Array<{ name: string; title: string; kind: string }>;
-	/**
-	 * A harness token for a Studio person's browser, when Studio asks for one over the live socket
-	 * (`token.ask`): issued by the harness for that person, bound to Studio's origin, with when it lapses
-	 * unused. It may throw, with a sentence Studio is told. Absent: every ask is refused.
-	 */
-	issueToken?: (ask: { user: { id: string; name: string }; origin: string }) => { token: string; expires: number };
-	/**
-	 * The key stopped being Studio's link: `revoked`, Studio closed the socket because the key was revoked
-	 * there (the harness removed in Studio); `changed`, the harness's own key was removed or replaced
-	 * (`apps/server/src/studio`). What was given through it should go.
-	 */
-	unlinked?: (why: "revoked" | "changed") => void;
-	/**
-	 * Where a drawing from Studio is written: through the harness's canvas store, which records the
-	 * write as Studio's (`by`, Studio's user id or "studio"), so what came down is not sent up again
-	 * (`edited`). Answers false to have the file written here instead. Absent: the file is written.
-	 */
-	remote?: { write(name: string, text: string, by: string): boolean };
-	/**
-	 * Someone elsewhere is on a canvas kept here: a person on a Studio page, or a person or an agent on
-	 * another harness (`by.harness`). Said as Studio says it, by the canvas's name here.
-	 */
-	presence?: (name: string, event: Extract<LiveEvent, { type: "presence" }>) => void;
-	/**
-	 * How far the deck is in step with Studio, each time that changes (at most four times a second while
-	 * files move, at once when the state does): for Settings, and for Studio (`SyncProgress`).
-	 */
-	progress?: (progress: SyncProgress) => void;
-}
-
-interface CanvasState {
-	id: string;
-	rev: number;
-	/** The drawing both sides last agreed on, kept here before 2026-10-21; now in `.decks/sync/<id>.pen`. */
-	pen?: string;
-	/** The canvas's files both sides last agreed on, by their path in the canvas's folder. */
-	files: Record<string, { version: number; hash: string }>;
-}
-
-interface State {
-	studio: string;
-	/** The Studio account this state belongs to: a key for another account starts afresh. */
-	user?: string;
-	/** By the canvas's name here: `plan`, or `shared/<owner>/<canvas>` for a friend's. */
-	canvases: Record<string, CanvasState>;
-	/** The folder each friend's canvases land in, by their account id: their name, made unique once. */
-	owners?: Record<string, string>;
-	/** The hash of the app list last told to Studio. */
-	inventory?: string;
-}
-
-/**
- * What sync costs, counted for the bench (`DECKS_STUDIO_STATS`: a file each pass appends one JSON
- * line to): bytes read from disk, bytes hashed and how many files, bytes written, bytes Studio sent,
- * how many canvases a pass looked at, and the time spent taking canvas pictures (at most one a minute each).
- */
-const cost = { read: 0, hashed: 0, files: 0, written: 0, received: 0, canvases: 0, pictureMs: 0 };
-const readFileSync = ((...args: Parameters<typeof readFileRaw>) => {
-	const out = readFileRaw(...args);
-	cost.read += out.length;
-	return out;
-}) as typeof readFileRaw;
-const writeFileSync = ((file: Parameters<typeof writeFileRaw>[0], data: string | Uint8Array, options?: Parameters<typeof writeFileRaw>[2]) => {
-	cost.written += typeof data === "string" ? Buffer.byteLength(data) : data.length;
-	writeFileRaw(file, data, options);
-}) as typeof writeFileRaw;
-
-/** The backstop: a pass over every canvas this often, besides the targeted ones. */
-export const FULL_PASS_MS = 5 * 60_000;
-/** Files bigger than this are not synced, and are listed in `skipped`. */
-const MAX_BYTES = 50 * 1024 * 1024;
-
-/*
- * What Studio sends is not trusted to name places on this disk. A canvas's name becomes a folder
- * under canvases/ or shared/canvases/, an owner's name a folder under shared/canvases/, and a file's
- * path a file in that canvas's folder (or this deck's assets/ and docs/); any of them, unchecked,
- * could be `../../.ssh/authorized_keys`. So a name is one plain segment, a path is in a bundle part
- * with no `..` and no hidden part, and nothing is written through a symbolic link. Anything else is
- * skipped and said in the log.
- */
-/**
- * Where a deck-relative path lands, or a sentence saying why it may not: outside the deck, in a
- * hidden folder, or through a symbolic link anywhere on the way (one an agent made would send the
- * write elsewhere).
- */
-export function landingFor(deck: string, path: string): { full: string } | { refused: string } {
-	if (typeof path !== "string" || !path || path.includes("\\") || path.includes("\0")) return { refused: "not a plain path" };
-	const parts = path.split("/");
-	if (parts.some((part) => part === "" || part === "." || part === ".." || (part.startsWith(".") && part !== PICTURES))) return { refused: "not a plain path, or in a hidden folder" };
-	const full = resolve(deck, ...parts);
-	const inside = relative(resolve(deck), full);
-	if (!inside || inside.startsWith("..") || isAbsolute(inside)) return { refused: "outside the deck" };
-	let at = resolve(deck);
-	for (const part of inside.split(sep)) {
-		at = join(at, part);
-		let link = false;
-		try {
-			link = lstatSync(at).isSymbolicLink();
-		} catch {
-			break; // Not there yet: nothing further on can be a link either.
-		}
-		if (link) return { refused: `${relative(deck, at).split(sep).join("/")} is a symbolic link` };
-	}
-	return { full };
-}
-
-/** `boards/plan.html` kept beside a conflict as `boards/plan.conflict-20261103-0012.html`; a second one the same minute gets the seconds too. */
-export function conflictName(path: string, now = new Date()): string {
-	const at = path.lastIndexOf("/");
-	const file = path.slice(at + 1);
-	const dot = file.lastIndexOf(".");
-	const stem = dot > 0 ? file.slice(0, dot) : file;
-	const ext = dot > 0 ? file.slice(dot) : "";
-	const stamp = now.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 13);
-	return `${path.slice(0, at + 1)}${stem}.conflict-${stamp}${ext}`;
-}
-
-/** A link in a board's text: in quotes, `url(…)` or a markdown link, with a file extension. */
-const LINK = /(["'(])((?:\.{1,2}\/)*[A-Za-z0-9_ -￿][^"'()\s<>?#|*:]*\.[A-Za-z0-9]{1,8})(?=[?#"')])/g;
-
 export class HarnessSync {
-	private state: State;
-	private readonly file: string;
-	/** Where each canvas's last agreed drawing is kept: `.decks/sync/<canvas id>.pen`. */
-	private readonly bases: string;
-	private readonly hashes: HashCache;
-	private me = "";
-	private user = "";
-	private ws?: WebSocket;
-	private watchers: FSWatcher[] = [];
-	private timer?: NodeJS.Timeout;
-	private running = Promise.resolve();
-	private stopped = false;
 	readonly skipped = new Set<string>();
-	/** Canvases whose drawing changed since their picture was last taken, and when each was taken. */
-	private pictureDue = new Set<string>();
-	private pictureAt = new Map<string, number>();
 	readonly conflicts: string[] = [];
-	/** Whether this connection has told Studio the app list yet: once on connecting, then on a change. */
-	private inventorySent = false;
-	/** The state as last written, so an unchanged one is not written again. */
-	private written = "";
-
-	// ---- what a targeted pass has to do ----
-	/** The last agreed drawing of each canvas, by its Studio id, parsed, with its text. */
-	private base = new Map<string, { doc: PenDocument; text: string }>();
-	/** Each canvas.pen as this harness last read or wrote it (size, time), by name: one that has not changed since is not read again. */
-	private penSeen = new Map<string, { size: number; mtimeMs: number }>();
-	/** Studio's canvases as last listed, by id: their role, owner and revision. */
-	private remote = new Map<string, SyncCanvas>();
-	/** The newest revision Studio has said each canvas is at, by id. */
-	private latest = new Map<string, number>();
-	/** Edits that came inside live messages and are not applied yet, by canvas id. */
-	private inbox = new Map<string, { base: number; rev: number; changes: PenEdit[] }[]>();
-	/** Edits made here and not sent yet, by canvas name, as the canvas store logged them (`edited`). */
-	private outbox = new Map<string, PenEdit[][]>();
-	/** Canvases (by id) Studio says changed; canvases (by name) whose drawing, files or card pictures changed here. */
-	private pull = new Set<string>();
-	private dirtyPens = new Set<string>();
-	private dirtyFiles = new Set<string>();
-	private dirtyPictures = new Set<string>();
-	/** Something only a full pass covers: a new canvas, a share, a lost connection. */
-	private fullDue = false;
-	/** Canvases (by name) adopted this pass: their first push adds what is here and removes nothing, since what is in Studio was never seen here. */
-	private adopted = new Set<string>();
+	private readonly bases: Bases;
+	private readonly store: SyncStore;
+	private readonly scheduler: SyncScheduler;
+	private readonly transport: StudioTransport;
+	private readonly canvas: CanvasSync;
+	private readonly files: FileSync;
+	private readonly pictures: PictureSync;
+	private readonly folders: FolderWatch;
 	/** When every file was last hashed whatever the cache said. */
 	private checkedAt = 0;
-	/** Whether Studio answers `changes?since=` (one from before 2026-10-21 does not: the whole drawing then). */
-	private changesRoute = true;
-	/** The deck files each canvas's boards point at, by canvas name, and each board's links by its deck path with its size and time. */
-	private links = new Map<string, Set<string>>();
-	private boardLinks = new Map<string, { size: number; mtimeMs: number; targets: string[] }>();
-	/** Canvases Studio refused to take up, so each refusal is logged once. */
-	private refused = new Set<string>();
-	/**
-	 * Until when Studio asked this harness to send no more of a kind (a 429's Retry-After): files (a
-	 * canvas's files and pictures, which share Studio's files-a-minute and bytes-an-hour limits) or
-	 * edits. What is held is sent by the pass that runs when the wait is over (`hold`), and the rest of
-	 * a pass goes on meanwhile: a backlog of pictures never stops a drawing's edits.
-	 */
-	private held: Record<"files" | "edits", number> = { files: 0, edits: 0 };
-	private resume?: NodeJS.Timeout;
-	/** Files Studio refused for themselves (too large for the space left, a path it will not keep), by canvas and path, with the bytes' hash: not sent again until they change, or until the next full recheck. */
-	private refusedFiles = new Map<string, string>();
-	/** Which canvas a board picture in `.decks/thumbs` belongs to, by its file name's prefix. */
-	private thumbOwner = new Map<string, string>();
-
-	/** How far the deck is in step, said through `progress` (`SyncProgress`). */
-	private told: SyncProgress = { state: "connecting", canvases: { done: 0, total: 0 }, files: { done: 0, total: 0 }, bytes: { done: 0, total: 0 }, sent: 0, received: 0, skipped: 0, at: Date.now() };
-	/** The files this pass found due, by `<canvas>:<path>`, with their size: each counted done once, when it is dealt with. */
-	private due = new Map<string, number>();
-	/** Each canvas's bundle as the plan read it, so the pass that follows does not walk it again. */
-	private planned = new Map<string, Map<string, string>>();
-	private telling?: NodeJS.Timeout;
-	private toldAt = 0;
 
 	constructor(private readonly o: SyncOptions) {
-		this.file = join(o.deck, ".decks", "studio-sync.json");
-		this.bases = join(o.deck, ".decks", "sync");
-		this.hashes = new HashCache(join(o.deck, ".decks", "studio-hashes.json"));
-		let saved: State | undefined;
-		try {
-			saved = existsSync(this.file) ? (JSON.parse(readFileSync(this.file, "utf8")) as State) : undefined;
-		} catch {
-			saved = undefined;
-		}
-		this.state = saved && saved.studio === o.studio ? saved : { studio: o.studio, canvases: {} };
-		for (const one of Object.values(this.state.canvases)) {
-			// A state from before canvases were bundles: each canvas's files are worked out again on the next pass.
-			one.files ??= {};
-			// A state from before the drawings had files of their own: each moves out to `.decks/sync/<id>.pen`.
-			if (typeof one.pen === "string") {
-				try {
-					this.keepBase(one.id, parse(one.pen), one.pen);
-				} catch {
-					/* unreadable: the next pass takes Studio's as the base */
-				}
-				delete one.pen;
-			}
-		}
-		delete (this.state as { files?: unknown }).files;
+		const log = (line: string) => this.log(line);
+		this.bases = new Bases(join(o.deck, ".decks", "sync"));
+		this.store = new SyncStore(o.deck, o.studio, this.bases);
+		// Both passes go through this object, so a wait's resume runs `sync` as a caller sees it.
+		this.scheduler = new SyncScheduler({ log, progress: o.progress, hashes: this.store.hashes, skipped: this.skipped, resume: () => void this.sync(), targeted: () => this.targeted() });
+		this.transport = new StudioTransport(o, log, this.store, this.bases, this.scheduler);
+		this.files = new FileSync(o, log, this.store, this.transport, this.scheduler, this.skipped, this.conflicts);
+		this.pictures = new PictureSync(o, log, this.store, this.transport, this.scheduler, this.files);
+		this.canvas = new CanvasSync(o, log, this.store, this.bases, this.transport, this.scheduler, this.files, this.pictures);
+		this.folders = new FolderWatch(o.deck, this.store, this.scheduler, this.files, this.pictures);
 	}
 
 	private log(line: string) {
 		(this.o.log ?? ((l) => console.log(`[decks] studio: ${l}`)))(line);
 	}
 
-	private async call(method: string, path: string, body?: unknown, raw?: Uint8Array): Promise<any> {
-		const res = await fetch(new URL(path, this.o.studio), { method, headers: { Authorization: `Bearer ${this.o.key}`, "Content-Type": raw ? "application/octet-stream" : "application/json" }, body: raw ? (raw as unknown as ArrayBuffer) : body === undefined ? undefined : JSON.stringify(body) });
-		if (path.startsWith("/sync/v1/blobs/")) {
-			if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
-			const bytes = new Uint8Array(await res.arrayBuffer());
-			cost.received += bytes.length;
-			return bytes;
-		}
-		const text = await res.text();
-		cost.received += Buffer.byteLength(text);
-		const json = JSON.parse(text);
-		if (!res.ok) throw Object.assign(new Error(`${method} ${path}: ${res.status} ${json.error ?? ""}`), { status: res.status, retryAfter: Number(res.headers.get("retry-after")) || undefined });
-		return json;
+	// ---- what the harness calls ----
+
+	/** Sync now, then on every change on either side, and every 5 minutes besides. */
+	async start(): Promise<void> {
+		await this.sync();
+		this.transport.listen((e) => this.heard(e));
+		this.folders.start();
+		this.scheduler.every(FULL_PASS_MS, () => this.sync());
 	}
 
-	/** Whether Studio asked for no more of this kind for now. */
-	private holding(kind: "files" | "edits"): boolean {
-		return Date.now() < this.held[kind];
-	}
-
-	/** Studio asked for a wait (429): none of this kind until then, and a pass when it is over, which sends what waited. */
-	private hold(kind: "files" | "edits", seconds = 60) {
-		const ms = Math.min(Math.max(seconds, 1), 3600) * 1000;
-		if (!this.holding(kind)) this.log(`Studio asked for no more ${kind} for ${Math.round(ms / 1000)} s: the rest go up then`);
-		this.held[kind] = Math.max(this.held[kind], Date.now() + ms);
-		this.say({ state: "held", heldUntil: Math.max(this.held.files, this.held.edits) }, true);
-		const at = Math.max(this.held.files, this.held.edits) - Date.now();
-		clearTimeout(this.resume);
-		this.resume = setTimeout(() => {
-			if (!this.stopped) void this.sync();
-		}, at + 500);
-	}
-
-	/**
-	 * A file up to Studio, the one way every file goes, a canvas's own, a card's picture, a canvas's
-	 * picture: not sent while Studio asks for a wait or while it refused these same bytes; a 429 holds
-	 * every file until Studio's Retry-After, a refusal of this file alone (any other 4xx but 401) is
-	 * said once and skipped, and the pass goes on with what else it has. Studio down, or the key
-	 * refused, still ends the pass. Answers what Studio said, or undefined when nothing was sent.
-	 */
-	private async upload(name: string, id: string, path: string, bytes: Uint8Array, hash: string, base?: number): Promise<any | undefined> {
-		const key = `${name}:${path}`;
-		if (this.holding("files") || this.refusedFiles.get(key) === hash) return undefined;
-		try {
-			this.say({ now: { canvas: name, path, up: true } });
-			const answer = await this.call("PUT", `/sync/v1/canvases/${id}/files?path=${encodeURIComponent(path)}${base !== undefined ? `&base=${base}` : ""}`, undefined, bytes);
-			this.refusedFiles.delete(key);
-			this.say({ sent: this.told.sent + bytes.length });
-			return answer;
-		} catch (error) {
-			const { status, retryAfter } = error as { status?: number; retryAfter?: number };
-			if (status === 429) return void this.hold("files", retryAfter);
-			if (status === undefined || status >= 500 || status === 401) throw error;
-			if (this.refusedFiles.get(key) !== hash) this.log(`did not upload ${path} of ${name}: ${(error as Error).message}`);
-			this.refusedFiles.set(key, hash);
-			return undefined;
-		}
-	}
-
-	/** Edits up to Studio; undefined, held, when Studio asks for a wait: the file still differs from what was agreed, so the next pass finds them again. */
-	private async postEdits(id: string, body: unknown): Promise<any | undefined> {
-		if (this.holding("edits")) return undefined;
-		try {
-			return await this.call("POST", `/sync/v1/canvases/${id}/edits`, body);
-		} catch (error) {
-			const { status, retryAfter } = error as { status?: number; retryAfter?: number };
-			if (status !== 429) throw error;
-			return void this.hold("edits", retryAfter);
-		}
-	}
-
-	/** The state, only this account's to read, written when it changed: it holds revisions and file versions, no drawings. */
-	private save() {
-		const text = JSON.stringify(this.state);
-		if (text !== this.written) {
-			mkdirSync(dirname(this.file), { recursive: true });
-			writeFileSync(this.file, text, { mode: 0o600 });
-			try {
-				chmodSync(this.file, 0o600);
-			} catch {
-				/* a filesystem without modes */
-			}
-			this.written = text;
-		}
-		this.hashes.save();
+	async stop() {
+		this.scheduler.halt();
+		this.folders.close();
+		this.transport.close();
+		await this.scheduler.idle();
 	}
 
 	/** One pass over everything; passes queue, so two never overlap. */
 	sync(): Promise<void> {
-		return this.queue(() => this.pass());
+		return this.scheduler.queue(() => this.pass());
 	}
-
-	private queue(work: () => Promise<void>): Promise<void> {
-		this.running = this.running
-			.then(() => this.measured(work))
-			.then(() => this.settled())
-			.catch((error) => {
-				this.log(`pass failed: ${(error as Error).message}`);
-				this.say({ state: "offline", error: offlineWhy(error as Error), now: undefined }, true);
-			});
-		return this.running;
-	}
-
-	/** A pass, and what it cost, as one line in `DECKS_STUDIO_STATS` when that names a file. */
-	private async measured(work: () => Promise<void>) {
-		const started = performance.now();
-		const was = { ...cost, cacheHashed: this.hashes.cost.hashed, cacheFiles: this.hashes.cost.files };
-		await work();
-		const file = process.env.DECKS_STUDIO_STATS;
-		if (file) {
-			const spent = Object.fromEntries(Object.entries(cost).map(([k, v]) => [k, Math.round(v - was[k as keyof typeof cost])]));
-			const hashed = this.hashes.cost.hashed - was.cacheHashed;
-			spent.hashed! += hashed;
-			spent.read! += hashed;
-			spent.files! += this.hashes.cost.files - was.cacheFiles;
-			appendFileSync(file, `${JSON.stringify({ at: Date.now(), ms: Math.round((performance.now() - started) * 10) / 10, ...spent })}\n`);
-		}
-	}
-
-	private async hello() {
-		if (this.me) return;
-		const hello = await this.call("GET", "/sync/v1/hello");
-		this.me = hello.harness.id;
-		this.user = hello.user.id;
-		if (this.state.user !== this.user) {
-			this.state = { studio: this.o.studio, user: this.user, canvases: {} };
-			this.base.clear();
-		}
-		this.log(`connected to ${this.o.studio} as ${hello.user.email}, harness "${hello.harness.name}"`);
-	}
-
-	/** Everything: every canvas both ways, its files, pictures and the app list. */
-	private async pass() {
-		this.begin();
-		await this.hello();
-		this.fullDue = false;
-		const fresh = Date.now() - this.checkedAt >= RECHECK_MS;
-		if (fresh) {
-			this.penSeen.clear();
-			this.refusedFiles.clear();
-		}
-		this.pull.clear();
-		this.dirtyPens.clear();
-		this.dirtyFiles.clear();
-		this.dirtyPictures.clear();
-		await this.syncCanvases(fresh);
-		await this.syncInventory();
-		if (fresh) {
-			this.checkedAt = Date.now();
-			this.hashes.prune();
-		}
-		this.save();
-		// A change to a friend's canvas that came down in this pass is seen at once, not on the next full pass.
-		this.watchFolders();
-	}
-
-	/** Only what changed: the canvases Studio named, and those whose folder changed here. */
-	private async targeted() {
-		if (this.fullDue || !this.me) return this.pass();
-		this.begin();
-		const byId = new Map(Object.entries(this.state.canvases).map(([name, s]) => [s.id, name]));
-		const pens = new Set(this.dirtyPens);
-		const files = new Set(this.dirtyFiles);
-		const pictures = new Set(this.dirtyPictures);
-		const pulls = new Set(this.pull);
-		this.dirtyPens.clear();
-		this.dirtyFiles.clear();
-		this.dirtyPictures.clear();
-		this.pull.clear();
-		for (const id of pulls) {
-			const name = byId.get(id);
-			if (!name) return this.pass();
-			pens.add(name);
-		}
-		// What was edited here goes up first, as logged: the file is compared only for what that missed.
-		for (const name of [...this.outbox.keys()]) {
-			const s = this.state.canvases[name];
-			const c = s && this.remote.get(s.id);
-			if (!c) return this.pass();
-			await this.pushEdits(name, c);
-		}
-		for (const name of new Set([...pens, ...files, ...pictures])) {
-			const s = this.state.canvases[name];
-			const c = s && this.remote.get(s.id);
-			// A canvas Studio has not listed to this harness yet (new here, or just shared): a full pass takes it up.
-			if (!c) return this.pass();
-			if (pens.has(name)) await this.syncCanvas(name, c);
-			if (files.has(name)) {
-				this.plan([[name, c]]);
-				const remote = await this.syncCanvasFiles(name, c, false);
-				if (remote && c.role !== "view") await this.syncPictures(name, s.id, remote);
-			} else if (pictures.has(name) && c.role !== "view") await this.syncPictures(name, s.id);
-		}
-		await this.syncCanvasPictures();
-		this.save();
-	}
-
-	// ---- how far it is ----
 
 	/** How far the deck is in step with Studio, as last said. */
 	progress(): SyncProgress {
-		return { ...this.told, canvases: { ...this.told.canvases }, files: { ...this.told.files }, bytes: { ...this.told.bytes } };
+		return this.scheduler.progress();
 	}
 
-	/**
-	 * A pass starts: the counts start again from nothing. A pass held by Studio stays held until the
-	 * wait is over; one after a failure says syncing again at once.
-	 */
-	private begin() {
-		this.due.clear();
-		this.planned.clear();
-		const held = this.holding("files") || this.holding("edits");
-		// The deck not yet in step (a wait, a failure): what was done counts on, so the bar goes on from where it was rather than from nothing.
-		const on = this.told.state === "held" || this.told.state === "offline" || this.told.state === "syncing";
-		const files = on ? { done: this.told.files.done, total: this.told.files.done } : { done: 0, total: 0 };
-		const bytes = on ? { done: this.told.bytes.done, total: this.told.bytes.done } : { done: 0, total: 0 };
-		this.say({ state: held ? "held" : "syncing", canvases: { done: 0, total: 0 }, files, bytes, ...(on ? {} : { sent: 0, received: 0 }), now: undefined, error: undefined, ...(held ? {} : { heldUntil: undefined }) }, true);
+	/** An edit made on this harness, as its canvas store logged it: sent up at once for a canvas on Studio (`CanvasSync.edited`). */
+	edited(name: string, change: { edits: readonly PenEdit[]; by: { kind: string; id?: string } }): void {
+		this.canvas.edited(name, change);
 	}
 
-	/**
-	 * What the files of these canvases will cost this pass: every file of a canvas you may write whose
-	 * size or time differs from what was last agreed (by the hash cache, without reading it), or that
-	 * Studio has not agreed on at all. Read once here, and the pass takes the same bundle.
-	 */
-	private plan(canvases: [string, SyncCanvas][]) {
-		for (const [name, c] of canvases) {
-			const s = this.state.canvases[name];
-			if (!s || c.role === "view") continue;
-			const local = this.bundle(name);
-			this.planned.set(name, local);
-			for (const [path, deckPath] of local) {
-				const seen = this.hashes.peek(join(this.o.deck, deckPath));
-				if (!seen || seen.size > MAX_BYTES) continue;
-				if (seen.hash && s.files[path]?.hash === seen.hash) continue;
-				this.owe(`${name}:${path}`, seen.size);
-			}
+	/** Where someone on this harness is on a canvas kept on Studio, said to everyone else on it (`StudioTransport.presence`). */
+	presence(name: string, message: PresenceMessage): void {
+		this.transport.presence(name, message);
+	}
+
+	// ---- passes ----
+
+	/** Everything: every canvas both ways, its files, pictures and the app list. */
+	private async pass() {
+		this.files.forgetPlan();
+		this.scheduler.begin();
+		await this.transport.hello();
+		this.scheduler.fullDue = false;
+		const fresh = Date.now() - this.checkedAt >= RECHECK_MS;
+		if (fresh) {
+			this.canvas.forgetSeen();
+			this.transport.forgetRefusals();
 		}
-	}
-
-	/** The files left out, `<canvas>/<path>`, the first hundred. */
-	private leftOut(): string[] {
-		return [...this.skipped].slice(0, 100).map((key) => key.replace(":", "/"));
-	}
-
-	/** A file joins the work due. */
-	private owe(key: string, size: number) {
-		if (this.due.has(key)) return;
-		this.due.set(key, size);
-		this.say({ files: { done: this.told.files.done, total: this.told.files.total + 1 }, bytes: { done: this.told.bytes.done, total: this.told.bytes.total + size } });
-	}
-
-	/** A file due is dealt with: sent, taken, found the same, or left out. */
-	private paid(key: string) {
-		const size = this.due.get(key);
-		if (size === undefined) return;
-		this.due.delete(key);
-		this.say({ files: { done: this.told.files.done + 1, total: this.told.files.total }, bytes: { done: this.told.bytes.done + size, total: this.told.bytes.total } });
-	}
-
-	/** A pass ended without failing: in step, unless Studio asked for a wait and something waits for it. */
-	private settled() {
-		if (this.holding("files") || this.holding("edits")) return this.say({ state: "held", now: undefined, heldUntil: Math.max(this.held.files, this.held.edits) }, true);
-		this.say({ state: "synced", now: undefined, heldUntil: undefined, error: undefined, syncedAt: Date.now(), skipped: this.skipped.size, leftOut: this.leftOut() }, true);
-	}
-
-	/** Change what is said; told through `progress` at once when the state changes, else at most every 250 ms. */
-	private say(change: Partial<SyncProgress>, now = false) {
-		const before = this.told.state;
-		const next = { ...this.told, ...change, at: Date.now() };
-		for (const key of Object.keys(change) as (keyof SyncProgress)[]) if (change[key] === undefined) delete next[key];
-		this.told = next;
-		if (!this.o.progress || this.stopped) return;
-		const tell = () => {
-			clearTimeout(this.telling);
-			this.telling = undefined;
-			this.toldAt = Date.now();
-			this.o.progress?.(this.progress());
-		};
-		if (now || next.state !== before || Date.now() - this.toldAt >= 250) return tell();
-		this.telling ??= setTimeout(tell, 250 - (Date.now() - this.toldAt));
-	}
-
-	// ---- where things are ----
-
-	/** A canvas's folder here, absolute. */
-	private folder(name: string): string {
-		return join(this.o.deck, canvasFolder(name));
-	}
-
-	/** This deck's own canvases: folders under canvases/ with a drawing. */
-	private localCanvases(): string[] {
-		const dir = join(this.o.deck, "canvases");
-		return existsSync(dir) ? readdirSync(dir).filter((n) => safeCanvasFolder(n) && plainSegment(n) && existsSync(join(dir, n, "canvas.pen"))) : [];
-	}
-
-	/**
-	 * The folder a friend's canvases land in: their Studio name, as a folder name, made unique once
-	 * against another friend of the same name and remembered, so it never moves under them.
-	 */
-	private ownerFolder(c: SyncCanvas): string | undefined {
-		const owners = (this.state.owners ??= {});
-		if (owners[c.owner]) return owners[c.owner];
-		const id = String(c.owner ?? "");
-		if (!/^[A-Za-z0-9_-]+$/.test(id)) return undefined;
-		const base = ownerFolderBase(c.ownerName ?? "");
-		const taken = new Set(Object.values(owners));
-		const name = taken.has(base) ? `${base}-${id.slice(0, 6)}` : base;
-		owners[c.owner] = name;
-		return name;
-	}
-
-	/** The name a Studio canvas has here, or undefined when its name could name somewhere else. */
-	private nameFor(c: SyncCanvas): string | undefined {
-		if (!safeCanvasName(c.name)) return undefined;
-		if (c.owner === this.user) return c.name;
-		const owner = this.ownerFolder(c);
-		return owner ? sharedName(owner, c.name) : undefined;
-	}
-
-	private shared(name: string): boolean {
-		return sharedParts(name) !== undefined;
-	}
-
-	// ---- the last agreed drawing of each canvas ----
-
-	private basePath(id: string): string {
-		return join(this.bases, `${id.replace(/[^A-Za-z0-9_-]/g, "_")}.pen`);
-	}
-
-	/** Keep a canvas's last agreed drawing, in memory and in `.decks/sync/<id>.pen`, when it changed. */
-	private keepBase(id: string, doc: PenDocument, text = serialize(doc)) {
-		if (this.base.get(id)?.text === text) return;
-		mkdirSync(this.bases, { recursive: true, mode: 0o700 });
-		writeFileSync(this.basePath(id), text, { mode: 0o600 });
-		this.base.set(id, { doc, text });
-	}
-
-	/** A canvas's last agreed drawing, from memory or its file; undefined when there is none. */
-	private baseOf(id: string): { doc: PenDocument; text: string } | undefined {
-		const kept = this.base.get(id);
-		if (kept) return kept;
-		try {
-			const text = readFileSync(this.basePath(id), "utf8");
-			const one = { doc: parse(text), text };
-			this.base.set(id, one);
-			return one;
-		} catch {
-			return undefined;
+		this.scheduler.pull.clear();
+		this.scheduler.dirtyPens.clear();
+		this.scheduler.dirtyFiles.clear();
+		this.scheduler.dirtyPictures.clear();
+		const synced = await this.canvas.syncCanvases();
+		await this.syncBundles(synced, fresh);
+		await this.transport.tellInventory();
+		if (fresh) {
+			this.checkedAt = Date.now();
+			this.store.hashes.prune();
 		}
+		this.store.save();
+		// A change to a friend's canvas that came down in this pass is seen at once, not on the next full pass.
+		this.folders.refresh();
 	}
 
-	private forgetCanvas(name: string) {
-		const s = this.state.canvases[name];
-		if (s) {
-			this.base.delete(s.id);
-			this.inbox.delete(s.id);
-			rmSync(this.basePath(s.id), { force: true });
-		}
-		this.penSeen.delete(name);
-		this.links.delete(name);
-		delete this.state.canvases[name];
-	}
-
-	// ---- canvases ----
-
-	private async syncCanvases(fresh: boolean) {
-		let remote: SyncCanvas[] = (await this.call("GET", "/sync/v1/canvases")).canvases;
-		const known = new Set(Object.values(this.state.canvases).map((c) => c.id));
-		/*
-		 * Every folder this state does not know: one of Studio's canvases under another name (renamed, or the
-		 * state lost) is adopted; a copy of one, or a canvas Studio has not seen, goes up; one whose name
-		 * Studio already has is adopted too. Adopted means Studio's drawing is taken as the agreed one and
-		 * what differs here goes up as edits, later in this pass (`syncCanvas`); nothing here is overwritten.
-		 */
-		for (const name of this.localCanvases()) {
-			if (this.state.canvases[name]) continue;
-			const claimed = this.studioIdOf(name);
-			const mine = claimed ? remote.find((c) => c.id === claimed && c.owner === this.user) : undefined;
-			const elsewhere = mine && Object.entries(this.state.canvases).some(([other, c]) => c.id === mine.id && other !== name && existsSync(join(this.folder(other), "canvas.pen")));
-			if (mine && !elsewhere) {
-				const before = Object.keys(this.state.canvases).find((other) => this.state.canvases[other]!.id === mine.id);
-				if (before) this.forgetCanvas(before);
-				await this.adopt(name, mine.id, known, before ? `was ${before}, renamed` : "is one of yours already in Studio");
-				continue;
-			}
-			const text = readFileSync(join(this.folder(name), "canvas.pen"), "utf8");
-			let made: { canvas: SyncCanvas; existed?: boolean };
-			try {
-				made = await this.call("POST", "/sync/v1/canvases", { name, title: this.titleOf(name), pen: parse(text) });
-			} catch (error) {
-				// Studio refuses this one (its name, its size): the rest of the deck still syncs, and the refusal is said once, not every pass.
-				const status = (error as { status?: number }).status;
-				if (status === undefined || status >= 500 || status === 401 || status === 429) throw error;
-				if (!this.refused.has(name)) this.log(`did not upload canvas ${name}: ${(error as Error).message}`);
-				this.refused.add(name);
-				continue;
-			}
-			this.refused.delete(name);
-			const { canvas, existed } = made;
-			if (existed) {
-				await this.adopt(name, canvas.id, known, "has the name of one of yours already in Studio");
-				continue;
-			}
-			const full = await this.call("GET", `/sync/v1/canvases/${canvas.id}`);
-			this.state.canvases[name] = { id: canvas.id, rev: full.rev, files: {} };
-			this.keepBase(canvas.id, full.pen);
-			this.writePen(name, this.base.get(canvas.id)!.text, { text });
-			this.writeMeta(name, { studio: canvas.id });
-			known.add(canvas.id);
-			this.pictureDue.add(name);
-			this.log(`uploaded canvas ${name}${mine ? ` (a copy of ${mine.name}, now its own canvas)` : ""}`);
-		}
-		remote = (await this.call("GET", "/sync/v1/canvases")).canvases;
-		const byId = new Map(remote.map((c) => [c.id, c]));
-		this.remote = byId;
-		// Every Studio canvas this deck lacks comes down: yours to canvases/, a friend's to shared/canvases/.
-		for (const c of remote) {
-			if (known.has(c.id)) continue;
-			const name = this.nameFor(c);
-			if (!name) {
-				this.log(`skipped Studio canvas ${JSON.stringify(c.name)}: its name is not a plain folder name`);
-				continue;
-			}
-			if (this.state.canvases[name]) continue;
-			const full = await this.call("GET", `/sync/v1/canvases/${c.id}`);
-			this.keepBase(c.id, full.pen);
-			this.writePen(name, this.base.get(c.id)!.text);
-			this.writeMeta(name, { title: c.title, studio: c.id, ...(this.shared(name) ? { shared: { owner: c.owner, ownerName: c.ownerName ?? "", role: c.role } } : {}) }, true);
-			this.state.canvases[name] = { id: c.id, rev: full.rev, files: {} };
-			this.log(this.shared(name) ? `${c.ownerName || "a friend"} shared ${c.title}: it is in ${canvasFolder(name)}` : `downloaded canvas ${name}`);
-		}
-		const synced: [string, SyncCanvas][] = [];
-		for (const [name, s] of Object.entries(this.state.canvases)) {
-			const c = byId.get(s.id);
-			if (!safeCanvasFolder(name.split("/").at(-1)) || (name.includes("/") && !this.shared(name))) {
-				this.log(`forgot canvas ${JSON.stringify(name)}: its name is not a plain folder name`);
-				this.forgetCanvas(name);
-				continue;
-			}
-			// A friend's canvas kept where shared canvases came down before (canvases/shared-<id>-<name>): it comes down again to shared/.
-			const misplaced = c && c.owner !== this.user && !this.shared(name);
-			if (!c || misplaced) {
-				this.moveAside(name, !c ? "is gone from Studio or no longer shared" : "is a friend's, and now lives in shared/canvases");
-				this.forgetCanvas(name);
-				continue;
-			}
-			if (this.shared(name)) this.writeMeta(name, { title: c.title, shared: { owner: c.owner, ownerName: c.ownerName ?? "", role: c.role } });
-			// One of yours that someone else may edit too: the harness runs no app inside it (`canvas/pens.ts`, `yoursAlone`).
-			else this.writeMeta(name, { othersEdit: c.othersEdit === true });
-			this.latest.set(c.id, Math.max(this.latest.get(c.id) ?? 0, c.rev));
-			this.say({ now: { canvas: name } });
-			await this.syncCanvas(name, c);
-			synced.push([name, c]);
-		}
+	/** The files and pictures of the canvases a full pass synced, after all their drawings. */
+	private async syncBundles(synced: [string, SyncCanvas][], fresh: boolean) {
 		/*
 		 * Every canvas's drawing first, then every canvas's files, then each canvas's picture, then the
 		 * cards' pictures: Studio takes so many files a minute from a harness, so what a person made goes
@@ -753,902 +167,99 @@ export class HarnessSync {
 		 * a canvas in Studio takes from the harness while one is in reach).
 		 */
 		const lists = new Map<string, Map<string, SyncFile>>();
-		this.plan(synced);
-		this.say({ canvases: { done: 0, total: synced.length } }, true);
+		this.files.plan(synced);
+		this.scheduler.say({ canvases: { done: 0, total: synced.length } }, true);
 		for (const [name, c] of synced) {
-			const remote = await this.syncCanvasFiles(name, c, fresh);
-			this.say({ canvases: { done: this.told.canvases.done + 1, total: synced.length } });
+			const remote = await this.files.syncCanvasFiles(name, c, fresh);
+			this.scheduler.say({ canvases: { done: this.scheduler.told.canvases.done + 1, total: synced.length } });
 			if (!remote) continue;
 			lists.set(name, remote);
-			if (c.role !== "view" && !remote.has(`${PICTURES}/canvas.light.jpg`)) this.pictureDue.add(name);
+			if (c.role !== "view" && !remote.has(`${PICTURES}/canvas.light.jpg`)) this.pictures.want(name);
 		}
-		await this.syncCanvasPictures();
+		await this.pictures.syncCanvasPictures();
 		for (const [name, c] of synced) {
-			const s = this.state.canvases[name];
+			const s = this.store.state.canvases[name];
 			const remote = lists.get(name);
-			if (s && remote && c.role !== "view" && !this.holding("files")) await this.syncPictures(name, s.id, remote);
+			if (s && remote && c.role !== "view" && !this.scheduler.holding("files")) await this.pictures.syncPictures(name, s.id, remote);
 		}
-		await this.syncCanvasPictures();
+		await this.pictures.syncCanvasPictures();
 	}
 
-	/** The Studio id a folder's `canvas.json` carries, or undefined. */
-	private studioIdOf(name: string): string | undefined {
-		try {
-			const id = (JSON.parse(readFileSync(join(this.folder(name), "canvas.json"), "utf8")) as { studio?: unknown }).studio;
-			return typeof id === "string" && /^[A-Za-z0-9_-]+$/.test(id) ? id : undefined;
-		} catch {
-			return undefined;
+	/** Only what changed: the canvases Studio named, and those whose folder changed here. */
+	private async targeted() {
+		if (this.scheduler.fullDue || !this.transport.me) return this.pass();
+		this.files.forgetPlan();
+		this.scheduler.begin();
+		const byId = new Map(Object.entries(this.store.state.canvases).map(([name, s]) => [s.id, name]));
+		const pens = new Set(this.scheduler.dirtyPens);
+		const files = new Set(this.scheduler.dirtyFiles);
+		const pictures = new Set(this.scheduler.dirtyPictures);
+		const pulls = new Set(this.scheduler.pull);
+		this.scheduler.dirtyPens.clear();
+		this.scheduler.dirtyFiles.clear();
+		this.scheduler.dirtyPictures.clear();
+		this.scheduler.pull.clear();
+		for (const id of pulls) {
+			const name = byId.get(id);
+			if (!name) return this.pass();
+			pens.add(name);
 		}
+		// What was edited here goes up first, as logged: the file is compared only for what that missed.
+		for (const name of this.canvas.queued()) {
+			const s = this.store.state.canvases[name];
+			const c = s && this.canvas.listed(s.id);
+			if (!c) return this.pass();
+			await this.canvas.pushEdits(name, c);
+		}
+		for (const name of new Set([...pens, ...files, ...pictures])) {
+			const s = this.store.state.canvases[name];
+			const c = s && this.canvas.listed(s.id);
+			// A canvas Studio has not listed to this harness yet (new here, or just shared): a full pass takes it up.
+			if (!c) return this.pass();
+			if (pens.has(name)) await this.canvas.syncCanvas(name, c);
+			if (files.has(name)) {
+				this.files.plan([[name, c]]);
+				const remote = await this.files.syncCanvasFiles(name, c, false);
+				if (remote && c.role !== "view") await this.pictures.syncPictures(name, s.id, remote);
+			} else if (pictures.has(name) && c.role !== "view") await this.pictures.syncPictures(name, s.id);
+		}
+		await this.pictures.syncCanvasPictures();
+		this.store.save();
 	}
-
-	/**
-	 * A folder here taken as one of Studio's canvases: Studio's drawing becomes the agreed one and the
-	 * folder's own file is left as it is, so `syncCanvas` sends what differs as edits and the merge comes
-	 * back; its files start with no agreed version, so one that differs is a conflict (`syncCanvasFiles`).
-	 */
-	private async adopt(name: string, id: string, known: Set<string>, why: string) {
-		const full = await this.call("GET", `/sync/v1/canvases/${id}`);
-		this.state.canvases[name] = { id, rev: full.rev, files: {} };
-		this.keepBase(id, full.pen);
-		this.writeMeta(name, { studio: id });
-		known.add(id);
-		this.adopted.add(name);
-		this.pictureDue.add(name);
-		this.log(`canvas ${name} ${why}: what is here and not there is merged into it`);
-	}
-
-	/**
-	 * A canvas gone from Studio, or no longer shared, moved out of the way, never deleted: left where
-	 * it is, a canvas of yours would read as a new one and go up again on the next pass.
-	 */
-	private moveAside(name: string, why: string) {
-		const from = this.folder(name);
-		const shared = sharedParts(name);
-		if (existsSync(from)) {
-			const to = shared ? join(this.o.deck, ".decks", "shared-removed", `${shared.owner}-${shared.canvas}-${Date.now()}`) : join(this.o.deck, ".decks", "studio-removed", `${name}-${Date.now()}`);
-			mkdirSync(dirname(to), { recursive: true });
-			renameSync(from, to);
-			this.log(`canvas ${name} ${why}; its folder is moved to ${relative(this.o.deck, to).split(sep).join("/")}`);
-		}
-	}
-
-	/**
-	 * A canvas's drawing as it is here: read and parsed, or, when the file has not changed since this
-	 * harness last read or wrote it, the last agreed drawing itself (`same`), with nothing read.
-	 */
-	private readLocal(name: string, base: { doc: PenDocument; text: string } | undefined): { text: string; doc: PenDocument; same: boolean; size: number; mtimeMs: number } | undefined {
-		const path = join(this.folder(name), "canvas.pen");
-		let st;
-		try {
-			st = statSync(path);
-		} catch {
-			return undefined;
-		}
-		const seen = this.penSeen.get(name);
-		if (base && seen && seen.size === st.size && seen.mtimeMs === st.mtimeMs) return { ...base, same: true, size: st.size, mtimeMs: st.mtimeMs };
-		cost.canvases++;
-		const text = readFileSync(path, "utf8");
-		try {
-			const doc = parse(text);
-			const same = base !== undefined && text === base.text;
-			return { text, doc, same, size: st.size, mtimeMs: st.mtimeMs };
-		} catch {
-			return undefined; // Mid-write, or a hand edit that does not parse yet: next pass.
-		}
-	}
-
-	/**
-	 * One canvas's drawing both ways: this harness's edits since the last agreed drawing go up, and
-	 * Studio's since its revision come down, from live messages, `changes?since=`, or whole.
-	 */
-	private async syncCanvas(name: string, remote: SyncCanvas) {
-		const s = this.state.canvases[name];
-		if (!s) return;
-		// Comparing the file finds every edit made here, the queued ones among them.
-		this.outbox.delete(name);
-		let base = this.baseOf(s.id);
-		const local = this.readLocal(name, base);
-		if (!local) return;
-		if (!base) {
-			// No agreed drawing kept (deleted by hand): Studio's as it is now, and this deck's differences go up on it.
-			const full = await this.call("GET", `/sync/v1/canvases/${s.id}`);
-			this.keepBase(s.id, full.pen);
-			s.rev = full.rev;
-			base = this.base.get(s.id)!;
-		}
-		let edits = local.same ? [] : diff(base.doc, local.doc);
-		// A folder adopted this pass: its items and words go up, but nothing Studio has is removed, since this folder never saw it.
-		if (this.adopted.delete(name)) edits = edits.filter((e) => e.op !== "remove");
-		let next: { doc: PenDocument; rev: number } | undefined;
-		if (edits.length && remote.role !== "view") {
-			this.pictureDue.add(name);
-			const r = await this.postEdits(s.id, { base: s.rev, edits, client: this.me });
-			if (!r) return;
-			if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
-			if (r.pen) next = { doc: r.pen, rev: r.rev }; // A Studio from before edits were answered with changes.
-			else if (r.base === s.rev) next = { doc: loosely(base.doc, r.changes ?? []), rev: r.rev };
-			else {
-				this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, r.rev));
-				next = await this.changesSince(s, base.doc);
-			}
-		} else if (edits.length || (this.latest.get(s.id) ?? s.rev) > s.rev || this.inbox.get(s.id)?.length) {
-			next = await this.changesSince(s, base.doc);
-			if (next) this.pictureDue.add(name);
-		}
-		if (!next) {
-			// Nothing to do, and the file is what was agreed: not read again until it changes.
-			if (local.same || !edits.length) this.penSeen.set(name, { size: local.size, mtimeMs: local.mtimeMs });
-			return;
-		}
-		/*
-		 * The file first, then the agreed drawing, then (at the end of the pass) the revision: stopped
-		 * between any two, the next pass finds the edits already made, which change nothing again.
-		 */
-		const text = serialize(next.doc);
-		this.writePen(name, text, local);
-		this.keepBase(s.id, next.doc, text);
-		s.rev = next.rev;
-		this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, s.rev));
-	}
-
-	/**
-	 * Studio's drawing at its newest revision, from the last agreed one: the edits that came in live
-	 * messages when they follow on, else `changes?since=`, else (the log no longer reaches back, or an
-	 * older Studio) the whole drawing.
-	 */
-	private async changesSince(s: CanvasState, from: PenDocument): Promise<{ doc: PenDocument; rev: number }> {
-		let doc = from;
-		let rev = s.rev;
-		const waiting = (this.inbox.get(s.id) ?? []).sort((a, b) => a.rev - b.rev);
-		this.inbox.delete(s.id);
-		try {
-			for (const m of waiting) {
-				if (m.rev <= rev) continue;
-				if (m.base !== rev) break;
-				doc = loosely(doc, m.changes);
-				rev = m.rev;
-			}
-		} catch {
-			doc = from;
-			rev = s.rev;
-		}
-		if (rev >= (this.latest.get(s.id) ?? 0) && rev !== s.rev) return { doc, rev };
-		if (this.changesRoute) {
-			try {
-				const got = await this.call("GET", `/sync/v1/canvases/${s.id}/changes?since=${rev}`);
-				if (!got.tooOld && Array.isArray(got.changes)) {
-					for (const edits of got.changes as PenEdit[][]) doc = loosely(doc, edits);
-					return { doc, rev: got.rev };
-				}
-			} catch (error) {
-				if ((error as { status?: number }).status === 404 && !(await this.canvasThere(s.id))) throw error;
-				if ((error as { status?: number }).status === 404) this.changesRoute = false;
-			}
-		}
-		const full = await this.call("GET", `/sync/v1/canvases/${s.id}`);
-		return { doc: full.pen, rev: full.rev };
-	}
-
-	/** Whether a 404 was the canvas gone (a full pass deals with that) or Studio without the route. */
-	private async canvasThere(id: string): Promise<boolean> {
-		try {
-			await this.call("GET", `/sync/v1/canvases/${id}?since=${Number.MAX_SAFE_INTEGER}`);
-			return true;
-		} catch {
-			this.fullDue = true;
-			return false;
-		}
-	}
-
-	/**
-	 * Written in place, never renamed over: the harness watches this file. `was` is the file as it
-	 * was read before Studio was asked; when it changed since (an agent wrote it meanwhile), those
-	 * changes are kept on top of Studio's and go up on the next pass.
-	 */
-	private writePen(name: string, text: string, was?: { text: string; size?: number; mtimeMs?: number }, by = "studio") {
-		const path = join(this.folder(name), "canvas.pen");
-		let current: string | undefined;
-		let st;
-		try {
-			st = statSync(path);
-		} catch {
-			st = undefined;
-		}
-		if (st && was && was.size === st.size && was.mtimeMs === st.mtimeMs) current = was.text;
-		else if (st) current = readFileSync(path, "utf8");
-		let out = text;
-		if (was && current !== undefined && current !== was.text) {
-			try {
-				const extra = diff(parse(was.text), parse(current));
-				out = serialize(loosely(parse(text), extra));
-				this.dirtyPens.add(name);
-				this.soon(300);
-			} catch {
-				// What is there does not parse (mid-write): it is left for the next pass.
-				return;
-			}
-		}
-		if (current !== out) {
-			cost.canvases++;
-			// Through the canvas store when the harness gives one: the write is recorded as Studio's and reaches every frame at once.
-			if (!this.o.remote?.write(name, out, by)) {
-				mkdirSync(dirname(path), { recursive: true });
-				writeFileSync(path, out);
-			}
-		}
-		const after = statSync(path);
-		if (out === text) this.penSeen.set(name, { size: after.size, mtimeMs: after.mtimeMs });
-	}
-
-	private titleOf(name: string): string {
-		try {
-			return JSON.parse(readFileSync(join(this.folder(name), "canvas.json"), "utf8")).title ?? name;
-		} catch {
-			return name;
-		}
-	}
-
-	/**
-	 * What `canvas.json` says about a synced canvas: the Studio canvas it is, and for a friend's, who
-	 * shared it and as what (`CanvasPens.sharing`). `fresh` writes a title too, for one that came down.
-	 */
-	private writeMeta(name: string, set: { title?: string; studio?: string; shared?: { owner: string; ownerName: string; role: string }; othersEdit?: boolean }, fresh = false) {
-		const file = join(this.folder(name), "canvas.json");
-		let meta: Record<string, unknown> = {};
-		try {
-			meta = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
-		} catch {
-			/* a first record */
-		}
-		const studio = set.studio ?? (typeof meta.studio === "string" ? meta.studio : undefined);
-		const next: Record<string, unknown> = { ...meta, ...((fresh || !meta.title) && set.title ? { title: set.title } : {}), ...(studio ? { studio } : {}), ...(set.shared ? { shared: { ...set.shared, ...(studio ? { studio } : {}) } } : {}) };
-		if (set.othersEdit === true) next.othersEdit = true;
-		else if (set.othersEdit === false) delete next.othersEdit;
-		next.boards ??= [];
-		if (JSON.stringify(next) === JSON.stringify(meta)) return;
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, `${JSON.stringify(next, null, "\t")}\n`);
-	}
-
-	// ---- a canvas's files ----
-
-	/**
-	 * Where a file of a canvas's bundle is here, deck-relative: in the canvas's folder, but the deck
-	 * files a canvas of this deck points at, which are this deck's own `assets/` and `docs/`.
-	 */
-	private deckPathOf(name: string, path: string): string {
-		const top = path.split("/")[0]!;
-		if (!this.shared(name) && MIRRORED.includes(top)) return path;
-		return `${canvasFolder(name)}/${path}`;
-	}
-
-	/** What a board's text points at, read again only when the board's size or time changed. */
-	private linksOf(deckPath: string): string[] {
-		const full = join(this.o.deck, deckPath);
-		let st;
-		try {
-			st = statSync(full);
-		} catch {
-			return [];
-		}
-		const kept = this.boardLinks.get(deckPath);
-		if (kept && kept.size === st.size && kept.mtimeMs === st.mtimeMs) return kept.targets;
-		let text: string;
-		try {
-			text = readFileSync(full, "utf8");
-		} catch {
-			return [];
-		}
-		const targets = new Set<string>();
-		for (const match of text.matchAll(LINK)) {
-			const asked = posix.normalize(posix.join(posix.dirname(deckPath), match[2]!));
-			const served = servedAs(asked);
-			if (!("path" in served)) continue;
-			if (MIRRORED.includes(served.path.split("/")[0]!) && !secretLooking(served.path)) targets.add(served.path);
-		}
-		const one = { size: st.size, mtimeMs: st.mtimeMs, targets: [...targets] };
-		this.boardLinks.set(deckPath, one);
-		return one.targets;
-	}
-
-	/** A canvas's bundle as it is here: its path in the canvas's folder → the file's deck path. */
-	private bundle(name: string): Map<string, string> {
-		const out = new Map<string, string>();
-		const folder = canvasFolder(name);
-		const walk = (dir: string) => {
-			let entries;
-			try {
-				entries = readdirSync(join(this.o.deck, dir), { withFileTypes: true });
-			} catch {
-				return;
-			}
-			for (const entry of entries) {
-				if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-				const path = `${dir}/${entry.name}`;
-				if (entry.isDirectory()) walk(path);
-				else if (entry.isFile() && !secretLooking(path)) out.set(path.slice(folder.length + 1), path);
-			}
-		};
-		for (const part of [...OWN_PARTS, ...(this.shared(name) ? MIRRORED : [])]) walk(`${folder}/${part}`);
-		if (this.shared(name)) return out;
-		// The deck files this canvas's boards point at: `../assets/x` beside its boards is the deck's assets/x (`deck/layout.ts`).
-		const named = new Set<string>();
-		for (const [path, deckPath] of [...out]) {
-			// A board, or anything in a card's folder that can name a file (`cards/<name>/`, its HTML, styles and scripts).
-			if (!(path.startsWith("boards/") || path.startsWith("cards/")) || !/\.(?:x?html?|mdx?|css|m?js)$/i.test(path)) continue;
-			for (const target of this.linksOf(deckPath)) {
-				named.add(target);
-				if (out.has(target)) continue;
-				try {
-					if (statSync(join(this.o.deck, target)).isFile()) out.set(target, target);
-				} catch {
-					/* named but not there */
-				}
-			}
-		}
-		/*
-		 * A canvas with cards takes the deck's own libraries with it (`assets/importmap.json`, `@decks/canvas`
-		 * card.ts) and the files the map names beside it: no card names them in its text, it imports them by name.
-		 */
-		if ([...out.keys()].some((path) => path.startsWith("cards/"))) {
-			const map = "assets/importmap.json";
-			try {
-				const imports = (JSON.parse(readFileSync(join(this.o.deck, map), "utf8")) as { imports?: Record<string, unknown> }).imports ?? {};
-				named.add(map);
-				out.set(map, map);
-				for (const address of Object.values(imports)) {
-					if (typeof address !== "string" || /^[a-z][a-z0-9+.-]*:|^\//i.test(address)) continue;
-					const target = posix.normalize(posix.join("assets", address));
-					if (!target.startsWith("assets/") || secretLooking(target)) continue;
-					named.add(target);
-					try {
-						if (statSync(join(this.o.deck, target)).isFile()) out.set(target, target);
-					} catch {
-						/* named but not there */
-					}
-				}
-			} catch {
-				/* no map, or not one */
-			}
-		}
-		this.links.set(name, named);
-		return out;
-	}
-
-	private async syncCanvasFiles(name: string, c: SyncCanvas, fresh: boolean): Promise<Map<string, SyncFile> | undefined> {
-		const s = this.state.canvases[name];
-		if (!s) return undefined;
-		const writable = c.role !== "view";
-		const remote = new Map<string, SyncFile>(((await this.call("GET", `/sync/v1/canvases/${s.id}/files`)).files as SyncFile[]).map((f) => [f.path, f]));
-		const local = this.planned.get(name) ?? this.bundle(name);
-		this.planned.delete(name);
-		const known = s.files;
-		// What comes down is known only now, from Studio's list: it joins the work due.
-		for (const [path, f] of remote) {
-			if (path.startsWith(`${PICTURES}/`) || local.has(path) || f.size > MAX_BYTES || known[path]?.hash === f.hash) continue;
-			this.owe(`${name}:${path}`, f.size);
-		}
-		/*
-		 * Deleted on one side, from a file both last agreed on: gone from the folder, it is deleted in
-		 * Studio (unless Studio's copy is newer, which then comes back); gone from Studio and unchanged
-		 * here, it is deleted here. Without this a deleted board came straight back.
-		 */
-		for (const [path, was] of Object.entries(known)) {
-			if (path.startsWith(`${PICTURES}/`)) continue;
-			const there = remote.get(path);
-			if (!local.has(path)) {
-				if (there && there.version !== was.version) continue;
-				if (there && writable) {
-					const gone = await this.call("DELETE", `/sync/v1/canvases/${s.id}/files?path=${encodeURIComponent(path)}&base=${was.version}`).catch(() => undefined);
-					if (!gone) continue;
-					remote.delete(path);
-					this.log(`deleted ${path} of ${name} in Studio`);
-				}
-				if (!there || writable) delete known[path];
-				continue;
-			}
-			if (!there) {
-				const full = join(this.o.deck, local.get(path)!);
-				if (this.hashes.hash(full, fresh)?.hash !== was.hash) continue;
-				// A deck file the canvas no longer points at stays in the deck; the canvas's own goes.
-				if (local.get(path) !== path) {
-					rmSync(full, { force: true });
-					this.hashes.forget(full);
-				}
-				local.delete(path);
-				delete known[path];
-				this.log(`deleted ${path} of ${name}, as in Studio`);
-			}
-		}
-		for (const [path, deckPath] of local) {
-			// A file Studio's wait kept back is still due: the pass after the wait sends it, and counts it then.
-			let dealt = true;
-			try {
-				dealt = await this.syncLocalFile(name, s, path, deckPath, remote, known, writable, fresh);
-			} finally {
-				if (dealt) this.paid(`${name}:${path}`);
-			}
-		}
-		for (const [path, f] of remote) {
-			if (path.startsWith(`${PICTURES}/`) || local.has(path)) continue;
-			if (f.size > MAX_BYTES) {
-				this.skipped.add(`${name}:${path}`);
-				continue;
-			}
-			try {
-				await this.download(name, path, f);
-			} finally {
-				this.paid(`${name}:${path}`);
-			}
-		}
-		this.say({ skipped: this.skipped.size, leftOut: this.leftOut() });
-		return remote;
-	}
-
-	/** One file of a canvas's folder against Studio's list: agreed, taken from Studio, sent, or a conflict; false when Studio's wait kept it back. */
-	private async syncLocalFile(name: string, s: CanvasState, path: string, deckPath: string, remote: Map<string, SyncFile>, known: CanvasState["files"], writable: boolean, fresh: boolean): Promise<boolean> {
-		const full = join(this.o.deck, deckPath);
-		const got = this.hashes.hash(full, fresh);
-		if (!got) return true;
-		const hash = got.hash;
-		const was = known[path];
-		const there = remote.get(path);
-		if (was?.hash === hash && (!there || there.version === was.version)) return true;
-		if (there && there.hash === hash) {
-			known[path] = { version: there.version, hash };
-			return true;
-		}
-		// Unchanged here and newer there, or a canvas only shared with you to view: Studio's copy comes down.
-		if (there && (was?.hash === hash || !writable)) {
-			await this.download(name, path, there);
-			return true;
-		}
-		if (!writable) return true;
-		if (got.size > MAX_BYTES) {
-			this.skipped.add(`${name}:${path}`);
-			return true;
-		}
-		const bytes = got.bytes ?? readFileSync(full);
-		/*
-		 * Both have the file, differently, and no version was agreed on (a folder adopted, a state lost):
-		 * a conflict before anything is sent, Studio's copy staying current. With a base, the put says
-		 * whether Studio moved on since: current when not, a conflict when it did.
-		 */
-		const base = was?.version ?? (there ? 0 : undefined);
-		const put = await this.upload(name, s.id, path, bytes, hash, base);
-		if (!put) return !this.holding("files");
-		if (put.current) known[path] = { version: put.version, hash };
-		else await this.conflicted(name, s, path, full, bytes, hash, put.version, remote.get(path)!);
-		return true;
-	}
-
-	/**
-	 * A file changed here and in Studio since both last agreed, or never agreed on: Studio's stays
-	 * current and comes down; this copy is kept there as a version, and here beside the file as
-	 * `<name>.conflict-<when>.<ext>`, a file like any other that goes up on the next pass, so both
-	 * copies are seen on every machine and a person chooses. Pictures just take Studio's.
-	 */
-	private async conflicted(name: string, s: CanvasState, path: string, full: string, bytes: Uint8Array, hash: string, version: number, theirs: SyncFile) {
-		if (!path.startsWith(`${PICTURES}/`)) {
-			const copy = conflictName(path);
-			const landing = landingFor(this.o.deck, this.deckPathOf(name, copy));
-			if (!("refused" in landing) && !existsSync(landing.full)) {
-				mkdirSync(dirname(landing.full), { recursive: true });
-				writeFileSync(landing.full, bytes);
-				this.hashes.wrote(landing.full, hash);
-				this.dirtyFiles.add(name);
-				this.soon(300);
-			}
-			this.conflicts.push(`${name}:${path}`);
-			this.log(`${path} of ${name} changed in Studio too: Studio's stays current, yours is kept there as version ${version} and here as ${copy}`);
-		}
-		await this.download(name, path, theirs);
-		void s;
-	}
-
-	private async download(name: string, path: string, f: SyncFile) {
-		const target = this.deckPathOf(name, path);
-		const landing = safeSyncPath(path) ? landingFor(this.o.deck, target) : { refused: "not a path of a canvas's bundle" };
-		if ("refused" in landing || secretLooking(path)) {
-			if (!this.skipped.has(`${name}:${path}`)) this.log(`did not download ${JSON.stringify(path)} of ${name}: ${"refused" in landing ? landing.refused : "it looks like a secret"}`);
-			this.skipped.add(`${name}:${path}`);
-			return;
-		}
-		this.say({ now: { canvas: name, path, up: false } });
-		const bytes = await this.call("GET", `/sync/v1/blobs/${encodeURIComponent(f.hash)}`);
-		this.say({ received: this.told.received + bytes.length });
-		mkdirSync(dirname(landing.full), { recursive: true });
-		writeFileSync(landing.full, bytes);
-		this.hashes.wrote(landing.full, hashOf(bytes));
-		const s = this.state.canvases[name];
-		if (s) s.files[path] = { version: f.version, hash: f.hash };
-		this.log(`downloaded ${path} of ${name}`);
-	}
-
-	/**
-	 * A picture of each canvas whose drawing changed, taken by this harness's own `canvas.screenshot`
-	 * (native, a few milliseconds), for its card in Studio. At most one a minute per canvas; a canvas
-	 * Studio has no picture of yet is taken first.
-	 */
-	private async syncCanvasPictures() {
-		const started = performance.now();
-		try {
-			await this.takeCanvasPictures();
-		} finally {
-			cost.pictureMs += performance.now() - started;
-		}
-	}
-
-	private async takeCanvasPictures() {
-		if (!this.o.harness) return;
-		for (const name of [...this.pictureDue]) {
-			// Studio asked for a wait: the pictures stay due, taken when it is over.
-			if (this.holding("files")) return;
-			const s = this.state.canvases[name];
-			if (!s || Date.now() - (this.pictureAt.get(name) ?? 0) < 60_000) continue;
-			this.pictureDue.delete(name);
-			this.pictureAt.set(name, Date.now());
-			try {
-				const res = await fetch(new URL("/api/v1/canvas.screenshot", this.o.harness), {
-					method: "POST",
-					headers: { "Content-Type": "application/json", ...(this.o.harnessToken ? { Authorization: `Bearer ${this.o.harnessToken()}` } : {}) },
-					body: JSON.stringify({ args: [{ canvas: name, format: "jpeg", scheme: "light" }] }),
-				});
-				const shot = (await res.json()) as { ok?: boolean; value?: { file?: string } };
-				if (!shot.ok || !shot.value?.file) continue;
-				const file = shot.value.file.startsWith("/") ? shot.value.file : join(this.o.deck, shot.value.file);
-				const bytes = readFileSync(file);
-				const sent = await this.upload(name, s.id, `${PICTURES}/canvas.light.jpg`, bytes, hashOf(bytes));
-				if (!sent && this.holding("files")) {
-					this.pictureDue.add(name);
-					this.pictureAt.delete(name);
-				}
-			} catch (error) {
-				this.log(`no picture of canvas ${name}: ${(error as Error).message}`);
-			}
-		}
-	}
-
-	/**
-	 * Each card's newest picture, so Studio can draw it when the card is not live: the whole one when
-	 * the harness has taken it, else its widest rung (800, then 480, which every card on a canvas has).
-	 */
-	private async syncPictures(name: string, id: string, remote?: Map<string, SyncFile>) {
-		const there = remote ?? new Map<string, SyncFile>(((await this.call("GET", `/sync/v1/canvases/${id}/files`)).files as SyncFile[]).map((f) => [f.path, f]));
-		if (!there.has(`${PICTURES}/canvas.light.jpg`)) this.pictureDue.add(name);
-		const dir = join(this.o.deck, ".decks", "thumbs");
-		if (!existsSync(dir)) return;
-		const thumbs = readdirSync(dir);
-		const folder = canvasFolder(name);
-		for (const path of this.bundle(name).keys()) {
-			if (!/^cards\/[^/]+\/index\.html$/.test(path) && !/^boards\/.+\.html$/.test(path)) continue;
-			const prefix = createHash("sha1").update(`${folder}/${path}`).digest("hex").slice(0, 16);
-			this.thumbOwner.set(prefix, name);
-			for (const scheme of ["light", "dark"]) {
-				const re = new RegExp(`^${prefix}-(\\d+)-${scheme}-\\d+-whole(?:-w(800|480))?-l\\d+\\.webp$`);
-				const found = thumbs.flatMap((t) => {
-					const m = re.exec(t);
-					return m ? [{ t, rev: m[1]!, width: m[2] ? Number(m[2]) : Number.POSITIVE_INFINITY, at: statSync(join(dir, t)).mtimeMs }] : [];
-				});
-				if (found.length === 0) continue;
-				// The newest revision's, its widest.
-				const rev = found.reduce((a, b) => (b.at > a.at ? b : a)).rev;
-				const newest = found.filter((one) => one.rev === rev).sort((a, b) => b.width - a.width)[0]!;
-				const target = `${PICTURES}/${path}.${scheme}.webp`;
-				const full = join(dir, newest.t);
-				const got = this.hashes.hash(full);
-				if (!got || there.get(target)?.hash === got.hash) continue;
-				await this.upload(name, id, target, got.bytes ?? readFileSync(full), got.hash);
-				if (this.holding("files")) return;
-			}
-		}
-	}
-
-	// ---- apps ----
-
-	/** The app list, to `PUT /sync/v1/inventory`, when it changed. A Studio too old to have the route (404) is left alone. */
-	private async syncInventory() {
-		if (!this.o.inventory) return;
-		let apps;
-		try {
-			apps = this.o.inventory().map(({ name, title, kind }) => ({ name, title, kind }));
-		} catch (error) {
-			this.log(`no app list: ${(error as Error).message}`);
-			return;
-		}
-		const body = JSON.stringify({ apps });
-		const hash = hashOf(Buffer.from(body));
-		if (this.inventorySent && this.state.inventory === hash) return;
-		const res = await fetch(new URL("/sync/v1/inventory", this.o.studio), { method: "PUT", headers: { Authorization: `Bearer ${this.o.key}`, "Content-Type": "application/json" }, body });
-		await res.arrayBuffer().catch(() => undefined);
-		if (!res.ok && res.status !== 404) {
-			this.log(`the app list was not taken: ${res.status}`);
-			return;
-		}
-		this.inventorySent = true;
-		this.state.inventory = hash;
-	}
-
-	// ---- edits made here, sent as they are logged ----
-
-	/**
-	 * An edit made on this harness, as its canvas store logged it (`CanvasPens.wrote`): for a canvas on
-	 * Studio, the edits go up at once, with Studio's revision as their base, instead of waiting for the
-	 * file to be compared with the last agreed drawing (which stays as the repair for anything missed).
-	 * One Studio made (author `studio`, written through `remote.write`) is Studio's already.
-	 */
-	edited(name: string, change: { edits: readonly PenEdit[]; by: { kind: string; id?: string } }): void {
-		if (this.stopped || change.by.kind === "studio" || !change.edits.length) return;
-		if (!this.state.canvases[name]) return;
-		const list = this.outbox.get(name) ?? [];
-		list.push([...change.edits]);
-		this.outbox.set(name, list);
-		this.soon(0);
-	}
-
-	/**
-	 * The edits queued for one canvas, sent as one body against the revision agreed here, and Studio's
-	 * answer taken as a pass takes it: the drawing as Studio now has it (ours merged, and whatever else
-	 * came meanwhile) becomes the agreed one, and is written here only where it differs.
-	 */
-	private async pushEdits(name: string, remote: SyncCanvas) {
-		const queued = this.outbox.get(name) ?? [];
-		this.outbox.delete(name);
-		const s = this.state.canvases[name];
-		if (!s || !queued.length) return;
-		// Nothing of ours goes onto a canvas shared with us to view: the next pass says so of the file.
-		if (remote.role === "view") return;
-		const base = this.baseOf(s.id);
-		if (!base) {
-			this.dirtyPens.add(name);
-			return;
-		}
-		const edits = queued.flat();
-		this.pictureDue.add(name);
-		const r = await this.postEdits(s.id, { base: s.rev, edits, client: this.me });
-		// Held: the file holds them, and the pass after the wait compares it (`syncCanvas`).
-		if (!r) return void this.dirtyPens.add(name);
-		if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
-		let next: { doc: PenDocument; rev: number };
-		if (r.pen) next = { doc: r.pen, rev: r.rev };
-		else if (r.base === s.rev) next = { doc: loosely(base.doc, r.changes ?? []), rev: r.rev };
-		else {
-			this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, r.rev));
-			next = await this.changesSince(s, base.doc);
-		}
-		if (next.rev === s.rev && !r.adjusted && !r.dropped) return; // Set what was already there: no revision, nothing to write.
-		const local = this.readLocal(name, base);
-		const text = serialize(next.doc);
-		this.writePen(name, text, local, "studio");
-		this.keepBase(s.id, next.doc, text);
-		s.rev = next.rev;
-		this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, s.rev));
-		this.save();
-	}
-
-	/**
-	 * Where someone on this harness is on a canvas kept on Studio: said up the live socket, naming them
-	 * (`by`), for Studio to say to everyone else on the canvas. Nothing when the canvas is not on Studio
-	 * or the socket is down: where a pointer was is not news later.
-	 */
-	presence(name: string, message: { by: { kind: "person" | "agent"; id: string; name?: string; color: string }; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: { x: number; y: number; zoom: number } | null; gone?: true }): void {
-		const s = this.state.canvases[name];
-		if (!s || !this.ws || this.ws.readyState !== this.ws.OPEN) return;
-		const { by, ...rest } = message;
-		this.ws.send(JSON.stringify({ type: "presence", canvas: s.id, by, ...rest }));
-	}
-
-	// ---- staying in step ----
 
 	/** What a live message asks for: one canvas, its files, or (the list changed) a full pass. */
 	private heard(e: LiveEvent) {
 		if (e.type === "hello") {
 			// Connected again: what was said while away is not known, so everything is looked at.
-			this.fullDue = true;
-			return this.soon(50);
+			this.scheduler.fullDue = true;
+			return this.scheduler.soon(50);
 		}
 		if (e.type === "presence") {
-			const name = Object.entries(this.state.canvases).find(([, s]) => s.id === e.canvas)?.[0];
+			const name = this.store.nameOf(e.canvas);
 			if (name) this.o.presence?.(name, e);
 			return;
 		}
-		if ("by" in e && e.by && e.by === this.me) return;
+		if ("by" in e && e.by && e.by === this.transport.me) return;
 		switch (e.type) {
 			case "canvas": {
 				if (!e.id) return;
-				if (typeof e.rev === "number") this.latest.set(e.id, Math.max(this.latest.get(e.id) ?? 0, e.rev));
-				if (Array.isArray(e.changes) && typeof e.base === "number" && typeof e.rev === "number") {
-					const list = this.inbox.get(e.id) ?? [];
-					list.push({ base: e.base, rev: e.rev, changes: e.changes as unknown as PenEdit[] });
-					// A canvas nobody here looks at for a while keeps at most its last 500 messages; the rest come by `changes?since=`.
-					this.inbox.set(e.id, list.slice(-500));
-				}
-				this.pull.add(e.id);
+				this.canvas.heard(e);
+				this.scheduler.pull.add(e.id);
 				// Applied the moment it arrives: the frames on this harness hear the change as the canvas store writes it.
-				return this.soon(0);
+				return this.scheduler.soon(0);
 			}
 			case "file": {
-				const name = Object.entries(this.state.canvases).find(([, s]) => s.id === e.canvas)?.[0];
+				const name = this.store.nameOf(e.canvas);
 				if (!name) return;
-				this.dirtyFiles.add(name);
-				return this.soon(50);
+				this.scheduler.dirtyFiles.add(name);
+				return this.scheduler.soon(50);
 			}
 			case "canvases":
 			case "canvas.gone":
-				this.fullDue = true;
-				return this.soon(50);
+				this.scheduler.fullDue = true;
+				return this.scheduler.soon(50);
 			default:
 				return; // Cursors, harnesses and the account's older tree are nothing to sync.
 		}
 	}
-
-	/** What a change in a watched folder asks for: the canvas it is in, or the canvases that use a deck file. */
-	private changed(top: string, filename: string | null) {
-		if (!filename) {
-			this.fullDue = true;
-			return this.soon(300);
-		}
-		const parts = filename.split(sep).join("/").split("/");
-		let name: string | undefined;
-		let rest: string[] = [];
-		if (top === "canvases") {
-			name = parts[0];
-			rest = parts.slice(1);
-		} else if (top === SHARED_CANVASES) {
-			if (parts.length < 2) return;
-			name = sharedName(parts[0]!, parts[1]!);
-			rest = parts.slice(2);
-		} else if (top === THUMBS) {
-			const owner = this.thumbOwner.get(parts[0]!.slice(0, 16));
-			if (owner) {
-				this.dirtyPictures.add(owner);
-				this.soon(1000);
-			}
-			return;
-		} else {
-			// A deck file: the canvases whose bundles hold it or whose boards point at it.
-			const path = `${top}/${parts.join("/")}`;
-			for (const [n, s] of Object.entries(this.state.canvases)) if (s.files[path] || this.links.get(n)?.has(path)) this.dirtyFiles.add(n);
-			return this.soon(300);
-		}
-		if (!name) return;
-		if (!this.state.canvases[name]) {
-			// A canvas made here, or a folder not synced yet: a full pass takes it up.
-			if (rest[0] === "canvas.pen") this.fullDue = true;
-			else return;
-		} else if (rest.length === 0) this.fullDue = true;
-		else if (rest.length === 1 && rest[0] === "canvas.pen") this.dirtyPens.add(name);
-		else if (rest.length === 1) return; // canvas.json and the like: nothing Studio keeps.
-		else this.dirtyFiles.add(name);
-		this.soon(300);
-	}
-
-	/** Sync now, then on every change on either side, and every 5 minutes besides. */
-	async start(): Promise<void> {
-		await this.sync();
-		const live = new URL("/sync/v1/live", this.o.studio);
-		live.protocol = live.protocol === "https:" ? "wss:" : "ws:";
-		let first = true;
-		const connect = () => {
-			if (this.stopped) return;
-			const ws = new WebSocket(live, { headers: { Authorization: `Bearer ${this.o.key}` } });
-			this.ws = ws;
-			ws.on("message", (m) => {
-				let e: LiveEvent;
-				try {
-					// A message this harness does not know (from a newer Studio) is nothing to sync.
-					const got = LiveEvent.safeParse(JSON.parse(String(m)));
-					if (!got.success) return;
-					e = got.data;
-				} catch {
-					return;
-				}
-				if (e.type === "token.ask") return this.giveToken(e, ws);
-				// The first hello follows the first full pass at once: nothing can have been missed but a moment.
-				if (e.type === "hello" && first) {
-					first = false;
-					return;
-				}
-				this.heard(e);
-			});
-			ws.on("close", (code) => {
-				// 4001: Studio revoked this harness's key. What was given through it goes too (`unlinked`).
-				if (code === 4001) this.o.unlinked?.("revoked");
-				setTimeout(connect, 2000);
-			});
-			ws.on("error", () => {});
-		};
-		connect();
-		this.started = true;
-		this.watchFolders();
-		this.timer = setInterval(() => this.sync(), FULL_PASS_MS);
-	}
-
-	/**
-	 * Studio asking, on the socket this harness's key opened, for a token for one of its people's
-	 * browsers: issued here (`issueToken`), or refused with a sentence, and answered on the same socket.
-	 */
-	private giveToken(ask: Extract<LiveEvent, { type: "token.ask" }>, ws: WebSocket) {
-		let answer: TokenGiven;
-		try {
-			if (!this.o.issueToken) throw new Error("This harness gives no tokens through Studio; it needs updating.");
-			const { token, expires } = this.o.issueToken({ user: ask.user, origin: ask.origin });
-			answer = { type: "token", id: ask.id, token, expires };
-		} catch (error) {
-			answer = { type: "token", id: ask.id, error: (error as Error).message };
-		}
-		ws.send(JSON.stringify(answer));
-	}
-
-	/** Which of the deck's synced folders are watched: one that comes later (a friend's first share, the first canvas) is watched from then on. */
-	private watched = new Set<string>();
-	private started = false;
-	private watchFolders() {
-		if (!this.started || this.stopped) return;
-		for (const top of ["canvases", SHARED_CANVASES, ...MIRRORED, THUMBS]) {
-			const dir = join(this.o.deck, top);
-			if (this.watched.has(top) || !existsSync(dir)) continue;
-			this.watched.add(top);
-			this.watchers.push(watch(dir, { recursive: top !== THUMBS }, (_event, filename) => this.changed(top, filename === null ? null : String(filename))));
-		}
-	}
-
-	private pending?: NodeJS.Timeout;
-	private soon(ms: number) {
-		clearTimeout(this.pending);
-		this.pending = setTimeout(() => {
-			if (!this.stopped) void this.queue(() => this.targeted());
-		}, ms);
-	}
-
-	async stop() {
-		this.stopped = true;
-		clearTimeout(this.pending);
-		clearInterval(this.timer);
-		clearTimeout(this.resume);
-		clearTimeout(this.telling);
-		for (const w of this.watchers) w.close();
-		this.ws?.close();
-		await this.running;
-	}
-}
-
-/** Card pictures the harness keeps, watched so a new one goes up with its canvas. */
-const THUMBS = ".decks/thumbs";
-
-/**
- * Edits applied as far as they fit: an insert of an item already there, or an edit to one gone, is
- * left out. Applying a revision twice (the harness stopped between writing the file and its state)
- * so changes nothing.
- */
-function loosely(doc: PenDocument, edits: readonly PenEdit[]): PenDocument {
-	const ids = new Set<string>();
-	const visit = (list: readonly { id: string; children?: unknown }[]) => {
-		for (const n of list) {
-			ids.add(n.id);
-			if (Array.isArray(n.children)) visit(n.children as never);
-		}
-	};
-	if (edits.some((e) => e.op === "insert")) visit(doc.children ?? []);
-	const fits = edits.filter((e) => e.op !== "insert" || !ids.has(e.id));
-	try {
-		return applyEdits(doc, fits);
-	} catch {
-		let out = doc;
-		for (const edit of fits) {
-			try {
-				out = applyEdits(out, [edit]);
-			} catch {
-				/* an item gone in Studio's drawing */
-			}
-		}
-		return out;
-	}
-}
-
-/** Why a pass failed, in words for Settings and Studio: Studio not reached, the key refused, or what Studio said. */
-function offlineWhy(error: Error & { status?: number }): string {
-	if (error.status === 401) return "Studio refused this harness's key: sign in again.";
-	if (error.status === undefined) return "Studio could not be reached.";
-	return `Studio answered ${error.status}.`.slice(0, 500);
 }
