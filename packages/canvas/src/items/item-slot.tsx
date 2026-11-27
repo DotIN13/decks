@@ -23,7 +23,7 @@ const EDGE_IN_PX = COARSE ? 6 : 4;
  * the person may not; their lights are still painted, and press nothing. A press on one is never the
  * bar's: it neither selects nor drags the window.
  */
-function AppLights(props: { board: ItemSlotProps["board"]; onClose?: (() => void) | undefined; onCollapse?: (() => void) | undefined }) {
+function AppLights(props: { card: ItemSlotProps["card"]; onClose?: (() => void) | undefined; onCollapse?: (() => void) | undefined }) {
 	const mine = (event: Event) => event.stopPropagation();
 	const light = (kind: "close" | "collapse" | "open", label: string, title: string, mark: string, press: (event: MouseEvent) => void) => (
 		<button type="button" class="app-light" data-light={kind} aria-label={label} title={title} onPointerDown={mine} onDblClick={mine} onClick={(event) => { event.stopPropagation(); press(event); }}>
@@ -36,23 +36,23 @@ function AppLights(props: { board: ItemSlotProps["board"]; onClose?: (() => void
 		<div class="app-lights" style={{ height: `${APP_BAR}px` }}>
 			<Show when={props.onClose}>{light("close", m.canvas_props_close(), m.canvas_app_close_title(), "M3.6 3.6 8.4 8.4M8.4 3.6 3.6 8.4", () => props.onClose?.())}</Show>
 			<Show when={props.onCollapse}>{light("collapse", m.canvas_app_collapse(), m.canvas_app_collapse_title(), "M2.8 6H9.2", () => props.onCollapse?.())}</Show>
-			{light("open", m.canvas_app_open_tab(), m.canvas_app_open_tab(), "M4.4 3.2H8.8V7.6M8.8 3.2 3.2 8.8", (event) => props.board.app && openAppTab(props.board.app, event.metaKey || event.ctrlKey))}
+			{light("open", m.canvas_app_open_tab(), m.canvas_app_open_tab(), "M4.4 3.2H8.8V7.6M8.8 3.2 3.2 8.8", (event) => props.card.app && openAppTab(props.card.app, event.metaKey || event.ctrlKey))}
 		</div>
 	);
 }
 
 /**
- * One placed item on the stage: a card (`card-surface.tsx`), a document or an app (`item-surfaces.tsx`)
+ * One placed item on the canvas: a card (`card-surface.tsx`), a document or an app (`item-surfaces.tsx`)
  * in its place while it is awake, its title above it to move it by, and the band along its edge.
  */
 export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 	const at = createMemo(() => {
 		const resized = props.view.resized();
-		return { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
+		return { x: resized?.x ?? props.card.x, y: resized?.y ?? props.card.y };
 	});
 	const size = () => {
 		const resized = props.view.resized();
-		return { w: resized?.w ?? props.board.w, h: resized?.h ?? props.board.h };
+		return { w: resized?.w ?? props.card.w, h: resized?.h ?? props.card.h };
 	};
 	const shift = () => {
 		const by = props.view.shift();
@@ -71,8 +71,8 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 	});
 	/** The bar and the edge: a mouse or pen press as `press`, a finger as `fingerDrag`. */
 	const grip = (event: PointerEvent) => (event.pointerType === "touch" ? fingerDrag(event) : press(event));
-	/** Awake, and something the slot draws: a board has nothing here but its title. */
-	const awake = createMemo(() => props.mounted && props.page !== undefined && (!!props.board.card || !!props.board.item));
+	/** Awake, and something the slot draws: a card has nothing here but its title. */
+	const awake = createMemo(() => props.mounted && props.page !== undefined && (!!props.card.card || !!props.card.item));
 	const [hovered, setHovered] = createSignal(false);
 	createEffect(() => props.view.hover(hovered()));
 	/** Its surface has been made: it takes the pointer, and the edge band moves it. */
@@ -81,7 +81,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 		if (!awake()) setShown(false);
 	});
 
-	/** Where an edge band sits, in board units: `EDGE_OUT_PX` outside the border and `EDGE_IN_PX` in. */
+	/** Where an edge band sits, in card units: `EDGE_OUT_PX` outside the border and `EDGE_IN_PX` in. */
 	const edgeBand = (side: "n" | "s" | "w" | "e") => {
 		const out = EDGE_OUT_PX / props.zoom;
 		const band = (EDGE_OUT_PX + EDGE_IN_PX) / props.zoom;
@@ -106,7 +106,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 	return (
 		<div
 			class="card-node plain-card"
-			data-path={props.board.path}
+			data-path={props.card.path}
 			data-selected={props.selected}
 			data-state={surfaceState({ live: awake() && !props.asleep, kept: !!props.kept, leaving: !!props.asleep && !props.kept, shown: shown() })}
 			data-inert={!shown() || props.asleep}
@@ -114,7 +114,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			data-covered={props.covered ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
 			data-active={props.active ? "" : undefined}
-			data-outlined={props.board.outlined ? "" : undefined}
+			data-outlined={props.card.outlined ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
 			style={{
@@ -124,56 +124,56 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 				width: `${size().w}px`,
 				height: `${size().h}px`,
 				// Its item's own corners, as the drawing's hole for it has them (`model/drawing.ts`, `cardFrame`).
-				...(props.board.corners ? { "--canvas-item-corners": props.board.corners.map((r) => `${r}px`).join(" ") } : {}),
+				...(props.card.corners ? { "--canvas-item-corners": props.card.corners.map((r) => `${r}px`).join(" ") } : {}),
 			}}
 		>
 			<div class="shade" aria-hidden="true" />
 			{/* An app's name is on the window bar the engine paints, which is also what it is dragged by (`app-grip`). */}
-			<Show when={props.visible && props.board.item !== "app"}>
-				<div class="plain-card-bar" title={props.board.path} onPointerDown={grip} onDblClick={() => props.onOpen()}>
-					{props.board.title}
+			<Show when={props.visible && props.card.item !== "app"}>
+				<div class="plain-card-bar" title={props.card.path} onPointerDown={grip} onDblClick={() => props.onOpen()}>
+					{props.card.title}
 				</div>
 			</Show>
-			<Show when={props.board.item === "app"}>
-				<div class="app-grip" title={props.board.title} style={{ height: `${APP_BAR}px` }} onPointerDown={grip} onDblClick={() => props.onOpen()} />
-				<AppLights board={props.board} onClose={props.onClose} onCollapse={props.onCollapse} />
+			<Show when={props.card.item === "app"}>
+				<div class="app-grip" title={props.card.title} style={{ height: `${APP_BAR}px` }} onPointerDown={grip} onDblClick={() => props.onOpen()} />
+				<AppLights card={props.card} onClose={props.onClose} onCollapse={props.onCollapse} />
 			</Show>
 			{/* The band along the edge of an awake item: a press inside it is the item's own, so this moves it. */}
 			<Show when={shown() && !props.asleep && (hovered() || props.selected)}>
 				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="card-edge" data-side={side} style={edgeBand(side)} onPointerDown={grip} />}</For>
 			</Show>
 			{/* Always shown while they are off: it says why the card sits still, and turns them on. */}
-			<Show when={props.onScriptsOn && props.board.card}>
+			<Show when={props.onScriptsOn && props.card.card}>
 				<button type="button" class="card-scripts-off" title={m.canvas_card_scripts_off_title()} onPointerDown={(event) => event.stopPropagation()} onClick={() => props.onScriptsOn?.()}>
 					{m.canvas_card_scripts_off()}
 				</button>
 			</Show>
 			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => (!shown() || props.asleep) && press(event)}>
-				<Show when={awake() && props.board.card}>
+				<Show when={awake() && props.card.card}>
 					<CardSurface
 						page={props.page!}
-						path={props.board.path}
-						trusted={props.cardScripts !== false && !props.board.path.startsWith("shared/")}
-						rev={props.board.rev}
-						sized={props.board.sized}
+						path={props.card.path}
+						trusted={props.cardScripts !== false && !props.card.path.startsWith("shared/")}
+						rev={props.card.rev}
+						sized={props.card.sized}
 						reload={props.reload}
 						size={size}
 						selected={props.selected}
 						awake={!props.asleep}
 						onSelect={() => props.view.select()}
 						onAddPress={(event, on) => props.view.press(event, on)}
-						onOpenPage={(path) => props.onOpenPage?.(path, props.board.path)}
-						onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}
+						onOpenPage={(path) => props.onOpenPage?.(path, props.card.path)}
+						onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.card.rev, ...extent }) : undefined}
 						onShown={() => setShown(true)}
 						{...(props.onWords ? { onWords: props.onWords } : {})}
 					/>
 				</Show>
 				{/* A document or an app item: no file of its own, drawn here (`item-surfaces.tsx`). */}
-				<Show when={awake() && props.board.item === "document"}>
-					<DocumentSurface file={props.board.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
+				<Show when={awake() && props.card.item === "document"}>
+					<DocumentSurface file={props.card.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
-				<Show when={awake() && props.board.item === "app"}>
-					<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={COARSE ? !!props.active : props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
+				<Show when={awake() && props.card.item === "app"}>
+					<AppSurface app={props.card.app ?? ""} path={props.card.path} visible={props.visible} selected={COARSE ? !!props.active : props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 			</div>
 			{/* On a touch screen the page is covered until the item is activated: the cover selects, drags, pinches, and a second tap lifts it (`active`). */}

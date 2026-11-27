@@ -8,7 +8,7 @@ import { canvasHost } from "../base/host.ts";
 import { scheme } from "../base/theme.ts";
 
 /**
- * The two items with no file of their own that the stage places as it places a card (`drawing.ts`'s
+ * The two items with no file of their own that the canvas places as it places a card (`drawing.ts`'s
  * `itemKind`): a document, edited where it sits, and an app, opened in a tab of its own.
  */
 
@@ -19,7 +19,7 @@ import { scheme } from "../base/theme.ts";
  * elements, not a shadow root: it is the canvas's own code, and the text selection it follows is the page's.
  */
 /**
- * The board tokens a dark board has (`card-host/lib/theme.css`, `[data-theme="dark"]`), as values: the
+ * The card tokens a dark card has (`card-host/lib/theme.css`, `[data-theme="dark"]`), as values: the
  * document editor draws in `--b-*`, with light values as its fallbacks, and the frame's page defines none.
  */
 const DARK_TOKENS: Record<string, string> = {
@@ -229,19 +229,19 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 type ForwardedWheel = { dx: number; dy: number; mode?: number; x: number; y: number; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean };
 
 /**
- * A wheel from inside an app's iframe, replayed on the stage where the pointer is: the canvas pans or
+ * A wheel from inside an app's iframe, replayed on the canvas where the pointer is: the canvas pans or
  * zooms with it as it does over a card whose insides cannot scroll (`input.ts`, `ownInput`). The point
  * is the app page's, turned into the frame's through the iframe's box on the screen, which is scaled by
  * the camera's zoom.
  */
 function forwardWheel(frame: HTMLIFrameElement, wheel: ForwardedWheel): void {
-	const stage = frame.closest(".stage") ?? document.querySelector(".stage");
-	if (!stage) return;
+	const canvas = frame.closest(".stage") ?? document.querySelector(".stage");
+	if (!canvas) return;
 	const box = frame.getBoundingClientRect();
 	const scale = frame.clientWidth > 0 ? box.width / frame.clientWidth : 1;
 	const clientX = box.left + Number(wheel.x || 0) * scale;
 	const clientY = box.top + Number(wheel.y || 0) * scale;
-	stage.dispatchEvent(new WheelEvent("wheel", { deltaX: Number(wheel.dx) || 0, deltaY: Number(wheel.dy) || 0, deltaMode: Number(wheel.mode) || 0, clientX, clientY, ctrlKey: !!wheel.ctrlKey, metaKey: !!wheel.metaKey, shiftKey: !!wheel.shiftKey, bubbles: true, cancelable: true }));
+	canvas.dispatchEvent(new WheelEvent("wheel", { deltaX: Number(wheel.dx) || 0, deltaY: Number(wheel.dy) || 0, deltaMode: Number(wheel.mode) || 0, clientX, clientY, ctrlKey: !!wheel.ctrlKey, metaKey: !!wheel.metaKey, shiftKey: !!wheel.shiftKey, bubbles: true, cancelable: true }));
 }
 
 const scripts = new Map<string, Promise<void>>();

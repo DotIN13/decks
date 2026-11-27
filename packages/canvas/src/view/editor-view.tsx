@@ -80,7 +80,7 @@ export function createEditorView(d: EditorViewNeeds) {
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
 			onMove={d.movePage}
-			frame={(slot) => <ItemSlot {...slot} reload={d.reloads()[slot.board.path]} page={d.options.pages?.page?.(slot.board.path)} {...(d.options.pages?.cardScripts && !d.options.pages.cardScripts(slot.board.path) ? { cardScripts: false, ...(d.options.pages.onScriptsOn && d.editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => d.options.pages!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
+			frame={(slot) => <ItemSlot {...slot} reload={d.reloads()[slot.card.path]} page={d.options.pages?.page?.(slot.card.path)} {...(d.options.pages?.cardScripts && !d.options.pages.cardScripts(slot.card.path) ? { cardScripts: false, ...(d.options.pages.onScriptsOn && d.editable && !slot.card.path.startsWith("shared/") ? { onScriptsOn: () => d.options.pages!.onScriptsOn!(slot.card.path) } : {}) } : {})} />}
 			shots={() => ({ picture: (board, scheme) => d.options.pages?.picture?.(board.path, scheme) ?? BLANK })}
 			{...(d.options.onComment ? { onComment: d.options.onComment } : {})}
 			{...(d.options.onInk ? { onInk: d.options.onInk } : {})}

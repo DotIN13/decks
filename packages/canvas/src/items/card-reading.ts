@@ -8,15 +8,15 @@
 /**
  * How much there is to read, and how small the smallest of it is.
  *
- * Sent with the extent so `decks.canvas.fit` can tell an agent that a board ran past one screen's
- * worth of words, or set type nobody can read once the board is fitted to a window, without
+ * Sent with the extent so `decks.canvas.fit` can tell an agent that a card ran past one screen's
+ * worth of words, or set type nobody can read once the card is fitted to a window, without
  * the agent taking a screenshot to find out. Visible text only, and only elements that hold
  * words of their own, so a wrapper's inherited size is not counted for its children.
  */
 /**
  * Words, for a budget that has to mean the same thing in Chinese as in English.
  *
- * Splitting on spaces counts a Chinese sentence as one word, so a board written in Chinese
+ * Splitting on spaces counts a Chinese sentence as one word, so a card written in Chinese
  * read as a fifth of its length and was never told it was long. Han, kana and hangul are
  * counted by character and divided by 1.6, which is about how many characters carry what an
  * English word does; everything else is counted by spaces as before.
@@ -28,7 +28,7 @@ export function countWords(text: string): number {
 }
 
 /**
- * The same reading of a card (`card.ts`), whose content is a block in the stage's own page rather than
+ * The same reading of a card (`card.ts`), whose content is a block in the canvas's own page rather than
  * a document: its words, its smallest type, how far it spills past its width, the boxes that cut off
  * their own content, and the labels in a drawing that sit on each other.
  */
@@ -42,11 +42,11 @@ export function readingOfCard(body: HTMLElement): { words: number; minFont?: num
 export function readingOfBody(body: HTMLElement, view: Window, spill: number): { words: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
 	const doc = body.ownerDocument;
 	const words = countWords(body.innerText ?? "");
-	// Content wider than the board: a table or a long line pushing past the right edge, which
-	// a board cannot scroll to. Two pixels of slack for rounding.
+	// Content wider than the card: a table or a long line pushing past the right edge, which
+	// a card cannot scroll to. Two pixels of slack for rounding.
 	const overflowX = spill > 2 ? { overflowX: spill } : {};
 	// Boxes that cut off their own words: a fixed-height panel that turned out too short. A
-	// board cannot scroll, so what is past the edge of such a box is simply not there.
+	// card cannot scroll, so what is past the edge of such a box is simply not there.
 	let cutBoxes = 0;
 	for (const element of body.querySelectorAll<HTMLElement>("*")) {
 		if (element.scrollHeight - element.clientHeight <= 4 || !element.innerText?.trim()) continue;

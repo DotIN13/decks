@@ -11,7 +11,7 @@ import { clockOf, filmLayout, SOUND_INK, soundLayout, waveBars } from "../look/m
  * on it or it is paused.
  *
  * **Presses on the picture are the canvas's.** The root lets them through, so a press on a film
- * or on a sound's name is still a press on a drawn item: a click plays or pauses it (the stage
+ * or on a sound's name is still a press on a drawn item: a click plays or pauses it (the canvas
  * asks `toggle`), and a drag moves it, as any item moves. Only the controls take presses.
  */
 interface MediaPlayerProps {
@@ -25,7 +25,7 @@ interface MediaPlayerProps {
 	scheme: "light" | "dark";
 	/** Where to start, when it was played before and stopped partway. */
 	from?: number;
-	/** The element, for the stage to play, pause and read. */
+	/** The element, for the canvas to play, pause and read. */
 	ref: (element: HTMLMediaElement) => void;
 	onEnded: () => void;
 	/** Where it was when it stopped, so starting it again goes on from there. */

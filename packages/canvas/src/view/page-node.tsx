@@ -47,7 +47,7 @@ export function createPageNode(d: PageNodeNeeds) {
 	/** One placed item's slot: the host's, told where it is and what it may do. */
 	const pageNode = (board: Page) => (
 		<d.Frame
-			board={board}
+			card={board}
 			zoom={d.ctl.zoom()}
 			mounted={d.isLive(board.path) || d.isKept(board.path) || d.isLeaving(board.path)}
 			asleep={d.isKept(board.path) || d.isLeaving(board.path)}

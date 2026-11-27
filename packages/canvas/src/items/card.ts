@@ -1,13 +1,13 @@
 import { readingOfCard } from "./card-reading.ts";
 import { freshAddress, passless } from "../base/host.ts";
 /**
- * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
+ * A card: a piece of HTML drawn in a closed shadow root of the canvas's own page, where a board has a
  * frame of its own.
  *
  * A frame is a whole document: its own copy of the styles, of every library its scripts import, and,
- * sandboxed, a process of its own; and wheel, pinch and touch inside it reach the stage only by
+ * sandboxed, a process of its own; and wheel, pinch and touch inside it reach the canvas only by
  * message. A card is a few elements in the page that is already there. Its styles stay inside its
- * root, its events bubble out of it to the stage as any element's do, and a library two cards import
+ * root, its events bubble out of it to the canvas as any element's do, and a library two cards import
  * is read and run once for the page (`import` keeps one copy per address).
  *
  * The price is that a shadow root fences styles, not code: a card's script runs as the page does.
@@ -55,12 +55,12 @@ function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) |
 	return at([]) as CardDecks;
 }
 
-/** What a card's script is handed: its own root, and what the stage knows of it. */
+/** What a card's script is handed: its own root, and what the canvas knows of it. */
 export interface CardContext {
 	/** The card's closed shadow root: what `document` is to a board. `querySelector` and `getElementById` work on it. */
 	root: ShadowRoot;
 	/**
-	 * The root dressed as a document, for a script written for a board: `body` and `documentElement`
+	 * The root dressed as a document, for a script written for a card: `body` and `documentElement`
 	 * are the card's own element, `createElement` and the rest are the page's.
 	 */
 	document: Document;
@@ -247,7 +247,7 @@ function cssInDeck(css: string, base: string): boolean {
 }
 
 /*
- * card.css for a shadow root: the board tokens and parts, with `:root` and the page's `html` and
+ * card.css for a shadow root: the card tokens and parts, with `:root` and the page's `html` and
  * `body.board` turned into the card's own host and element, and the fonts declared once in the page
  * itself, since a shadow root's `@font-face` is not used.
  *
@@ -281,7 +281,7 @@ function cardSheet(lib: string): Promise<string | undefined> {
 	if (made) return made;
 	made = (async () => {
 		try {
-			const [theme, board] = await Promise.all([fetch(new URL("theme.css", lib)).then(textOf), fetch(new URL("card.css", lib)).then(textOf)]);
+			const [theme, card] = await Promise.all([fetch(new URL("theme.css", lib)).then(textOf), fetch(new URL("card.css", lib)).then(textOf)]);
 			const fonts = (theme.match(/@font-face\s*\{[^}]*\}/g) ?? []).map((rule) => rule.replace(/url\(\s*["']?(?!data:)([^"')]+)["']?\s*\)/g, (_all, file: string) => `url("${new URL(file, lib).href}")`));
 			if (!fontsSaid.has(key) && fonts.length) {
 				fontsSaid.add(key);
@@ -292,7 +292,7 @@ function cardSheet(lib: string): Promise<string | undefined> {
 			}
 			// card.css is one cascade layer, `decks`, under the card's own styles; its theme.css, imported
 			// into that layer on a page, joins it here, so any rule a card writes beats both.
-			const css = ("@layer decks {\n" + theme.replace(/@font-face\s*\{[^}]*\}/g, "") + "\n}\n" + board.replace(/@import[^;]*;/g, ""))
+			const css = ("@layer decks {\n" + theme.replace(/@font-face\s*\{[^}]*\}/g, "") + "\n}\n" + card.replace(/@import[^;]*;/g, ""))
 				.replace(/html:not\(\[data-theme="light"\]\)/g, ':host(:not([data-theme="light"]))')
 				.replace(/(^|[\s,}])\[data-theme="dark"\]/g, '$1:host([data-theme="dark"])')
 				.replace(/:root\b/g, ":host")
@@ -325,7 +325,7 @@ function cardSheet(lib: string): Promise<string | undefined> {
 	return made;
 }
 
-/** The root, dressed as a document for a script written for a board. */
+/** The root, dressed as a document for a script written for a card. */
 function asDocument(root: ShadowRoot, body: HTMLElement): Document {
 	return new Proxy(document, {
 		get(target, key) {
@@ -550,10 +550,10 @@ export function giveDeckImports(given: Record<string, string>, base: string): vo
 }
 
 /**
- * The deck's own libraries, beside the boards' (`assets/importmap.json`, `{ "imports": { "name": "address" } }`):
+ * The deck's own libraries, beside the cards' (`assets/importmap.json`, `{ "imports": { "name": "address" } }`):
  * added to the page's import map once, before the first card's script that could name one. An address
  * is taken from the file's own folder when it is relative. A name the page already maps keeps its
- * first address, as import maps do, so a deck cannot swap the boards' d3.
+ * first address, as import maps do, so a deck cannot swap the cards' d3.
  */
 function deckImports(cardUrl: string): Promise<void> {
 	// Handed by the host for the whole canvas (`giveDeckImports`): nothing to look for.
