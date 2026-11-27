@@ -10,11 +10,11 @@ import type { SceneQuery } from "./scene.ts";
 export const SNAP_PX = 5;
 
 /**
- * The items around a selection and the boards, as far as `view` (the window, in stage pixels)
+ * The items around a selection and the cards, as far as `view` (the window, in canvas pixels)
  * shows. Top-level items, and the siblings of an item inside a frame; never what is moving, the
  * inside of an instance, or an arrow, whose box is only where its line runs.
  */
-export function snapTargets(scene: SceneQuery, ids: readonly string[], boards: readonly string[], view: Rect): Rect[] {
+export function snapTargets(scene: SceneQuery, ids: readonly string[], cards: readonly string[], view: Rect): Rect[] {
 	const seen = (box: Rect) => box.x < view.x + view.w && box.x + box.w > view.x && box.y < view.y + view.h && box.y + box.h > view.y;
 	const moving = new Set(ids);
 	const parents = new Set(ids.map((id) => scene.item(id)?.parent).filter((id): id is string => !!id));
@@ -27,34 +27,34 @@ export function snapTargets(scene: SceneQuery, ids: readonly string[], boards: r
 		const box = scene.box(node.id) ?? placed.box;
 		if (seen(box)) out.push(box);
 	}
-	for (const board of scene.boards()) if (!boards.includes(board.path) && seen(board)) out.push({ x: board.x, y: board.y, w: board.w, h: board.h });
+	for (const card of scene.cards()) if (!cards.includes(card.path) && seen(card)) out.push({ x: card.x, y: card.y, w: card.w, h: card.h });
 	return out;
 }
 
 /**
- * The boards a drag of boards alone keeps the reading gap from (`snap.ts`, `READING_GAP`): every
- * other board the window shows. None when drawn items are carried too.
+ * The cards a drag of cards alone keeps the reading gap from (`snap.ts`, `READING_GAP`): every
+ * other card the window shows. None when drawn items are carried too.
  */
-export function readingTargets(scene: SceneQuery, ids: readonly string[], boards: readonly string[], view: Rect): Rect[] {
-	if (ids.length || !boards.length) return [];
+export function readingTargets(scene: SceneQuery, ids: readonly string[], cards: readonly string[], view: Rect): Rect[] {
+	if (ids.length || !cards.length) return [];
 	const seen = (box: Rect) => box.x < view.x + view.w && box.x + box.w > view.x && box.y < view.y + view.h && box.y + box.h > view.y;
 	return scene
-		.boards()
-		.filter((board) => !boards.includes(board.path) && seen(board))
-		.map((board) => ({ x: board.x, y: board.y, w: board.w, h: board.h }));
+		.cards()
+		.filter((card) => !cards.includes(card.path) && seen(card))
+		.map((card) => ({ x: card.x, y: card.y, w: card.w, h: card.h }));
 }
 
-/** The box round everything in a selection: items as drawn, boards as placed. */
-export function selectionBox(scene: SceneQuery, ids: readonly string[], boards: readonly string[]): Rect | undefined {
+/** The box round everything in a selection: items as drawn, cards as placed. */
+export function selectionBox(scene: SceneQuery, ids: readonly string[], cards: readonly string[]): Rect | undefined {
 	const boxes: Rect[] = [
 		...ids.flatMap((id) => {
 			const box = scene.box(id) ?? scene.item(id)?.box;
 			return box ? [box] : [];
 		}),
 		...scene
-			.boards()
-			.filter((board) => boards.includes(board.path))
-			.map((board) => ({ x: board.x, y: board.y, w: board.w, h: board.h })),
+			.cards()
+			.filter((card) => cards.includes(card.path))
+			.map((card) => ({ x: card.x, y: card.y, w: card.w, h: card.h })),
 	];
 	if (boxes.length === 0) return undefined;
 	const x1 = Math.min(...boxes.map((box) => box.x));

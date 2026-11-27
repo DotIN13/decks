@@ -23,23 +23,23 @@ function put(file: string, data: string | Uint8Array): void {
  * it — which, for a card neither had moved before, is the place they were both seeded with: the
  * value before the move, exactly, with the move itself on disk and correct.
  *
- * That is the bug reported on 21 September 2026 as "stage.boards() returned pre-move positions
+ * That is the bug reported on 21 September 2026 as "decks.cards() returned pre-move positions
  * twice, and now will not reproduce". It reproduces whenever the caller is not the conversation
  * on screen, which is why it came and went.
  */
 
 function open() {
-	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-boards-caller-")));
+	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-cards-caller-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	for (const name of ["plan.html", "risks.html"]) {
-		put(join(deck, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><html><head><title>${name}</title></head><body class="board"></body></html>`);
+		put(join(deck, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><html><head><title>${name}</title></head><body class="card-page"></body></html>`);
 	}
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }
 
-test("a board an agent moved reads back moved, whoever the browser is looking at", () => {
+test("a card an agent moved reads back moved, whoever the browser is looking at", () => {
 	const { app, cleanup } = open();
 	try {
 		// Restored rows: a chat that exists and starts no runtime, which is all this needs.

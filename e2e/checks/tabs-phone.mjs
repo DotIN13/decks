@@ -98,7 +98,7 @@ const rows = page.locator(".tab-row");
 await until(async () => ((await rows.count()) === 3 && (await rows.nth(0).innerText()).trim().length > 0 ? true : undefined));
 say("the chip opens the tabs as a list: the canvas the chat's camera is on first, then each, the one in front marked", (await rows.count()) === 3 && (await rows.nth(0).getAttribute("data-kind")) === "canvas" && (await rows.nth(1).getAttribute("data-kind")) === "card" && (await rows.nth(2).getAttribute("data-kind")) === "app" && (await rows.nth(2).getAttribute("data-current")) === "true", (await rows.allInnerTexts()).join(" | "));
 await rows.nth(0).tap();
-say("the canvas picked comes forward, and the title names it again", (await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await title.innerText()).trim() === bar.words.trim() ? true : undefined))) === true, await title.innerText());
+say("the canvas picked comes forward, and the title names it again", (await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await title.innerText()).trim() === bar.words.trim() ? true : undefined))) === true, await title.innerText());
 
 // --- the side panel open: the bars and the tool row go aside with it, the + still there ---------------------------
 await page.locator('.v3-topbar [aria-label="Show the side panel"]').first().tap();

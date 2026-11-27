@@ -2,23 +2,23 @@ import { readingOfCard } from "./card-reading.ts";
 import { freshAddress, passless } from "../base/host.ts";
 import { loadCardModule } from "./card-modules.ts";
 /**
- * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
+ * A card: a piece of HTML drawn in a closed shadow root of the canvas's own page, where a card has a
  * frame of its own.
  *
  * A frame is a whole document: its own copy of the styles, of every library its scripts import, and,
- * sandboxed, a process of its own; and wheel, pinch and touch inside it reach the stage only by
+ * sandboxed, a process of its own; and wheel, pinch and touch inside it reach the canvas only by
  * message. A card is a few elements in the page that is already there. Its styles stay inside its
- * root, its events bubble out of it to the stage as any element's do, and a library two cards import
+ * root, its events bubble out of it to the canvas as any element's do, and a library two cards import
  * is read and run once for the page (`import` keeps one copy per address).
  *
  * The price is that a shadow root fences styles, not code: a card's script runs as the page does.
- * So only the deck's own cards run scripts, as its own boards run theirs; a card from a canvas a
+ * So only the deck's own cards run scripts; a card from a canvas a
  * friend shared is cleaned of anything that runs before it is placed (`clean`).
  *
  * ### A card's scripts
  *
  * Each inline script is a module, served at its own address beside the card (`sales.html.m0.js`,
- * the server's `boards/cards.ts`), so `import "./sales.js"` resolves from the card's folder and the
+ * the server's `cards/cards.ts`), so `import "./sales.js"` resolves from the card's folder and the
  * page's import map names the shared libraries. A module runs once per address; its default export
  * is called for each placement of the card each time it wakes, with the card (`CardContext`), and
  * what it returns is called when the card sleeps or goes.
@@ -56,12 +56,12 @@ function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) |
 	return at([]) as CardDecks;
 }
 
-/** What a card's script is handed: its own root, and what the stage knows of it. */
+/** What a card's script is handed: its own root, and what the canvas knows of it. */
 export interface CardContext {
-	/** The card's closed shadow root: what `document` is to a board. `querySelector` and `getElementById` work on it. */
+	/** The card's closed shadow root: what `document` is to a page. `querySelector` and `getElementById` work on it. */
 	root: ShadowRoot;
 	/**
-	 * The root dressed as a document, for a script written for a board: `body` and `documentElement`
+	 * The root dressed as a document, for a script written for a card: `body` and `documentElement`
 	 * are the card's own element, `createElement` and the rest are the page's.
 	 */
 	document: Document;
@@ -248,14 +248,14 @@ function cssInDeck(css: string, base: string): boolean {
 }
 
 /*
- * card.css for a shadow root: the board tokens and parts, with `:root` and the page's `html` and
- * `body.board` turned into the card's own host and element, and the fonts declared once in the page
+ * card.css for a shadow root: the card tokens and parts, with `:root` and the page's `html` and
+ * `body.card` turned into the card's own host and element, and the fonts declared once in the page
  * itself, since a shadow root's `@font-face` is not used.
  *
  * Its rules sit in the cascade layer `decks`, so any rule of the card's own wins whatever its
  * specificity. It goes in each root as a `<style>` before the card's own (`data-card-sheet`), not as an adopted
  * sheet: adopted sheets cascade after every sheet in the tree, so card.css's `h1 { font-size: 30px }`
- * beat a card's own `h1 { font-size: 23px }`, and `.board .doc`'s padding a card's `.board .doc`,
+ * beat a card's own `h1 { font-size: 23px }`, and `.card .doc`'s padding a card's `.card .doc`,
  * where on a page of its own (and in every picture and screenshot of it) the card's own rule, written
  * later, wins. The browser parses the same text once for every root that holds it.
  */
@@ -282,7 +282,7 @@ function cardSheet(lib: string): Promise<string | undefined> {
 	if (made) return made;
 	made = (async () => {
 		try {
-			const [theme, board] = await Promise.all([fetch(new URL("theme.css", lib)).then(textOf), fetch(new URL("card.css", lib)).then(textOf)]);
+			const [theme, card] = await Promise.all([fetch(new URL("theme.css", lib)).then(textOf), fetch(new URL("card.css", lib)).then(textOf)]);
 			const fonts = (theme.match(/@font-face\s*\{[^}]*\}/g) ?? []).map((rule) => rule.replace(/url\(\s*["']?(?!data:)([^"')]+)["']?\s*\)/g, (_all, file: string) => `url("${new URL(file, lib).href}")`));
 			if (!fontsSaid.has(key) && fonts.length) {
 				fontsSaid.add(key);
@@ -293,15 +293,15 @@ function cardSheet(lib: string): Promise<string | undefined> {
 			}
 			// card.css is one cascade layer, `decks`, under the card's own styles; its theme.css, imported
 			// into that layer on a page, joins it here, so any rule a card writes beats both.
-			const css = ("@layer decks {\n" + theme.replace(/@font-face\s*\{[^}]*\}/g, "") + "\n}\n" + board.replace(/@import[^;]*;/g, ""))
+			const css = ("@layer decks {\n" + theme.replace(/@font-face\s*\{[^}]*\}/g, "") + "\n}\n" + card.replace(/@import[^;]*;/g, ""))
 				.replace(/html:not\(\[data-theme="light"\]\)/g, ':host(:not([data-theme="light"]))')
 				.replace(/(^|[\s,}])\[data-theme="dark"\]/g, '$1:host([data-theme="dark"])')
 				.replace(/:root\b/g, ":host")
-				.replace(/html:has\(> body\.board\)/g, ":host")
+				.replace(/html:has\(> body\.card-page\)/g, ":host")
 				.replace(/html\[data-decks-focus\]\s*/g, ":host([data-decks-focus]) ")
-				.replace(/body\.board/g, ".card-body")
+				.replace(/body\.card-page/g, ".card-body")
 				.replace(/(^|[\s,}])html,\s*body\s*\{/g, "$1.card-body {")
-				// The card is as wide as its box, and as tall as the box at least: card.css sizes a board's body by its meta.
+				// The card is as wide as its box, and as tall as the box at least: card.css sizes a card's body by its meta.
 				/*
 				 * As tall as what is in it, so the card can be measured (`onHeight`, what `decks canvas fit` reads);
 				 * the paper is the host's, so a card shorter than its box still fills it, and what does not fit in the
@@ -326,7 +326,7 @@ function cardSheet(lib: string): Promise<string | undefined> {
 	return made;
 }
 
-/** The root, dressed as a document for a script written for a board. */
+/** The root, dressed as a document for a script written for a card. */
 function asDocument(root: ShadowRoot, body: HTMLElement): Document {
 	return new Proxy(document, {
 		get(target, key) {
@@ -349,7 +349,7 @@ function asDocument(root: ShadowRoot, body: HTMLElement): Document {
 }
 
 /*
- * What `card.js` draws on a board, drawn in a card: `[data-md]` as markdown, maths in it and in a
+ * What `card.js` draws on a card, drawn here: `[data-md]` as markdown, maths in it and in a
  * `.doc`, `[data-mermaid]` as a diagram, and code in `<pre>` coloured. From the same vendored files in
  * the deck's `lib/`, each loaded once for the page whatever number of cards asks for it.
  */
@@ -500,7 +500,7 @@ async function cardMermaid(host: HTMLElement, target: HTMLElement, lib: string, 
 	}
 }
 
-/** Draw a card's markdown, maths, diagrams and code, as `card.js` draws a board's. Never throws: a part that fails says so in place. */
+/** Draw a card's markdown, maths, diagrams and code, as `card.js` draws a card's. Never throws: a part that fails says so in place. */
 async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement, lib: string): Promise<void> {
 	const work: Promise<unknown>[] = [];
 	for (const element of body.querySelectorAll<HTMLElement>("[data-md], [data-mermaid]")) {
@@ -551,10 +551,10 @@ export function giveDeckImports(given: Record<string, string>, base: string): vo
 }
 
 /**
- * The deck's own libraries, beside the boards' (`assets/importmap.json`, `{ "imports": { "name": "address" } }`):
+ * The deck's own libraries, beside the cards' (`assets/importmap.json`, `{ "imports": { "name": "address" } }`):
  * added to the page's import map once, before the first card's script that could name one. An address
  * is taken from the file's own folder when it is relative. A name the page already maps keeps its
- * first address, as import maps do, so a deck cannot swap the boards' d3.
+ * first address, as import maps do, so a deck cannot swap the cards' d3.
  */
 function deckImports(cardUrl: string): Promise<void> {
 	// Handed by the host for the whole canvas (`giveDeckImports`): nothing to look for.
@@ -719,8 +719,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 
 	const { fragment, scripts } = readFragment(source);
 	const body = document.createElement("div");
-	// Also `board`, so a board's own `.board .doc` rules match a card made from it.
-	body.className = "card-body board";
+	// Also `card-page`, so a card's own `.card-page .doc` rules match.
+	body.className = "card-body card-page";
 	// Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`items/input.ts`).
 	body.tabIndex = -1;
 	body.style.outline = "none";

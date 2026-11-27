@@ -13,7 +13,7 @@ export interface PageViewsNeeds {
 }
 
 export function createPageViews(d: PageViewsNeeds) {
-	/** What a board's frame reads of the editor and says back to it (`PageView`). */
+	/** What a card's frame reads of the editor and says back to it (`PageView`). */
 	/** The item on the drawing that is this page, by its path as the item names it or by its end. */
 	const pageItemId = (path: string): string | undefined => {
 		if (d.host.scene.pageItem) return d.host.scene.pageItem(path);
@@ -40,8 +40,8 @@ export function createPageViews(d: PageViewsNeeds) {
 		},
 		resized: () => (d.editor.pageResize()?.path === path ? d.editor.pageResize() : undefined),
 		hover: (on) => {
-			if (on) d.editor.hover({ board: path });
-			else if (untrack(d.editor.hoverPage) === path) d.editor.hover({ board: undefined });
+			if (on) d.editor.hover({ card: path });
+			else if (untrack(d.editor.hoverPage) === path) d.editor.hover({ card: undefined });
 		},
 		press: (event, on) => (d.host.editable() ? d.dragPage(path, event, on) : false),
 		dragging: (at) => d.editor.setOwnDrag(at ? { path, ...at } : undefined),

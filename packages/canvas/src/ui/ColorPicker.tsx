@@ -25,7 +25,7 @@ import type { ColorPickerProps } from "./color-picker-props.ts";
  * not where the rest of the panel is. This one opens under the swatch that asked for it, in the
  * page (`Portal`, so the panel's scrolling does not clip it), and keeps to the screen.
  *
- * A drag in the square or the strip draws the colour on the stage at every step (`onLive`) and saves
+ * A drag in the square or the strip draws the colour on the canvas at every step (`onLive`) and saves
  * it when the pointer is let go, so the item changes under the pointer and the drawing still takes
  * one edit and not sixty.
  */

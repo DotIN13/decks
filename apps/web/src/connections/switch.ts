@@ -2,7 +2,7 @@ import { render } from "solid-js/web";
 import type { JSX } from "solid-js";
 import { resetDeck } from "../state/deck.ts";
 import { resetPens } from "../state/pens.ts";
-import { resetStages } from "../state/canvases.ts";
+import { resetCanvases } from "../state/canvases.ts";
 import { resetHistory } from "../state/history.ts";
 import { resetToolResults } from "@decks/agent-ui/chat";
 import { scratch } from "../state/agent.ts";
@@ -42,7 +42,7 @@ function forget(): void {
 	stop();
 	resetDeck();
 	resetPens();
-	resetStages();
+	resetCanvases();
 	resetHistory();
 	resetToolResults();
 	scratch.clear();
@@ -72,7 +72,7 @@ export async function remount(move?: () => void): Promise<void> {
 	/*
 	 * The tab's connection changes only now, with nothing mounted: every address the old view builds
 	 * follows it (`api()`), and changed earlier, the old view would have asked the new backend for
-	 * its own boards in the moment before it went.
+	 * its own cards in the moment before it went.
 	 */
 	move?.();
 	// Ready already when the switch came from the switcher (`reach`) or `warm` ran: nothing to wait on.

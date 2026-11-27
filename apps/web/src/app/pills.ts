@@ -17,7 +17,7 @@ import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /** What finding a named thing on the canvas reads of the page. */
 interface PillInputs {
-	stagePen: () => { doc: Parameters<typeof canvasItems>[0] } | undefined;
+	canvasPen: () => { doc: Parameters<typeof canvasItems>[0] } | undefined;
 	editorHandle: () => FramedHandle | undefined;
 	setPenSelected: (ids: string[]) => void;
 	playAndFrame: (path: string) => void;
@@ -27,22 +27,22 @@ interface PillInputs {
  * What a row, a pill or a message names, found on the canvas: the Canvas tab's rows, a pill's card
  * and its name, and a sent message read back into its pills.
  */
-export function createPills({ stagePen, editorHandle, setPenSelected, playAndFrame }: PillInputs) {
+export function createPills({ canvasPen, editorHandle, setPenSelected, playAndFrame }: PillInputs) {
 	/**
-	 * A row of the Canvas tab: a board plays and is framed as from any list; a drawn item is selected
+	 * A row of the Canvas tab: a card plays and is framed as from any list; a drawn item is selected
 	 * and brought to the middle of the canvas, framed whole when it would not fit at this zoom.
 	 */
 	const pickItem = (item: CanvasItem) => {
-		if (item.board) {
+		if (item.card) {
 			const name = canvasOnScreen()?.name;
-			const path = state.pages.find((one) => one.path === item.board || (name && one.path === `canvases/${name}/${item.board}`))?.path;
+			const path = state.pages.find((one) => one.path === item.card || (name && one.path === `canvases/${name}/${item.card}`))?.path;
 			if (path) return playAndFrame(path);
 		}
 		untrack(editorHandle)?.select([item.id]);
 		setPenSelected([item.id]);
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage || item.box.w <= 0) return;
-		const view = { width: stage.clientWidth, height: stage.clientHeight };
+		const canvas = document.querySelector(".canvas, iframe.canvas-frame");
+		if (!canvas || item.box.w <= 0) return;
+		const view = { width: canvas.clientWidth, height: canvas.clientHeight };
 		const region = canvasBox(view);
 		const fitted = fitInto([item.box], view, region);
 		const zoom = Math.min(fitted.zoom, camera().zoom);
@@ -50,25 +50,25 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 		const cy = item.box.y + item.box.h / 2;
 		moveCamera({ zoom, x: cx - (region.x + region.width / 2 - view.width / 2) / zoom, y: cy - (region.y + region.height / 2 - view.height / 2) / zoom }, { animate: true });
 	};
-	/** A board's or card's title by its path, for the name on a pill's card. */
+	/** A card's title by its path, for the name on a pill's card. */
 	const titleOf = (path: string) => state.pages.find((one) => one.path === path)?.title;
 	/** A drawn item's name by its id, as the layers list calls it: its own name, or a few of its words. */
-	const itemName = (id: string) => canvasItems(stagePen()?.doc).items.find((one) => one.id === id)?.label;
+	const itemName = (id: string) => canvasItems(canvasPen()?.doc).items.find((one) => one.id === id)?.label;
 	/**
-	 * Show what a pill is about (its card's name): a file opens in a new tab; a board, a card or a drawn
+	 * Show what a pill is about (its card's name): a file opens in a new tab; a card, a card or a drawn
 	 * item, or what a comment is on, is found on the canvas and framed as the side panel's rows do.
 	 */
 	const showPill = (node: DraftMention, comment?: WaitingComment) => {
 		// Read with this tab's token, as every file is (`lib/authed.tsx`).
 		if (node.kind === "file") return void openAuthed(api(`/file?path=${encodeURIComponent(node.id)}`)).catch((error: unknown) => notice("warn", m.app_file_open_failed({ name: node.id, error: (error as Error).message })));
-		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
+		const target = comment ? (comment.items?.[0] ?? comment.card) : node.id;
 		const name = canvasOnScreen()?.name;
-		const item = canvasItems(stagePen()?.doc).items.find(
-			(one) => one.id === target || (!!one.board && (one.board === target || target.endsWith(`/${one.board}`) || (!!name && `canvases/${name}/${one.board}` === target))),
+		const item = canvasItems(canvasPen()?.doc).items.find(
+			(one) => one.id === target || (!!one.card && (one.card === target || target.endsWith(`/${one.card}`) || (!!name && `canvases/${name}/${one.card}` === target))),
 		);
 		if (item) return pickItem(item);
-		const board = state.pages.find((one) => one.path === target);
-		if (board) return flyTo(board);
+		const card = state.pages.find((one) => one.path === target);
+		if (card) return flyTo(card);
 		notice("info", m.app_not_on_canvas());
 	};
 	// A message you sent, read back into its pills: from the parts kept with it, or, sent before they were, from its text.

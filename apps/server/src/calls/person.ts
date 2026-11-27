@@ -6,7 +6,7 @@ import { personToolOf } from "./agent-tools.ts";
 /**
  * Whose canvas the person's click acts on.
  *
- * The browser names the canvas on screen (`X-Decks-Stage`, or `stage` on a socket message) and the
+ * The browser names the canvas on screen (`X-Decks-Canvas`, or `canvas` on a socket message) and the
  * agent it is talking to (`X-Decks-Agent`). The canvas wins: the change goes to the agent on that
  * canvas, the one the browser is looking at first; with no canvas named, to the agent it names, and
  * then to the focused conversation, which is what every card frame acts on.

@@ -69,7 +69,7 @@ export const Camera = named("Camera", obj({ x: num(), y: num(), zoom: num() }), 
 
 export const Item = named(
 	"Item",
-	obj({ type: str(), id: opt(str()), card: opt(str()), html: opt(str()), title: opt(str()), board: opt(str()), box: opt(Box), children: opt(arr(any())) }, true),
+	obj({ type: str(), id: opt(str()), card: opt(str()), html: opt(str()), title: opt(str()), box: opt(Box), children: opt(arr(any())) }, true),
 	'Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a card, with its own pen.dev fields and its `box`. A card is { type: "card", card: <path>, width? }, or { type: "card", html, title? } to write one.',
 );
 

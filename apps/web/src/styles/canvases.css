@@ -8,7 +8,7 @@
 	 * search field at the working height of a real field, the grid, and a line of keys. A card is a
 	 * picture first; its controls stay out of it until the pointer or the keyboard is there.
 	 */
-	.stage-manager {
+	.canvas-manager {
 		position: fixed;
 		inset: 0;
 		z-index: var(--z-popup);
@@ -24,21 +24,21 @@
 		transition: opacity 140ms ease;
 	}
 
-	.stage-manager[data-open] {
+	.canvas-manager[data-open] {
 		opacity: 1;
 		pointer-events: auto;
 	}
 
 	/* The canvas goes quiet behind the panel: dimmer, and blurred by the scrim above it. */
-	.stage > * {
+	.canvas > * {
 		transition: opacity 140ms ease;
 	}
 
-	body[data-stage-manager] .stage > * {
+	body[data-canvas-manager] .canvas > * {
 		opacity: 0.55;
 	}
 
-	.stage-box {
+	.canvas-box {
 		display: flex;
 		flex-direction: column;
 		width: min(94vw, 1040px);
@@ -53,24 +53,24 @@
 		transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 	}
 
-	.stage-manager[data-open] .stage-box {
+	.canvas-manager[data-open] .canvas-box {
 		transform: none;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.stage-manager,
-		.stage > *,
-		.stage-box {
+		.canvas-manager,
+		.canvas > *,
+		.canvas-box {
 			transition: none;
 		}
-		.stage-box {
+		.canvas-box {
 			transform: none;
 		}
 	}
 
 	/* --- the head: what this is, how many, the new-canvas button, and the search -------------- */
 
-	.stage-head {
+	.canvas-head {
 		display: flex;
 		flex: none;
 		flex-direction: column;
@@ -79,14 +79,14 @@
 		border-bottom: 1px solid var(--line);
 	}
 
-	.stage-title-row {
+	.canvas-title-row {
 		display: flex;
 		align-items: center;
 		gap: 12px;
 		min-height: 32px;
 	}
 
-	.stage-title {
+	.canvas-title {
 		display: flex;
 		flex: 1;
 		align-items: baseline;
@@ -100,7 +100,7 @@
 	}
 
 	/* The one filled button here: making a canvas is the panel's only action that is not a choice. */
-	.stage-new {
+	.canvas-new {
 		display: inline-flex;
 		flex: none;
 		align-items: center;
@@ -118,16 +118,16 @@
 		transition: opacity 120ms ease;
 	}
 
-	.stage-new:hover {
+	.canvas-new:hover {
 		opacity: 0.86;
 	}
 
-	.stage-new:focus-visible {
+	.canvas-new:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
 	}
 
-	.stage-new-form {
+	.canvas-new-form {
 		display: flex;
 		flex: 0 1 380px;
 		align-items: center;
@@ -135,7 +135,7 @@
 		min-width: 0;
 	}
 
-	.stage-new-field {
+	.canvas-new-field {
 		flex: 1;
 		min-width: 0;
 		height: 32px;
@@ -151,7 +151,7 @@
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
 	}
 
-	.stage-search {
+	.canvas-search {
 		display: flex;
 		align-items: center;
 		gap: 10px;
@@ -160,7 +160,7 @@
 		padding: 0 12px;
 		border: 1px solid var(--line);
 		border-radius: 10px;
-		background: var(--stage);
+		background: var(--ground);
 		cursor: text;
 		transition:
 			border-color 120ms ease,
@@ -168,13 +168,13 @@
 			background-color 120ms ease;
 	}
 
-	.stage-search:focus-within {
+	.canvas-search:focus-within {
 		border-color: var(--color-accent);
 		background: var(--raise);
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
 	}
 
-	.stage-search > input {
+	.canvas-search > input {
 		flex: 1;
 		min-width: 0;
 		border: 0;
@@ -185,11 +185,11 @@
 		outline: none;
 	}
 
-	.stage-search > input::placeholder {
+	.canvas-search > input::placeholder {
 		color: var(--faint);
 	}
 
-	.stage-kbd {
+	.canvas-kbd {
 		display: inline-grid;
 		min-width: 20px;
 		height: 20px;
@@ -208,7 +208,7 @@
 
 	/* --- the grid ---------------------------------------------------------------------------- */
 
-	.stage-wall {
+	.canvas-wall {
 		display: grid;
 		flex: 1;
 		align-content: start;
@@ -219,7 +219,7 @@
 		padding: 20px 22px 24px;
 	}
 
-	.stage-none {
+	.canvas-none {
 		grid-column: 1 / -1;
 		margin: 24px 0;
 		color: var(--muted);
@@ -227,7 +227,7 @@
 		text-align: center;
 	}
 
-	.stage-card {
+	.canvas-card {
 		position: relative;
 		display: flex;
 		flex-direction: column;
@@ -239,7 +239,7 @@
 	}
 
 	/* The picture is the card's button: it opens the canvas, and it is what the keyboard lands on. */
-	.stage-open {
+	.canvas-open {
 		position: relative;
 		display: grid;
 		aspect-ratio: 16 / 10;
@@ -250,7 +250,7 @@
 		border: 1px solid var(--line);
 		border-radius: 12px;
 		/* The canvas's own ground, with the faint dots it is drawn on. */
-		background-color: var(--stage);
+		background-color: var(--ground);
 		background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--fg) 9%, transparent) 1px, transparent 0);
 		background-size: 14px 14px;
 		cursor: pointer;
@@ -260,25 +260,25 @@
 			transform 160ms ease;
 	}
 
-	.stage-card:hover .stage-open {
+	.canvas-card:hover .canvas-open {
 		border-color: var(--line-strong);
 		box-shadow: var(--shadow-row);
 		transform: translateY(-1px);
 	}
 
-	.stage-open:focus-visible {
+	.canvas-open:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
 	}
 
 	/* The canvas you are on: the accent, all round, and a word on its corner. */
-	.stage-card[data-here] .stage-open {
+	.canvas-card[data-here] .canvas-open {
 		border-color: var(--color-accent);
 		box-shadow: 0 0 0 1px var(--color-accent);
 	}
 
 	/* The whole canvas, letterboxed on its own ground, with a margin so work at an edge is not a crop. */
-	.stage-shot {
+	.canvas-shot {
 		display: block;
 		width: 100%;
 		height: 100%;
@@ -288,31 +288,31 @@
 	}
 
 	/* Taken on first ask, which is a second or two: the ground breathes until the picture is in. */
-	.stage-shot:not([data-loaded]) {
+	.canvas-shot:not([data-loaded]) {
 		opacity: 0;
 	}
 
-	.stage-shot[data-loaded] {
-		animation: stage-shot-in 200ms ease;
+	.canvas-shot[data-loaded] {
+		animation: canvas-shot-in 200ms ease;
 	}
 
-	.stage-open:has(> .stage-shot:not([data-loaded])) {
-		animation: stage-shot-wait 1.4s ease-in-out infinite;
+	.canvas-open:has(> .canvas-shot:not([data-loaded])) {
+		animation: canvas-shot-wait 1.4s ease-in-out infinite;
 	}
 
-	@keyframes stage-shot-in {
+	@keyframes canvas-shot-in {
 		from {
 			opacity: 0;
 		}
 	}
 
-	@keyframes stage-shot-wait {
+	@keyframes canvas-shot-wait {
 		50% {
-			background-color: color-mix(in srgb, var(--stage) 70%, var(--line));
+			background-color: color-mix(in srgb, var(--ground) 70%, var(--line));
 		}
 	}
 
-	.stage-empty {
+	.canvas-manager-empty {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -323,7 +323,7 @@
 	}
 
 	/* Rename and delete, on the picture's corner, out of sight until the card is approached. */
-	.stage-acts {
+	.canvas-acts {
 		position: absolute;
 		top: 8px;
 		right: 8px;
@@ -336,23 +336,23 @@
 			transform 120ms ease;
 	}
 
-	.stage-card:hover .stage-acts,
-	.stage-card:focus-within .stage-acts,
-	.stage-acts[data-confirming] {
+	.canvas-card:hover .canvas-acts,
+	.canvas-card:focus-within .canvas-acts,
+	.canvas-acts[data-confirming] {
 		opacity: 1;
 		transform: none;
 	}
 
 	/* Under a finger there is no hover: the corner is always there, smaller, so the pictures still lead. */
 	@media (hover: none) {
-		.stage-acts {
+		.canvas-acts {
 			top: 6px;
 			right: 6px;
 			gap: 3px;
 			opacity: 1;
 			transform: none;
 		}
-		.stage-acts .stage-icon {
+		.canvas-acts .canvas-icon {
 			width: 26px;
 			height: 26px;
 			box-shadow: none;
@@ -360,7 +360,7 @@
 		}
 	}
 
-	.stage-icon {
+	.canvas-icon {
 		display: grid;
 		width: 28px;
 		height: 28px;
@@ -374,13 +374,13 @@
 		cursor: pointer;
 	}
 
-	.stage-icon:hover {
+	.canvas-icon:hover {
 		color: var(--fg);
 		border-color: var(--line-strong);
 	}
 
 	/* Delete asks once, where the bin was: red, and named, so it cannot be mistaken. */
-	.stage-confirm {
+	.canvas-confirm {
 		height: 28px;
 		padding: 0 10px;
 		border: 0;
@@ -394,7 +394,7 @@
 		font-weight: 600;
 	}
 
-	.stage-foot {
+	.canvas-foot {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -402,14 +402,14 @@
 		padding: 0 2px;
 	}
 
-	.stage-name-row {
+	.canvas-name-row {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		min-height: 24px;
 	}
 
-	.stage-name-row > .row-label {
+	.canvas-name-row > .row-label {
 		flex: 1;
 		min-width: 0;
 		overflow: hidden;
@@ -419,14 +419,14 @@
 		white-space: nowrap;
 	}
 
-	.stage-meta {
+	.canvas-meta {
 		color: var(--muted);
 		font-size: var(--type-label);
 		font-variant-numeric: tabular-nums;
 	}
 
 	/* The name, edited where it is drawn. */
-	.stage-rename {
+	.canvas-rename {
 		flex: 1;
 		min-width: 0;
 		height: 26px;
@@ -444,20 +444,20 @@
 	}
 
 	/* Stacked, as a group of faces is everywhere else in this app. */
-	.stage-faces {
+	.canvas-faces {
 		display: flex;
 		flex: none;
 	}
 
-	.stage-faces > .agent-face {
+	.canvas-faces > .agent-face {
 		margin-left: -5px;
 		box-shadow: 0 0 0 2px var(--raise);
 	}
 
-	/* The pill's stage segment: the app's mark, the name, and the chevron that opens all this.
+	/* The pill's canvas segment: the app's mark, the name, and the chevron that opens all this.
 	   `.pill-agent` keeps 3px on the left because a round face fills its own corner; a square
 	   mark does not, so it gets the same 7px as the right. */
-	.pill-agent.pill-stage {
+	.pill-agent.pill-canvas {
 		padding-left: 7px;
 	}
 
@@ -469,7 +469,7 @@
 	}
 
 	/* The mark itself, centred in its own box. */
-	.pill-stage-glyph {
+	.pill-canvas-glyph {
 		display: grid;
 		place-items: center;
 		flex: none;

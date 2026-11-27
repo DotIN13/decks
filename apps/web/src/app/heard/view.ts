@@ -1,5 +1,5 @@
 import { m } from "@decks/i18n";
-import { stageOf } from "../../state/canvases.ts";
+import { canvasOf } from "../../state/canvases.ts";
 import type { Camera } from "@decks/protocol";
 import { viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "../../state/views.ts";
@@ -20,10 +20,10 @@ import { aim, aimCanvas, canvasOnScreen, keepCanvas, onCanvas, openTab, showCanv
  */
 export function rememberView(agentId: string, camera: Camera, selected?: string, canvas?: string): void {
 	// The canvas is named by the frame that said it: the page may not have heard yet that the agent's camera went there.
-	agentViews(state.deck?.path ?? "").keep(agentId, canvas ?? stageOf(agentId)?.name, viewToPark(camera, selected));
+	agentViews(state.deck?.path ?? "").keep(agentId, canvas ?? canvasOf(agentId)?.name, viewToPark(camera, selected));
 	// Its camera is on its canvas now, with no card, document or app over it: opening its chat shows this view.
 	aimCanvas(agentId);
-	// So `decks.view.camera()` answers for that agent's stage rather than falling back to wherever the last person to look at anything was.
+	// So `decks.view.camera()` answers for that agent's canvas rather than falling back to wherever the last person to look at anything was.
 	reportCamera(camera, agentId);
 }
 
@@ -43,8 +43,8 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 	 * answers, and the person is offered the way back, since the tab they are reading is theirs to leave.
 	 */
 	if (message.call.op === "show" && message.call.agentId === state.focused && !onCanvas()) {
-		const args = (message.call.args ?? {}) as { stage?: unknown; paths?: unknown };
-		if (args.stage === canvasOnScreen()?.name) {
+		const args = (message.call.args ?? {}) as { canvas?: unknown; paths?: unknown };
+		if (args.canvas === canvasOnScreen()?.name) {
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
 			const what = state.pages.find((page) => page.path === paths[0])?.title ?? m.app_something_on_canvas();
 			offer(m.app_wants_show({ name: nameOf(message.call.agentId), what }), { label: m.app_show(), run: () => showCanvas() }, "agent-view");
@@ -52,26 +52,26 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 	}
 	// An agent going to the canvas its chat's camera is already on, from behind a card, a document or an app: nothing moves at the harness, so it is brought forward here.
 	// Not the person's own move of a camera, which this page made, is already on, and said what is in front when it made it (`moveConversation`); a `view open` is always one to bring forward.
-	const going = message.call.op === "goto" ? (message.call.args as { stage?: unknown; person?: unknown; keep?: unknown } | undefined) : undefined;
-	if (going && message.call.agentId && (going.person !== true || going.keep === true) && going.stage === stageOf(message.call.agentId)?.name) aimCanvas(message.call.agentId);
+	const going = message.call.op === "goto" ? (message.call.args as { canvas?: unknown; person?: unknown; keep?: unknown } | undefined) : undefined;
+	if (going && message.call.agentId && (going.person !== true || going.keep === true) && going.canvas === canvasOf(message.call.agentId)?.name) aimCanvas(message.call.agentId);
 	// The chat on screen opening a canvas as a tab (`view.open`): that canvas and the one its camera leaves stay in the row, whoever answers whether it may move.
 	if (message.call.op === "goto" && message.call.agentId === state.focused && (message.call.args as { keep?: unknown } | undefined)?.keep === true) {
-		const to = (message.call.args as { stage?: unknown }).stage;
+		const to = (message.call.args as { canvas?: unknown }).canvas;
 		const from = canvasOnScreen()?.name;
 		if (from) keepCanvas(from);
 		if (typeof to === "string") keepCanvas(to);
 	}
 	// An agent moving to another canvas while its own is on screen: the frame answers, which knows whether the person is using the canvas.
 	// The person's own move asks nobody, so this page answers it, whether or not that frame is up yet.
-	if (message.call.op === "goto" && message.call.agentId && (message.call.args as { person?: unknown } | undefined)?.person !== true && stageOf(message.call.agentId)?.name === canvasOnScreen()?.name && document.querySelector("iframe.canvas-frame")) return;
+	if (message.call.op === "goto" && message.call.agentId && (message.call.args as { person?: unknown } | undefined)?.person !== true && canvasOf(message.call.agentId)?.name === canvasOnScreen()?.name && document.querySelector("iframe.canvas-frame")) return;
 	if (["show", "camera", "reload", "cursor", "shot"].includes(message.call.op)) {
-		const args = message.call.args as { stage?: unknown; path?: unknown } | undefined;
+		const args = message.call.args as { canvas?: unknown; path?: unknown } | undefined;
 		const screen = canvasOnScreen()?.name;
 		// A cursor, a reload or a card's picture names a card: the frame answers when that card is on the canvas it shows.
 		if ((message.call.op === "cursor" || message.call.op === "reload" || message.call.op === "shot") && typeof args?.path === "string") {
-			if (state.pages.some((board) => board.path === args.path) || (screen && args.path.startsWith(`canvases/${screen}/`))) return;
+			if (state.pages.some((card) => card.path === args.path) || (screen && args.path.startsWith(`canvases/${screen}/`))) return;
 		} else {
-			const on = typeof args?.stage === "string" ? args.stage : stageOf(message.call.agentId)?.name;
+			const on = typeof args?.canvas === "string" ? args.canvas : canvasOf(message.call.agentId)?.name;
 			if (on && on === screen) return;
 		}
 	}
@@ -93,7 +93,7 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 	/*
 	 * A picture of a card as this browser has it, for an agent's screenshot: the canvas frame writes
 	 * out a card on the canvas it shows (above, `items/card-snapshot.ts`). For a card on a canvas not
-	 * on screen, or a board, which the canvas draws as its picture, there is none, and the server's
+	 * on screen, or a card, which the canvas draws as its picture, there is none, and the server's
 	 * picture is the one.
 	 */
 	if (message.call.op === "shot") {
@@ -110,10 +110,10 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 	let value: unknown;
 	try {
 		value = runViewCall(message.call, {
-			boards: () => state.pages,
+			cards: () => state.pages,
 			viewport: () => {
-				const stage = document.querySelector("iframe.canvas-frame");
-				return { width: stage?.clientWidth ?? 0, height: stage?.clientHeight ?? 0 };
+				const canvas = document.querySelector("iframe.canvas-frame");
+				return { width: canvas?.clientWidth ?? 0, height: canvas?.clientHeight ?? 0 };
 			},
 			/*
 			 * Whose canvas this is. An op that moves the view is carried out for the
@@ -122,7 +122,7 @@ export function heardView(message: Of<"view">, hooks: FrameHooks): void {
 			 */
 			focused: () => state.focused,
 			canvasOnScreen: () => canvasOnScreen()?.name,
-			offerGoto: (agentId, stage) => offer(m.app_wants_goto({ name: nameOf(agentId), canvas: stage }), { label: m.app_go(), run: () => hooks.moveConversation?.(agentId, stage) }, "agent-view"),
+			offerGoto: (agentId, canvas) => offer(m.app_wants_goto({ name: nameOf(agentId), canvas: canvas }), { label: m.app_go(), run: () => hooks.moveConversation?.(agentId, canvas) }, "agent-view"),
 			/*
 			 * What reaches this page is never for the canvas on screen, whose frame carries out its own
 			 * calls (above): a view for another conversation is remembered for it, and nothing on this

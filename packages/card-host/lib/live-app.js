@@ -1,16 +1,16 @@
 /**
- * A board that is an app (`apps/service.ts` on the server): a bar over a frame of `/app/<name>/`.
+ * A card that is an app (`apps/service.ts` on the server): a bar over a frame of `/app/<name>/`.
  *
  * The bar says what the app is doing — building, running, asleep, broken — reads the server's
- * `/api/apps/<name>` every couple of seconds while the board is drawn and seldom when it is not,
+ * `/api/apps/<name>` every couple of seconds while the card is drawn and seldom when it is not,
  * and holds Reload, Restart (a server app), Open in a tab, and the log.
  *
  * Seen is said with a heartbeat that only beats while this page is being painted: frames come
- * only to a page on screen, so a board panned away or asleep under its picture lets a server app
+ * only to a page on screen, so a card panned away or asleep under its picture lets a server app
  * go to sleep after its idle minutes, and the next request from the frame wakes it again.
  *
  * In the server's own browser (pictures, `navigator.webdriver`) a server app is not loaded, so
- * taking a board's picture never starts a process.
+ * taking a card's picture never starts a process.
  */
 
 const STYLE = `
@@ -101,7 +101,7 @@ export function mountLiveApp(host, options) {
 
 	/*
 	 * Pan and zoom pass through the app. The canvas pans and zooms from wheel events it reads in
-	 * the board's page (`frame-gestures.ts`), and the app is a page inside that one, so its wheel
+	 * the card's page (`frame-gestures.ts`), and the app is a page inside that one, so its wheel
 	 * stopped there and the canvas never moved over an app. It is served from Decks' own address,
 	 * so its page can be listened in from here, with the rule an embed keeps: a pinch (or ⌘ and
 	 * the wheel) always zooms the canvas, a scroll a box in the app can still take is the app's,
@@ -125,7 +125,7 @@ export function mountLiveApp(host, options) {
 		const root = doc.scrollingElement ?? doc.documentElement;
 		return root && canScroll(view, root, dx, dy) ? root : undefined;
 	};
-	// The canvas's zoom, which the board's gestures say (`frame-gestures.ts`): a wheel's pixels are the screen's.
+	// The canvas's zoom, which the card's gestures say (`frame-gestures.ts`): a wheel's pixels are the screen's.
 	const scale = () => (typeof window.decksScale === "function" ? Number(window.decksScale()) || 1 : 1);
 	const passThrough = () => {
 		let view;
@@ -143,7 +143,7 @@ export function mountLiveApp(host, options) {
 				event.preventDefault();
 				/*
 				 * A box in the app that can take the scroll is scrolled here, by hand, as the canvas does for
-				 * boxes in a board: inside a frame the canvas has scaled, the browser's own scroll is not reliable.
+				 * boxes in a card: inside a frame the canvas has scaled, the browser's own scroll is not reliable.
 				 */
 				const box = zooming ? undefined : scrollableUnder(view, event.target, event.deltaX, event.deltaY);
 				if (box) {
@@ -209,7 +209,7 @@ export function mountLiveApp(host, options) {
 			if (down.size === 0) canvasFingers = false;
 		};
 		/*
-		 * A middle-drag, or a drag with Space held, pans the canvas wherever it starts, as over a board
+		 * A middle-drag, or a drag with Space held, pans the canvas wherever it starts, as over a card
 		 * or an embed (`embed-guest.js`): handed on as the pan an embed sends (`decks:embed-pan`), in
 		 * screen pixels, since the canvas moves the app under a still mouse. Space typed into a field
 		 * is the field's.
@@ -339,11 +339,11 @@ export function mountLiveApp(host, options) {
 			void lines(coverLines);
 		} else if (show === "unbuilt") {
 			coverTitle.textContent = "Not built yet";
-			coverText.textContent = `The agent builds it with stage.apps.build("${name}").`;
+			coverText.textContent = `The agent builds it with decks.apps.build("${name}").`;
 			coverLines.textContent = "";
 		} else if (show === "picture") {
 			coverTitle.textContent = app.title ?? name;
-			coverText.textContent = "A server app; it starts when its board is opened.";
+			coverText.textContent = "A server app; it starts when its card is opened.";
 			coverLines.textContent = "";
 		}
 		// The page, once there is one to show; and again when a build, a restart or an edited file has made a new one.
@@ -373,9 +373,9 @@ export function mountLiveApp(host, options) {
 		state.textContent = "Restarting";
 		dot.style.background = COLOURS.starting;
 		try {
-			// A command, so asked of the page around this board, as a button's verb is (`card.js`, `boardStage`).
-			const stage = await options.stage();
-			await stage.apps.restart(name);
+			// A command, so asked of the page around this card, as a button's verb is (`card.js`, `cardCanvas`).
+			const decks = await options.canvas();
+			await decks.apps.restart(name);
 		} catch (error) {
 			console.warn(`[decks] could not restart ${name}:`, error);
 		} finally {
@@ -411,7 +411,7 @@ export function mountLiveApp(host, options) {
 		}
 	}, 1000);
 	setInterval(() => {
-		// A read, not a post: a board's page gives no commands, and being looked at is not one.
+		// A read, not a post: a card's page gives no commands, and being looked at is not one.
 		if (seenNow() && !robot) void fetch(`${api}/apps/${encodeURIComponent(name)}/seen`, { cache: "no-store" }).catch(() => {});
 	}, 60_000);
 	void ask();

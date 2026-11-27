@@ -34,7 +34,7 @@ export interface CanvasTableHost {
 	/** The agent the harness acts for when a call names none: the focused one. */
 	target(): DeckAgent;
 	/** The canvas list again, to every page. */
-	publishStages(): void;
+	publishCanvases(): void;
 }
 
 const DOCUMENT_SIZE = { w: 1000, h: 1100 };
@@ -116,7 +116,7 @@ export function canvasTable(host: CanvasTableHost): PersonVerbs {
 		},
 		"canvas.edit": async ([ops, options], call) => {
 			const asked = (options ?? {}) as { canvas?: string; agent?: string };
-			const on = { ...(asked.agent ?? call.on.agent ? { agent: asked.agent ?? call.on.agent } : {}), ...(asked.canvas ?? call.on.canvas ? { stage: asked.canvas ?? call.on.canvas } : {}) };
+			const on = { ...(asked.agent ?? call.on.agent ? { agent: asked.agent ?? call.on.agent } : {}), ...(asked.canvas ?? call.on.canvas ? { canvas: asked.canvas ?? call.on.canvas } : {}) };
 			const run = () => personGesture(host, on, "edit", [ops as Op[]]);
 			return call.on.edit ? penEditBy.run(call.on.edit, run) : run();
 		},
@@ -124,7 +124,7 @@ export function canvasTable(host: CanvasTableHost): PersonVerbs {
 			const held = pens();
 			if (!held) throw new Error("This server keeps no canvases.");
 			deleteCanvas({ deck: host.deck, pens: held, agents: agents.all() }, String(canvas));
-			host.publishStages();
+			host.publishCanvases();
 		},
 		"view.remember": async ([camera, options]) => {
 			const asked = (options ?? {}) as { agent?: string; canvas?: string; device?: string };
@@ -135,9 +135,9 @@ export function canvasTable(host: CanvasTableHost): PersonVerbs {
 }
 
 /** A canvas renamed by the person: `canvas.rename` is the table's, for an agent, and this is what the canvas manager's rename runs. */
-export function renameCanvas(host: Pick<CanvasTableHost, "agents" | "canvas" | "deck" | "publishStages">, name: string, to: string): void {
+export function renameCanvas(host: Pick<CanvasTableHost, "agents" | "canvas" | "deck" | "publishCanvases">, name: string, to: string): void {
 	const pens = host.canvas.pens;
 	if (!pens) throw new Error("This server keeps no canvases.");
 	titleCanvas({ deck: host.deck, pens, agents: host.agents.all() }, name, to);
-	host.publishStages();
+	host.publishCanvases();
 }

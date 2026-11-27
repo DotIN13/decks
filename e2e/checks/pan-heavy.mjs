@@ -130,7 +130,7 @@ const goCanvas = async (name) => {
 };
 
 const helpers = () => {
-	const stage = () => document.querySelector(".stage");
+	const stage = () => document.querySelector(".canvas");
 	const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
 	const wheel = (deltaX, deltaY, ctrlKey) => {
 		const r = stage().getBoundingClientRect();
@@ -209,7 +209,7 @@ const quiet = (ms = 1500, cap = 20000) =>
 				await new Promise((done) => setTimeout(done, 100));
 				const n = globalThis.__decksProbes?.sheet?.tiles ?? 0;
 				const f = document.querySelectorAll("iframe").length;
-				const d = document.querySelector(".stage")?.dataset;
+				const d = document.querySelector(".canvas")?.dataset;
 				if (n !== last || f !== frames || d?.moving === "true" || d?.gliding === "true") {
 					last = n;
 					frames = f;

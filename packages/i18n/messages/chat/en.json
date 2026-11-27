@@ -89,7 +89,7 @@
 	"chat_tm_rewind_note": "Take back everything after it, and these words go back into the input bar.",
 	"chat_tm_fork_note": "Keep this history and start a second agent from this point.",
 	"chat_tm_restore": "Restore",
-	"chat_tm_restore_note": "Write the boards back to how they were here. The conversation stays where it is.",
+	"chat_tm_restore_note": "Write the cards back to how they were here. The conversation stays where it is.",
 	"chat_the_conversation": "The conversation",
 	"chat_hide_conversation": "Hide the conversation",
 	"chat_conversation_history": "Conversation history",

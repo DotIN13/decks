@@ -6,7 +6,7 @@ import { m } from "@decks/i18n";
  * A pill, as it is drawn wherever one sits — in the field, and in a message you sent — and what it
  * says when you point at it or press it.
  *
- * Everything you put in a message is a pill in your words, where you put it: a comment, a board or a
+ * Everything you put in a message is a pill in your words, where you put it: a comment, a card or a
  * card, a drawn item, a file. Pointing at one shows the host's dark tooltip (`data-tip`, with a quieter
  * second line in `data-tip-sub`); pressing one opens a small card over it: the thing it is about by
  * name, which shows it, the quote and the note, and the exact words the agent receives for it. Plain
@@ -15,9 +15,9 @@ import { m } from "@decks/i18n";
 
 /** What a pill is about, as its tooltip and card tell it. The host knows; this file only draws. */
 export interface PillAbout {
-	/** The thing it is about: the board or card a comment is on, the board, the item, the file. */
+	/** The thing it is about: the card a comment is on, the card, the item, the file. */
 	name: string;
-	/** Which icon goes before the name: a card or board, a drawn item, a file. */
+	/** Which icon goes before the name: a card, a drawn item, a file. */
 	of: "card" | "shape" | "file";
 	quote?: string;
 	note?: string;
@@ -31,15 +31,15 @@ export interface PillAbout {
 
 export interface PillHost {
 	about(node: DraftMention): PillAbout | undefined;
-	/** Show what it is about: the board or item on the canvas, the file. */
+	/** Show what it is about: the card or item on the canvas, the file. */
 	show?(node: DraftMention): void;
 	/** Take it out of the draft. Only the composer offers this; a sent message cannot change. */
 	remove?(node: DraftMention): void;
 }
 
 /*
- * Lucide's `message-square`, `layout-template`, `shapes` and `file`: a comment, a board or card, a thing
- * drawn on the stage, a file. The wash behind each is its own colour too (`styles/ink.css`).
+ * Lucide's `message-square`, `layout-template`, `shapes` and `file`: a comment, a card, a thing
+ * drawn on the canvas, a file. The wash behind each is its own colour too (`styles/ink.css`).
  */
 const svg = (body: string, size: number, slot: string) =>
 	`<svg data-slot="${slot}" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
@@ -57,7 +57,7 @@ const PILL_ICONS: Record<MentionKind, string> = {
 	file: svg(BODIES.file, 11, "pill-icon"),
 };
 
-/** The most of a name a pill shows: a long board title would otherwise wrap a sent message over lines. */
+/** The most of a name a pill shows: a long card title would otherwise wrap a sent message over lines. */
 export const PILL_LIMIT = 20;
 
 /** A pill's words, cut to `PILL_LIMIT` with an ellipsis. The whole name is in its tooltip and its card. */

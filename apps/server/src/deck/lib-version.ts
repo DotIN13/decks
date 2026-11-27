@@ -5,15 +5,15 @@ import { join } from "node:path";
 /**
  * A card's runtime, cached by the browser for as long as it does not change.
  *
- * Every card asks for `../lib/board.css` and `../lib/board.js`, and through them the theme, four
+ * Every card asks for `../../lib/card.css` and `../../lib/card.js`, and through them the theme, four
  * fonts and the maths library. Served `no-cache`, each new page asked again for every one of them,
  * and each answer was a "not modified" that first waited for one of the browser's six connections to
  * the server: about 200 ms of a zoom in, before a single card could show. Cached outright, a deploy
- * that changes `board.js` would go unseen.
+ * that changes `card.js` would go unseen.
  *
  * So the address carries the version. A card is served with its references to `lib/` rewritten to
  * `lib/~<version>/`, where the version is a hash of what `lib/` holds; an address with the current
- * version is cached for a year, and a new `lib/` is a new address. `board.js` finds its libraries
+ * version is cached for a year, and a new `lib/` is a new address. `card.js` finds its libraries
  * beside itself, so they come from the same versioned address. The file on disk is never changed:
  * only what is sent.
  */
@@ -55,13 +55,13 @@ export function libVersion(deckPath: string, now = Date.now()): string {
 /**
  * A card's markup with its `href` and `src` references into `lib/` given the version: the relative
  * `../lib/` a card writes, at any depth, and the absolute `/api/lib/` a page outside `/api/card/` uses. Only
- * attributes are touched, so a card that shows `href="../lib/board.css"` as text, escaped, keeps it.
+ * attributes are touched, so a card that shows `href="../../lib/card.css"` as text, escaped, keeps it.
  */
 export function versionLibRefs(html: string, version: string): string {
 	return html.replace(/(\b(?:href|src)\s*=\s*["'])((?:\.\.\/)+lib\/|\/api\/lib\/)(?!~)/gi, `$1$2~${version}/`);
 }
 
-/** A path under `lib/` that names a version, split into the version and the file: `~ab12/board.css`. */
+/** A path under `lib/` that names a version, split into the version and the file: `~ab12/card.css`. */
 export function splitLibVersion(path: string): { version: string; file: string } | undefined {
 	const match = /^~([0-9a-f]+)\/(.+)$/.exec(path);
 	return match ? { version: match[1]!, file: match[2]! } : undefined;

@@ -11,7 +11,7 @@ import { camera } from "../../state/camera.ts";
 import { mode, setMode, setSelected } from "../../state/selection.ts";
 import { exportPicture } from "../../app/frame-handoffs.ts";
 import type { Parts } from "../../app/parts.ts";
-import { viewOnlyStage } from "../../app/person.ts";
+import { viewOnlyCanvas } from "../../app/person.ts";
 
 /**
  * The canvas's tools, drawn on this page over the canvas frame: the tool column, the pen tray, the
@@ -31,9 +31,9 @@ import { viewOnlyStage } from "../../app/person.ts";
  * keyboard, and gives it back when it is left.
  */
 export function CanvasTools(props: { parts: Parts }): JSX.Element {
-	const { layout, dock, floats, editorHandle, stagePen, canvasHost } = props.parts;
+	const { layout, dock, floats, editorHandle, canvasPen, canvasHost } = props.parts;
 	const handle = () => editorHandle();
-	const canWrite = () => !viewOnlyStage();
+	const canWrite = () => !viewOnlyCanvas();
 	const step = (direction: "undo" | "redo") => handle()?.step(direction);
 	const setPen = (on: boolean) => {
 		if (on && !canWrite()) return;
@@ -57,9 +57,9 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 
 	/** A file of any kind, chosen in the file picker and placed in the middle of the view by what it is. */
 	const openFile = () => {
-		const stage = document.querySelector("iframe.canvas-frame");
-		if (!stage) return;
-		void canvasHost.files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
+		const canvas = document.querySelector("iframe.canvas-frame");
+		if (!canvas) return;
+		void canvasHost.files.fileAt({ x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 }, false).then((path) => {
 			if (!path) return;
 			setSelected(path);
 			canvasHost.frameWhenPlaced(path);
@@ -98,7 +98,7 @@ export function CanvasTools(props: { parts: Parts }): JSX.Element {
 			<Show when={!(drawing() && mode() === "browse")}>
 				{/* The dock's height as a variable, for the properties sheet on a phone to sit above the composer (`properties.css`). */}
 				<div style={{ display: "contents", "--dock": `${dock.dockCover()}px` }}>
-					<PenBar tools={false} doc={penPicked() ?? stagePen()?.doc} onEdit={(ops) => handle()?.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => exportPicture(ids)} />
+					<PenBar tools={false} doc={penPicked() ?? canvasPen()?.doc} onEdit={(ops) => handle()?.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => exportPicture(ids)} />
 				</div>
 			</Show>
 			{/* A column at the left; on a phone, a row just above the dock. */}

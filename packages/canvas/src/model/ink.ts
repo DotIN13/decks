@@ -2,7 +2,7 @@ import { strokeShape, type InkColor, type InkStroke } from "@decks/ink";
 import { DECKS_COLORS, type PenNode, type Placed } from "@decks/pen";
 
 /**
- * Ink on the stage: a stroke drawn with the pen or the marker, kept in the stage's `.pen` file.
+ * Ink on the canvas: a stroke drawn with the pen or the marker, kept in the canvas's `.pen` file.
  *
  * pen has no ink type, so a stroke is pen's own `path`, which pen.dev draws as it is: `geometry`
  * is the stroke's shape — a filled outline when the pen's pressure changed its width, a round-capped
@@ -13,9 +13,9 @@ import { DECKS_COLORS, type PenNode, type Placed } from "@decks/pen";
  *       "size": 4, "points": [x, y, pressure, …] } }
  *
  * The points are in the path's own box, from its top-left corner, so moving the path moves the
- * stroke with it. Every colour follows the stage's light or dark look through a pen variable, one of
+ * stroke with it. Every colour follows the canvas's light or dark look through a pen variable, one of
  * Decks's own (`@decks/pen` `DECKS_COLORS`), which the stroke's edit defines when the drawing lacks
- * it (`withDecksColors`, `model/drawing.ts`): `ink` is dark on a light stage and light on a dark one,
+ * it (`withDecksColors`, `model/drawing.ts`): `ink` is dark on a light canvas and light on a dark one,
  * and red, blue, green and yellow are a shade lighter on dark.
  */
 
@@ -25,7 +25,7 @@ export const INK = "decks.ink";
 const VARIABLE: Record<InkColor, string> = { ink: "decks-text", red: "decks-accent-red", blue: "decks-accent-blue", green: "decks-accent-green", yellow: "decks-accent-yellow" };
 const PAINT = Object.fromEntries(Object.entries(VARIABLE).map(([color, name]) => [color, `$${name}`])) as Record<InkColor, string>;
 
-/** An ink colour as the stage draws it in a scheme: what its variable comes to there, for a stroke still under the pen and the tray's swatches. */
+/** An ink colour as the canvas draws it in a scheme: what its variable comes to there, for a stroke still under the pen and the tray's swatches. */
 export function inkHex(color: InkColor, scheme: "light" | "dark"): string {
 	return DECKS_COLORS[VARIABLE[color]]![scheme];
 }
@@ -36,7 +36,7 @@ export function isInk(node: PenNode): boolean {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-/** A stroke drawn on the stage, as the pen item that keeps it. `points` are in stage pixels. */
+/** A stroke drawn on the canvas, as the pen item that keeps it. `points` are in canvas pixels. */
 export function inkItem(stroke: Omit<InkStroke, "id">, id: string): PenNode {
 	const pad = stroke.size;
 	let minX = Infinity;
@@ -73,7 +73,7 @@ export function inkItem(stroke: Omit<InkStroke, "id">, id: string): PenNode {
 	};
 }
 
-/** The stroke an ink item holds, in stage pixels: where it is drawn now, moved or scaled. */
+/** The stroke an ink item holds, in canvas pixels: where it is drawn now, moved or scaled. */
 export function strokeOf(placed: Placed): InkStroke | undefined {
 	const { node, box } = placed;
 	if (!isInk(node)) return undefined;

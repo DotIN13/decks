@@ -74,7 +74,7 @@ export function registerMcp(routers: Router[], deps: { app: CallsHost & PersonHo
 					} catch {
 						/* it has a canvas once it draws */
 					}
-					app.publishStages();
+					app.publishCanvases();
 				}
 				session.principal = { kind: "agent", id: agent.id };
 				const canvas = agent.seat.canvasFolder();

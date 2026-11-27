@@ -8,17 +8,17 @@ const RING_GAP = 2;
 const RING = 1.5;
 
 /**
- * Everyone else on this canvas, drawn in the stage's world, in two layers: over everything, the agent's
+ * Everyone else on this canvas, drawn in the canvas's world, in two layers: over everything, the agent's
  * cursor, the others' pointers (`presence.ts`) and what agents just drew (`marks.ts`), as
- * `CanvasOptions.world`; and under what the stage itself paints over the drawing, the others'
+ * `CanvasOptions.world`; and under what the canvas itself paints over the drawing, the others'
  * selections as rings (`CanvasOptions.worldUnder`).
  */
 export function createOthersLayer(ctx: FrameContext): { cursors: () => JSX.Element; rings: () => JSX.Element } {
 	const { camera, pages, cursor } = ctx;
 	/*
-	 * The agent's cursor, in the stage's world (`CanvasOptions.world`): the card's place plus the point on
+	 * The agent's cursor, in the canvas's world (`CanvasOptions.world`): the card's place plus the point on
 	 * it, drifting from one place to the next and one size on the screen at any zoom. In the world rather
-	 * than over the canvas on a layer of its own, which placed it from the window's middle while the stage
+	 * than over the canvas on a layer of its own, which placed it from the window's middle while the canvas
 	 * places the drawing from the column beside the side panel: the cursor stood 180 px from what it pointed
 	 * at, and jittered against the drawing at every step of a pan, a frame behind the scroll.
 	 */
@@ -60,7 +60,7 @@ export function createOthersLayer(ctx: FrameContext): { cursors: () => JSX.Eleme
 		return list;
 	};
 	/*
-	 * Others' selections, under what the stage paints over the drawing (`worldUnder`): the person's own
+	 * Others' selections, under what the canvas paints over the drawing (`worldUnder`): the person's own
 	 * outline, its handles and its guides are always the ones on top, where a ring drawn over them, in
 	 * another colour, read as the selection being someone else's. Placed in canvas units; the world's own
 	 * transform scrolls and scales it.

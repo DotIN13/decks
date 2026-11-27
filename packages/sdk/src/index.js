@@ -214,7 +214,7 @@ function defaultNotes(lines) {
  * @param {string} [options.url]  Decks' address, as in http://127.0.0.1:4329. Default: `DECKS_URL`, or the page's own, or in Node what `~/.decks/server.json` says.
  * @param {number} [options.wait]  In Node, how many seconds a call keeps trying while nothing listens at the address (a server that is restarting). Default: `DECKS_WAIT`, else 30; 0 fails at once.
  * @param {string | (() => string | undefined)} [options.token]  Who is calling: a token from Decks. Default: `DECKS_TOKEN`, else the one `decks login` kept for this address in `~/.decks/token`, else none (a page whose `fetch` adds its own).
- * @param {string | (() => string | undefined)} [options.stage]  For the person: the canvas they are acting on (`X-Decks-Stage`). A parameter, not who is calling.
+ * @param {string | (() => string | undefined)} [options.canvas]  For the person: the canvas they are acting on (`X-Decks-Canvas`). A parameter, not who is calling.
  * @param {string | (() => string | undefined)} [options.agent]  For the person: the agent they are talking to (`X-Decks-Agent`). A parameter, not who is calling.
  * @param {(lines: string[]) => void} [options.notes]  Where the notes a verb adds go. Default: stderr in Node.
  * @param {typeof fetch} [options.fetch]  A fetch to use instead of the global one.
@@ -225,7 +225,7 @@ export function connect(options = {}) {
 	const base = String(options.url ?? env("DECKS_URL") ?? page.url ?? fromAddressFile() ?? "").replace(/\/+$/, "");
 	// What the person is acting on, when the person is calling: parameters, read per call.
 	const agent = options.agent;
-	const stage = options.stage;
+	const canvas = options.canvas;
 	const given = options.token ?? env("DECKS_TOKEN");
 	/** The token, from what was given, else the one `decks login` kept; read once. */
 	let found;
@@ -269,8 +269,8 @@ export function connect(options = {}) {
 		const given = [...args];
 		while (given.length && given[given.length - 1] === undefined) given.pop();
 		const headers = { ...(await authHeaders()), "content-type": "application/json" };
-		const on = typeof stage === "function" ? stage() : stage;
-		if (on) headers["x-decks-stage"] = on;
+		const on = typeof canvas === "function" ? canvas() : canvas;
+		if (on) headers["x-decks-canvas"] = on;
 		const to = typeof agent === "function" ? agent() : agent;
 		if (to) headers["x-decks-agent"] = to;
 		let response;

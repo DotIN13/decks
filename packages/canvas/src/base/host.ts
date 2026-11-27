@@ -3,8 +3,8 @@
  *
  * The canvas is a package (`@decks/canvas`): the Decks app mounts it, and so does any other host
  * (Decks Studio, the package's own demo). These are the questions the canvas cannot answer itself
- * — where a deck file is served from, whether the person may write at all, which links on a board
- * name another board — set once by the host (`setCanvasHost`) and read where they are needed.
+ * — where a deck file is served from, whether the person may write at all, which links on a card
+ * name another card — set once by the host (`setCanvasHost`) and read where they are needed.
  * Module state, like the tool signals beside it (`state/pen-tools.ts`): one canvas to a page.
  */
 /** Where a host keeps its icons, asked before the CDN; undefined there falls through. */
@@ -16,7 +16,7 @@ export interface CanvasHost {
 	/** Whether the person may add files at all (the Add menu's Open File… and attachments). */
 	canWrite(): boolean;
 	/**
-	 * A link on a drawn item: the board it names, when it names one this host can open on the
+	 * A link on a drawn item: the card it names, when it names one this host can open on the
 	 * canvas, read against the drawing's own folder `base`. Undefined opens it in a tab.
 	 */
 	cardLink(href: string, base: string): string | undefined;

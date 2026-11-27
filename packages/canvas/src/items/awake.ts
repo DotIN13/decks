@@ -116,7 +116,7 @@ export function sameAwake(a: Awake, b: Awake): boolean {
 }
 
 /**
- * The state one placed item is in, from what the stage knows of it: the five states of the one
+ * The state one placed item is in, from what the canvas knows of it: the five states of the one
  * lifecycle, as the item's node is marked (`data-state`) and the checks read it.
  *
  * - `picture`: not awake; the sheet draws its picture (or its placeholder, until one comes).

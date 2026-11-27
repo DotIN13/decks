@@ -1,9 +1,9 @@
 /**
  * The drawing's keys on the page: `core/keys.ts` decides what a key does, and this does it — the
- * ops sent, the selection and the tool set, an edit stepped through, the boards nudged.
+ * ops sent, the selection and the tool set, an edit stepped through, the cards nudged.
  *
- * The stage's keydown asks here first (`key`), after its own guards (a text box with the caret, a
- * board being edited); a key that was one of the drawing's goes no further.
+ * The canvas's keydown asks here first (`key`), after its own guards (a text box with the caret, a
+ * card being edited); a key that was one of the drawing's goes no further.
  */
 import type { Op } from "@decks/pen";
 import { penKey as penKeyOf, type KeyAct } from "../core/keys.ts";
@@ -19,9 +19,9 @@ export type KeysHost = {
 	/** The draw tool is out: the keys are the ink's. */
 	drawing: () => boolean;
 	tool: () => PenTool;
-	/** Whether a board is the app's selection: its letters are the board's. */
+	/** Whether a card is the app's selection: its letters are the card's. */
 	pageSelected: () => boolean;
-	/** That board's path: the arrows move it too. */
+	/** That card's path: the arrows move it too. */
 	selectedPage?: () => string | undefined;
 	/** Step through the person's own edits, when the page can (`CanvasView`'s `onPenStep`). */
 	canStep: () => boolean;
@@ -32,7 +32,7 @@ export type KeysHost = {
 	/** Take the chosen cards, apps and documents off the canvas, as the pill's Delete does (`onDeleteCard`). */
 	deletePages?: (paths: readonly string[]) => void;
 	setTool: (tool: PenTool) => void;
-	/** Arm a tool from its key: the board palette's tool goes down first. */
+	/** Arm a tool from its key: the card palette's tool goes down first. */
 	arm: (tool: PenTool) => void;
 	onMove: (path: string, x: number, y: number) => void;
 	nextIds: () => NextId;
@@ -54,7 +54,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 		let ids: (() => string) | undefined;
 		const act: KeyAct = penKeyOf(
 			{ key: event.key, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey },
-			{ selection: selected, boards: editor.pagePicks(), tool: host.tool(), pageSelected: host.pageSelected(), selectedPage: host.selectedPage?.(), canStep: host.canStep(), scene: host.scene, nextId: () => (ids ??= host.nextIds())() },
+			{ selection: selected, cards: editor.pagePicks(), tool: host.tool(), pageSelected: host.pageSelected(), selectedPage: host.selectedPage?.(), canStep: host.canStep(), scene: host.scene, nextId: () => (ids ??= host.nextIds())() },
 		);
 		if (!act.handled) return false;
 		switch (act.do) {
@@ -68,7 +68,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 				if ("tool" in act) host.setTool(act.tool);
 				else {
 					editor.select(act.select);
-					editor.pickPages(act.boards);
+					editor.pickPages(act.cards);
 				}
 				break;
 			case "duplicate":
@@ -77,7 +77,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 				break;
 			case "nudge":
 				host.edit(act.ops);
-				for (const move of act.boards) host.onMove(move.path, move.x, move.y);
+				for (const move of act.cards) host.onMove(move.path, move.x, move.y);
 				break;
 			case "select":
 				editor.pickPages([]);
@@ -91,7 +91,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 	};
 	/**
 	 * The drawing's own keys, in either mode but not while drawing. None of them fire while a text box has the caret
-	 * (the stage's guard). Delete, the arrows and ⌘D act on what is selected; ⌘Z and ⇧⌘Z step through the
+	 * (the canvas's guard). Delete, the arrows and ⌘D act on what is selected; ⌘Z and ⇧⌘Z step through the
 	 * person's own edits; Escape lets go, then puts the tool down; a letter arms a tool
 	 * (`PEN_TOOL_KEYS`), from this document only. True when the key was the drawing's.
 	 */

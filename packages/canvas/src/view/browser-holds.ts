@@ -15,7 +15,7 @@ export function holdBrowserScroll(d: HoldBrowserScrollNeeds) {
 	 * A pinch over anything that is not the canvas (the toolbars, the composer, the conversation,
 	 * the panels, a dialog) does nothing. Chrome sends a trackpad pinch as a wheel event with
 	 * `ctrlKey`, and one nobody cancels zooms the whole page. The canvas zooms only for a pinch
-	 * over the stage itself (`onWheel`).
+	 * over the canvas itself (`onWheel`).
 	 */
 	const pinchOver = (event: WheelEvent) => {
 		if (event.ctrlKey && !d.element.contains(event.target as Node | null)) event.preventDefault();
@@ -25,7 +25,7 @@ export function holdBrowserScroll(d: HoldBrowserScrollNeeds) {
 
 	onCleanup(() => window.removeEventListener("wheel", pinchOver, { capture: true }));
 
-	// The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`).
+	// The canvas scrolled: the camera follows (`CanvasView.tsx`, `scrolled`).
 	const onScroll = () => {
 		d.lastScroll = performance.now();
 		d.deps.scrolled();
@@ -37,7 +37,7 @@ export function holdBrowserScroll(d: HoldBrowserScrollNeeds) {
 
 	/*
 	 * The keys a scroll area scrolls by (Space, the arrows, Page Up and Down, Home and End) are the
-	 * canvas's own when the focus is on it (a nudge, a pan, a tool): the stage does not scroll for
+	 * canvas's own when the focus is on it (a nudge, a pan, a tool): the canvas does not scroll for
 	 * them. Typing in a card or a field keeps them.
 	 */
 	const scrollKeys = new Set([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"]);
@@ -54,7 +54,7 @@ export function holdBrowserScroll(d: HoldBrowserScrollNeeds) {
 	onCleanup(() => d.element.removeEventListener("keydown", holdScrollKeys));
 
 	/*
-	 * A finger on an item, a handle or a board is the editor's: its touch must not scroll the stage.
+	 * A finger on an item, a handle or a card is the editor's: its touch must not scroll the canvas.
 	 * The pointer event comes first and says so (`keepTouch`); cancelling the touch's start is what
 	 * keeps the browser from taking it. Every other finger is left to scroll natively.
 	 */

@@ -47,7 +47,7 @@ export function createDrawingEdits(d: DrawingEditsNeeds) {
 			const id = d.nameOne({});
 			d.pending.push({ id, ops });
 			d.setWaiting(d.pending.length);
-			// Shown at once, even when nothing changed: the stage waits for the drawing that answers its gesture.
+			// Shown at once, even when nothing changed: the canvas waits for the drawing that answers its gesture.
 			d.show(next, { from: prev, edits: diff(prev, next) });
 			d.flush();
 			return true;
@@ -62,9 +62,9 @@ export function createDrawingEdits(d: DrawingEditsNeeds) {
 		}
 		if (!d.commit(prev, next)) {
 			/*
-			 * Nothing changed (an item dropped back where it was), but the stage is waiting for the drawing
+			 * Nothing changed (an item dropped back where it was), but the canvas is waiting for the drawing
 			 * that answers its gesture, as a server sends one whatever the edit did: a fresh copy is that
-			 * answer, so what was let go glides back into place now rather than when the stage gives up.
+			 * answer, so what was let go glides back into place now rather than when the canvas gives up.
 			 */
 			d.show({ ...prev }, { from: prev, edits: [] });
 			return false;

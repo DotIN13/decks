@@ -59,8 +59,8 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-views-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
-	put(join(deck, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="board"></body>`);
+	mkdirSync(join(deck, "cards"), { recursive: true });
+	put(join(deck, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="card-page"></body>`);
 	const one = seeded(deck, "One", { x: 10, y: 20 });
 	const two = seeded(deck, "Two", { x: 900, y: 400 });
 
@@ -82,7 +82,7 @@ function open() {
 	const last = <T extends ServerMessage["type"]>(view: View, type: T) =>
 		inbox.get(view)!.filter((message): message is Extract<ServerMessage, { type: T }> => message.type === type).at(-1);
 	const plan = (message: Extract<ServerMessage, { type: "deck.changed" }> | undefined) => {
-		const card = message?.deck.boards.find((one) => one.path === "canvases/t/cards/plan/index.html");
+		const card = message?.deck.cards.find((one) => one.path === "canvases/t/cards/plan/index.html");
 		return card && [card.x, card.y];
 	};
 	return {
@@ -119,7 +119,7 @@ test("opening a chat on one device leaves the other device where it was", async 
 	}
 });
 
-test("each device's board list carries its own conversation's arrangement", async () => {
+test("each device's card list carries its own conversation's arrangement", async () => {
 	const { app, one, two, laptop, phone, call, last, plan, cleanup } = open();
 	try {
 		await call(laptop, "agent.focus", [one]);

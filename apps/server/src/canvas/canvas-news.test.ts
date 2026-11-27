@@ -14,7 +14,7 @@ import { penWriter } from "./pens.ts";
 function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-canvas-news-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }

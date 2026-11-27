@@ -7,7 +7,7 @@
 import { ask, canvasFrame, deckState, emptyCanvas, freshAgent, nameOf, open, openPanel, say, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
-const two = deck.boards.map((card) => card.path).slice(0, 2);
+const two = deck.cards.map((card) => card.path).slice(0, 2);
 /* The stage's nodes carry the path, and the Canvas tab's rows a card's title (its item's name), or its folder when it has none (`model/layers.ts`). */
 const base = nameOf;
 const labelOf = (path) => deck.library.find((card) => card.path === path)?.title || nameOf(path);

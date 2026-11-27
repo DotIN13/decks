@@ -19,7 +19,7 @@ function serviceOn(root: string): { deck: Deck; service: CardService; sent: Serv
 	const sent: ServerMessage[] = [];
 	const service = new CardService(deck, {
 		send: (message) => void sent.push(message),
-		state: () => ({ boards: deck.cards }) as unknown as DeckState,
+		state: () => ({ cards: deck.cards }) as unknown as DeckState,
 		removed: () => {},
 	});
 	return { deck, service, sent };
@@ -27,8 +27,8 @@ function serviceOn(root: string): { deck: Deck; service: CardService; sent: Serv
 
 test("an agent's byline and act time reach every browser, are on disk, and come back after a reload and a restart", () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-wrote-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
-	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="board"></body>`);
+	mkdirSync(join(root, "cards"), { recursive: true });
+	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="card-page"></body>`);
 	const { deck, service, sent } = serviceOn(root);
 
 	service.wrote("canvases/t/cards/plan/index.html", "agent-1", 1000);
@@ -36,7 +36,7 @@ test("an agent's byline and act time reach every browser, are on disk, and come 
 	service.wrote("canvases/t/cards/plan/index.html", "agent-1", 2000);
 	service.wrote("canvases/t/cards/none/index.html", "agent-1", 3000);
 	const changes = sent.filter((message) => message.type === "card.changed");
-	assert.equal(changes.length, 2, "the same act twice says nothing, a later act does, and a board that is not there says nothing");
+	assert.equal(changes.length, 2, "the same act twice says nothing, a later act does, and a card that is not there says nothing");
 	assert.equal(changes[0]?.type === "card.changed" && changes[0].card?.lastWrittenBy, "agent-1");
 	assert.equal(changes[0]?.type === "card.changed" && changes[0].card?.namedAt, 1000);
 	assert.equal(changes[1]?.type === "card.changed" && changes[1].card?.namedAt, 2000);
@@ -59,10 +59,10 @@ test("an agent's byline and act time reach every browser, are on disk, and come 
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("a board the person has read is stamped once, and a later write makes it news again", () => {
+test("a card the person has read is stamped once, and a later write makes it news again", () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-seen-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
-	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="board"></body>`);
+	mkdirSync(join(root, "cards"), { recursive: true });
+	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="card-page"></body>`);
 	const { deck, service, sent } = serviceOn(root);
 	const modified = deck.card("canvases/t/cards/plan/index.html")?.modifiedAt ?? 0;
 
@@ -75,7 +75,7 @@ test("a board the person has read is stamped once, and a later write makes it ne
 	assert.equal(serviceOn(root).deck.card("canvases/t/cards/plan/index.html")?.seenAt, modified, "kept across a restart");
 
 	// Written again: the reading is carried forward, and is now older than the file.
-	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan, again</title><body class="board"></body>`);
+	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan, again</title><body class="card-page"></body>`);
 	const later = deck.refresh("canvases/t/cards/plan/index.html");
 	assert.equal(later?.seenAt, modified);
 

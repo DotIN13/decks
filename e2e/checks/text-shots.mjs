@@ -70,7 +70,7 @@ const quiet = () =>
 		while (performance.now() - t0 < 20000) {
 			await new Promise((done) => setTimeout(done, 100));
 			const n = globalThis.__decksProbes?.sheet?.tiles ?? 0;
-			if (n !== last || document.querySelector(".stage")?.dataset.moving === "true") {
+			if (n !== last || document.querySelector(".canvas")?.dataset.moving === "true") {
 				last = n;
 				at = performance.now();
 			} else if (performance.now() - at >= 1500) return;
@@ -81,7 +81,7 @@ const quiet = () =>
 const show = (zoom) =>
 	canvas.evaluate(
 		async ({ zoom, W, H, ORIGIN }) => {
-			const stage = document.querySelector(".stage");
+			const stage = document.querySelector(".canvas");
 			const r = stage.getBoundingClientRect();
 			const wheel = (deltaX, deltaY, ctrlKey) => stage.dispatchEvent(new WheelEvent("wheel", { deltaX, deltaY, ctrlKey, deltaMode: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true }));
 			const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
@@ -111,7 +111,7 @@ for (const z of ZOOMS) {
 	const camera = await show(z / 100);
 	await quiet();
 	const box = await canvas.evaluate(() => {
-		const r = document.querySelector(".stage").getBoundingClientRect();
+		const r = document.querySelector(".canvas").getBoundingClientRect();
 		return { x: r.left, y: r.top, width: r.width, height: r.height };
 	});
 	// The words' block on screen, with a margin.

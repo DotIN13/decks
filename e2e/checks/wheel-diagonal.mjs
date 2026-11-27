@@ -24,7 +24,7 @@ for (const [dx, dy] of [[1.3, 0.9], [3.2, 2.1], [0.4, 0.7]]) {
 	const before = await cameraNow();
 	await canvas.evaluate(
 		({ dx, dy }) => {
-			const stage = document.querySelector(".stage");
+			const stage = document.querySelector(".canvas");
 			for (let i = 0; i < 30; i++) stage.dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: 700, clientY: 450, bubbles: true, cancelable: true }));
 		},
 		{ dx, dy },

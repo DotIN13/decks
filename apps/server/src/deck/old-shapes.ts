@@ -66,7 +66,7 @@ export function closeOldShapes(deck: string, now: Date = new Date()): void {
 /**
  * 2026-09-16: where a card sits belongs to a canvas, not to `deck.json`.
  *
- * Older files kept a `boards` map of `{ x, y, w, h }`. Its `x`/`y` are read once more, as the places
+ * Older files kept a `cards` map of `{ x, y, w, h }`. Its `x`/`y` are read once more, as the places
  * a canvas starts from (`deck/loader.ts` hands them to the first canvas that draws the card), and
  * the map is dropped on the next write of `deck.json` (`deck/schema.ts`). A size is the card's own
  * file's business now, so `w`/`h` are ignored.

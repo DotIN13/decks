@@ -1,19 +1,19 @@
 /*
- * theme.css: the colour and type tokens, and the one rule a board cannot opt out of.
+ * theme.css: the colour and type tokens, and the one rule a card cannot opt out of.
  *
- * A board that brings its own design links this file alone. It gives the page the app's
+ * A card that brings its own design links this file alone. It gives the page the app's
  * light and dark palettes (the app sets `data-theme` on <html>; with nothing set, the
  * system preference decides) and the two font stacks. `card.css` imports it, so the
  * component vocabulary and a hand-made page read the same palette.
  *
- * It styles one element, at the end of the file: `body.board` does not scroll. That is not
- * a choice a board gets to make — the stage does the panning, and a board whose document
+ * It styles one element, at the end of the file: `body.card-page` does not scroll. That is not
+ * a choice a card gets to make — the canvas does the panning, and a card whose document
  * is a few pixels taller than the rectangle the canvas gave it grows a scrollbar instead
  * of saying so. `card.css` has always stated it; a page that links this file alone was
  * getting it from neither.
  */
 /*
- * The two families the stacks below name first, shipped with the board (`type/`), so a board
+ * The two families the stacks below name first, shipped with the card (`type/`), so a card
  * reads the same in any browser and in the server's Chrome that draws its picture. Without
  * them "Inter" matched nothing on a machine without it installed, and each fell back to its
  * own system font: a Mac's live page and the server's picture of it were two typefaces.
@@ -89,8 +89,8 @@
 
 	/* The shades syntax needs and the semantic ramp did not have: a green, a red and an
 	   amber dark enough to read as 12px text on white, and the light halves of the same
-	   three (plus a purple and a blue) for a dark board. They live here rather than in a
-	   theme beside the highlighter because a code block is read in the board's own two
+	   three (plus a purple and a blue) for a dark card. They live here rather than in a
+	   theme beside the highlighter because a code block is read in the card's own two
 	   palettes, like everything else on it. */
 	--b-green-400: #5ed48c;
 	--b-green-800: #1c7a3f;
@@ -142,7 +142,7 @@
 	--b-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* Dark when the board says so, or when the reader's system does and it has not. */
+/* Dark when the card says so, or when the reader's system does and it has not. */
 [data-theme="dark"] {
 	--b-bg: var(--b-grey-1100);
 	--b-bg-deep: #0f0f0f;
@@ -195,15 +195,15 @@
 }
 
 /*
- * A board does not scroll.
+ * A card does not scroll.
  *
- * The canvas gives a board a rectangle and pans it; scrolling inside that rectangle fights
- * the camera, and a picture of the board shows a scrollbar instead of the work. So anything
- * past the edge is simply not drawn, and `stage.fit` is how a writer finds out.
+ * The canvas gives a card a rectangle and pans it; scrolling inside that rectangle fights
+ * the camera, and a picture of the card shows a scrollbar instead of the work. So anything
+ * past the edge is simply not drawn, and `decks.canvas.fit` is how a writer finds out.
  *
- * `card.css` repeats this on `body.board` for the component vocabulary. It is here as well
+ * `card.css` repeats this on `body.card-page` for the component vocabulary. It is here as well
  * because a page that brings its own design links this file and nothing else.
  */
-body.board {
+body.card-page {
 	overflow: hidden;
 }

@@ -13,7 +13,7 @@ const canvas = await canvasFrame(page);
 /** A point on bare canvas, in the middle of it: no item under it in the frame, and none of the page's chrome over it. */
 const bareSpot = async () => {
 	const candidates = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage").getBoundingClientRect();
+		const stage = document.querySelector(".canvas").getBoundingClientRect();
 		const out = [];
 		for (let y = Math.round(stage.top + 120); y < stage.bottom - 200; y += 16)
 			for (let x = Math.round(stage.left + 340); x < stage.right - 160; x += 16) {
@@ -33,7 +33,7 @@ const bareSpot = async () => {
 // rounds the frame's layout to device pixels, which added a pixel or two of noise to what
 // is otherwise an exact property.
 const anchor = await canvas.evaluate(async () => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const rect = stage.getBoundingClientRect();
 	const cursor = { x: 420, y: 300 };
 	const camera = () => {
@@ -85,7 +85,7 @@ const bare = await bareSpot();
 if (bare) await page.mouse.click(bare.x, bare.y);
 say(
 	"the canvas has the focus, not a board",
-	await canvas.evaluate(() => document.activeElement === document.querySelector(".stage") || !document.activeElement?.closest(".card-node")),
+	await canvas.evaluate(() => document.activeElement === document.querySelector(".canvas") || !document.activeElement?.closest(".card-node")),
 	`clicked ${JSON.stringify(bare)}`,
 );
 await page.keyboard.press("0");
@@ -93,7 +93,7 @@ await page.keyboard.press("0");
 await still(page);
 await settle(page, 400);
 const fitted = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage").getBoundingClientRect();
+	const stage = document.querySelector(".canvas").getBoundingClientRect();
 	// Every board, with a node or as a picture on the sheet (below the live zoom it has no node).
 	const nodes = window.__decksProbes.cards().map((one) => one.rect);
 	return {
@@ -107,7 +107,7 @@ const fitted = await canvas.evaluate(() => {
 fitted.level = await page.locator(".v3-zoom-value").first().textContent();
 // The count comes from the deck, not a literal: this asserted 3 and started failing the
 // moment an agent added a fourth board to the fixture, which is not what it tests.
-const expected = (await deckState()).boards.length;
+const expected = (await deckState()).cards.length;
 say("0 fits every board on screen", fitted.inside && fitted.count === expected, `${fitted.count}/${expected} boards at ${fitted.level}`);
 
 /*
@@ -193,19 +193,19 @@ const bareNow = await bareSpot();
 if (bareNow) await page.mouse.click(bareNow.x, bareNow.y);
 await settle(page, 200);
 await page.keyboard.press("Control+Equal");
-const whileZooming = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const whileZooming = await canvas.evaluate(() => document.querySelector(".canvas").dataset.scaling);
 say("a zoom says the scale is moving, so the boards can go on layers", whileZooming === "true", `data-scaling=${whileZooming}`);
 await settle(page, 900);
-const atRest = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const atRest = await canvas.evaluate(() => document.querySelector(".canvas").dataset.scaling);
 // Held only while it is moving: a layer is a texture kept in memory, and a deck of them
 // held for the life of the page is memory nobody asked for.
 say("…and gives the layers back once it stops", atRest === "false", `data-scaling=${atRest}`);
 
-const beforePan = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const beforePan = await canvas.evaluate(() => document.querySelector(".canvas").dataset.scaling);
 await page.mouse.move(700, 400);
 await page.mouse.wheel(0, 120);
 await settle(page, 120);
-const whilePanning = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const whilePanning = await canvas.evaluate(() => document.querySelector(".canvas").dataset.scaling);
 say("a scroll that only moves the camera does not ask for them", beforePan === "false" && whilePanning === "false", `${beforePan} -> ${whilePanning}`);
 
 /*

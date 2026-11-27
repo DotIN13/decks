@@ -2,14 +2,14 @@ import type { Page } from "@decks/protocol";
 import type { PageView } from "./page-view.ts";
 
 /**
- * What the stage hands the slot of one placed item (`CanvasView`'s `frame` prop): a card, a document or
+ * What the canvas hands the slot of one placed item (`CanvasView`'s `frame` prop): a card, a document or
  * an app.
  *
- * The stage decides where it is, whether it is awake and what its gestures do; the host adds what it
+ * The canvas decides where it is, whether it is awake and what its gestures do; the host adds what it
  * knows of the item's file (`ItemSlotExtras`).
  */
 export interface ItemSlotProps {
-	board: Page;
+	card: Page;
 	/** The camera's zoom: an edge band is sized in screen pixels. */
 	zoom: number;
 	/** Whether the item is awake: a card, an app or a document chosen near the window (`items/awake.ts`). */
@@ -35,7 +35,7 @@ export interface ItemSlotProps {
 	/** A drag carries this item's picture (`PenLayer.carry`): its surface waits, unseen, for the move to land. */
 	carried?: boolean;
 	onMove: (x: number, y: number) => void;
-	/** The stage's editor, as far as this item goes (`editor/dom/pointer.ts`, `PageView`). */
+	/** The canvas's editor, as far as this item goes (`editor/dom/pointer.ts`, `PageView`). */
 	view: PageView;
 	onOpen: () => void;
 	/** Take the item off the canvas, as its pill's ✕ does: an app window's red light. Absent where the canvas is not the person's to change. */
@@ -44,12 +44,12 @@ export interface ItemSlotProps {
 	onCollapse?: () => void;
 	/** How much room a card's content took, for `decks.canvas.fit`, with the revision it was measured at. */
 	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
-	/** A link on a card to another board or card of the deck: `true` once the host has opened it. */
+	/** A link on a card to another card of the deck: `true` once the host has opened it. */
 	onOpenPage?: (path: string, from: string) => boolean;
-	/** Words selected in a card, to comment on: the stage gives this while you may. */
+	/** Words selected in a card, to comment on: the canvas gives this while you may. */
 	onWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
-	/** The stage's fingers: a finger on the bar or the edge carries the item, and a second makes it a pinch. */
-	gestures: { claimTouch(id: number): void; pinching(): boolean; /** A finger the stage pans for, from a cover the browser cannot scroll. */ panTouch(id: number): void; /** The first finger caught a moving canvas: its lift is no tap. */ caught(): boolean };
+	/** The canvas's fingers: a finger on the bar or the edge carries the item, and a second makes it a pinch. */
+	gestures: { claimTouch(id: number): void; pinching(): boolean; /** A finger the canvas pans for, from a cover the browser cannot scroll. */ panTouch(id: number): void; /** The first finger caught a moving canvas: its lift is no tap. */ caught(): boolean };
 	/**
 	 * On a touch screen an item's page is covered until it is activated (`items-layer.tsx`): a tap on the
 	 * cover selects, a drag anywhere on it moves the item, a pinch with a finger on it zooms the canvas,

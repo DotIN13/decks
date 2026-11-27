@@ -47,7 +47,7 @@ export interface DraftFieldApi {
 	set(draft: Draft): void;
 	/** Put a mention where the caret is, replacing `back` characters before it. */
 	insertMention(node: Extract<DraftNode, { type: "mention" }>, back: number): void;
-	/** Append, for something kept rather than typed: a comment on a board. */
+	/** Append, for something kept rather than typed: a comment on a card. */
 	append(node: DraftNode): void;
 	/** Put plain words where the caret is, spaced from their neighbours: a dropped file's `@path`. */
 	insertText(text: string): void;
@@ -225,7 +225,7 @@ export function DraftField(props: DraftFieldProps) {
 			/*
 			 * The caret moves only if the field already has it. Putting a selection inside an
 			 * editable box focuses it, and this runs on every switch of agent: unguarded, opening
-			 * a stage took the keyboard into the bar, and Escape there belonged to the field.
+			 * a canvas took the keyboard into the bar, and Escape there belonged to the field.
 			 */
 			const last = el.lastChild;
 			if (last && document.activeElement === el) caretAfter(last);

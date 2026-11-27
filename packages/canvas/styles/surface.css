@@ -1,6 +1,6 @@
 /*
  * The canvas surface, for any host: what both apps share and theme through `--canvas-*` tokens
- * (`surface-tokens.css`). The stage and the world, card slots and their title bars, what a card shows,
+ * (`surface-tokens.css`). The canvas and the world, card slots and their title bars, what a card shows,
  * live ink and the lasso, an agent's marks and cursors. The kit around it (the controls, the pill, the
  * hold menu, the tool column, the ink tray, the properties panel, the comment box, the conversation) is
  * each app's own and is not here: the Decks app has it in `apps/web/src/styles/kit/`.
@@ -24,7 +24,7 @@
 	--color-bg: var(--canvas-bg);
 	--color-bg-deep: var(--canvas-bg-deep);
 	--color-panel: var(--canvas-panel);
-	--color-stage: var(--canvas-stage);
+	--color-ground: var(--canvas-ground);
 	--color-fg: var(--canvas-fg);
 	--color-muted: var(--canvas-muted);
 	--color-faint: var(--canvas-faint);

@@ -13,12 +13,12 @@ import { canvasOnScreen } from "./tabs.ts";
  */
 export async function placeLink(to: Pick<Tab, "kind" | "target">, client?: { x: number; y: number }): Promise<void> {
 	const canvas = canvasOnScreen()?.name;
-	const stage = document.querySelector<HTMLElement>(".stage, iframe.canvas-frame");
+	const element = document.querySelector<HTMLElement>(".canvas, iframe.canvas-frame");
 	const address = addressOf(to);
-	if (!canvas || !stage || !address) return;
-	const box = stage.getBoundingClientRect();
-	const view = client ? { x: client.x - box.left, y: client.y - box.top } : { x: stage.clientWidth / 2, y: stage.clientHeight / 2 };
-	const at = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, view);
+	if (!canvas || !element || !address) return;
+	const box = element.getBoundingClientRect();
+	const view = client ? { x: client.x - box.left, y: client.y - box.top } : { x: element.clientWidth / 2, y: element.clientHeight / 2 };
+	const at = toWorld(camera(), { width: element.clientWidth, height: element.clientHeight }, view);
 	// About half a chip up and to the left, so its middle is where it was put.
 	await act("canvas.insert", [{ type: "link", to: address }, { canvas, at: { x1: Math.round(at.x - 80), y1: Math.round(at.y - 18) } }]);
 }

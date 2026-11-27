@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { commentBlock, COMMENTS_KEY, loadComments, popupPlace, QUOTE_LIMIT, quoteOf, saveComments, withComments, type CardComment } from "./comments.ts";
 
-const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", board: "boards/plan.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
+const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", card: "cards/plan/index.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
 
 test("a quotation is one line, and not the whole page", () => {
 	assert.equal(quoteOf("  Keep\n\tit   short. "), "Keep it short.");
@@ -15,17 +15,17 @@ test("the agent reads where, the words, and the comment, and the list says what 
 	assert.equal(commentBlock([]), "");
 	assert.equal(
 		commentBlock([comment()]),
-		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. cards/plan/index.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
 	);
 	const two = commentBlock([comment(), comment({ id: "c2", component: undefined, text: "Why?\nSay more." })]);
 	assert.match(two, /^2 comments on cards\./);
-	assert.match(two, /2\. boards\/plan\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
+	assert.match(two, /2\. cards\/plan\/index\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
 });
 
 test("waiting comments go in front of the next message, and either half may be missing", () => {
 	assert.equal(withComments("  hello ", []), "hello");
 	assert.equal(withComments("", [comment()]), commentBlock([comment()]));
-	assert.equal(withComments("Then fit the board.", [comment()]), `${commentBlock([comment()])}\n\nThen fit the board.`);
+	assert.equal(withComments("Then fit the card.", [comment()]), `${commentBlock([comment()])}\n\nThen fit the card.`);
 });
 
 test("comments survive a reload per agent, and a broken store is an empty one", () => {
@@ -52,15 +52,15 @@ test("the popup sits under the selection, above it when there is no room, and ne
 	assert.equal(popupPlace({ left: 270, top: 100, right: 330, bottom: 120 }, size, { ...view, left: 264 }).left, 272, "clear of the sidebar");
 });
 
-test("a comment on the whole board has no quote, and says so", () => {
+test("a comment on the whole card has no quote, and says so", () => {
 	assert.equal(
 		commentBlock([comment({ quote: "", component: undefined })]),
-		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, the whole card\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. cards/plan/index.html, the whole card\n   Two sentences, please.",
 	);
 });
 
 test("a comment on drawn items names the canvas file, the items by id, and their words", () => {
-	const note: CardComment = { id: "c1", board: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
+	const note: CardComment = { id: "c1", card: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
 	const block = commentBlock([note]);
 	assert.match(block, /^A comment on items drawn on a canvas:/);
 	assert.match(block, /on canvases\/plan\/canvas\.pen, item "term-1" \("Program start"\)\n   make this green/);
@@ -68,7 +68,7 @@ test("a comment on drawn items names the canvas file, the items by id, and their
 
 test("waiting comments are kept per agent and canvas, and ones kept under the agent alone move to its canvas once", async () => {
 	const { adoptComments, commentsKey } = await import("./comments.ts");
-	const note = { id: "c1", board: "boards/a.html", quote: "q", text: "t", at: 1 };
+	const note = { id: "c1", card: "cards/a/index.html", quote: "q", text: "t", at: 1 };
 	assert.equal(commentsKey("a1", "x"), "a1@x");
 	assert.equal(commentsKey("a1", undefined), "a1");
 	const moved = adoptComments({ a1: [note], "a1@x": [] }, "a1", "x");

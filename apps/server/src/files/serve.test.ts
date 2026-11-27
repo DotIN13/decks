@@ -7,7 +7,7 @@ test("which files a browser runs, and therefore which get quarantined", () => {
 	for (const path of ["a.html", "A.HTM", "chart.svg", "doc.xhtml", "feed.xml"]) {
 		assert.equal(isExecutable(path), true, path);
 	}
-	// Data, not documents: board.js draws these itself, so they never execute.
+	// Data, not documents: card.js draws these itself, so they never execute.
 	for (const path of ["notes.md", "paper.pdf", "fig.png", "data.json", "x"]) {
 		assert.equal(isExecutable(path), false, path);
 	}
@@ -21,7 +21,7 @@ function headers(): { set: Record<string, string>; res: Response } {
 
 test("an asset a browser would run is sandboxed, even though it is inside the deck", () => {
 	// The point of this one: `assets/` now holds files the user dropped in, and
-	// `/api/board/assets/x.html` is same-origin unless something says otherwise.
+	// `/api/card/assets/x.html` is same-origin unless something says otherwise.
 	const executable = headers();
 	assetHeaders(executable.res, "/deck/assets/evil.html");
 	assert.equal(executable.set["content-security-policy"], "sandbox allow-scripts");

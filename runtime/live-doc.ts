@@ -1,19 +1,19 @@
 import { mountDocPage } from "@decks/docs/page";
 
 /**
- * `lib/live-doc.js`: a `[data-live="doc"]` box on a board, drawn as a document page you type into.
+ * `lib/live-doc.js`: a `[data-live="doc"]` box on a card, drawn as a document page you type into.
  *
- * The page is `@decks/docs/page`; this is only how it talks. A board has no socket of its own:
+ * The page is `@decks/docs/page`; this is only how it talks. A card has no socket of its own:
  * it hands every message up to the app, which carries it on the connection it already has, and
- * the app hands the server's answers back down (`apps/web/src/board/live-doc.ts`).
+ * the app hands the server's answers back down (`apps/web/src/canvases`).
  *
- * `data-path` names the file the way an embed does: relative to the board, or absolute.
+ * `data-path` names the file the way an embed does: relative to the card, or absolute.
  *
  *     npm run build:live-doc
  */
 export function mountLiveDoc(
 	host: HTMLElement,
-	board: string | null,
+	card: string | null,
 	renderers: {
 		markdown?: (into: HTMLElement, source: string) => Promise<void> | void;
 		math?: (into: HTMLElement) => Promise<void> | void;
@@ -29,7 +29,7 @@ export function mountLiveDoc(
 	}
 	const page = mountDocPage(host, {
 		...renderers,
-		path: resolvePath(raw, board),
+		path: resolvePath(raw, card),
 		send: (message) => window.parent.postMessage({ decks: "doc", message }, "*"),
 		listen: (listener) => {
 			const onMessage = (event: MessageEvent) => {
@@ -44,10 +44,10 @@ export function mountLiveDoc(
 	addEventListener("pagehide", () => page.destroy(), { once: true });
 }
 
-/** A path as a board means it: from the board's own folder, unless it is absolute. */
-function resolvePath(raw: string, board: string | null): string {
-	if (raw.startsWith("/") || raw.startsWith("~") || !board) return raw;
-	const parts = board.split("/").slice(0, -1);
+/** A path as a card means it: from the card's own folder, unless it is absolute. */
+function resolvePath(raw: string, card: string | null): string {
+	if (raw.startsWith("/") || raw.startsWith("~") || !card) return raw;
+	const parts = card.split("/").slice(0, -1);
 	for (const part of raw.split("/")) {
 		if (part === "..") parts.pop();
 		else if (part !== "." && part !== "") parts.push(part);

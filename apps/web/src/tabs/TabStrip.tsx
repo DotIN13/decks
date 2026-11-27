@@ -7,8 +7,8 @@ import { m } from "@decks/i18n";
 import { CanvasSwitcher } from "../canvases/CanvasSwitcher.tsx";
 import { scheme } from "../lib/theme.ts";
 import { canvasMenu } from "../app/canvas-menu.tsx";
-import { newCanvas, setStagesOpen } from "../app/person.ts";
-import { stages } from "../state/canvases.ts";
+import { newCanvas, setCanvasesOpen } from "../app/person.ts";
+import { canvases } from "../state/canvases.ts";
 import { kindOf } from "./kinds.ts";
 import { dragToCanvas } from "./drag-link.ts";
 import { OpenMore } from "./OpenMore.tsx";
@@ -149,12 +149,12 @@ export function TabStrip(props: { /** How many tabs the bar has room for beside 
 			</Show>
 			{/* The +: the canvases, to open one as a tab and keep the one the camera leaves, where the list a canvas tab in front opens only takes that tab to one; and after them what the other kinds offer (`OpenMore.tsx`). */}
 			<CanvasSwitcher
-				stages={stages()}
+				canvases={canvases()}
 				here={canvasOnScreen()?.name}
 				scheme={scheme()}
 				onPick={(name) => openTab("canvas", name)}
 				onNew={() => newCanvas()}
-				onAll={() => void setStagesOpen(true)}
+				onAll={() => void setCanvasesOpen(true)}
 				findLabel={m.tabs_find()}
 				more={(find, pick) => <OpenMore find={find()} pick={pick} />}
 				trigger={(popover) => {

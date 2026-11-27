@@ -35,8 +35,8 @@ export function Hints(props: {
 	/**
 	 * Whether `@` completes anything yet.
 	 *
-	 * Picone's third hint is `@ for memory`; here it is **`@ for boards`**, because a
-	 * board is the thing this app has a lot of and a subject is not a thing it has at all.
+	 * Picone's third hint is `@ for memory`; here it is **`@ for cards`**, because a
+	 * card is the thing this app has a lot of and a subject is not a thing it has at all.
 	 * Off by default, and the fallback is Shift+Enter — the same trade picone makes when a
 	 * workspace has no subjects. A hint for a key that does nothing is worse than the
 	 * ordinary hint it displaced, so this only turns on when the mention menu is built.

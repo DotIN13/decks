@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { smallName, thumbName, webpSize, webpWidth } from "./service.ts";
 
 test("a smaller copy is named beside its whole picture, keeping the look", () => {
-	const whole = thumbName("boards/a.html", 7, "light", "whole");
+	const whole = thumbName("pages/a.html", 7, "light", "whole");
 	assert.match(whole, /-whole-l\d+\.webp$/);
 	assert.equal(smallName(whole, 192), whole.replace("-whole-", "-whole-w192-"));
 	assert.equal(smallName("/x/abc-7-light-720-whole.webp", 480), "/x/abc-7-light-720-whole-w480.webp");

@@ -15,8 +15,8 @@ export function createFollow(d: FollowNeeds) {
 	/**
 	 * Follow one press to its release: `move` on each step past the pointer's slop (`touch-rules.ts`: 3 px for a mouse, 8 for a finger), `done` at the end.
 	 *
-	 * The pointer is captured by `on`, the stage unless said otherwise, and the click that ends the
-	 * press goes to whatever captured it — so a press on a board's title bar keeps it on the bar, or
+	 * The pointer is captured by `on`, the canvas unless said otherwise, and the click that ends the
+	 * press goes to whatever captured it — so a press on a card's title bar keeps it on the bar, or
 	 * its double-click would reach the canvas and make a note.
 	 *
 	 * The camera can move while the press is held (a wheel, a glide), and then the last step runs
@@ -53,7 +53,7 @@ export function createFollow(d: FollowNeeds) {
 			if (e.pointerId === event.pointerId) released(e);
 		};
 		/*
-		 * A second finger landing while one follows a press is a pinch, which the stage's pool takes
+		 * A second finger landing while one follows a press is a pinch, which the canvas's pool takes
 		 * from here (`input.ts`): the press is abandoned, not released where it was, so a resize or a
 		 * carry that had begun is put back rather than landed half done.
 		 */
@@ -78,7 +78,7 @@ export function createFollow(d: FollowNeeds) {
 		 * captured the pointer, the same anywhere in the window, the capture being lost (the element
 		 * left the page, or the browser took it back), or a move with no button held. Listening on
 		 * the captured element alone, a release it never heard left the drag following the cursor and
-		 * the camera after the button was up: zoomed out to 20%, moving a board or a group.
+		 * the camera after the button was up: zoomed out to 20%, moving a card or a group.
 		 */
 		const finish = (e: PointerEvent) => {
 			if (over || e.pointerId !== event.pointerId) return;
@@ -105,7 +105,7 @@ export function createFollow(d: FollowNeeds) {
 
 	/**
 	 * Follow a press the editor took to its lift (`editor/core/gesture.ts`): each move and the lift
-	 * told to it, in stage coordinates. `on` captures the pointer, the stage unless said otherwise.
+	 * told to it, in canvas coordinates. `on` captures the pointer, the canvas unless said otherwise.
 	 */
 	const followEditor = (event: PointerEvent, on?: HTMLElement) =>
 		follow(
@@ -118,7 +118,7 @@ export function createFollow(d: FollowNeeds) {
 
 	/*
 	 * A finger pressing a handle, an arrow's end or a block's grip is the editor's, and these presses
-	 * stop at their element: the stage never hears them, so the finger was not in its pool, and a
+	 * stop at their element: the canvas never hears them, so the finger was not in its pool, and a
 	 * pinch begun on a handle could not happen. Put in the pool here, and kept from the browser's
 	 * scroll (`keepTouch`); a second finger then makes the pinch and abandons the press (`follow`).
 	 */

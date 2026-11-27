@@ -8,7 +8,7 @@ import { Translator, titleFor } from "./translator.ts";
  *
  * The conversation draws a call as one line — a glyph, the name in mono, and this string —
  * so an empty return here is a row with a name and nothing else, which is the state the app
- * spent a while in for its own `stage_eval`.
+ * spent a while in for its own `canvas_eval`.
  */
 
 test("a file tool is its path, and a shell tool is its command", () => {
@@ -18,11 +18,11 @@ test("a file tool is its path, and a shell tool is its command", () => {
 });
 
 test("an MCP prefix is routing, not the tool's name", () => {
-	// `mcp__decks__stage_eval` used to fall through to the default, which looks for a short
+	// `mcp__decks__canvas_eval` used to fall through to the default, which looks for a short
 	// string argument and finds none in a program — so the row was blank.
 	assert.equal(
-		titleFor("mcp__decks__stage_eval", { code: 'await stage.show("boards/plan.html");\nreturn 1;' }),
-		'await stage.show("boards/plan.html");',
+		titleFor("mcp__decks__canvas_eval", { code: 'await decks.view.focus("pages/plan.html");\nreturn 1;' }),
+		'await decks.view.focus("pages/plan.html");',
 	);
 	assert.equal(titleFor("mcp__some_server__read", { path: "a.txt" }), "a.txt");
 	// A name that merely contains the separator is not a prefix.

@@ -1,7 +1,7 @@
-# Board fonts
+# Card fonts
 
-The two families `theme.css` names for every board, shipped so that a board looks the same
-in every browser and in the server's own Chrome, which draws the boards' pictures. Before
+The two families `theme.css` names for every card, shipped so that a card looks the same
+in every browser and in the server's own Chrome, which draws the cards' pictures. Before
 these were here, "Inter" resolved to nothing on any machine without it installed: a Mac
 drew its system font and the server drew Liberation Sans.
 

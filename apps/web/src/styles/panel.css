@@ -1,9 +1,9 @@
 /*
- * The left panel's own shapes: the list, its section lines, and a board drawn small.
+ * The left panel's own shapes: the list, its section lines, and a card drawn small.
  *
  * The split this file lives on is the one `styles/chrome.css` states: **shapes several
  * places spell the same way live in CSS; layout lives in a class attribute next to the
- * markup.** So the row, the thumbnail and the tile are here — a board row appears in two
+ * markup.** So the row, the thumbnail and the tile are here — a card row appears in two
  * lists and will appear in a third — while where the panel sits, how its header stacks and
  * what the header's gaps are are Tailwind utilities in `panel/LeftPanel.tsx`.
  *
@@ -106,7 +106,7 @@
 	 * `min-height: auto` and refuses to shrink below its content, so a deck of seventy-eight
 	 * would grow the panel off the bottom of the screen instead of scrolling — `overflow-y`
 	 * never engages on a box that is never smaller than what is inside it. It was two bugs
-	 * in one in `AllBoards`, where the rows past the second were clipped and unreachable.
+	 * in one in `AllCards`, where the rows past the second were clipped and unreachable.
 	 *
 	 * 2px of padding so a focus ring and the current tile's 1px halo are not clipped:
 	 * setting `overflow-y` makes `overflow-x` compute to `auto` too, so anything painted
@@ -169,11 +169,11 @@
 	 * three-digit one at 258.6, so even the *right edge* of a count moved as it gained a digit.
 	 * Right-aligned, a count ends on the same line whatever it says, and the digits grow into the
 	 * label's spare width, where there is room at any count — the deck this was written against
-	 * lists 650 boards.
+	 * lists 650 cards.
 	 *
 	 * But right-aligned against the *box* is not right-aligned against the column. `--count-inset` is
 	 * how far the ink ends before the box does, and it is not one number, because the two lists do not
-	 * repeat the same thing down the right edge: the boards list repeats a **6px dot** (whose ink ends
+	 * repeat the same thing down the right edge: the cards list repeats a **6px dot** (whose ink ends
 	 * at 252, seven pixels inside the box) and the agents list repeats its **timestamp**, text that
 	 * ends at 255, four inside. One value would have put one list's counts three pixels off the line
 	 * its own rows stand on. Everything in the rail is centred in a 20px box and smaller than it — the
@@ -249,7 +249,7 @@
 	 * at the edge of it.
 	 *
 	 * `pointer-events` is the part that matters for correctness. A slid-away panel still has
-	 * a box over the canvas, and without this it would swallow clicks meant for boards along
+	 * a box over the canvas, and without this it would swallow clicks meant for cards along
 	 * the left edge — which is worse than no animation at all. `visibility` is deliberately
 	 * not used: Chromium will not transition a discrete property without
 	 * `transition-behavior: allow-discrete`, so it would flip at the start of the exit and
@@ -274,7 +274,7 @@
 	}
 
 	/*
-	 * The one control beside the search: list or grid on Boards, the grouping on Agents.
+	 * The one control beside the search: list or grid on Cards, the grouping on Agents.
 	 * A bordered square the height of the field, so the header is one row of two shapes.
 	 * The foot it replaces was a 30px strip with the count and this control in it; the
 	 * count is in every section heading already.
@@ -284,7 +284,7 @@
 	}
 
 	/*
-	 * One board, as a line.
+	 * One card, as a line.
 	 *
 	 * A wash on hover and on the current one, rather than a border: the row is text on the
 	 * panel's own background, and a 1px box around a line of text is a border earning
@@ -294,7 +294,7 @@
 	/*
 	 * One agent in the Agents tab: the reading surface.
 	 *
-	 * Taller than a board row, because it is answering a different question. A board row is
+	 * Taller than a card row, because it is answering a different question. A card row is
 	 * a name you pick from a list; this is one agent, in one or two lines — the count is the
 	 * list's `data-lines` (`.agent-list[data-lines]`). No tags on the row; they are in the
 	 * hover card.
@@ -306,7 +306,7 @@
 	 * Two overrides on the row vocabulary, and nothing else.
 	 *
 	 * `.row-list` already gives the grid, the corner, the hover, the current wash, `.row-act`
-	 * and the type scale — the board rows above are the same object, and re-implementing it
+	 * and the type scale — the card rows above are the same object, and re-implementing it
 	 * here is how two lists in one panel come to nearly match. What differs is only what has
 	 * to: the icon column is 28px rather than 16 because the avatar is worth seeing at that
 	 * size here, and the actions sit on the *first line* rather than centred in a row that
@@ -575,7 +575,7 @@
 	 * The `+` that opens your own tags.
 	 *
 	 * In the row's action column beside the ×, revealed on approach for the same reason the
-	 * board row's bin is: a column of `+` down a list of five agents is an invitation to
+	 * card row's bin is: a column of `+` down a list of five agents is an invitation to
 	 * tidy rather than a list to read. Always visible on a coarse pointer, where nothing can
 	 * be approached.
 	 */

@@ -27,7 +27,7 @@ for (const target of TARGETS) {
 	const drawnBefore = await canvasDraws(page);
 
 	const lost = await canvas.evaluate(() => {
-		const canvas = document.querySelector("canvas.stage-engine-over");
+		const canvas = document.querySelector("canvas.canvas-engine-over");
 		const gl = canvas.getContext("webgl2");
 		const ext = gl?.getExtension("WEBGL_lose_context");
 		if (!ext) return false;

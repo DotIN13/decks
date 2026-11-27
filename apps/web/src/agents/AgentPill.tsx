@@ -24,13 +24,13 @@ import { AuthedImg } from "../lib/authed.tsx";
  *
  * One pill where there were three things — a title bar, a free-standing palette and a
  * hover-triggered rail — and the merge is the point rather than a tidy-up. It buys three
- * things the boards asked for by name: **one `data-inset="top"` instead of two**, so the
+ * things the cards asked for by name: **one `data-inset="top"` instead of two**, so the
  * canvas's own box is one measurement; **an empty top centre**, which is where notices land
  * and they used to have to dodge the palette; and **a line that fits a 393px phone**, which
  * two clusters never did.
  *
- * The tools that add things, and undo and redo, are the stage's own, in a column on the canvas's
- * left edge (`canvas/pen/PenBar.tsx`). A board's own edits still undo with ⌘Z inside the board.
+ * The tools that add things, and undo and redo, are the canvas's own, in a column on the canvas's
+ * left edge (`canvas/pen/PenBar.tsx`). A card's own edits still undo with ⌘Z inside the card.
  *
  * Presentational on purpose. It takes the chats, the identities and a callback per verb —
  * nothing here reads the socket or `App`'s state, so the whole cluster can be drawn from a
@@ -402,7 +402,7 @@ export function AgentMenu(props: {
 
 export function AgentPill(props: {
 	/**
-	 * The canvas's mode (`state/selection.ts`). This pill only ever asks for browse: a board is a
+	 * The canvas's mode (`state/selection.ts`). This pill only ever asks for browse: a card is a
 	 * *document* — text selects and copies, a game plays, a click is an ordinary click — and
 	 * what is drawn still moves and retypes. Its pages are never edited from the canvas.
 	 */
@@ -411,7 +411,7 @@ export function AgentPill(props: {
 	/** Whether the draw tool is on, and how to turn it on and off. Browse mode only. */
 	drawing: boolean;
 	onDrawing: (drawing: boolean) => void;
-	/** Whether the boards panel is showing. A button, not a hover — folded means gone. */
+	/** Whether the cards panel is showing. A button, not a hover — folded means gone. */
 	panelOpen: boolean;
 	onTogglePanel: () => void;
 	/** The agents, for the switcher: a face and a name, one button, opening the agent list. */
@@ -425,19 +425,19 @@ export function AgentPill(props: {
 	/** Open the Agents panel, from the agent list's overflow row. */
 	onMoreAgents?: () => void;
 	/**
-	 * The stage this conversation is on, and the way to every other one.
+	 * The canvas this conversation is on, and the way to every other one.
 	 *
-	 * A segment of its own behind the pill's own hairline, marked by a small stage glyph — not
+	 * A segment of its own behind the pill's own hairline, marked by a small canvas glyph — not
 	 * `Ada · deploy`, because a separator in this pill is a hairline everywhere else and a middle
 	 * dot would be a second kind of separator on one line.
 	 *
 	 * The name is absent for a chat that has never drawn on one, and then the glyph stands alone:
 	 * the way in cannot depend on already being somewhere. The whole segment is absent only when
-	 * the deck keeps no stages at all.
+	 * the deck keeps no canvases at all.
 	 */
-	stage?: string;
-	onStages?: () => void;
-	stagesOpen?: boolean;
+	canvas?: string;
+	onCanvases?: () => void;
+	canvasesOpen?: boolean;
 	/**
 	 * The canvas on screen is a friend's, shared with you to view: who shared it. The pill says so
 	 * beside the canvas's name, with the way to change it, which is your own copy (`onCopy`).
@@ -501,8 +501,8 @@ export function AgentPill(props: {
 			<span class="pill-sep" aria-hidden="true" />
 
 			{/*
-			 * The agent whose stage this is: its face and its name, as one button. Pressing it
-			 * opens the agent list, and picking a row goes to that agent's stage.
+			 * The agent whose canvas this is: its face and its name, as one button. Pressing it
+			 * opens the agent list, and picking a row goes to that agent's canvas.
 			 *
 			 * The name stops at 160px.
 			 */}
@@ -538,32 +538,32 @@ export function AgentPill(props: {
 			<NewAgentButton onNew={props.onNew} />
 
 			{/*
-				The stage: what this agent's work is kept in, and the button that opens the manager.
+				The canvas: what this agent's work is kept in, and the button that opens the manager.
 
-				It had never been on screen at all, so two stages looked like one canvas that had
+				It had never been on screen at all, so two canvases looked like one canvas that had
 				changed. The name goes where it is read with the agent — this pill is already the
 				answer to "whose work am I looking at" — and pressing it is the answer to "what else
 				is there" (`canvases/CanvasManager.tsx`).
 			*/}
-			<Show when={props.onStages}>
+			<Show when={props.onCanvases}>
 				{(_on) => (
 					<>
 						<span class="pill-sep" aria-hidden="true" />
 						<button
 							type="button"
-							class="chip-button pill-agent pill-stage"
-							data-on={props.stagesOpen ? "soft" : undefined}
+							class="chip-button pill-agent pill-canvas"
+							data-on={props.canvasesOpen ? "soft" : undefined}
 							aria-haspopup="dialog"
-							aria-expanded={props.stagesOpen ?? false}
-							title={props.stage ? m.agents_stage_title({ name: props.stage }) : m.agents_stages()}
-							aria-label={props.stage ? m.agents_stage_label({ name: props.stage }) : m.agents_stage_none()}
-							onClick={() => props.onStages?.()}
+							aria-expanded={props.canvasesOpen ?? false}
+							title={props.canvas ? m.agents_canvas_title({ name: props.canvas }) : m.agents_canvases()}
+							aria-label={props.canvas ? m.agents_canvas_label({ name: props.canvas }) : m.agents_canvas_none()}
+							onClick={() => props.onCanvases?.()}
 						>
-							{/* The app's own mark, not a drawing of it: a stage is what the mark is a picture of. */}
-							<span class="pill-stage-glyph" aria-hidden="true">
+							{/* The app's own mark, not a drawing of it: a canvas is what the mark is a picture of. */}
+							<span class="pill-canvas-glyph" aria-hidden="true">
 								<DecksMark size={15} />
 							</span>
-							<Show when={props.stage}>{(name) => <span class="pill-agent-name">{name()}</span>}</Show>
+							<Show when={props.canvas}>{(name) => <span class="pill-agent-name">{name()}</span>}</Show>
 							<Icon of={ChevronDown} size={12} />
 						</button>
 						<Show when={props.viewOnly}>
@@ -587,8 +587,8 @@ export function AgentPill(props: {
 
 			{/*
 				The two modes, as one set, and first after the agent because they change what every
-				press on the canvas means: browse (the cursor) reads the boards and moves the drawing,
-				draw (the brush) puts the pen on the stage. A board's own page is never edited from
+				press on the canvas means: browse (the cursor) reads the cards and moves the drawing,
+				draw (the brush) puts the pen on the canvas. A card's own page is never edited from
 				here. The one in force is pressed, in the accent, as a tool picked from a set is.
 
 				No confirmation. A single press is right for something this reversible, and what guards

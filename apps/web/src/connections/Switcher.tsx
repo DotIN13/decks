@@ -53,7 +53,7 @@ async function reachable(one: Connection): Promise<Reach> {
 function kindNote(one: Connection): string {
 	if (one.kind === "here") return location.host;
 	if (one.kind === "server") return new URL(one.base).host;
-	return m.connections_file_cards({ count: one.boards });
+	return m.connections_file_cards({ count: one.cards });
 }
 
 export function Switcher(props: { label?: string } = {}) {
@@ -93,7 +93,7 @@ export function Switcher(props: { label?: string } = {}) {
 		const own = one?.kind === "here" ? ownName() : one?.label;
 		rename(id, draftName().trim() === own ? "" : draftName());
 	};
-	const stage = () => canvasOnScreen();
+	const canvas = () => canvasOnScreen();
 
 	const opened = (open: boolean) => {
 		if (!open) {
@@ -349,7 +349,7 @@ export function Switcher(props: { label?: string } = {}) {
 						<Icon of={FileUp} size={13} class="flex-none text-muted" />
 						<span class="row-label flex-1">{m.connections_open_file()}</span>
 					</button>
-					<Show when={can("share") && stage()}>
+					<Show when={can("share") && canvas()}>
 						{(one) => (
 							<a role="menuitem" data-row data-flat="true" href={api(`/bundle/${encodeURIComponent(one().name)}`)} download="" data-download-bundle>
 								<Icon of={Download} size={13} class="flex-none text-muted" />

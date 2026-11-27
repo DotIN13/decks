@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { libName, servedAs } from "@decks/hub/layout";
+import { servedAs } from "@decks/hub/layout";
 import { deckVersion, DryRun, LATEST, MIGRATIONS, runAtOpen } from "./index.ts";
 import { readRecord } from "./version.ts";
 
@@ -180,14 +180,16 @@ test("an old deck (stages/, library boards, no version) migrates all the way to 
 
 		// The records followed: the agent is ordinary, on the renamed canvas; Allow decisions follow the board.
 		const agent = json<Record<string, unknown>>(join(deck, ".decks", "agents", "a1", "meta.json"));
-		assert.equal(agent.stage, "auth-refresh");
+		assert.equal(agent.canvas, "auth-refresh");
+		assert.ok(!("stage" in agent));
 		assert.ok(!("isolated" in agent) && !("isolatedStages" in agent));
 		assert.deepEqual(agent.context, ["canvases/auth-refresh/boards/plan.html", "canvases/auth-refresh/boards/risks.html"]);
-		assert.ok(json<{ allowed: string[] }>(join(data, "board-eval.json")).allowed.includes("canvases/auth-refresh/boards/plan.html"));
+		assert.ok(json<{ allowed: string[] }>(join(data, "app-trust.json")).allowed.includes("canvases/auth-refresh/boards/plan.html"));
+		assert.ok(!existsSync(join(data, "board-eval.json")));
 
 		// Backups before every migration that changes something, each a zip that reads, and the leftovers' report.
 		const backups = readdirSync(join(deck, ".decks", "backups"));
-		for (const kind of ["standalone-canvases", "isolation-removed", "markdown-cards", "documents-and-apps", "boards-to-cards", "board-leftovers"]) {
+		for (const kind of ["standalone-canvases", "isolation-removed", "markdown-cards", "documents-and-apps", "boards-to-cards", "board-leftovers", "card-and-canvas-names"]) {
 			const zip = backups.find((name) => name.endsWith(`-before-${kind}.zip`));
 			assert.ok(zip, `a backup before ${kind}: ${backups.join(", ")}`);
 			assert.ok(statSync(join(deck, ".decks", "backups", zip)).size > 0);
@@ -203,11 +205,8 @@ test("an old deck (stages/, library boards, no version) migrates all the way to 
 		assert.deepEqual(leftovers.notConverted.map((one) => [one.board, one.as]), [["canvases/auth-refresh/boards/embed-site.html", "picture"]]);
 		assert.equal(leftovers.report, `.decks/backups/${report}`);
 
-		// What the converted cards and the kept page ask for is served: an old page's ../lib/board.css is lib/card.css.
-		assert.equal(libName("board.css"), "card.css");
-		assert.equal(libName("board.js"), "card.js");
-		assert.equal(libName("~ab12/board.css"), "~ab12/card.css");
-		assert.deepEqual(servedAs("canvases/auth-refresh/lib/board.js"), { path: "lib/card.js" });
+		// What the converted cards and the kept page ask for is served: the card-and-canvas-names migration wrote ../lib/board.css as card.css.
+		assert.deepEqual(servedAs("canvases/auth-refresh/lib/card.js"), { path: "lib/card.js" });
 		let libAsks = 0;
 		for (const canvas of readdirSync(join(deck, "canvases"))) {
 			const pages = [...snapshot(join(deck, "canvases", canvas)).keys()].filter((path) => /^(cards\/[^/]+\/index|boards\/.+)\.html$/.test(path)).map((path) => `canvases/${canvas}/${path}`);
@@ -218,11 +217,12 @@ test("an old deck (stages/, library boards, no version) migrates all the way to 
 					const served = servedAs(address);
 					assert.ok("path" in served, `${page} asks for ${address}, which is refused`);
 					const file = posix.basename(address);
-					if (/^board\.(css|js)$/.test(file)) assert.equal(served.path, `lib/${libName(file)}`, `${page}: ${address} is served as the card runtime`);
+					assert.ok(!/^board\.(css|js)$/.test(file), `${page} still asks for ${address}`);
+					if (/^card\.(css|js)$/.test(file)) assert.equal(served.path, `lib/${file}`, `${page}: ${address} is served as the card runtime`);
 				}
 			}
 		}
-		assert.ok(libAsks > 0, "the kept old page asks for ../lib/board.css, and it was checked");
+		assert.ok(libAsks > 0, "the kept old page asks for ../lib/card.css, and it was checked");
 
 		// Running again changes nothing.
 		const after = snapshot(data);

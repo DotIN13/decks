@@ -5,7 +5,7 @@ import { state } from "../state/deck.ts";
 import { offer } from "../state/notices.ts";
 import type { Tab } from "./kind.ts";
 import { kindAt, kindOf } from "./kinds.ts";
-import { stageOf, stages } from "../state/canvases.ts";
+import { canvasOf, canvases } from "../state/canvases.ts";
 import { aimCanvas, front, openTab, restoreTabs, rowNow } from "./tabs.ts";
 
 /** The canvas each conversation's camera was last seen on, or was put on by this page: what a canvases frame is news against. */
@@ -142,17 +142,17 @@ export function rememberTabs(): void {
 		offer(m.tabs_moved_elsewhere({ canvas }), { label: m.tabs_follow(), run: () => aimCanvas(agent) }, `moved:${agent}`);
 	};
 	createEffect(() => {
-		for (const stage of stages()) {
-			for (const agent of stage.agents) {
+		for (const canvas of canvases()) {
+			for (const agent of canvas.agents) {
 				/*
-				 * Where the page takes the agent to be (`stageOf`), which during a move this page made is
+				 * Where the page takes the agent to be (`canvasOf`), which during a move this page made is
 				 * where it is going: a canvases frame sent before the harness had moved it still lists it on
 				 * the canvas it left, and read as it is, that frame and the next were two moves.
 				 */
-				const now = stageOf(agent.id)?.name ?? stage.name;
+				const now = canvasOf(agent.id)?.name ?? canvas.name;
 				const was = seen.get(agent.id);
 				seen.set(agent.id, now);
-				if (was !== undefined && was !== now) moved(agent.id, stages().find((one) => one.name === now)?.title ?? now);
+				if (was !== undefined && was !== now) moved(agent.id, canvases().find((one) => one.name === now)?.title ?? now);
 			}
 		}
 	});

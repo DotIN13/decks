@@ -14,12 +14,12 @@
  */
 @layer components {
 	/*
-	 * A column of cards over the boards, and not a panel.
+	 * A column of cards over the cards, and not a panel.
 	 *
 	 * No background, no border, no pointer events. The cards below take their own, so the
-	 * 10px gaps between turns are still canvas: you can drag a board through one. The trade
+	 * 10px gaps between turns are still canvas: you can drag a card through one. The trade
 	 * that buys — the wheel over a *gap* scrolls the canvas rather than the history — is the
-	 * one the boards asked for, and the cards are most of the column's area anyway.
+	 * one the cards asked for, and the cards are most of the column's area anyway.
 	 *
 	 * `justify-content: flex-end` on the column rather than on the scroller inside it: a
 	 * flex container that both scrolls and justifies to the end clips its own overflow at the
@@ -49,7 +49,7 @@
 		 * `auto` too, so every card's shadow was sliced off in a straight vertical line down
 		 * both edges — which is what makes a column of floating cards read as a box with a
 		 * cut-out. The scroller carries this much padding instead, and the column is wider and
-		 * closer to the edge by the same amount, so the cards land where the board drew them.
+		 * closer to the edge by the same amount, so the cards land where the card drew them.
 		 *
 		 * **24px, because that is how far the shadow reaches.** `--shadow` is
 		 * `0 8px 24px`, so a 12px gutter clipped the outer two thirds of it and the column
@@ -195,7 +195,7 @@
 	 * **Opaque, and no ladder with age.** `index.css` refuses frosted glass in writing — 40%
 	 * words behind 100% words reads as grime, and it moves when the camera does — and a
 	 * floating transcript is the exact case that argument was about. The `canvas-chat` version
-	 * this idea comes from also steps older turns back in opacity so the board shows through;
+	 * this idea comes from also steps older turns back in opacity so the card shows through;
 	 * that is the same grime by a gentler name, and it buys nothing, because the newest card
 	 * is at the foot of the column where the eye already is.
 	 */
@@ -244,7 +244,7 @@
 	}
 
 	/* The soft accent is a *light* tint; on the dark scheme it is a bright plate with light
-	   text on it. The dark value is the one the board drew rather than a mix of the light one,
+	   text on it. The dark value is the one the card drew rather than a mix of the light one,
 	   which came out either invisible or violet. */
 	[data-color-scheme="dark"] .stream-mine {
 		--mine: #2b3a63;
@@ -256,7 +256,7 @@
 		box-sizing: border-box;
 		max-width: 88%;
 		padding: 8px 11px 10px;
-		/* A tint alone loses its edge over a light board, so the border is not decoration:
+		/* A tint alone loses its edge over a light card, so the border is not decoration:
 		   it is what keeps the bubble a bubble when the thing behind it is white. */
 		border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
 		border-radius: var(--radius-panel, 12px);
@@ -484,7 +484,7 @@
 	 * reading as the sentence rather than the label on it.
 	 *
 	 * `flex: 0 1 auto` with a 42% ceiling, because an MCP tool is called
-	 * `mcp__decks__stage_eval` and would otherwise take a 320px row on its own. It gives way
+	 * `mcp__decks__canvas_eval` and would otherwise take a 320px row on its own. It gives way
 	 * before the description does; the description is the part that says *which* call.
 	 */
 	.tool > .row .name {
@@ -706,8 +706,8 @@
 	 * and some screen readers announce a long uppercase run letter by letter.
 	 *
 	 * A chip rather than a label with a rule running off it, which is what that eyebrow was: a
-	 * bare hairline over the canvas lands on top of whatever board is behind the column and
-	 * reads as that board's own rule. Everything else in here is opaque; so is this.
+	 * bare hairline over the canvas lands on top of whatever card is behind the column and
+	 * reads as that card's own rule. Everything else in here is opaque; so is this.
 	 */
 	.stream-day {
 		align-self: center;

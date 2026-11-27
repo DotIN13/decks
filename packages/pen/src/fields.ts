@@ -56,7 +56,7 @@ export const UNDRAWN_EFFECTS: ReadonlySet<string> = new Set(["background_blur", 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
 
 /**
- * Whether the stage draws an inner shadow on an item of this type with these values: on boxes and
+ * Whether the canvas draws an inner shadow on an item of this type with these values: on boxes and
  * whole ellipses, not on paths, polygons, text, icons, or an ellipse cut to an arc or a ring.
  */
 function drawsInnerShadow(type: string | undefined, values: Record<string, unknown>): boolean {

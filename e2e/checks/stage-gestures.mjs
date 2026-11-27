@@ -49,7 +49,7 @@ const toScreen = (m, x, y) => ({ x: m.e + x * m.a, y: m.f + y * m.a });
 
 // A stretch of bare canvas to work in, zooming out until there is one.
 const findRoom = () => canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 130; y + 300 < 780; y += 20) {
 		for (let x = 580; x + 640 < 1560; x += 20) {
@@ -64,7 +64,7 @@ const findRoom = () => canvas.evaluate(() => {
  * fixture's boards fill the view it opens on.
  */
 {
-	const boards = deck.boards.filter((b) => Number.isFinite(b.x));
+	const boards = deck.cards.filter((b) => Number.isFinite(b.x));
 	const right = Math.max(...boards.map((b) => b.x + (b.w ?? 800)));
 	const top = Math.min(...boards.map((b) => b.y));
 	const now = await matrix();
@@ -131,7 +131,7 @@ const count = (selector) => canvas.evaluate((s) => document.querySelectorAll(s).
 const itemOf = (doc, path) => doc.children.find((n) => n.metadata?.path === path || n.metadata?.path === path.replace(/^canvases\/[^/]+\//, ""));
 
 // --- browse mode: the tools, the hover, the marquee ----------------------------------------------
-say("the canvas is browsing", (await canvas.evaluate(() => document.querySelector(".stage").dataset.mode)) === "browse");
+say("the canvas is browsing", (await canvas.evaluate(() => document.querySelector(".canvas").dataset.mode)) === "browse");
 say("…and the tool column is there, select pressed: that is browsing", (await page.locator(".pen-tools button[data-tool]").count()) >= 10 && (await page.evaluate(() => document.querySelector('.pen-tools [data-tool="select"]')?.getAttribute("aria-pressed"))) === "true");
 const a0 = await centre("g-a");
 await page.mouse.move(a0.x, a0.y);
@@ -173,7 +173,7 @@ let bar;
 for (const one of await canvas.evaluate(() => window.__decksProbes.cards().map(({ path, rect }) => ({ path, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })))) {
 	// A board is its picture: the stage says which board is under a point (`CanvasView.tsx`), or its node's inert surface is there.
 	const points = await canvas.evaluate(({ path, rect: r }) => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const out = [];
 		// The boards end 60 px left of the room, partly under the side panel (360 px): their right-hand strip is what shows.
 		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8], [0.85, 0.5], [0.92, 0.3]]) {
@@ -425,7 +425,7 @@ let ITEM_WASH = "";
 {
 	await drawnWhereFileSays("g-a");
 	const a = await centre("g-a");
-	const touch = (type, id, x, y, target = ".stage") =>
+	const touch = (type, id, x, y, target = ".canvas") =>
 		canvas.evaluate(({ type, id, x, y, target }) => {
 			const t = type === "pointerdown" ? document.elementFromPoint(x, y) : document.querySelector(target) ?? window;
 			t.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: id === 31, clientX: x, clientY: y, bubbles: true, composed: true, buttons: type === "pointerup" ? 0 : 1 }));
@@ -455,12 +455,12 @@ let ITEM_WASH = "";
 	const bareSpots = () =>
 		canvas.evaluate(() => {
 			const out = [];
-			for (let y = 120; y < innerHeight - 200; y += 16) for (let x = 40; x < innerWidth - 40; x += 16) if (document.elementFromPoint(x, y)?.classList.contains("stage")) out.push({ x, y });
+			for (let y = 120; y < innerHeight - 200; y += 16) for (let x = 40; x < innerWidth - 40; x += 16) if (document.elementFromPoint(x, y)?.classList.contains("canvas")) out.push({ x, y });
 			return out.slice(0, 400);
 		});
 	const bare = (await firstOnCanvas(await bareSpots())) ?? null;
 	if (bare) {
-		const target = ".stage";
+		const target = ".canvas";
 		await until(() => count(".pen-selection").then((n) => n === 1), 2000);
 		// Out and back, resting before the lift, so the camera ends where it was for the checks after this one.
 		await touch("pointerdown", 31, bare.x, bare.y);
@@ -571,7 +571,7 @@ let ITEM_WASH = "";
 			const r = node.getBoundingClientRect();
 			const x = r.x + r.width - 30;
 			const y = r.y + Math.min(80, r.height / 2);
-			if (x > 320 && x < 1560 && y > 120 && y < 880 && (node.picture ? document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksProbes.pictureAt(x, y) === node.dataset.path : document.elementFromPoint(x, y)?.closest(".card-node") === node)) out.push({ x, y, path: node.dataset.path });
+			if (x > 320 && x < 1560 && y > 120 && y < 880 && (node.picture ? document.elementFromPoint(x, y) === document.querySelector(".canvas") && window.__decksProbes.pictureAt(x, y) === node.dataset.path : document.elementFromPoint(x, y)?.closest(".card-node") === node)) out.push({ x, y, path: node.dataset.path });
 		}
 		return out;
 	}));
@@ -605,7 +605,7 @@ let ITEM_WASH = "";
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
 				const at = document.elementFromPoint(x, y);
-				if (x > 320 && x < 1500 && y > 290 && y < 880 && (node.picture ? at === document.querySelector(".stage") && window.__decksProbes.pictureAt(x, y) === node.dataset.path : at?.closest(".card-node") === node) && !at.closest("a, button")) out.push({ x, y, path: node.dataset.path });
+				if (x > 320 && x < 1500 && y > 290 && y < 880 && (node.picture ? at === document.querySelector(".canvas") && window.__decksProbes.pictureAt(x, y) === node.dataset.path : at?.closest(".card-node") === node) && !at.closest("a, button")) out.push({ x, y, path: node.dataset.path });
 			}
 		}
 		return out;
@@ -649,7 +649,7 @@ let ITEM_WASH = "";
 
 // --- the pen: a held stroke straightens, two fingers undo, the lasso resizes -------------------------
 await page.click('.v3-tool[data-tool="pen"]');
-await canvas.waitForSelector(".stage-ink");
+await canvas.waitForSelector(".canvas-ink");
 {
 	const had = new Set(onDisk().children.map((n) => n.id));
 	const p = { x: room.x + 40, y: room.y + 250 };
@@ -664,12 +664,12 @@ await canvas.waitForSelector(".stage-ink");
 
 	// Two fingers down and up together: the stroke is taken back.
 	const sheet = await canvas.evaluate(() => {
-		const r = document.querySelector(".stage-ink").getBoundingClientRect();
+		const r = document.querySelector(".canvas-ink").getBoundingClientRect();
 		return { x: r.x + r.width - 200, y: r.y + r.height / 2 };
 	});
 	const finger = (type, id, x, y) =>
 		canvas.evaluate(({ type, id, x, y }) => {
-			document.querySelector(".stage-ink").dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: id === 41, clientX: x, clientY: y, bubbles: true, composed: true }));
+			document.querySelector(".canvas-ink").dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: id === 41, clientX: x, clientY: y, bubbles: true, composed: true }));
 		}, { type, id, x, y });
 	await finger("pointerdown", 41, sheet.x, sheet.y);
 	await finger("pointerdown", 42, sheet.x + 60, sheet.y);
@@ -699,7 +699,7 @@ await canvas.waitForSelector(".stage-ink");
 	}), 3000);
 	say("the lasso's box has corners to resize by", !!corner);
 	// What the lasso holds gets the selection's pill, leading with what the agent on screen can make of it.
-	const inkPill = await until(() => canvas.evaluate(() => { const pill = document.querySelector(".stage-fixed > .card-callout"); return pill && /Make a drawing/.test(pill.textContent ?? "") ? pill.textContent.replace(/\s+/g, " ").trim().slice(0, 120) : undefined; }), 3000);
+	const inkPill = await until(() => canvas.evaluate(() => { const pill = document.querySelector(".canvas-fixed > .card-callout"); return pill && /Make a drawing/.test(pill.textContent ?? "") ? pill.textContent.replace(/\s+/g, " ").trim().slice(0, 120) : undefined; }), 3000);
 	say("…and its pill offers Make a drawing, Make a card and Send to the agent on screen", !!inkPill, String(inkPill));
 	if (corner && stroke) {
 		await page.mouse.move(corner.x, corner.y);
@@ -738,7 +738,7 @@ await page.keyboard.press("Escape");
 			const x = r.x + r.width / 2;
 			const y = r.y + Math.min(r.height / 2, 60);
 			const at = document.elementFromPoint(x, y);
-			if (x > 320 && x < 1560 && y > 150 && y < 800 && (node.picture ? at === document.querySelector(".stage") && window.__decksProbes.pictureAt(x, y) === node.dataset.path : at?.closest(".card-node") === node)) return node.dataset.path;
+			if (x > 320 && x < 1560 && y > 150 && y < 800 && (node.picture ? at === document.querySelector(".canvas") && window.__decksProbes.pictureAt(x, y) === node.dataset.path : at?.closest(".card-node") === node)) return node.dataset.path;
 		}
 	});
 	/**
@@ -765,7 +765,7 @@ await page.keyboard.press("Escape");
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
 				const hit = document.elementFromPoint(x, y);
-				if (hit?.closest(".card-node")?.dataset.path === wanted || (hit === document.querySelector(".stage") && window.__decksProbes.pictureAt(x, y) === wanted)) out.push({ x, y });
+				if (hit?.closest(".card-node")?.dataset.path === wanted || (hit === document.querySelector(".canvas") && window.__decksProbes.pictureAt(x, y) === wanted)) out.push({ x, y });
 			}
 			return out;
 		}, wanted));

@@ -27,9 +27,9 @@ export function createEditorCamera(d: EditorCameraNeeds) {
 	};
 
 	/*
-	 * The camera the host put the canvas at (`setCamera`, `glide`, `fit`), if it has: what the stage opens on
-	 * when its boards first arrive, rather than the camera it was made with. A canvas frame is made with the
-	 * page's camera as it was, and the page's landing can reach it before its boards do; opening on the
+	 * The camera the host put the canvas at (`setCamera`, `glide`, `fit`), if it has: what the canvas opens on
+	 * when its cards first arrive, rather than the camera it was made with. A canvas frame is made with the
+	 * page's camera as it was, and the page's landing can reach it before its cards do; opening on the
 	 * camera it was made with then undid the landing, and the frame told the page so.
 	 */
 	let asked: Camera | undefined;

@@ -56,9 +56,9 @@ function agentOn(
 	} = {},
 ) {
 	const root = mkdtempSync(join(tmpdir(), "decks-sets-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
+	mkdirSync(join(root, "cards"), { recursive: true });
 	for (const name of cards) {
-		put(join(root, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><title>${name}</title><body class="board"></body>`);
+		put(join(root, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><title>${name}</title><body class="card-page"></body>`);
 	}
 	const sent: ServerMessage[] = [];
 	const deck = Deck.open(root);
@@ -70,7 +70,7 @@ function agentOn(
 	 * The session reads it the first time something asks for the conversation, so a test that
 	 * wants a restored window writes what a real restart leaves behind — `chat.json` under the
 	 * agent's directory. `items` is this helper's shorthand for that and never reaches the
-	 * constructor, whose `restored` is about the *row* rather than the conversation.
+	 * function Object() { [native code] }, whose `restored` is about the *row* rather than the conversation.
 	 */
 	const { restored, camera, cameras = new Cameras(), ...rest } = options;
 	if (restored && restored.items.length > 0) {
@@ -344,7 +344,7 @@ function agentOn(
 		rmSync(root, { recursive: true, force: true });
 	});
 
-test("showing a board holds it, and taking it off the stage keeps holding it", () => {
+test("showing a card holds it, and taking it off the canvas keeps holding it", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
 	assert.equal(context(), "", "holding nothing yet");
 
@@ -354,7 +354,7 @@ test("showing a board holds it, and taking it off the stage keeps holding it", (
 	// What `decks.canvas.delete` and the card's × both do: off the canvas, still held.
 	agent.seat.setInPlay(["canvases/t/cards/b/index.html"]);
 	assert.equal(inPlay(), "canvases/t/cards/b/index.html");
-	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html", "a board taken off stays held");
+	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html", "a card taken off stays held");
 	cleanup();
 });
 
@@ -365,7 +365,7 @@ test("both sets travel together, and neither repeats itself", () => {
 	const message = last();
 	assert.ok(message && message.type === "agent.context");
 	assert.deepEqual(message.inPlay, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], "deduplicated");
-	assert.deepEqual(message.boards, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
+	assert.deepEqual(message.cards, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 	cleanup();
 });
 
@@ -373,12 +373,12 @@ test("the chat row carries what is held and what is shown, and they are not the 
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
 	agent.seat.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
 	agent.seat.setInPlay(["canvases/t/cards/a/index.html"]);
-	assert.deepEqual(agent.chat().boards, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
+	assert.deepEqual(agent.chat().cards, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 	assert.deepEqual(agent.chat().inPlay, ["canvases/t/cards/a/index.html"]);
 	cleanup();
 });
 
-test("a deleted board leaves the context, and only the deleted one", () => {
+test("a deleted card leaves the context, and only the deleted one", () => {
 	const { agent, context, inPlay, last, cleanup } = agentOn(["a.html", "b.html"]);
 	agent.seat.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 
@@ -387,11 +387,11 @@ test("a deleted board leaves the context, and only the deleted one", () => {
 	assert.equal(inPlay(), "canvases/t/cards/b/index.html");
 	const message = last();
 	assert.ok(message && message.type === "agent.context");
-	assert.deepEqual(message.boards, ["canvases/t/cards/b/index.html"], "the removal is published, not just recorded");
+	assert.deepEqual(message.cards, ["canvases/t/cards/b/index.html"], "the removal is published, not just recorded");
 	cleanup();
 });
 
-test("forgetting a board nobody holds says so, and stays quiet", () => {
+test("forgetting a card nobody holds says so, and stays quiet", () => {
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
 	agent.seat.setInPlay(["canvases/t/cards/a/index.html"]);
 	const before = agent.seat.context.join(" ");
@@ -403,7 +403,7 @@ test("forgetting a board nobody holds says so, and stays quiet", () => {
 	cleanup();
 });
 
-test("an agent left holding only a deleted board is holding nothing", () => {
+test("an agent left holding only a deleted card is holding nothing", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html"]);
 	agent.seat.setInPlay(["canvases/t/cards/a/index.html"]);
 
@@ -441,16 +441,16 @@ test("a subagent outlives the parent it reported to", () => {
  */
 class Probe extends DeckAgent {
 	readonly ran: string[] = [];
-	override async run(text: string): Promise<{ report: string; boards: string[] }> {
+	override async run(text: string): Promise<{ report: string; cards: string[] }> {
 		this.ran.push(text);
-		return { report: "done", boards: [] };
+		return { report: "done", cards: [] };
 	}
 }
 
 function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ agentId: string; text: string }>; sentTos: string[]; cleanup: () => void } {
 	const root = mkdtempSync(join(tmpdir(), "decks-queue-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
-	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
+	mkdirSync(join(root, "cards"), { recursive: true });
+	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>plan</title><body class="card-page"></body>`);
 	const sent: ServerMessage[] = [];
 	const reportCalls: Array<{ agentId: string; text: string }> = [];
 	const sentTos: string[] = [];
@@ -482,7 +482,7 @@ const item = (task: string, cards: string[] = [], reply = false) => ({
 	from: "a1",
 	fromName: "Ada",
 	task,
-	boards: cards,
+	cards: cards,
 	at: 1,
 	...(reply ? { reply: true as const } : {}),
 });
@@ -599,7 +599,7 @@ test("a report nobody asked for is not delivered — a reply you did not ask for
 /*
  * Which subscription an agent opens on, and the seam that made this worth a test.
  *
- * The constructor resolved the account by reading `this.accounts` — twenty lines above the
+ * The function Object() { [native code] } resolved the account by reading `this.accounts` — twenty lines above the
  * assignment that sets it. So it was always `undefined`, every agent fell through to "no
  * account", and nothing anywhere failed: the field is optional and a missing one is a legal
  * state. The damage was one level down. The backend only puts `account` on its context when
@@ -765,10 +765,10 @@ test("a tool call's whole output is there to be asked for", () => {
 test("a restored row renamed before it is opened keeps its transcript", () => {
 	const items: ChatItem[] = [
 		{ kind: "user", id: "u1", text: "hello", at: 1 },
-		{ kind: "assistant", id: "a2", text: "on the board", at: 2 },
+		{ kind: "assistant", id: "a2", text: "on the card", at: 2 },
 	];
 	const { agent, store, cleanup } = agentOn([], {
-		restored: { id: "R", items, context: [], inPlay: [], createdAt: 1, lastLine: "on the board", lastAt: 2 },
+		restored: { id: "R", items, context: [], inPlay: [], createdAt: 1, lastLine: "on the card", lastAt: 2 },
 	});
 	try {
 		// Nothing has asked for the conversation, so this is a change to the row and nothing
@@ -777,7 +777,7 @@ test("a restored row renamed before it is opened keeps its transcript", () => {
 		agent.dispose();
 
 		assert.equal(store.readRecord("R")?.name, "Pi", "the row went to disk");
-		assert.equal(store.readRecord("R")?.lastLine, "on the board", "with the preview it already had");
+		assert.equal(store.readRecord("R")?.lastLine, "on the card", "with the preview it already had");
 		assert.deepEqual(
 			store.readItems("R").map((item) => item.id),
 			items.map((item) => item.id),
@@ -822,7 +822,7 @@ test("a restored row shows its last line before its transcript is read", () => {
  * deck that is a column a million pixels tall, so a card arrived forty screens from the one being
  * read and nothing moved to show it.
  */
-test("a board joining the stage lands beside the stage's newest board", () => {
+test("a card joining the canvas lands beside the canvas's newest card", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html", "three.html"]);
 	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
 	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
@@ -838,7 +838,7 @@ test("a board joining the stage lands beside the stage's newest board", () => {
 	cleanup();
 });
 
-test("a board given a place when it joins keeps it, far from the rest or not", () => {
+test("a card given a place when it joins keeps it, far from the rest or not", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
 	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
 	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
@@ -852,7 +852,7 @@ test("a board given a place when it joins keeps it, far from the rest or not", (
  * another canvas's, then whichever browser panned last, so cards landed in somebody else's
  * cluster, 95,000 px from their own. Placement reads the canvas now and no camera at all.
  */
-test("where any browser is looking, this chat's included, does not move where a board lands", () => {
+test("where any browser is looking, this chat's included, does not move where a card lands", () => {
 	const far = { x: -18_000, y: 950_000, zoom: 1, width: 1378, height: 702 };
 	const { agent, cameras, cleanup } = agentOn(["one.html", "two.html"], { camera: far });
 	cameras.report("someone-else", { ...far, x: 40_000 });
@@ -864,7 +864,7 @@ test("where any browser is looking, this chat's included, does not move where a 
 	cleanup();
 });
 
-test("a board whose only place is the old deck-wide column is placed again, beside the canvas", () => {
+test("a card whose only place is the old deck-wide column is placed again, beside the canvas", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
 	// One card on the canvas, and another carrying the sort of place the deck-wide layout left.
 	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
@@ -873,14 +873,14 @@ test("a board whose only place is the old deck-wide column is placed again, besi
 	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
 
 	const two = agent.seat.positions()["canvases/t/cards/two/index.html"];
-	assert.ok(two && two.y < 10_000, `the board came back from ${two?.y} to the canvas`);
+	assert.ok(two && two.y < 10_000, `the card came back from ${two?.y} to the canvas`);
 	const one = agent.seat.positions()["canvases/t/cards/one/index.html"];
-	assert.deepEqual(one, { x: 0, y: 0 }, "and the board already on the canvas did not move");
+	assert.deepEqual(one, { x: 0, y: 0 }, "and the card already on the canvas did not move");
 	assert.notDeepEqual(two, one, "nor did the newcomer land on top of it");
 	cleanup();
 });
 
-test("hiding a board and playing it again puts it back where it was", () => {
+test("hiding a card and playing it again puts it back where it was", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
 	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
 	agent.seat.setPosition("canvases/t/cards/two/index.html", 1760, 0);
@@ -899,7 +899,7 @@ test("restoring a canvas places nothing: the arrangement is the one the person l
 	cleanup();
 });
 
-test("clearing the canvas and playing a board back leaves it where it was", () => {
+test("clearing the canvas and playing a card back leaves it where it was", () => {
 	const { agent, cleanup } = agentOn(["one.html"]);
 	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
 	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });

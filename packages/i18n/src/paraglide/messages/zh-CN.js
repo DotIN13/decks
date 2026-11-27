@@ -5,6 +5,10 @@
 /** @typedef {{}} Agents_AgentsInputs */
 /** @typedef {{}} Agents_Browse_LabelInputs */
 /** @typedef {{}} Agents_Browse_TitleInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Canvas_LabelInputs */
+/** @typedef {{}} Agents_Canvas_NoneInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Canvas_TitleInputs */
+/** @typedef {{}} Agents_CanvasesInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_CloseInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_BodyInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_TitleInputs */
@@ -75,10 +79,6 @@
 /** @typedef {{}} Agents_Stack_LabelInputs */
 /** @typedef {{ count: NonNullable<unknown>, shown: NonNullable<unknown> }} Agents_Stack_MoreInputs */
 /** @typedef {{ name: NonNullable<unknown>, status: NonNullable<unknown> }} Agents_Stack_SwitchInputs */
-/** @typedef {{ name: NonNullable<unknown> }} Agents_Stage_LabelInputs */
-/** @typedef {{}} Agents_Stage_NoneInputs */
-/** @typedef {{ name: NonNullable<unknown> }} Agents_Stage_TitleInputs */
-/** @typedef {{}} Agents_StagesInputs */
 /** @typedef {{}} Agents_Status_DoneInputs */
 /** @typedef {{}} Agents_Status_IdleInputs */
 /** @typedef {{}} Agents_Status_ThinkingInputs */
@@ -225,6 +225,7 @@
 /** @typedef {{}} Canvas_Empty_AgentInputs */
 /** @typedef {{ agent: NonNullable<unknown> }} Canvas_Empty_BodyInputs */
 /** @typedef {{}} Canvas_Empty_TitleInputs */
+/** @typedef {{ why: NonNullable<unknown> }} Canvas_Engine_FailedInputs */
 /** @typedef {{}} Canvas_Frame_TitleInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_BendInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_JoinInputs */
@@ -275,6 +276,7 @@
 /** @typedef {{}} Canvas_Media_PlayInputs */
 /** @typedef {{}} Canvas_Media_SeekInputs */
 /** @typedef {{}} Canvas_Media_UnmuteInputs */
+/** @typedef {{}} Canvas_No_BackendInputs */
 /** @typedef {{}} Canvas_Paste_Kind_CardInputs */
 /** @typedef {{}} Canvas_Paste_Kind_DocumentInputs */
 /** @typedef {{}} Canvas_Paste_Kind_FileInputs */
@@ -490,8 +492,6 @@
 /** @typedef {{}} Canvas_Shape_TerminatorInputs */
 /** @typedef {{}} Canvas_Shape_TrapezoidInputs */
 /** @typedef {{}} Canvas_Shape_TriangleInputs */
-/** @typedef {{ why: NonNullable<unknown> }} Canvas_Stage_FailedInputs */
-/** @typedef {{}} Canvas_Stage_No_BackendInputs */
 /** @typedef {{}} Canvas_Tool_ArrowInputs */
 /** @typedef {{}} Canvas_Tool_CardInputs */
 /** @typedef {{}} Canvas_Tool_FileInputs */
@@ -796,7 +796,7 @@
 /** @typedef {{}} Composer_Queue_Send_Now_TitleInputs */
 /** @typedef {{}} Composer_Queue_ShowInputs */
 /** @typedef {{ count: NonNullable<unknown>, name: NonNullable<unknown> }} Composer_Queue_TitleInputs */
-/** @typedef {{}} Composer_Recipient_BoardInputs */
+/** @typedef {{}} Composer_Recipient_CardInputs */
 /** @typedef {{ label: NonNullable<unknown> }} Composer_Recipient_ChipInputs */
 /** @typedef {{}} Composer_Recipient_LabelInputs */
 /** @typedef {{}} Composer_Recipient_NoneInputs */
@@ -1588,6 +1588,22 @@ export const agents_browse_title = /** @type {(inputs: Agents_Browse_TitleInputs
 	return /** @type {LocalizedString} */ (`浏览：阅读卡片，移动和改写绘图`)
 };
 
+export const agents_canvas_label = /** @type {(inputs: Agents_Canvas_LabelInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`画布，当前为 ${i?.name}`)
+};
+
+export const agents_canvas_none = /** @type {(inputs: Agents_Canvas_NoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`画布，此对话不在任何画布上`)
+};
+
+export const agents_canvas_title = /** @type {(inputs: Agents_Canvas_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`画布：${i?.name}`)
+};
+
+export const agents_canvases = /** @type {(inputs: Agents_CanvasesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`画布`)
+};
+
 export const agents_close = /** @type {(inputs: Agents_CloseInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`关闭 ${i?.name}`)
 };
@@ -1866,22 +1882,6 @@ export const agents_stack_more = /** @type {(inputs: Agents_Stack_MoreInputs) =>
 
 export const agents_stack_switch = /** @type {(inputs: Agents_Stack_SwitchInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`切换到 ${i?.name}：${i?.status}`)
-};
-
-export const agents_stage_label = /** @type {(inputs: Agents_Stage_LabelInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`画布，当前为 ${i?.name}`)
-};
-
-export const agents_stage_none = /** @type {(inputs: Agents_Stage_NoneInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`画布，此对话不在任何画布上`)
-};
-
-export const agents_stage_title = /** @type {(inputs: Agents_Stage_TitleInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`画布：${i?.name}`)
-};
-
-export const agents_stages = /** @type {(inputs: Agents_StagesInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`画布`)
 };
 
 export const agents_status_done = /** @type {(inputs: Agents_Status_DoneInputs) => LocalizedString} */ () => {
@@ -2468,6 +2468,10 @@ export const canvas_empty_title = /** @type {(inputs: Canvas_Empty_TitleInputs) 
 	return /** @type {LocalizedString} */ (`此画布是空的`)
 };
 
+export const canvas_engine_failed = /** @type {(inputs: Canvas_Engine_FailedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`画布无法启动：${i?.why}`)
+};
+
 export const canvas_frame_title = /** @type {(inputs: Canvas_Frame_TitleInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`画布`)
 };
@@ -2666,6 +2670,10 @@ export const canvas_media_seek = /** @type {(inputs: Canvas_Media_SeekInputs) =>
 
 export const canvas_media_unmute = /** @type {(inputs: Canvas_Media_UnmuteInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`打开声音`)
+};
+
+export const canvas_no_backend = /** @type {(inputs: Canvas_No_BackendInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`此浏览器无法绘制画布：需要 WebGPU 或 WebGL 2。`)
 };
 
 export const canvas_paste_kind_card = /** @type {(inputs: Canvas_Paste_Kind_CardInputs) => LocalizedString} */ () => {
@@ -3526,14 +3534,6 @@ export const canvas_shape_trapezoid = /** @type {(inputs: Canvas_Shape_Trapezoid
 
 export const canvas_shape_triangle = /** @type {(inputs: Canvas_Shape_TriangleInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`三角形`)
-};
-
-export const canvas_stage_failed = /** @type {(inputs: Canvas_Stage_FailedInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`画布无法启动：${i?.why}`)
-};
-
-export const canvas_stage_no_backend = /** @type {(inputs: Canvas_Stage_No_BackendInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`此浏览器无法绘制画布：需要 WebGPU 或 WebGL 2。`)
 };
 
 export const canvas_tool_arrow = /** @type {(inputs: Canvas_Tool_ArrowInputs) => LocalizedString} */ () => {
@@ -4752,7 +4752,7 @@ export const composer_queue_title = /** @type {(inputs: Composer_Queue_TitleInpu
 	return /** @type {LocalizedString} */ (`${i?.count} 条排队发给 ${i?.name}`)
 };
 
-export const composer_recipient_board = /** @type {(inputs: Composer_Recipient_BoardInputs) => LocalizedString} */ () => {
+export const composer_recipient_card = /** @type {(inputs: Composer_Recipient_CardInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`一个卡片`)
 };
 

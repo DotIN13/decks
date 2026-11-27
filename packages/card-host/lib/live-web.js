@@ -1,7 +1,7 @@
 /**
  * The status card for the user's own Chrome, shared with the deck.
  *
- * A board with `data-live="web"` draws nothing from its file: the app posts the shared
+ * A card with `data-live="web"` draws nothing from its file: the app posts the shared
  * browser's state in (`live.web`), and this draws it. There is no
  * picture of the tab on purpose — the tab is on the user's own screen, in the Chrome the
  * extension runs in — so the card says which tab is shared, whether it is connected, what
@@ -57,7 +57,7 @@ export function mountLiveWeb(host) {
 			for (const step of [
 				"Open the Decks extension's popup in Chrome.",
 				`Address: ${location.origin}`,
-				`Code: ${code ?? "(ask the agent: stage.web.pairing())"}`,
+				`Code: ${code ?? "(ask the agent: decks.web.pairing())"}`,
 				"Save, then press “Share this tab” on the tab the agent should work in.",
 			]) {
 				const li = document.createElement("li");

@@ -5,8 +5,8 @@ import { canvasFolder } from "@decks/hub/layout";
 /**
  * Where a deck's cards are: each canvas's own `cards/`, and each friend's canvas's.
  *
- * A card is the only kind of page there is. A deck from before cards may still hold a `boards/`
- * folder, or a canvas a `boards/` of its own: those are plain files now, read like any other file
+ * A card is the only kind of page there is. A deck from before cards may still hold a `cards/`
+ * folder, or a canvas a `cards/` of its own: those are plain files now, read like any other file
  * of the deck, listed nowhere and watched by nobody.
  */
 

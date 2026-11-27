@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { realPathOf } from "../deck/roots.ts";
-import { movedPath } from "../canvas/canvas-files.ts";
+import { movedPath } from "./2026-10-16-stages-to-canvases.ts";
 import { migrateStages } from "./2026-10-16-stages-to-canvases.ts";
 
 /*

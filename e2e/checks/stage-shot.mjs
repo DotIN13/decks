@@ -42,7 +42,7 @@ await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().worke
 
 // Empty paper to the right of every board, so the items' surroundings are paper.
 const deck = await deckState();
-const placed = deck.boards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
+const placed = deck.cards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
 const right = Math.max(0, ...placed.map((b) => b.x + (b.w ?? 0)));
 const top = Math.min(...placed.map((b) => b.y));
 const X = Math.round(right + 400);
@@ -58,13 +58,13 @@ link.edit(agentId, [
 		{ op: "insert", node: { type: "rectangle", id: RECT, width: 180, height: 96, fill: FILL, stroke: "#1f2328", strokeWidth: 2 }, box: { x1: X, y1: Y + 110, x2: X + 180, y2: Y + 206 } },
 	]);
 const landed = await until(() => link.drawn.some((m) => [TEXT, RECT].every((id) => m.doc?.children?.some((n) => n.id === id))));
-say("the text item and the rectangle are on the stage", !!landed);
+say("the text item and the rectangle are on the canvas", !!landed);
 
 /** The canvas's camera: `translate(a, b) scale(z) translate(c, d)` on the world, inside the stage's box. */
 const camera = () =>
 	canvas.evaluate(() => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform?.() ?? "");
-		const rect = document.querySelector(".stage").getBoundingClientRect();
+		const rect = document.querySelector(".canvas").getBoundingClientRect();
 		return m ? { left: rect.left + Number(m[1]), top: rect.top + Number(m[2]), zoom: Number(m[3]), cx: Number(m[4]), cy: Number(m[5]), dpr: devicePixelRatio, rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } } : null;
 	});
 const itemBox = (id) => canvas.evaluate((id) => {
@@ -81,7 +81,7 @@ async function zoomTo(want) {
 		if (want >= 1 ? cam.zoom >= want : cam.zoom <= want) break;
 		const at = toScreen(cam, X + 120, Y + 100);
 		await canvas.evaluate(([at, dy]) => {
-			const stage = document.querySelector(".stage");
+			const stage = document.querySelector(".canvas");
 			stage.dispatchEvent(new WheelEvent("wheel", { deltaY: dy, ctrlKey: true, clientX: at.x, clientY: at.y, bubbles: true, cancelable: true }));
 		}, [at, want >= 1 ? -12 : 12]);
 		await settle(page, 60);
@@ -95,7 +95,7 @@ async function zoomTo(want) {
 		const dy = at.y - mid.y;
 		if (Math.abs(dx) < 4 && Math.abs(dy) < 4) break;
 		await canvas.evaluate(([dx, dy, mid]) => {
-			document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: mid.x, clientY: mid.y, bubbles: true, cancelable: true }));
+			document.querySelector(".canvas").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: mid.x, clientY: mid.y, bubbles: true, cancelable: true }));
 		}, [dx, dy, mid]);
 		await settle(page, 120);
 	}
@@ -197,7 +197,7 @@ say("the canvas draws both items below zoom 1", Object.values(below1.ink).every(
 async function shot(query) {
 	const params = new URLSearchParams({ agent: agentId, scale: "1", scheme: "light", ...query });
 	const started = Date.now();
-	const response = await fetch(`${API}/api/stage-shot?${params}`, { headers: await asPerson(API) });
+	const response = await fetch(`${API}/api/canvas-shot?${params}`, { headers: await asPerson(API) });
 	const ms = Date.now() - started;
 	if (!response.ok) return { error: `${response.status} ${await response.text()}`, ms };
 	const box = JSON.parse(response.headers.get("x-shot-box") ?? "null");
@@ -224,7 +224,7 @@ const PATHS = [
 	{ label: "", extra: {} },
 	{ label: " [browser]", extra: { live: "1" } },
 ];
-const nativeBuilt = existsSync(new URL("../../packages/stage/target/release/stage-shot", import.meta.url));
+const nativeBuilt = existsSync(new URL("../../packages/stage/target/release/canvas-shot", import.meta.url));
 for (const path of PATHS)
 for (const raw of CASES) {
 	const c = { ...raw, name: `${raw.name}${path.label}`, query: { ...raw.query, ...path.extra } };
@@ -264,7 +264,7 @@ for (const raw of CASES) {
 	say(`${c.name}: the paper is the canvas's paper`, diff <= 3, `picture (${paper}) canvas (${canvasPaper})`);
 }
 
-// Dark: the stage's dark colour (`--stage` in index.css), not a colour of the picture page's own.
+// Dark: the stage's dark colour (`--ground` in index.css), not a colour of the picture page's own.
 {
 	const dark = await shot({ of: TEXT, scheme: "dark" });
 	const found = dark.png ? await page.evaluate(inkOf, [dark.png.toString("base64"), { corner: { x1: 0, y1: 0, x2: 4, y2: 4 } }, INK]) : undefined;

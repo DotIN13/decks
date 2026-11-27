@@ -3,7 +3,7 @@
  *
  * Each is pressed as a person presses it (select, ⋯, Export as …) and the file the browser saves is
  * read: a PNG of the size asked, with the card's words and the drawing's colour where they should be;
- * a PDF whose page carries the card's words and the drawing. The page fetches `/stage-shot`, which runs
+ * a PDF whose page carries the card's words and the drawing. The page fetches `/canvas-shot`, which runs
  * `canvas.screenshot`, the call `decks canvas screenshot` makes, so a download is drawn as an agent's
  * screenshot is. `DECKS_E2E_SHOTS=<dir>` keeps the files to look at.
  */
@@ -32,7 +32,7 @@ await selectCard(page, NOTES);
 const cardRect = await canvas.evaluate((path) => window.__decksProbes?.cards?.().find((one) => one.path === path)?.rect, NOTES);
 const world = await canvas.evaluate(() => {
 	const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform?.() ?? "");
-	const r = document.querySelector(".stage").getBoundingClientRect();
+	const r = document.querySelector(".canvas").getBoundingClientRect();
 	return m ? { left: r.left + Number(m[1]), top: r.top + Number(m[2]), zoom: Number(m[3]), cx: Number(m[4]), cy: Number(m[5]) } : null;
 });
 const toWorld = (x, y) => ({ x: (x - world.left) / world.zoom - world.cx, y: (y - world.top) / world.zoom - world.cy });
@@ -53,7 +53,7 @@ await settle(page, 600);
 const exported = async (format) => {
 	// Once the camera rests: a moving camera hides the pill and shuts its menu.
 	await settle(page, 700);
-	const pill = canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").first();
+	const pill = canvas.locator(".canvas-fixed > .card-callout:not([data-hidden])").first();
 	await pill.locator('[aria-label="More"]').click({ timeout: 4000 });
 	await settle(page, 150);
 	const download = page.waitForEvent("download", { timeout: 30000 }).catch(() => null);
@@ -129,7 +129,7 @@ for (const one of cases) {
 	await settle(page, 200);
 	await one.select();
 	await settle(page, 500);
-	const label = await canvas.evaluate(() => document.querySelector(".stage-fixed > .card-callout:not([data-hidden])")?.getAttribute("aria-label") ?? "");
+	const label = await canvas.evaluate(() => document.querySelector(".canvas-fixed > .card-callout:not([data-hidden])")?.getAttribute("aria-label") ?? "");
 	if (one.name === "group") say("the square and the card are picked together", /1 card, 1 item/.test(label), label);
 
 	const png = await exported("png");

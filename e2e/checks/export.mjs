@@ -40,7 +40,7 @@ const until = async (test, ms = 15000) => {
 
 const { browser, page, errors } = await open({ width: 1200, height: 800, scheme: "light", cards: true });
 const deck = await deckState();
-const placed = deck.boards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
+const placed = deck.cards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
 const X = Math.round(Math.max(0, ...placed.map((b) => b.x + (b.w ?? 0))) + 400);
 const Y = Math.round((placed.length ? Math.min(...placed.map((b) => b.y)) : 0) + 120);
 
@@ -67,7 +67,7 @@ const agentId = await until(() => link.last("agent.list")?.focused);
 link.edit(agentId, [{ op: "insert", node: card, box: { x1: X, y1: Y } }]);
 const landed = await until(() => link.drawn.find((m) => m.doc?.children?.some((n) => n.id === ID)));
 const stage = landed?.canvas;
-say("the fixture card is on the stage", !!stage);
+say("the fixture card is on the canvas", !!stage);
 
 const person = await asPerson();
 const call = async (verb, args) => {
@@ -82,7 +82,7 @@ say("the canvas has a box for the card", !!box, JSON.stringify(read.error ?? box
 
 // The server's picture of the card, at one pixel a stage unit.
 const params = new URLSearchParams({ agent: agentId, scale: "1", scheme: "light", of: ID });
-const shotResponse = await fetch(`${API}/api/stage-shot?${params}`, { headers: person });
+const shotResponse = await fetch(`${API}/api/canvas-shot?${params}`, { headers: person });
 const shotBox = JSON.parse(shotResponse.headers.get("x-shot-box") ?? "null");
 const shotHow = decodeURIComponent(shotResponse.headers.get("x-shot-how") ?? "");
 const shot = Buffer.from(await shotResponse.arrayBuffer());

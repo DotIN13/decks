@@ -28,12 +28,12 @@ export const FULL_PASS_MS = 5 * 60_000;
  * A canvas is a folder that stands alone (`deck/layout.ts`), and it goes to Studio as one bundle:
  * its drawing, pushed as edits (`diff` against the last version both sides agreed on) and merged item
  * by item in Studio; and its files, whole, with versions, by their path in the canvas's folder —
- * its `boards/`, `frames/` and `files/`, the deck's `assets/` and `docs/` files its boards point at
+ * its `cards/`, `frames/` and `files/`, the deck's `assets/` and `docs/` files its cards point at
  * (at their deck paths, `assets/…`, `docs/…`), and pictures (`.pictures/…`). Studio keeps them with
  * the canvas, so sharing a canvas shares that bundle and nothing else of this deck.
  *
  * A canvas a friend shared comes down into `shared/canvases/<their name>/<canvas>/`, bundle and all,
- * the deck files mirrored inside it, so its boards read their own copies and never this deck's. If
+ * the deck files mirrored inside it, so its cards read their own copies and never this deck's. If
  * they let you edit it, your changes go back; if only view, it follows theirs. When they stop sharing
  * it, its folder is moved to `.decks/shared-removed/`, never deleted.
  *

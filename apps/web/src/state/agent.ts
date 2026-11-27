@@ -46,13 +46,13 @@ export interface AgentRecord {
 	/** The question it is waiting on, if any. Drawn only in its own conversation. */
 	dialog?: ExtensionUiPrompt;
 	/** A point in its past being previewed, and the revisions to render while it is. */
-	preview?: { entryId: string; boards: Record<string, string> };
+	preview?: { entryId: string; cards: Record<string, string> };
 	/** The Claude subscription it spends. */
 	spending?: string;
 	/**
-	 * The boards it has put on the canvas.
+	 * The cards it has put on the canvas.
 	 *
-	 * Here, while `contexts` — the boards it merely *holds* — stays in the store for now.
+	 * Here, while `contexts` — the cards it merely *holds* — stays in the store for now.
 	 * The difference is not about the data: every use of this one narrows to a single agent
 	 * before reading it, while `contexts` is read across agents.
 	 */

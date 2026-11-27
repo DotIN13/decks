@@ -3,15 +3,15 @@ import { scheme, setCanvasScheme, type Scheme } from "@decks/canvas/page";
 export type { Scheme };
 
 /**
- * The colour scheme, and handing it to the boards.
+ * The colour scheme, and handing it to the cards.
  *
  * This is the first thing the same-origin decision (DESIGN §4) buys: the app can
- * reach into a board's document and set `data-theme` on it, so a dark shell does
+ * reach into a card's document and set `data-theme` on it, so a dark shell does
  * not sit around three white pages. No bridge, no message, no cooperation needed
- * from the board — three lines, because the frame is ours.
+ * from the card — three lines, because the frame is ours.
  *
- * A board that names its own theme keeps it. `card.js` writes `data-theme` only
- * when the board's `<meta>` asked for one, so the presence of the attribute is
+ * A card that names its own theme keeps it. `card.js` writes `data-theme` only
+ * when the card's `<meta>` asked for one, so the presence of the attribute is
  * exactly the question "did the author decide this?" and the answer is respected.
  */
 const KEY = "decks.scheme";
@@ -46,7 +46,7 @@ export function toggleScheme(): void {
 	setScheme(scheme() === "dark" ? "light" : "dark");
 }
 
-/** Give one board frame the app's scheme, unless the board chose for itself. */
+/** Give one card frame the app's scheme, unless the card chose for itself. */
 function paintFrame(frame: HTMLIFrameElement | null | undefined): void {
 	if (!frame) return;
 	try {
@@ -56,7 +56,7 @@ function paintFrame(frame: HTMLIFrameElement | null | undefined): void {
 		root.dataset.theme = scheme();
 		root.dataset.deckPainted = "true";
 	} catch {
-		// Only reachable if a board is ever served cross-origin. Then it keeps its
+		// Only reachable if a card is ever served cross-origin. Then it keeps its
 		// own scheme, which is a cosmetic loss and not worth a warning in the log.
 	}
 }

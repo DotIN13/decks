@@ -10,7 +10,7 @@
  *       lib/                             the card runtime, served beside every canvas's cards/
  *
  * A card is the only page there is: `cards/<name>/index.html` in a canvas's folder, with what it
- * keeps beside it. A deck from before cards may still hold a `boards/` folder, at its root or in a
+ * keeps beside it. A deck from before cards may still hold a `cards/` folder, at its root or in a
  * canvas: those are plain files now, listed nowhere and shown on no canvas.
  *
  * A canvas's drawing and its cards may point at its own folder, at the deck's `assets/`, `docs/`
@@ -38,18 +38,9 @@ const DECK_PARTS = ["assets", "docs", "apps"] as const;
 /**
  * The card runtime (`@decks/card-host`'s `lib/`: card.css, theme.css, card.js and the live pages),
  * served at the deck's `lib/` and inside every canvas's folder, so a card's `../../lib/card.css`
- * and an old board's `../lib/board.css` both find it.
+ * and a card's `../../lib/card.css` both find it.
  */
 const LIB = "lib";
-
-/**
- * A file of `lib/` by the name a page asked for: `board.css` and `board.js`, which pages written
- * before cards ask for, are `card.css` and `card.js` (at a version too, `~ab12/board.css`). The same
- * rule as `@decks/card-host`'s `libName`.
- */
-export function libName(rest: string): string {
-	return rest.replace(/(^|\/)board\.(css|js)$/, "$1card.$2");
-}
 
 /**
  * The sandbox a friend's page runs in: scripts, forms, pop-ups, dialogs and downloads, and never
@@ -59,7 +50,7 @@ export function libName(rest: string): string {
 export const SHARED_SANDBOX = CARD_SANDBOX;
 
 /** What a canvas may point at, said once for every refusal. */
-const MAY = "a canvas points at its own boards/, frames/ and files/, and the deck's assets/, docs/ and apps/";
+const MAY = `a canvas points at its own ${OWN_PARTS.map((part) => `${part}/`).join(", ")}, and the deck's assets/, docs/ and apps/`;
 
 type Resolution = { path: string } | { refused: string };
 
@@ -135,8 +126,8 @@ function normalise(parts: string[]): string[] | undefined {
 }
 
 /**
- * What a reference written in a canvas's drawing (a board item's `metadata.path`) names, as a deck
- * path: `boards/a.html` on the canvas `plan` is `canvases/plan/boards/a.html`; `docs/notes.md` is
+ * What a reference written in a canvas's drawing (a card item's `metadata.path`) names, as a deck
+ * path: `cards/a/index.html` on the canvas `plan` is `canvases/plan/cards/a/index.html`; `docs/notes.md` is
  * the deck's own `docs/notes.md`, or for a friend's canvas the copy that came with it. Refused, with
  * a sentence, when it points anywhere a canvas may not.
  */
@@ -178,13 +169,13 @@ export function referenceFor(name: string, deckPath: string): Resolution {
 		const rest = parts.slice(folder.length);
 		if (rest.length > 1 && (OWN_PARTS as readonly string[]).includes(rest[0]!)) return { path: rest.join("/") };
 		if (isSharedCanvas(name) && rest.length > 1 && (DECK_PARTS as readonly string[]).includes(rest[0]!) && rest[0] !== "apps") return { path: rest.join("/") };
-		return { refused: `${rest.join("/")} is not in the canvas's boards/, frames/ or files/` };
+		return { refused: `${rest.join("/")} is not in the canvas's ${OWN_PARTS.map((part) => `${part}/`).join(", ")}` };
 	}
 	if (!isSharedCanvas(name) && (DECK_PARTS as readonly string[]).includes(parts[0]!) && parts.length > 1) return { path: parts.join("/") };
 	return { refused: `${clean} is not ${canvasOfPath(clean) ? "on this canvas" : "in this canvas's folder"}: ${MAY}` };
 }
 
-/** The address a board item gives pen.dev for a reference: its own folder's as written, the deck's climbing out. */
+/** The address a card item gives pen.dev for a reference: its own folder's as written, the deck's climbing out. */
 export function urlFor(name: string, reference: string): string {
 	const top = reference.split("/")[0]!;
 	if ((OWN_PARTS as readonly string[]).includes(top) || isSharedCanvas(name)) return reference;
@@ -192,20 +183,20 @@ export function urlFor(name: string, reference: string): string {
 }
 
 /**
- * The file a board's page asks for, through a canvas's folder, as the deck path it is.
+ * The file a card's page asks for, through a canvas's folder, as the deck path it is.
  *
- * A board in `canvases/plan/boards/` asks for `../lib/board.css`, which is `lib/card.css` (`libName`):
- * the deck's `lib/`, served there so a board moved into a canvas needs no rewrite. The same for the
+ * A card in `canvases/plan/cards/<name>/` asks for `../../lib/card.css`, which is `lib/card.css`:
+ * the deck's `lib/`, served there so a card in a canvas needs no copy of it. The same for the
  * deck's `assets/`, `docs/` and `apps/` from one of this deck's own canvases. A friend's canvas gets
  * the deck's `lib/` too, but its `assets/` and `docs/` are the copies in its own folder, and nothing
  * of this deck's apps. A path in no canvas, or in a canvas's own parts, is itself.
  */
 export function servedAs(path: string): Resolution {
 	const at = canvasOfPath(path);
-	if (!at) return { path: path.startsWith(`${LIB}/`) ? `${LIB}/${libName(path.slice(LIB.length + 1))}` : path };
+	if (!at) return { path };
 	const [top, ...rest] = at.rest.split("/");
 	if (!rest.length) return { path };
-	if (top === LIB) return { path: `${LIB}/${libName(rest.join("/"))}` };
+	if (top === LIB) return { path: `${LIB}/${rest.join("/")}` };
 	if (isSharedCanvas(at.name)) {
 		if (top === "apps") return { refused: "apps are not shared with a canvas" };
 		return { path };
@@ -216,9 +207,9 @@ export function servedAs(path: string): Resolution {
 
 /**
  * Whether a deck path is a card: the `index.html` of a folder in a canvas's own `cards/`
- * (`cards/sales/index.html`), which the stage puts in a shadow root of its own page rather than a
+ * (`cards/sales/index.html`), which the canvas puts in a shadow root of its own page rather than a
  * frame. Everything else in the folder is the card's own (its scripts, styles, data); a card is a
- * board in every other way.
+ * card in every other way.
  */
 export function isCardPath(path: string): boolean {
 	const clean = path.split("\\").join("/").replace(/^\/+/, "");
@@ -235,11 +226,11 @@ export function cardOf(path: string): string | undefined {
 	return at && name ? `${clean.slice(0, clean.length - at.rest.length)}cards/${name}/index.html` : undefined;
 }
 
-/** What a board or card is called from its path: a card by its folder (`sales`), a board by its file (`plan`). */
+/** What a card is called from its path: a card by its folder (`sales`), any other page by its file (`plan`). */
 export function pageName(path: string): string {
 	const parts = path.split("/");
 	if (isCardPath(path)) return parts[parts.length - 2] ?? "card";
-	return (parts[parts.length - 1] ?? "board").replace(/\.[^.]+$/, "");
+	return (parts[parts.length - 1] ?? "page").replace(/\.[^.]+$/, "");
 }
 
 /**

@@ -3,7 +3,7 @@
  *
  * Told by the operating system, not by the screen or the pointer: a mobile system (iOS, iPadOS,
  * Android) gives a web page one thread and a hard memory ceiling whatever is plugged into it, and
- * that is what a budget has to fit. Safari on an iPad mini was killed at 2.9 GB with six board pages
+ * that is what a budget has to fit. Safari on an iPad mini was killed at 2.9 GB with six card pages
  * up. A touch screen alone would count a Surface as mobile, a screen size an iPad Pro as a computer,
  * and the user agent alone an iPad as a Mac, which is what iPadOS calls itself: a real Mac has no
  * touch screen, so a "Mac" with one is an iPad.

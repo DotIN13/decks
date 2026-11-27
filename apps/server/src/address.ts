@@ -66,7 +66,7 @@ export function launchdService(env: NodeJS.ProcessEnv = process.env, parent: num
 }
 
 /** What Decks sets for one caller (an agent's shell, an app's server): never a server's own setting. */
-const CALLERS = new Set(["DECKS_AGENT", "DECKS_URL", "DECKS_SDK", "DECKS_SKILLS", "DECKS_SESSION", "DECKS_APP", "DECKS_NODE", "DECKS_STAGE_URL", "DECKS_STAGE_SHOT", "DECKS_MIGRATE_DRY_RUN"]);
+const CALLERS = new Set(["DECKS_AGENT", "DECKS_URL", "DECKS_SDK", "DECKS_SKILLS", "DECKS_SESSION", "DECKS_APP", "DECKS_NODE", "DECKS_CANVAS_URL", "DECKS_CANVAS_SHOT", "DECKS_MIGRATE_DRY_RUN"]);
 
 /**
  * The settings a restart needs: the server's own `DECKS_*` variables, without what belongs to a

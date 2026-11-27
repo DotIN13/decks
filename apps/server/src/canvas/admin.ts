@@ -75,7 +75,7 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 }
 
 /** Delete a canvas, with its drawing and any cards kept in its own folder. The deck's own cards are untouched. */
-export function deleteCanvas(context: Context, name: string): { boards: number } {
+export function deleteCanvas(context: Context, name: string): { cards: number } {
 	refuseIfBusy(context, name, "delete");
 	const folder = join(context.deck.path, canvasFolder(name), "cards");
 	const cards = existsSync(folder) ? readdirSync(folder).length : 0;
@@ -84,5 +84,5 @@ export function deleteCanvas(context: Context, name: string): { boards: number }
 	// A chip that pointed at it, or at something kept in it, stays where it is, dimmed.
 	linksFollow(context.pens, { did: "removed", canvas: name });
 	for (const agent of context.agents) agent.seat.canvasDeleted(name);
-	return { boards: cards };
+	return { cards: cards };
 }

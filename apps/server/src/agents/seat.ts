@@ -5,7 +5,7 @@ import { joinPlaces } from "../deck/place.ts";
 import { cardsOn, putOn, takeOff, type OnCanvas } from "../canvas/canvas-ops.ts";
 import type { CanvasService } from "../canvas/service.ts";
 import { canvasNews } from "./canvas-news.ts";
-import { recordedBoardsToAdopt } from "./old-records.ts";
+import { recordedCardsToAdopt } from "./old-records.ts";
 import type { AgentRecord } from "./store.ts";
 
 /**
@@ -42,7 +42,7 @@ export interface SeatHost {
 export interface SeatStart {
 	/** The canvas a new agent opens on, asked the first time it needs one (`Registry.latestCanvas`). */
 	firstCanvas?: ((self: string) => string | undefined) | undefined;
-	restored?: { context: string[]; inPlay: string[]; positions?: Record<string, { x: number; y: number }> | undefined; stage?: string | undefined } | undefined;
+	restored?: { context: string[]; inPlay: string[]; positions?: Record<string, { x: number; y: number }> | undefined; canvas?: string | undefined } | undefined;
 }
 
 /**
@@ -73,7 +73,7 @@ export class Seat {
 	 * "what is this agent working on" with everything it had ever held, oldest first. A held
 	 * card is a decision the agent made — attaching one is it saying *this is what I am
 	 * working from* — so the recent end is the answer to the question, and the rest of the
-	 * list is history. The touch sites (`stage.attach`, a new card, a first `decks.canvas.insert`) put the
+	 * list is history. The touch sites (`decks.attach`, a new card, a first `decks.canvas.insert`) put the
 	 * newest card at the front; `setContext` keeps whatever order it is given. Re-attaching a
 	 * card is a fresh touch, which is why `attach` moves it to the front rather than leaving
 	 * it where it sat.
@@ -105,7 +105,7 @@ export class Seat {
 		start: SeatStart = {},
 	) {
 		this.firstCanvas = start.firstCanvas;
-		this.folder = start.restored?.stage;
+		this.folder = start.restored?.canvas;
 		if (!start.restored) return;
 		this.held = [...start.restored.context];
 		this.restoredPlaying = start.restored.inPlay.filter((path) => this.held.includes(path));
@@ -116,13 +116,13 @@ export class Seat {
 	}
 
 	/** What the agent's record keeps of its seat. */
-	record(): Pick<AgentRecord, "context" | "inPlay" | "positions" | "stage"> {
+	record(): Pick<AgentRecord, "context" | "inPlay" | "positions" | "canvas"> {
 		return {
 			context: [...this.held],
 			// What is on a canvas is its file's; only a seat with no canvas file keeps its own list.
 			inPlay: this.canvasName() ? [] : [...this.loosePlaying],
 			...(Object.keys(this.places).length > 0 ? { positions: { ...this.places } } : {}),
-			...(this.folder ? { stage: this.folder } : {}),
+			...(this.folder ? { canvas: this.folder } : {}),
 		};
 	}
 
@@ -211,11 +211,11 @@ export class Seat {
 		if (!this.canvasName()) for (const { path, x, y } of seeded) this.setPosition(path, x, y);
 		// The size the canvas draws each card at is its item's in the canvas file; a card the seat does not hold keeps its file's size.
 		const sizes = this.cardSizes();
-		const cards = state.boards.map((card) => {
+		const cards = state.cards.map((card) => {
 			const size = sizes[card.path];
 			return size && (size.w !== card.w || size.h !== card.h) ? { ...card, w: size.w, h: size.h } : card;
 		});
-		return { ...state, boards: cards };
+		return { ...state, cards: cards };
 	}
 
 	/** How big the canvas draws its cards: its file's sizes. */
@@ -270,7 +270,7 @@ export class Seat {
 		const restored = this.restoredPlaying;
 		this.restoredPlaying = undefined;
 		// A record's own list of cards, from before deck version 0.1.0: only in a deck old enough to hold one (`old-records.ts`).
-		const adopt = this.of.deck.readsOldShapes ? recordedBoardsToAdopt(this.onCanvas().length, restored) : [];
+		const adopt = this.of.deck.readsOldShapes ? recordedCardsToAdopt(this.onCanvas().length, restored) : [];
 		if (adopt.length === 0) {
 			if (this.canvasName()) this.penChanged();
 			return;
@@ -289,8 +289,8 @@ export class Seat {
 	 */
 	openCanvas(name: string): void {
 		const pens = this.of.canvas.pens;
-		if (!pens) throw new Error("This server keeps no stage files.");
-		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". decks canvas list lists them; decks canvas create <title> makes one.`);
+		if (!pens) throw new Error("This server keeps no canvas files.");
+		if (!pens.names().includes(name)) throw new Error(`No canvas "${name}". decks canvas list lists them; decks canvas create <title> makes one.`);
 		if (name === this.folder) return;
 		this.folder = name;
 		this.of.save();
@@ -337,7 +337,7 @@ export class Seat {
 	/** A new, empty canvas, named from a title, and opened. Returns its folder name. */
 	newCanvas(title: string, options: { provisional?: boolean } = {}): string {
 		const pens = this.of.canvas.pens;
-		if (!pens) throw new Error("This server keeps no stage files.");
+		if (!pens) throw new Error("This server keeps no canvas files.");
 		const name = pens.claim(title.trim() || UNTITLED, { provisional: options.provisional === true || !title.trim() });
 		this.openCanvas(name);
 		return name;
@@ -434,7 +434,7 @@ export class Seat {
 	}
 
 	private publishContext(): void {
-		this.of.emit({ type: "agent.context", agentId: this.of.id, boards: [...this.held], inPlay: [...this.playing] });
+		this.of.emit({ type: "agent.context", agentId: this.of.id, cards: [...this.held], inPlay: [...this.playing] });
 		// The cards are part of the record, and this is not a transcript change, so the
 		// translator's hook does not cover it.
 		this.of.save();

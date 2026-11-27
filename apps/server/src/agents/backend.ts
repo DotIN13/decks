@@ -257,7 +257,7 @@ export interface AgentBackend {
 	/**
 	 * Which revision each card was at, at that point in the conversation.
 	 *
-	 * Only pi has this: it writes a `board-rev` entry per write, which names the exact revision
+	 * Only pi has this: it writes a `card-rev` entry per write, which names the exact revision
 	 * a card was at. The others have no entry Decks can write into, and leave this out;
 	 * `App.cardsAt` then falls back to the revision store's own times, which is the same answer
 	 * except where two writes share a second.

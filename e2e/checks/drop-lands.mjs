@@ -215,7 +215,7 @@ const canvas = await canvasFrame(page);
 	await settle(page, 300);
 }
 const cam = await canvas.evaluate(() => globalThis.__decksProbes.rust.camera);
-const r = await canvas.evaluate(() => document.querySelector(".stage").getBoundingClientRect().toJSON());
+const r = await canvas.evaluate(() => document.querySelector(".canvas").getBoundingClientRect().toJSON());
 // The engine's camera is the stage point at the middle of the window: a box there.
 link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "lift-a", fill: "#4c8bf5" }, box: { x1: cam.x - 60 / cam.zoom, y1: cam.y - 40 / cam.zoom, x2: cam.x + 60 / cam.zoom, y2: cam.y + 40 / cam.zoom } }]);
 say("the box is drawn", !!(await until(() => canvas.evaluate(() => globalThis.__decksProbes?.rust?.placed.get("lift-a")))));

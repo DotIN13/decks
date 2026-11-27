@@ -18,7 +18,7 @@ const STUDIO = { origin: "https://studio.test", "sec-fetch-site": "cross-site", 
 async function open(required: boolean) {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-studio-connect-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	const before = process.env.DECKS_REQUIRE_PAIR_CODE;
 	if (required) process.env.DECKS_REQUIRE_PAIR_CODE = "1";
 	else delete process.env.DECKS_REQUIRE_PAIR_CODE;
@@ -87,8 +87,8 @@ test("a page that hands the harness a Studio key is refused and nothing is kept:
 		assert.equal(refused.status, 401, "without the token, another site is refused");
 		const allowed = await post("/v1/now", { args: [] }, { ...STUDIO, "x-decks-person": "studio", authorization: `Bearer ${done.body.token}` });
 		assert.equal(allowed.status, 200);
-		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
-		const card = await fetch(`${base}/card/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
+		writeFileSync(join(deck, "cards", "a.html"), "<p>a</p>");
+		const card = await fetch(`${base}/card/pages/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
 		assert.equal(card.status, 401, "a token in an address is no longer taken: a frame gets a ticket");
 	} finally {
 		cleanup();

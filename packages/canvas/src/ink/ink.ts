@@ -6,9 +6,9 @@ import { inkHex } from "../model/ink.ts";
 /**
  * Drawing: the tool in hand, its colour and width, and what the lasso holds.
  *
- * What is drawn goes on the stage, into its `.pen` file (`canvas/pen/CanvasInk.tsx`, `pen/ink.ts`),
- * and undoes with the stage's own history. Ink that older builds wrote into a board's file stays
- * in it and is drawn by the board itself.
+ * What is drawn goes on the canvas, into its `.pen` file (`canvas/pen/CanvasInk.tsx`, `pen/ink.ts`),
+ * and undoes with the canvas's own history. Ink that older builds wrote into a card's file stays
+ * in it and is drawn by the card itself.
  */
 
 export type InkTool = "pen" | "marker" | "eraser" | "lasso";
@@ -45,19 +45,19 @@ export const inkSwatch = (color: InkColor): string => inkHex(color, scheme());
 
 export const INK_WIDTHS: Record<"pen" | "marker", [number, number, number]> = { pen: [2, 4, 8], marker: [12, 20, 32] };
 
-/** The width the tool in hand draws at, in stage pixels. */
+/** The width the tool in hand draws at, in canvas pixels. */
 export function inkSize(): number {
 	const tool = inkTool();
 	return INK_WIDTHS[tool === "marker" ? "marker" : "pen"][inkWidth()] ?? 4;
 }
 
-/** What the lasso holds: stroke ids on the stage (`canvas/pen/CanvasInk.tsx`). */
+/** What the lasso holds: stroke ids on the canvas (`canvas/pen/CanvasInk.tsx`). */
 const [inkSelection, setInkSelection] = createSignal<{ path: string; ids: string[] } | undefined>(undefined);
 
 export { inkSelection, setInkSelection };
 
-/** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
-export const STAGE_INK = "stage";
+/** What the lasso holds is marked with this path, since ink is the canvas's now and not a card's. */
+export const CANVAS_INK = "canvas";
 
 /** A touch this soon after the pencil leaves the glass is the hand that held it. */
 export const PALM_AFTER_MS = 500;

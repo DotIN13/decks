@@ -20,12 +20,12 @@ test("a card placed from another canvas comes with its whole folder, into cards/
 	}
 });
 
-test("only a card is copied in: a board file from before cards is refused", () => {
+test("only a card is copied in: a page that is no card is refused", () => {
 	const deck = mkdtempSync(join(tmpdir(), "copy-in-"));
 	try {
-		mkdirSync(join(deck, "boards"), { recursive: true });
-		writeFileSync(join(deck, "boards/sales.html"), `<html><body class="board"></body></html>`);
-		assert.throws(() => copyCardInto(deck, "boards/sales.html", "b"), /There is no card boards\/sales\.html/);
+		mkdirSync(join(deck, "pages"), { recursive: true });
+		writeFileSync(join(deck, "pages/sales.html"), `<html><body class="card-page"></body></html>`);
+		assert.throws(() => copyCardInto(deck, "pages/sales.html", "b"), /There is no card pages\/sales\.html/);
 		assert.throws(() => copyCardInto(deck, "canvases/a/cards/gone/index.html", "b"), /There is no card/);
 		assert.ok(!existsSync(join(deck, "canvases/b")), "nothing was made");
 	} finally {

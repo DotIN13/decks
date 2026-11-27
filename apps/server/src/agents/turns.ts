@@ -51,7 +51,7 @@ export interface TurnsHost {
 	/** Say a message to the agent, as a turn (`DeckAgent.prompt`). */
 	prompt(text: string, parts?: MessagePart[], at?: LookingAt): Promise<void>;
 	/** Run one turn of handed-over work to its end, and answer its report (`DeckAgent.run`). */
-	run(text: string): Promise<{ report: string; boards: string[] }>;
+	run(text: string): Promise<{ report: string; cards: string[] }>;
 	/** A line in the conversation that is nobody's message. */
 	notice(level: "info" | "warn" | "error", text: string): void;
 	/** The briefing a handed-over task is run with, composed when it runs (`Registry`). */
@@ -183,7 +183,7 @@ export class Turns {
 			const position = this.enqueue(item);
 			return { delivered: false, turn: "queued", position, note: `${this.of.name()} works in ${this.of.outside()!.client}, outside Decks, so Decks cannot start a turn for it: the message waits in its inbox and reaches it with its next call.` };
 		}
-		const text = this.of.brief(item.task, item.boards, item.person);
+		const text = this.of.brief(item.task, item.cards, item.person);
 		// The person's message is theirs, as if typed in the chat; an agent's says who it is from.
 		const sent = item.person ? text : `${item.fromName} sent you this, to act on now:\n\n${text}`;
 		if (this.of.state() === "idle") {
@@ -298,7 +298,7 @@ export class Turns {
 		const item = this.work.shift();
 		if (!item) return;
 		try {
-			const result = await this.of.run(this.of.brief(item.task, item.boards, item.person));
+			const result = await this.of.run(this.of.brief(item.task, item.cards, item.person));
 			// A report the sender asked for is delivered to them as a notice, not as a queued
 			// task. The distinction is the whole of the no-loop rule: an item in a queue runs a
 			// turn when it drains, and a turn that answers a report with another report is two

@@ -54,7 +54,7 @@ test("a gradient turns as pen turns it, and shadows, opacity and turns are CSS's
 	assert.match(style, /box-shadow: 0px 2px 6px 0px #0003, inset 0px 0px 4px 0px #00000040(;|$)/);
 });
 
-test("an angular gradient is a conic gradient from pen's start, its stops where the stage puts them", () => {
+test("an angular gradient is a conic gradient from pen's start, its stops where the canvas puts them", () => {
 	const wheel = [{ color: "#f00", position: 0 }, { color: "#ff0", position: 0.25 }, { color: "#00f", position: 1 }];
 	const page = toHtml(
 		doc([
@@ -70,7 +70,7 @@ test("an angular gradient is a conic gradient from pen's start, its stops where 
 	assert.match(styleOf(page, "b"), /conic-gradient\(from 0deg at 50% 50%, #f00 0%, #ff0 25%, #00f 100%\)/);
 });
 
-test("a blur is a CSS filter of half pen's radius, as the stage draws it", () => {
+test("a blur is a CSS filter of half pen's radius, as the canvas draws it", () => {
 	const page = toHtml(doc([{ type: "rectangle", id: "b", width: 10, height: 10, fill: "#000", effect: [{ type: "blur", radius: 6 }, { type: "blur", radius: 4 }, { type: "blur", radius: 9, enabled: false }] }]), ["b"], { format: "html" });
 	assert.match(styleOf(page, "b"), /filter: blur\(5px\)/);
 });

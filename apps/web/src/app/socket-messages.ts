@@ -16,13 +16,13 @@ import { canvasOnScreen } from "../tabs/tabs.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
-	/** A board asked for by a drop heard its path. */
+	/** A card asked for by a drop heard its path. */
 	hearCreated(request: string, path: string): void;
 	/**
 	 * The deck has arrived for the conversation we just switched to.
 	 *
-	 * The other half of a switch, because *where the boards are* is half of what decides where to
-	 * look: a view is restored only if it still shows one of the boards it was left on, and that
+	 * The other half of a switch, because *where the cards are* is half of what decides where to
+	 * look: a view is restored only if it still shows one of the cards it was left on, and that
 	 * question cannot be asked of the conversation being left.
 	 */
 	landed(): void;

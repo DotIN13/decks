@@ -87,7 +87,7 @@ export class DeckAgent {
 			/** Put work in another agent's queue, without waiting for it. */
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
 			/** Deliver now (`agent.send`); optional so a host with no registry can leave it out. */
-			deliver?(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
+			deliver?(fromId: string, target: string, spec: { task: string; cards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
 			wait?(target: string, timeoutMs: number): Promise<{ name: string; state: AgentState; reply: string; waited: number; timedOut: boolean }>;
 			/** Make an agent, idle, for a send to follow. Optional: a host without a registry has none. */
 			create?(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string; kind?: AgentKind; model?: string; thinking?: string; mode?: string; canvas?: string }>;
@@ -138,7 +138,7 @@ export class DeckAgent {
 			 * The Claude account to open on, for a child that should spend what its parent does.
 			 *
 			 * A subagent is the parent's work continuing, so it should not quietly spend a
-			 * different subscription — `stage.delegate` hands this down. Absent means the
+			 * different subscription — `decks.delegate` hands this down. Absent means the
 			 * install's default.
 			 */
 			account?: string;
@@ -204,7 +204,7 @@ export class DeckAgent {
 				outside?: NonNullable<AgentRecord["outside"]>;
 				workspace?: string;
 				/** The folder its canvas drawing is in (`canvas/pens.ts`). */
-				stage?: string;
+				canvas?: string;
 			};
 		},
 	) {
@@ -264,7 +264,7 @@ export class DeckAgent {
 		/*
 		 * Both tag lists come back with a restored agent.
 		 *
-		 * Assigned rather than pushed through `setTags`, because this runs in the constructor:
+		 * Assigned rather than pushed through `setTags`, because this runs in the function Object() { [native code] }:
 		 * the setters emit and save, and there is nobody subscribed yet and nothing to save
 		 * over. Already cleaned — they were cleaned on the way in — and re-cleaning a stored
 		 * value is how a cap change silently rewrites history.
@@ -344,7 +344,7 @@ export class DeckAgent {
 		 * canvas that conversation had rather than an empty context.
 		 *
 		 * Last, because applying it writes the chat's record, which reads the transcript: run
-		 * before the translator existed, it threw inside the constructor and took the server
+		 * before the translator existed, it threw inside the function Object() { [native code] } and took the server
 		 * down with it, so every fork from any runtime ended the deck instead of opening a chat.
 		 */
 		if (options.forkedFrom) {
@@ -444,7 +444,7 @@ export class DeckAgent {
 			openCanvas: (name: string) => this.seat.openCanvas(name),
 			newCanvas: (title: string) => this.seat.newCanvas(title),
 			setHome: (name: string) => this.seat.openCanvas(name),
-			deliver: (target: string, spec: { task: string; boards?: string[] }) => {
+			deliver: (target: string, spec: { task: string; cards?: string[] }) => {
 				if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 				return this.host.deliver(this.id, target, spec);
 			},
@@ -538,7 +538,7 @@ export class DeckAgent {
 	/**
 	 * What this agent's canvas tools are made from (`calls/agent-tools.ts` makes each once and keeps it).
 	 *
-	 * - `agent`: the `stage` its code runs against, and what `/api/v1/<verb>` calls when a request
+	 * - `agent`: the `canvas` its code runs against, and what `/api/v1/<verb>` calls when a request
 	 *   names this agent (`calls/caller.ts`). Each run is recorded, so a rewind can put the canvas back
 	 *   to what it was at that point and a fork can inherit it (§6.2).
 	 * - `person`: the person acting on this agent's canvas from the browser (`calls/person.ts`): the
@@ -564,7 +564,7 @@ export class DeckAgent {
 				drew: undefined,
 				// A hand-off the person makes is signed as theirs, not as this agent's.
 				send: (target: string, spec: SendSpec) => this.host.send(PERSON, target, spec),
-				deliver: (target: string, spec: { task: string; boards?: string[] }) => {
+				deliver: (target: string, spec: { task: string; cards?: string[] }) => {
 					if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 					return this.host.deliver(PERSON, target, spec);
 				},
@@ -644,11 +644,11 @@ export class DeckAgent {
 	 * list is what the agent fitted, showed or reported through the canvas tool during the turn
 	 * (`workedOn`), in the order it first named them.
 	 */
-	async run(text: string): Promise<{ report: string; boards: string[] }> {
+	async run(text: string): Promise<{ report: string; cards: string[] }> {
 		this.worked = new Set();
 		await this.prompt(text);
 		const cards = [...this.worked].filter((path) => this.deck.card(path));
-		return { report: this.conversation.translator.lastAssistantText(), boards: cards };
+		return { report: this.conversation.translator.lastAssistantText(), cards: cards };
 	}
 
 	/**
@@ -813,7 +813,7 @@ export class DeckAgent {
 			unread: 0,
 			kind: this.kind,
 			identity: this.identity,
-			boards: [...this.seat.context],
+			cards: [...this.seat.context],
 			inPlay: [...this.seat.inPlay],
 			// Its state, the runtime's commands, and what it runs on, will spend and has spent.
 			...this.conversation.chatFacts(),

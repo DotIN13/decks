@@ -55,7 +55,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		if (data.pictures) picturesAt = data.pictures;
 	});
 	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Page[] } : await backend.drawing();
-	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
+	/** The cards on the canvas: their records from the harness, their places from the drawing. */
 	const own = (path: string): FramePage["trust"] => (path.startsWith("shared/") ? "friend" : "own");
 	const [pages, setPages] = createSignal<FramePage[]>(studio ? cardsOf(first.doc, own) : first.cards.map((card) => ({ ...card, trust: own(card.path) })));
 	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
@@ -96,7 +96,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		const doc = made?.handle.drawn();
 		return doc ? pagesOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
 	};
-	/** Every place the stage draws a page in: the cards and boards, and the document and app items. */
+	/** Every place the canvas draws a page in: the cards, and the document and app items. */
 	const places = () => [...pages(), ...items()];
 	const changed = () => {
 		setRevision((n) => n + 1);
@@ -104,7 +104,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	};
 	/*
 	 * Where each card is, read off the drawing at each change: the same boxes the harness gives
-	 * (`CanvasPens.boards`). A card placed or taken off that the list does not know yet is read again.
+	 * (`CanvasPens.cards`). A card placed or taken off that the list does not know yet is read again.
 	 */
 	let cardsReading = false;
 	/** How often the card list was read again from the harness (`placeCards`): for the checks. */
@@ -160,7 +160,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	/*
 	 * What a host answers for the canvas (`host.ts`), from the ticket: a deck file in the drawing is read in
 	 * the canvas's own folder, where the deck's `assets/` and `docs/` are served beside it too
-	 * (`deck/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
+	 * (`deck/layout.ts`); a link from a card to another is its deck path, when it is one on this canvas.
 	 */
 	const folder = `canvases/${start.canvas.name}/`;
 	// The deck's import map, once for every card here (the harness's), before any card's script runs: its paths under assets/ read beside this canvas's cards, where the deck's assets/ is served.
@@ -257,7 +257,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	};
 }
 
-/** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
+/** The cards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
 function cardsOf(doc: PenDocument, trust: (path: string) => FramePage["trust"]): FramePage[] {
 	return pageItems(doc).map((item) => ({ path: item.path!, title: item.name ?? item.path!.split("/").slice(-2).join("/"), rev: 0, ...item.box, inContext: [], ...(item.type === "decks.card" ? { card: true as const } : {}), trust: trust(item.path!) }));
 }

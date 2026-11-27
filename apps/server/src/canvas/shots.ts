@@ -43,7 +43,7 @@ export type ShotFormat = "png" | "jpeg" | "pdf";
 export type ShotOf = string | string[] | Partial<Box> | undefined;
 
 interface ShotRequest {
-	stage: string;
+	canvas: string;
 	/** A .pen file to picture instead of the canvas, whole: a saved frame, or any other (`CanvasPens.penFile`). */
 	file?: string;
 	of?: ShotOf;
@@ -96,7 +96,7 @@ export function shotBox(pens: CanvasPens, canvas: string, of: ShotOf): Box {
 	if (of && typeof of === "object" && !Array.isArray(of)) {
 		const { x1, y1, x2, y2 } = of;
 		if ([x1, y1, x2, y2].some((n) => typeof n !== "number" || !Number.isFinite(n)) || x2! <= x1! || y2! <= y1!) {
-			throw new Error("A box to picture is { x1, y1, x2, y2 } on the stage, with x2 right of x1 and y2 below y1.");
+			throw new Error("A box to picture is { x1, y1, x2, y2 } on the canvas, with x2 right of x1 and y2 below y1.");
 		}
 		return { x1: x1!, y1: y1!, x2: x2!, y2: y2! };
 	}
@@ -104,7 +104,7 @@ export function shotBox(pens: CanvasPens, canvas: string, of: ShotOf): Box {
 	const doc = pens.get(canvas).doc;
 	const cards = pens.cards.cards(canvas);
 	const boxOfName = (name: string): Box | undefined => {
-		const card = cards.find((one) => one.path === name || one.path === `boards/${name}`);
+		const card = cards.find((one) => one.path === name);
 		const found = card ? placed.get(card.id)?.box : placed.get(name)?.box;
 		return found ? { x1: found.x, y1: found.y, x2: found.x + found.w, y2: found.y + found.h } : undefined;
 	};
@@ -112,10 +112,10 @@ export function shotBox(pens: CanvasPens, canvas: string, of: ShotOf): Box {
 	const boxes: Box[] = [];
 	for (const name of names) {
 		const box = boxOfName(String(name));
-		if (!box) throw new Error(`"${name}" is not an item or a board on stage ${canvas}: decks canvas read lists the items and boards.`);
+		if (!box) throw new Error(`"${name}" is not an item or a card on canvas ${canvas}: decks canvas read lists the items and cards.`);
 		boxes.push(box);
 	}
-	if (boxes.length === 0) throw new Error(`Stage ${canvas} has nothing on it to picture.`);
+	if (boxes.length === 0) throw new Error(`Canvas ${canvas} has nothing on it to picture.`);
 	return pad(
 		{
 			x1: Math.min(...boxes.map((b) => b.x1)),
@@ -131,11 +131,11 @@ export class CanvasShots {
 	constructor(private host: ShotHost) {}
 
 	async take(request: ShotRequest): Promise<Shot> {
-		const { stage: canvas } = request;
+		const { canvas: canvas } = request;
 		const fileFrame = request.file ? this.host.pens.files.fileFrame(request.file) : undefined;
-		if (!fileFrame && !this.host.pens.names().includes(canvas)) throw new Error(`There is no stage "${canvas}".`);
+		if (!fileFrame && !this.host.pens.names().includes(canvas)) throw new Error(`There is no canvas "${canvas}".`);
 		let box: Box;
-		if (fileFrame?.stage) box = shotBox(this.host.pens, fileFrame.stage, request.of);
+		if (fileFrame?.canvas) box = shotBox(this.host.pens, fileFrame.canvas, request.of);
 		else if (fileFrame) {
 			if (!fileFrame.box) throw new Error(`${request.file} has nothing in it to picture.`);
 			box = { x1: Math.floor(fileFrame.box.x1 - MARGIN), y1: Math.floor(fileFrame.box.y1 - MARGIN), x2: Math.ceil(fileFrame.box.x2 + MARGIN), y2: Math.ceil(fileFrame.box.y2 + MARGIN) };
@@ -149,9 +149,9 @@ export class CanvasShots {
 		const width = Math.max(1, Math.round(w * zoom));
 		const height = Math.max(1, Math.round(h * zoom));
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-		const named = fileFrame ? (fileFrame.stage ?? basename(request.file!).replace(/\.pen$/, "")) : canvas;
+		const named = fileFrame ? (fileFrame.canvas ?? basename(request.file!).replace(/\.pen$/, "")) : canvas;
 		// Placeholder frames are marked as on the canvas: in the colour and name of the canvas's last writer.
-		const writerCanvas = fileFrame ? fileFrame.stage : canvas;
+		const writerCanvas = fileFrame ? fileFrame.canvas : canvas;
 		const writer = writerCanvas ? this.host.writer?.(writerCanvas) : undefined;
 		const target = request.to ? shotTarget(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
 		mkdirSync(dirname(target), { recursive: true });
@@ -163,19 +163,19 @@ export class CanvasShots {
 		 * person would see it go to the browser page below, and `how` says why.
 		 */
 		const native = this.host.native;
-		const why = format === "pdf" ? "a PDF is printed by the browser" : request.live ? "live boards were asked for" : !native ? "this server has no native renderer" : undefined;
+		const why = format === "pdf" ? "a PDF is printed by the browser" : request.live ? "live cards were asked for" : !native ? "this server has no native renderer" : undefined;
 		let notNative = why;
 		if (native && !why) {
-			const drawn = fileFrame?.stage ? this.host.pens.drawingOf(fileFrame.stage) : fileFrame ? { doc: fileFrame.doc, base: fileFrame.base } : this.host.pens.drawingOf(canvas);
-			const onCanvas = fileFrame?.stage ?? (fileFrame ? undefined : canvas);
+			const drawn = fileFrame?.canvas ? this.host.pens.drawingOf(fileFrame.canvas) : fileFrame ? { doc: fileFrame.doc, base: fileFrame.base } : this.host.pens.drawingOf(canvas);
+			const onCanvas = fileFrame?.canvas ?? (fileFrame ? undefined : canvas);
 			const cards = onCanvas ? this.host.pens.cards.cards(onCanvas).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
-			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, boards: cards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target, ...(writer ? { writer } : {}) });
+			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, cards: cards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target, ...(writer ? { writer } : {}) });
 			if (outcome.ok) return { ...shot, bytes: readFileSync(target), how: "native" as const };
 			notNative = outcome.why;
 		}
 
-		const drawn: Record<string, string> = fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage: canvas };
-		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(writer ? { writerColor: writer.color, ...(writer.name ? { writerName: writer.name } : {}) } : {}), ...(this.host.pass ? { pass: this.host.pass(drawn.stage ?? "") } : {}) });
+		const drawn: Record<string, string> = fileFrame?.canvas ? { canvas: fileFrame.canvas } : fileFrame ? { pen: request.file! } : { canvas };
+		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(writer ? { writerColor: writer.color, ...(writer.name ? { writerName: writer.name } : {}) } : {}), ...(this.host.pass ? { pass: this.host.pass(drawn.canvas ?? "") } : {}) });
 		const url = `${this.host.webOrigin()}/shot.html?${query}`;
 
 		const bytes = await this.host.borrow(async (browser) => {
@@ -185,7 +185,7 @@ export class CanvasShots {
 				await page.goto(url, { waitUntil: "load", timeout: READY_MS });
 				await page.waitForFunction("window.__shotReady === true || typeof window.__shotFailed === 'string'", undefined, { timeout: READY_MS });
 				const failed = await page.evaluate("window.__shotFailed");
-				if (typeof failed === "string") throw new Error(`The stage page could not draw: ${failed}`);
+				if (typeof failed === "string") throw new Error(`The canvas page could not draw: ${failed}`);
 				if (format === "pdf") return await page.pdf({ width: `${width}px`, height: `${height}px`, printBackground: true, pageRanges: "1" });
 				return await page.screenshot({ type: format, ...(format === "jpeg" ? { quality: 90 } : {}), animations: "disabled", timeout: 15_000 });
 			} finally {
@@ -242,7 +242,7 @@ export class CanvasShots {
 	/** Keep a picture of one card where a screenshot keeps its pictures, or at `to`: the deck-relative file. */
 	keepCard(path: string, bytes: Buffer, ext: "png" | "jpg" | "webp", to?: string): string {
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-		const name = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "board";
+		const name = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "card";
 		const target = to ? shotTarget(this.host.deck, to) : join(this.host.deck, ".decks", "shots", `${name}-${stamp}.${ext}`);
 		mkdirSync(dirname(target), { recursive: true });
 		writeFileSync(target, bytes);
@@ -262,14 +262,14 @@ export class CanvasShots {
 	 * for one picture.
 	 */
 	async thumb(canvas: string, shot: string, scheme: "light" | "dark"): Promise<string> {
-		const dir = join(this.host.deck, ".decks", "thumbs", "stages");
+		const dir = join(this.host.deck, ".decks", "thumbs", "canvases");
 		const file = join(dir, `${canvas}-${shot}-${scheme}.jpg`);
 		if (existsSync(file)) return file;
 		const key = `${canvas}-${scheme}`;
 		const waiting = this.thumbing.get(key);
 		if (waiting) return waiting;
 		const work = (async () => {
-			const shot = await this.take({ stage: canvas, scheme, format: "jpeg", scale: 1, to: relative(this.host.deck, file) });
+			const shot = await this.take({ canvas: canvas, scheme, format: "jpeg", scale: 1, to: relative(this.host.deck, file) });
 			// Whatever this canvas's picture was before, of an older drawing; never another canvas's whose name begins with this one's.
 			for (const old of existsSync(dir) ? readdirSync(dir) : []) {
 				if (old !== basename(file) && isThumbOf(old, canvas, scheme)) rmSync(join(dir, old), { force: true });
@@ -289,7 +289,7 @@ export class CanvasShots {
 	private readonly thumbing = new Map<string, Promise<string>>();
 }
 
-/** Whether a file in the canvases' pictures folder is this canvas's in this scheme: `<stage>-<hash or old revision>-<scheme>.jpg`, the middle with no hyphen in it. */
+/** Whether a file in the canvases' pictures folder is this canvas's in this scheme: `<canvas>-<hash or old revision>-<scheme>.jpg`, the middle with no hyphen in it. */
 export function isThumbOf(file: string, canvas: string, scheme: "light" | "dark"): boolean {
 	const head = `${canvas}-`;
 	const tail = `-${scheme}.jpg`;

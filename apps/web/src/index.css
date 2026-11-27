@@ -101,7 +101,7 @@ body,
 
 html {
 	/* A phone in landscape enlarges body text by its own factor, which on a canvas
-	   app moves every panel and none of the boards. The canvas has its own zoom. */
+	   app moves every panel and none of the cards. The canvas has its own zoom. */
 	-webkit-text-size-adjust: 100%;
 	text-size-adjust: 100%;
 }
@@ -118,22 +118,22 @@ body {
 	-webkit-font-smoothing: antialiased;
 	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
 	   chrome — where a double-tap means nothing and the delay is felt on every button.
-	   The stage sets `none` for itself (`stage/input.ts`). */
+	   The canvas sets `none` for itself (`view/input.ts`). */
 	touch-action: manipulation;
 }
 
 /*
  * The zoom, as the one number a counter-scaled box is written with.
  *
- * A board's title bar and an agent's cursor both stay a constant size on screen, so each
+ * A card's title bar and an agent's cursor both stay a constant size on screen, so each
  * has a scale, and some an offset, that are functions of the zoom. Each
  * such element is handed the zoom as `--zoom` and the rules below derive the rest — one
  * inline write per element per frame instead of three.
  *
  * **Registered, and not inherited, and that is load-bearing.** An ordinary custom property
  * inherits, and a changed inherited property makes the browser recompute the style of every
- * element beneath it: written once on the stage it cost 21ms of style recalculation per step
- * of a pinch, more than the pinch cost before (measured, 17 boards, 4× CPU throttle). Written
+ * element beneath it: written once on the canvas it cost 21ms of style recalculation per step
+ * of a pinch, more than the pinch cost before (measured, 17 cards, 4× CPU throttle). Written
  * on the box that uses it, and declared non-inherited, a change touches that box alone.
  */
 @property --zoom {

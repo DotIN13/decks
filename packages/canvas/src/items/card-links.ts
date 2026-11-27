@@ -13,8 +13,7 @@ export function createCardLinks(d: CardLinksNeeds) {
 	/*
 	 * A link in a card never takes the app's own page away. Its address is read against the card's own
 	 * (`../../files/plan.html` is a file of the card's canvas), never against the page the card is drawn
-	 * in. A link to another card (`cards/<name>/index.html`) or a board opens it beside this one, as on a
-	 * board (`card.js`); a link to something in the deck by its address in the window (`#canvas/<name>`,
+	 * in. A link to another card (`cards/<name>/index.html`) opens it beside this one, as `card.js` does; a link to something in the deck by its address in the window (`#canvas/<name>`,
 	 * `#app/<name>`) opens it as a tab, where the host has tabs; a link with `download` saves the file, under the name it gives; any other link,
 	 * a file of the deck's among them, opens in a tab of its own.
 	 */
@@ -79,8 +78,8 @@ export function createCardLinks(d: CardLinksNeeds) {
 		return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;
 	};
 
-	/** Whether a deck path is one the canvas opens beside a card: another card, or a board. */
-	const opensBeside = (path: string) => /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path) || /(?:^|\/)boards\/.+\.html?$/i.test(path);
+	/** Whether a deck path is one the canvas opens beside a card: another card. */
+	const opensBeside = (path: string) => /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path);
 
 	return {
 		followLink,

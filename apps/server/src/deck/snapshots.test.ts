@@ -15,7 +15,7 @@ function put(file: string, data: string | Uint8Array): void {
 
 function deckWith(text: string) {
 	const root = mkdtempSync(join(tmpdir(), "decks-rev-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
+	mkdirSync(join(root, "cards"), { recursive: true });
 	put(join(root, "canvases", "t", "cards", "a", "index.html"), text);
 	return { root, deck: Deck.open(root) };
 }
@@ -57,7 +57,7 @@ test("the order survives a restart — the bug the index exists to fix", () => {
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("the version a board was at, at a moment in time", () => {
+test("the version a card was at, at a moment in time", () => {
 	const { root, deck } = deckWith("<title>one</title>");
 	const revisions = new Revisions(deck);
 	// Recorded with explicit times, since this is what the timeline asks about.

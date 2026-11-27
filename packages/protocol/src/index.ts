@@ -12,9 +12,9 @@
  * and no module that imports it was touched by the split.
  *
  * The direction runs left to right — `wire.ts` is the only one that depends on the rest,
- * because a frame names a board, an agent and a stage:
+ * because a frame names a card, an agent and a canvas:
  *
- *     deck · chat · usage · transcript · stage · extension-ui · web · files → wire
+ *     deck · chat · usage · transcript · canvas · extension-ui · web · files → wire
  *
  * Documents are their own package, `@decks/docs`, whose message types this one carries.
  */
@@ -23,7 +23,7 @@ export * from "./deck.ts";
 export * from "./chat.ts";
 export * from "./usage.ts";
 export * from "./transcript.ts";
-export * from "./stage.ts";
+export * from "./canvas.ts";
 export * from "./extension-ui.ts";
 export * from "./web.ts";
 export * from "./wire.ts";

@@ -9,7 +9,7 @@ import { antigravityServer, decksCommands, installDir, opencodeConfigDir, runtim
  *
  * The paths used to be four independent sums in four files, each correct about a different
  * depth, and nothing checked that any of them pointed at a directory that existed. A broken
- * one showed up as an agent that could not read a board, several hundred milliseconds later,
+ * one showed up as an agent that could not read a card, several hundred milliseconds later,
  * with a path in the message.
  */
 
@@ -23,7 +23,7 @@ test("every path resolves to something real", () => {
 
 test("the named spots are the ones the app asks for", () => {
 	assert.ok(isAbsolute(runtimeDir()));
-	assert.ok(runtimeLib().endsWith(join("card-host", "lib")), "the board primitives are @decks/card-host's");
+	assert.ok(runtimeLib().endsWith(join("card-host", "lib")), "the card primitives are @decks/card-host's");
 	assert.equal(skillsDir(), join(runtimeDir(), "skills"));
 	assert.equal(decksCommands(), join(runtimeDir(), "decks-commands.md"));
 	assert.equal(opencodeConfigDir(), join(runtimeDir(), "opencode"));

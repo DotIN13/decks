@@ -6,7 +6,7 @@
  * back once a pen's pressure has been turned into one.
  */
 
-/** The colours on offer. `ink` follows the board's foreground, so it reads in light and dark. */
+/** The colours on offer. `ink` follows the card's foreground, so it reads in light and dark. */
 export const INK_COLORS = ["ink", "red", "blue", "green", "yellow"] as const;
 export type InkColor = (typeof INK_COLORS)[number];
 
@@ -15,9 +15,9 @@ export interface InkStroke {
 	/** A pen is opaque and takes pressure; a marker is wide, see-through and one width. */
 	tool: "pen" | "marker";
 	color: InkColor;
-	/** The width at a mouse's pressure, in board pixels. */
+	/** The width at a mouse's pressure, in card pixels. */
 	size: number;
-	/** `x, y, pressure` triples, in board pixels. Pressure is 0 to 1; 0.5 for a mouse or a finger. */
+	/** `x, y, pressure` triples, in card pixels. Pressure is 0 to 1; 0.5 for a mouse or a finger. */
 	points: number[];
 }
 
@@ -259,7 +259,7 @@ export function inkShaper(): InkShaper {
  * Fewer points for the same line (Ramer-Douglas-Peucker on x and y, pressure carried along).
  *
  * A pencil reports 240 points a second and most of them sit on the line between their
- * neighbours. At a tolerance of 0.35 board pixels a stroke keeps about one point in six and
+ * neighbours. At a tolerance of 0.35 card pixels a stroke keeps about one point in six and
  * no eye can find the difference, and that ratio is the size of the file.
  */
 export function simplify(points: number[], tolerance = 0.35): number[] {
@@ -385,7 +385,7 @@ export function moveStroke(stroke: InkStroke, dx: number, dy: number): InkStroke
 // --- undo and redo -------------------------------------------------------------------
 
 /**
- * Undo and redo for one board's ink: the lists it has been, and where in them it is now.
+ * Undo and redo for one card's ink: the lists it has been, and where in them it is now.
  *
  * Whole lists rather than inverse operations. A stroke object is shared between every list it
  * appears in, so a step costs an array of references, and "erase three, move two, undo, undo,

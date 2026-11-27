@@ -7,10 +7,10 @@ import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
  * What an agent is doing to a card, said by the server rather than the agent.
  *
  * The canvas draws a cursor and editing marks for an agent at work (`canvas/acts.ts`), and it
- * used to have one source for where to draw them: `stage.cursor`, which an agent had to call
+ * used to have one source for where to draw them: `decks.cursor`, which an agent had to call
  * itself, and almost never did. Everything the drawing needs is already passing through here:
  *
- * - **A tool call starts.** A write or edit tool naming a file under `boards/` says which card
+ * - **A tool call starts.** A write or edit tool naming a file under `cards/` says which card
  *   is about to change. For an edit, the old text it names is looked for in the file as it is
  *   now, and the innermost named block it sits in is the one being held.
  * - **The file lands.** The watcher says the card changed; the file as it was when the tool

@@ -49,7 +49,7 @@ export function createFingers(d: FingersNeeds) {
 	/**
 	 * Every finger on the canvas, and the camera they move.
 	 *
-	 * Fingers on the stage pan it natively (`camera/scroll-area.ts`): the browser scrolls, and the
+	 * Fingers on the canvas pan it natively (`camera/scroll-area.ts`): the browser scrolls, and the
 	 * camera follows from the scroll. Two are one pinch, the canvas's own (`touch.ts` reduces the pool,
 	 * `pinchCamera` moves the camera), wherever each landed: on bare canvas, on a card or on an item's
 	 * bar. A finger can be **claimed** by whoever it landed on (an item carried by its bar or its edge):
@@ -59,7 +59,7 @@ export function createFingers(d: FingersNeeds) {
 	 */
 	const touches = createTouches();
 
-	/** Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the stage. */
+	/** Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the canvas. */
 	const keptTouches = new KeptTouches();
 
 	const claimed = new Set<number>();
@@ -83,10 +83,10 @@ export function createFingers(d: FingersNeeds) {
 	 */
 	let poolPans = false;
 
-	/** The pool's last pan steps, for the coast after a throw: stage pixels and when. */
+	/** The pool's last pan steps, for the coast after a throw: canvas pixels and when. */
 	const panned: Array<{ t: number; dx: number; dy: number }> = [];
 
-	/** A finger, in the stage's own coordinates: the space the camera works in. */
+	/** A finger, in the canvas's own coordinates: the space the camera works in. */
 	const fingerOf = (event: PointerEvent): Finger => {
 		const at = viewPoint(event);
 		return { id: event.pointerId, x: at.x, y: at.y };

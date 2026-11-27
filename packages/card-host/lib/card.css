@@ -1,12 +1,12 @@
 /*
- * The board primitives: tokens, and the components a board is built from.
+ * The card primitives: tokens, and the components a card is built from.
  *
- * A board is a standalone document — you can open the file in a browser and it
+ * A card is a standalone document — you can open the file in a browser and it
  * looks right — so this carries its own palette rather than inheriting the app's.
- * The ramp is the same one Picone uses (opencode's v2 system), so a board and the
+ * The ramp is the same one Picone uses (opencode's v2 system), so a card and the
  * shell around it read as one piece of software.
  *
- * A board is one page that flows: its content reads top to bottom, laid out with ordinary
+ * A card is one page that flows: its content reads top to bottom, laid out with ordinary
  * CSS (flex, grid), as wide as its `<meta>` says and as tall as what is in it. Nothing here
  * is placed by coordinates.
  *
@@ -17,7 +17,7 @@
 
 /*
  * Everything here sits in one cascade layer, `decks`, beneath a card's own styles: any rule a card
- * writes wins over these, whatever its specificity (`.doc { padding: 0 }` beats `.board .doc`), so a
+ * writes wins over these, whatever its specificity (`.doc { padding: 0 }` beats `.card-page .doc`), so a
  * card changes what it likes without fighting the defaults.
  */
 @import url("theme.css") layer(decks);
@@ -35,13 +35,13 @@ body {
 }
 
 /*
- * The board itself: a page as wide as its `<meta>` says, and as tall as its content.
+ * The card itself: a page as wide as its `<meta>` says, and as tall as its content.
  *
  * The height is the content's. `card.js` sets the meta's `h`, if there is one, as a floor
- * (`min-height`), and the canvas measures the page and draws the board that tall, so nothing
+ * (`min-height`), and the canvas measures the page and draws the card that tall, so nothing
  * is clipped and nothing scrolls inside the frame — the canvas does the panning.
  */
-body.board {
+body.card-page {
 	position: relative;
 	width: 1000px;
 	height: auto;
@@ -60,43 +60,43 @@ body.board {
 }
 
 /*
- * No scrollbar on the page. The canvas draws a board as tall as its content, so there is
+ * No scrollbar on the page. The canvas draws a card as tall as its content, so there is
  * nothing to scroll to; a scrollbar that showed for the beat before the measurement landed
  * would take its width out of the layout and wrap the text differently from the picture.
  */
-html:has(> body.board) {
+html:has(> body.card-page) {
 	scrollbar-width: none;
 	/*
 	 * And nothing to scroll by hand either: in the beat before the canvas has the page's height, a page
 	 * taller than its frame scrolled under a wheel or a finger instead of the canvas panning. Unscrollable,
-	 * the page hands the scroll on to the canvas. A board's own scrolling parts (a document, a wide table)
+	 * the page hands the scroll on to the canvas. A card's own scrolling parts (a document, a wide table)
 	 * scroll as before.
 	 */
 	overflow: hidden;
 }
 
-/* Two backgrounds a board may ask for in its meta (`"bg": "grid"` or `"dots"`); plain is the default. */
-body.board[data-bg="grid"] {
+/* Two backgrounds a card may ask for in its meta (`"bg": "grid"` or `"dots"`); plain is the default. */
+body.card-page[data-bg="grid"] {
 	background-image:
 		linear-gradient(to right, var(--b-grid) 1px, transparent 1px),
 		linear-gradient(to bottom, var(--b-grid) 1px, transparent 1px);
 	background-size: calc(var(--b-unit) * 4) calc(var(--b-unit) * 4);
 }
 
-body.board[data-bg="dots"] {
+body.card-page[data-bg="dots"] {
 	background-image: radial-gradient(var(--b-grid) 1.5px, transparent 1.5px);
 	background-size: calc(var(--b-unit) * 4) calc(var(--b-unit) * 4);
 }
 
 /*
- * A board that is one thing edge to edge: a live document, a file, an app, the shared
- * browser's card (the server writes these, `cards/size.ts`). The thing is the board, so it
+ * A card that is one thing edge to edge: a live document, a file, an app, the shared
+ * browser's card (the server writes these, `cards/size.ts`). The thing is the card, so it
  * fills the frame the canvas gives it — `100vh` inside a frame is that rectangle — and its own
  * content scrolls inside it.
  */
-body.board > .live,
-body.board > [data-bare],
-body.board > [data-fill] {
+body.card-page > .live,
+body.card-page > [data-bare],
+body.card-page > [data-fill] {
 	position: relative;
 	width: 100%;
 	height: 100vh;
@@ -285,8 +285,8 @@ pre code {
  * Syntax arriving as `hljs-*` classes on spans `card.js` put inside a `pre` or a `code`.
  *
  * The highlighter is vendored with its grammars and *without* a theme, which is the whole
- * reason this file has the last word on what a string looks like: these are the board's own
- * tokens, so a code block is light or dark with everything around it, and a board that
+ * reason this file has the last word on what a string looks like: these are the card's own
+ * tokens, so a code block is light or dark with everything around it, and a card that
  * styles itself is not fighting a third-party theme for the colour of a keyword.
  *
  * The mapping is coarse on purpose — six families across every grammar in the bundle.
@@ -422,12 +422,12 @@ table.table,
  * file, so nobody — agent or person — can say where it goes without running the
  * page. A diagram is a component that states its own coordinates instead: an
  * `<svg>` the author sized and positioned, styled from the tokens above like
- * everything else. `skills/board-authoring` has the worked example.
+ * everything else. `skills/card-authoring` has the worked example.
  */
 
 /*
  * A mermaid diagram is given a box and has to live in it, so the box centres it
- * and clips rather than letting a tall flowchart run out over the board.
+ * and clips rather than letting a tall flowchart run out over the card.
  */
 [data-mermaid] {
 	display: flex;
@@ -454,7 +454,7 @@ table.table,
 }
 
 /*
- * A board that is the file (`data-bare`): no frame round it, the file edge to edge under a bar
+ * A card that is the file (`data-bare`): no frame round it, the file edge to edge under a bar
  * of its own — the name, what it is, and the reload button (`card.js`, `chrome`).
  */
 .embed[data-bare] {
@@ -491,19 +491,19 @@ table.table,
 }
 
 /*
- * In the app's focus view, a board that is one file has its bar as the view's header (`card.js`,
+ * In the app's focus view, a card that is one file has its bar as the view's header (`card.js`,
  * `watchFocus`): the height of the app's header, with room at each end for the app's controls laid
  * over it, and the file under it centred clear of the conversation when that is open.
  */
-/* The board is laid out at the work area's size there, not the size in its file. */
-html[data-decks-focus] body.board {
+/* The card is laid out at the work area's size there, not the size in its file. */
+html[data-decks-focus] body.card-page {
 	width: 100vw !important;
 	height: 100vh !important;
 	min-height: 0 !important;
 }
 
 /* A document's box loses its frame there too: it is the page, not a card on one. */
-html[data-decks-focus] body.board > .live[data-live="doc"] {
+html[data-decks-focus] body.card-page > .live[data-live="doc"] {
 	border: 0;
 	border-radius: 0;
 }
@@ -746,7 +746,7 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 }
 
 /* The chip for a file with no family: a name, what it is, and how to get it. Not
-   dashed — it resolved, it is simply not something a board can draw. */
+   dashed — it resolved, it is simply not something a card can draw. */
 .embed[data-kind="file"] > .embed-body > a:first-child {
 	font-family: var(--b-mono);
 	font-size: 13px;
@@ -777,22 +777,22 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 
 /* Screenshots and printing: the grid is furniture, the work is the content. */
 @media print {
-	body.board {
+	body.card-page {
 		background-image: none;
 	}
 }
 /* --- live components: a window onto something the app is holding ---------------- */
 
 /*
- * A live card: the shared-Chrome status (`lib/live-web.js`). The component fills the board, the
+ * A live card: the shared-Chrome status (`lib/live-web.js`). The component fills the card, the
  * list inside it scrolls, and nothing here comes from the file — the app posts its state in.
  *
  * The one property that matters to the canvas is on `.live-list`: `overflow-y: auto` is
- * what makes the canvas (`stage/input.ts`) give it the wheel while it has room and hand the scroll
- * back to the stage at the ends. Everything else is appearance.
+ * what makes the canvas (`packages/canvas/src/view/input.ts`) give it the wheel while it has room and hand the scroll
+ * back to the canvas at the ends. Everything else is appearance.
  *
  * `--live-panel` is `#fff` in the light scheme and `#242424` in the dark one, this ramp's
- * `grey-50` and `grey-1000` — not `--b-bg`, because a board's page colour is a step darker
+ * `grey-50` and `grey-1000` — not `--b-bg`, because a card's page colour is a step darker
  * than a card and this *is* the card.
  */
 .live {
@@ -812,7 +812,7 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 }
 
 /* The dark half of both, written twice for the same reason the tokens at the top of this file
-   are: a board can be dark because the reader's system is, or because the file said so, and a
+   are: a card can be dark because the reader's system is, or because the file said so, and a
    component that only honoured one of them would be in the wrong palette half the time. */
 [data-theme="dark"] .live {
 	--live-panel: var(--b-grey-1000);
@@ -851,7 +851,7 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 	/* The column's own gap between turns (`stream-roll`), which is also the click-through
 	   target that lets a wheel over a gap belong to the canvas. */
 	gap: 10px;
-	/* Set here as well as inline, so a board that never runs the script still reads. */
+	/* Set here as well as inline, so a card that never runs the script still reads. */
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	scrollbar-width: thin;
@@ -869,11 +869,11 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 /*
  * ── Documents: `.doc` ─────────────────────────────────────────────────────────────────
  *
- * The block a board's content flows in: the width of the board, as tall as what is in it, with
- * the board's margin as its padding. A board this app wrote holds its content in one of these.
- * `.board.flow`, on boards written earlier, is just a word on the body now.
+ * The block a card's content flows in: the width of the card, as tall as what is in it, with
+ * the card's margin as its padding. A card this app wrote holds its content in one of these.
+ * `.card-page.flow`, on cards written earlier, is just a word on the body now.
  */
-.board .doc {
+.card-page .doc {
 	display: block;
 	width: 100%;
 	padding: 28px 32px;
@@ -882,11 +882,11 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 }
 
 /*
- * A document board is a document, not an embed of one: the embed's card (a header with the
+ * A document card is a document, not an embed of one: the embed's card (a header with the
  * filename, a border, a scrolling body) is dropped, and the body is as tall as its content,
  * because the canvas is what scrolls.
  */
-.board .doc.embed {
+.card-page .doc.embed {
 	overflow: visible;
 	height: auto;
 	border: 0;
@@ -895,44 +895,44 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 	box-shadow: none;
 }
 
-.board .doc > .embed-head {
+.card-page .doc > .embed-head {
 	display: none;
 }
 
-.board .doc > .embed-body {
+.card-page .doc > .embed-body {
 	overflow: visible;
 	height: auto;
 	padding: 0;
 }
 
 /*
- * The prose inside a document block, as defaults that lose to any rule the board writes.
+ * The prose inside a document block, as defaults that lose to any rule the card writes.
  *
- * `:where()` takes `.board .doc` out of their weight, so a class the board styles
- * (`.lede { margin: 0 0 26px }`) or a tag rule in the board's own <style> wins. The flush first
+ * `:where()` takes `.card-page .doc` out of their weight, so a class the card styles
+ * (`.lede { margin: 0 0 26px }`) or a tag rule in the card's own <style> wins. The flush first
  * child weighs one class (0,1,0), enough to beat the heading rule after it.
  */
-:where(.board .doc) > :first-child {
+:where(.card-page .doc) > :first-child {
 	margin-top: 0;
 }
 
-:where(.board .doc) h1,
-:where(.board .doc) h2,
-:where(.board .doc) h3 {
+:where(.card-page .doc) h1,
+:where(.card-page .doc) h2,
+:where(.card-page .doc) h3 {
 	margin: 1.4em 0 0.5em;
 	line-height: 1.25;
 }
 
-:where(.board .doc) p,
-:where(.board .doc) ul,
-:where(.board .doc) ol,
-:where(.board .doc) table,
-:where(.board .doc) pre,
-:where(.board .doc) blockquote {
+:where(.card-page .doc) p,
+:where(.card-page .doc) ul,
+:where(.card-page .doc) ol,
+:where(.card-page .doc) table,
+:where(.card-page .doc) pre,
+:where(.card-page .doc) blockquote {
 	margin: 0.75em 0 0;
 }
 
-:where(.board .doc) li {
+:where(.card-page .doc) li {
 	margin: 0.3em 0;
 }
 

@@ -15,7 +15,7 @@ export interface RecipientProps {
 	dest: Destination;
 	/** The word that goes with it, for the tooltip and for a check to read: "to Sable". */
 	label: string;
-	/** Go to an agent's stage: picking one here is the same as pressing its row. */
+	/** Go to an agent's canvas: picking one here is the same as pressing its row. */
 	onPick: (id: string) => void;
 	onNew: (kind: AgentKind) => void;
 	onClose: (id: string) => void;
@@ -29,7 +29,7 @@ export interface RecipientProps {
  * Who gets the line, as a control.
  *
  * A chip with the agent's face on it. Pressing it opens the pill's own agent list
- * (`AgentMenu`), and picking one goes to that agent's stage, where the line then goes. A
+ * (`AgentMenu`), and picking one goes to that agent's canvas, where the line then goes. A
  * typed `@Name` sends one line to another agent without moving you, and the chip follows the
  * words, because the bar reads the line (`destination()`) and not this menu.
  */
@@ -40,7 +40,7 @@ export function Recipient(props: RecipientProps) {
 	};
 	const name = () => {
 		if (props.dest.kind === "prompt") return props.dest.name;
-		if (props.dest.kind === "note") return m.composer_recipient_board();
+		if (props.dest.kind === "note") return m.composer_recipient_card();
 		return m.composer_recipient_none();
 	};
 	/*

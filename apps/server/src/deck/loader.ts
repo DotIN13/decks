@@ -4,8 +4,7 @@ import { isCardPath, pageName } from "@decks/hub/layout";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Page, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
-import { cardMeta } from "@decks/deck-kit";
-import { BOARD_W } from "../cards/size.ts";
+import { CARD_W, cardMeta } from "@decks/deck-kit";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { readsOldShapes } from "./old-shapes.ts";
@@ -34,7 +33,7 @@ export class Deck {
 	 * The places an older `deck.json` laid its cards out in — the arrangement a canvas is seeded from.
 	 *
 	 * Read, never written: a place belongs to a canvas now, so this is handed to a conversation the first
-	 * time it asks and then recorded in that conversation's own record (`App.stageState`). It is not in
+	 * time it asks and then recorded in that conversation's own record (`App.canvasState`). It is not in
 	 * `file`, so the next `save()` drops it from the disk for good — a conversation started after that
 	 * seeds nothing, which is the end state the migration is for.
 	 */
@@ -97,7 +96,7 @@ export class Deck {
 	/**
 	 * Create a deck in an empty (or new) directory: `deck.json`, `assets/`, and the
 	 * primitives copied in so its pages work offline and keep working if this app is not
-	 * running. No `boards/`: nothing makes cards any more, and a canvas keeps its cards.
+	 * running. No `cards/`: nothing makes cards any more, and a canvas keeps its cards.
 	 */
 	static create(path: string, runtimeLib: string, name?: string): Deck {
 		const absolute = resolve(path);
@@ -154,7 +153,7 @@ export class Deck {
 		onPlace?: (path: string, at: { x: number; y: number }) => void,
 		onCanvas?: readonly string[],
 	): DeckState {
-		return { path: this.path, name: this.name, boards: this.arrange(positions, onPlace, onCanvas), roots: this.resolved.roots, pens: this.pens() };
+		return { path: this.path, name: this.name, cards: this.arrange(positions, onPlace, onCanvas), roots: this.resolved.roots, pens: this.pens() };
 	}
 
 	/** The `.pen` files in the deck's `frames/`, each with the ref that places it and a title to list it by. */
@@ -390,12 +389,12 @@ export class Deck {
 		/*
 		 * Where the size comes from: **the card's own file**, and nowhere else.
 		 *
-		 * A card says its width in `<meta name="board">` (or in front-matter, if it is markdown) and
+		 * A card says its width in `<meta name="card">` (or in front-matter, if it is markdown) and
 		 * may say a height there too. And `deck.json` no longer keeps a copy: preferring one meant a resize that wrote the
 		 * file — which is what every resize does — could appear to do nothing, and a card's width was
 		 * unchangeable for as long as the record disagreed with the file.
 		 */
-		const width = meta.w ?? BOARD_W;
+		const width = meta.w ?? CARD_W;
 		/*
 		 * **A stated height is a floor.** It is the room somebody dragged out or the number `decks.canvas.fit`
 		 * wrote, and the browser's measurement raises the card above it the moment the content needs

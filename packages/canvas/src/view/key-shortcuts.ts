@@ -4,8 +4,8 @@ import type { CameraController } from "../camera/controller.ts";
 import type { CanvasViewProps } from "./CanvasView.tsx";
 
 /**
- * `v`, select: the one palette key left. The tools that add things are the stage's own now, armed
- * by `PEN_TOOL_KEYS` (`state/pen-tools.ts`); the ones that inserted components into a board are gone.
+ * `v`, select: the one palette key left. The tools that add things are the canvas's own now, armed
+ * by `PEN_TOOL_KEYS` (`state/pen-tools.ts`); the ones that inserted components into a card are gone.
  */
 const TOOL_KEYS: Record<string, "select"> = { v: "select" };
 
@@ -32,11 +32,11 @@ export function createShortcut(d: ShortcutNeeds) {
 		}
 		switch (key) {
 			case "0":
-				d.pushCamera(d.frame(d.props.boards.map(boxOf)));
+				d.pushCamera(d.frame(d.props.cards.map(boxOf)));
 				return true;
 			case "1": {
-				const board = d.props.boards.find((candidate) => candidate.path === d.props.selected) ?? d.props.boards[0];
-				if (board) d.pushCamera(d.frame([boxOf(board)]));
+				const card = d.props.cards.find((candidate) => candidate.path === d.props.selected) ?? d.props.cards[0];
+				if (card) d.pushCamera(d.frame([boxOf(card)]));
 				return true;
 			}
 			case "+":

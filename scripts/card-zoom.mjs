@@ -96,7 +96,7 @@ await page.goto(`${url}/${query ? `?${query}` : ""}`, { waitUntil: "load" });
 const findFrame = async () => {
 	for (let i = 0; i < 300; i++) {
 		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame"));
-		if (frame && (await frame.evaluate(() => !!document.querySelector(".stage") && (globalThis.__decksProbes?.cards?.().length ?? 0) > 0).catch(() => false))) return frame;
+		if (frame && (await frame.evaluate(() => !!document.querySelector(".canvas") && (globalThis.__decksProbes?.cards?.().length ?? 0) > 0).catch(() => false))) return frame;
 		await sleep(100);
 	}
 	throw new Error("the canvas frame never showed its stage with items on it");
@@ -136,7 +136,7 @@ const atRest = async (timeout = 15000) => {
 	await sleep(200);
 	await canvas
 		.waitForFunction(() => {
-			const stage = document.querySelector(".stage")?.dataset;
+			const stage = document.querySelector(".canvas")?.dataset;
 			return stage && stage.moving !== "true" && stage.gliding !== "true" && stage.scaling !== "true";
 		}, null, { timeout, polling: 100 })
 		.catch(() => {});
@@ -156,7 +156,7 @@ const settled = async (quiet = 1500, timeout = 20000) => {
 	}
 };
 const stageBox = await canvas.evaluate(() => {
-	const r = document.querySelector(".stage").getBoundingClientRect();
+	const r = document.querySelector(".canvas").getBoundingClientRect();
 	return { x: r.left, y: r.top, w: r.width, h: r.height };
 });
 const middle = { x: stageBox.x + stageBox.w / 2, y: stageBox.y + stageBox.h / 2 };
@@ -166,7 +166,7 @@ const pinch = async (factor, ms = 900) => {
 	if (engine === "webkit") {
 		await canvas.evaluate(
 			async ([factor, ms, x, y]) => {
-				const stage = document.querySelector(".stage");
+				const stage = document.querySelector(".canvas");
 				const fire = (type, scale) => stage.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { scale, clientX: x, clientY: y }));
 				const start = performance.now();
 				fire("gesturestart", 1);
@@ -231,7 +231,7 @@ const live = () =>
 		const all = [...document.querySelectorAll(".card-host")];
 		// A card kept asleep with its root (`items/awake.ts`, `kept`) is not live.
 		const hosts = all.filter((host) => !host.closest("[data-asleep]"));
-		const r = document.querySelector(".stage").getBoundingClientRect();
+		const r = document.querySelector(".canvas").getBoundingClientRect();
 		const shown = hosts.filter((host) => {
 			const b = host.getBoundingClientRect();
 			return getComputedStyle(host).visibility !== "hidden" && b.right > r.left && b.left < r.right && b.bottom > r.top && b.top < r.bottom;
@@ -246,7 +246,7 @@ await canvas.evaluate(() => {
 	const rects = (globalThis.__decksProbes?.cards?.() ?? []).map((one) => one.rect);
 	const xs = rects.map((r) => r.left + r.width / 2).sort((p, q) => p - q);
 	const ys = rects.map((r) => r.top + r.height / 2).sort((p, q) => p - q);
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const s = stage.getBoundingClientRect();
 	stage.scrollBy({ left: xs[xs.length >> 1] - (s.left + s.width / 2), top: ys[ys.length >> 1] - (s.top + s.height / 2), behavior: "instant" });
 });

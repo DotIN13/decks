@@ -1,14 +1,14 @@
 /**
- * What this browser can draw the stage with, found before any engine is loaded: WebGPU where it has
+ * What this browser can draw the canvas with, found before any engine is loaded: WebGPU where it has
  * an adapter, else WebGL 2 where both the page and a worker's `OffscreenCanvas` have it, else
- * nothing, and the stage shows why (`notice.ts`).
+ * nothing, and the canvas shows why (`notice.ts`).
  *
  * The answer also says which build to load: `@decks/stage` (`pkg/`) draws with WebGPU only, and
  * `@decks/stage/gl` (`pkg-gl/`) with WebGL 2 as well, at about 680 KB more brotli wasm, so a
  * browser with WebGPU never downloads the GL half. The page and its render worker load the same
  * one, named by the backend the page passes in the worker's init.
  *
- * Nothing here touches the stage's own canvas: a canvas that has once had a WebGPU context can
+ * Nothing here touches the canvas's own canvas element: a canvas that has once had a WebGPU context can
  * never have a WebGL 2 one, and the engine opens it (`crates/web/src/select.rs`).
  */
 import { keptBytes } from "@decks/frame";
@@ -17,20 +17,20 @@ import webglWasm from "@decks/stage/gl/wasm?url";
 import * as webgpu from "./webgpu.ts";
 import * as webgl from "./webgl.ts";
 
-/** The graphics API the stage draws with, by the name the engine gives it. */
+/** The graphics API the canvas draws with, by the name the engine gives it. */
 type BackendName = "webgpu" | "webgl2";
 
 /** The engine's module, either build: they have the same calls. */
-export type StageModule = typeof import("@decks/stage");
+export type EngineModule = typeof import("@decks/stage");
 
-/** Starts the engine again when its device goes, and stops watching when the stage goes. */
+/** Starts the engine again when its device goes, and stops watching when the canvas goes. */
 type Watch = (canvas: EventTarget, on: { lost: () => void; restored: () => void; isLost: () => boolean }) => () => void;
 
 /** A backend this browser has: the build to load, and how its device is lost and comes back. */
 export interface Backend {
 	name: BackendName;
 	/** The engine's module for this backend, initialised: from `compiled` when given (the page's, posted to its worker), else fetched and compiled. */
-	load: (compiled?: WebAssembly.Module) => Promise<StageModule>;
+	load: (compiled?: WebAssembly.Module) => Promise<EngineModule>;
 	watch: Watch;
 }
 
@@ -41,7 +41,7 @@ export interface Detected {
 	lowMemory?: boolean;
 }
 
-/** No WebGPU and no WebGL 2 that a worker can draw with: the stage shows the notice. */
+/** No WebGPU and no WebGL 2 that a worker can draw with: the canvas shows the notice. */
 export class NoBackend extends Error {
 	constructor(why: string) {
 		super(why);
@@ -52,7 +52,7 @@ export class NoBackend extends Error {
 const BACKENDS: Record<BackendName, Backend> = {
 	webgpu: { name: "webgpu", load: (compiled) => import("@decks/stage").then((module) => started(module, compiled, webgpuWasm)), watch: webgpu.watch },
 	// The same calls; only the wasm's own exports (`InitOutput`) differ between the builds.
-	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled, webglWasm)), watch: webgl.watch },
+	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as EngineModule, compiled, webglWasm)), watch: webgl.watch },
 };
 
 /**
@@ -60,7 +60,7 @@ const BACKENDS: Record<BackendName, Backend> = {
  * this is a frame whose page does (`@decks/frame`, `kept.ts`: a frame has no cache, and the module
  * is megabytes); else fetched and compiled as it streams in, as before.
  */
-async function started(module: StageModule, compiled: WebAssembly.Module | undefined, address: string): Promise<StageModule> {
+async function started(module: EngineModule, compiled: WebAssembly.Module | undefined, address: string): Promise<EngineModule> {
 	if (compiled) {
 		await module.default({ module_or_path: compiled });
 		return module;
@@ -105,10 +105,10 @@ export function lowMemory(): boolean | undefined {
 }
 
 /**
- * The backend to open the stage with. WebGPU present but with no adapter (a blocklisted card,
+ * The backend to open the canvas with. WebGPU present but with no adapter (a blocklisted card,
  * WebGPU turned off) is as if it were not there. WebGL 2 counts only where an `OffscreenCanvas`
  * has it too, since the render worker paints there: iOS 16 has WebGL 2 on the page and not in a
- * worker, and gets the notice rather than a stage with no drawing (decision D2).
+ * worker, and gets the notice rather than a canvas with no drawing (decision D2).
  */
 /** The renderer this browser asked for in a settings page (Studio's), kept in `decks.backend`; else the best there is. */
 const PREFERRED_BACKEND_KEY = "decks.backend";

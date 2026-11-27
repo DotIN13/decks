@@ -48,11 +48,11 @@ export interface Start {
 	stored: Record<string, string>;
 	/** What each app on the canvas saved in its browser storage, kept by the page (`app-store`), by app name and key. */
 	appStored?: Record<string, Record<string, string>>;
-	/** The card or board the page has selected on this canvas, selected again as the frame starts. */
+	/** The card the page has selected on this canvas, selected again as the frame starts. */
 	selected?: string;
 }
 
-/** A card or a board on the canvas, as the frame draws it. */
+/** A card on the canvas, as the frame draws it. */
 export type FramePage = Page & { trust?: "own" | "friend" };
 
 export type Rect = { x: number; y: number; w: number; h: number };

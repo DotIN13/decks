@@ -16,7 +16,7 @@ const TILE_BUDGET = { ms: 4, bytes: 12, pictures: 2 };
 
 const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...knobs.tileBudget });
 
-/** A tile's place on the stage, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
+/** A tile's place on the canvas, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
 const tileScale = new DataView(new ArrayBuffer(4));
 
 function tileArea(t: { scale: number; x: number; y: number }): [number, number, number] {
@@ -193,7 +193,7 @@ export class EngineTiles {
 	}
 
 	/**
-	 * Once the stage is first sharp, in idle time before any gesture, both engines make what a
+	 * Once the canvas is first sharp, in idle time before any gesture, both engines make what a
 	 * first zoom or drag would otherwise make in its first frames (`PageEngine::warm`,
 	 * `WorkerEngine::warm`): every pipeline they draw with, the glyph textures, spare tile textures
 	 * (not on a device short of memory).

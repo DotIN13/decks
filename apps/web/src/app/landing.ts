@@ -7,16 +7,16 @@ import { scheme } from "../lib/theme.ts";
 import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
-import { stages } from "../state/canvases.ts";
+import { canvases } from "../state/canvases.ts";
 import { canvasOnScreen } from "../tabs/tabs.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
 /** What the landing reads of the page. */
 interface LandingInputs {
 	views: () => AgentViews;
-	/** The drawing on screen: its doc and the canvas it is (`stagePen`). */
-	stagePen: () => { doc: Parameters<typeof placements>[0]; scope?: string } | undefined;
-	stagePages: () => Page[];
+	/** The drawing on screen: its doc and the canvas it is (`canvasPen`). */
+	canvasPen: () => { doc: Parameters<typeof placements>[0]; scope?: string } | undefined;
+	canvasPages: () => Page[];
 	/** How many deck frames have arrived. */
 	deckSeen: () => number;
 }
@@ -26,7 +26,7 @@ interface LandingInputs {
  * conversations, which it hands here to keep): a view kept per agent and canvas on this device,
  * taken back exactly on arriving there, else the middle of everything on the canvas once its
  * drawing is on screen. An agent with no canvas waits for a deck frame sent after it began, since
- * its boards are the deck's.
+ * its cards are the deck's.
  */
 /**
  * Whose view the camera on screen is: the conversation's, on whichever canvas its camera is on
@@ -35,14 +35,14 @@ interface LandingInputs {
  */
 const ownerNow = (): string | undefined => state.focused;
 
-export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: LandingInputs) {
+export function createCameraLanding({ views, canvasPen, canvasPages, deckSeen }: LandingInputs) {
 	/**
-	 * Everything on the canvas in view, for framing it: its boards and every item drawn round them
+	 * Everything on the canvas in view, for framing it: its cards and every item drawn round them
 	 * (notes, shapes, arrows, ink, frames), so a canvas that is mostly drawing is framed on its drawing.
 	 */
 	const canvasBoxes = (): Array<{ x: number; y: number; w: number; h: number }> => {
-		const boxes = stagePages().map(boxOf);
-		const doc = stagePen()?.doc;
+		const boxes = canvasPages().map(boxOf);
+		const doc = canvasPen()?.doc;
 		if (doc) {
 			const placed = placements(doc, { theme: baseTheme(doc, scheme() === "dark" ? "dark" : "light") });
 			for (const node of doc.children ?? []) {
@@ -60,16 +60,16 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		viewport: () => ({ width: window.innerWidth, height: window.innerHeight }),
 		region: canvasBox,
 		current: (to) => to.scope === ownerNow() && canvasOnScreen()?.name === to.canvas,
-		onScreen: (to) => !to.canvas || untrack(stagePen)?.scope === to.canvas,
+		onScreen: (to) => !to.canvas || untrack(canvasPen)?.scope === to.canvas,
 		waitFor: (to, first) => {
 			/*
 			 * The page's first landing has no canvas being left, and its deck frame usually came before it
-			 * began, so it takes any frame at all; it also waits for the canvas's boards themselves, the deck
-			 * frame on hand may not have put them in play yet. A canvas's boards are in its drawing, so a
+			 * began, so it takes any frame at all; it also waits for the canvas's cards themselves, the deck
+			 * frame on hand may not have put them in play yet. A canvas's cards are in its drawing, so a
 			 * switch to a canvas waits for nothing more: a switch by `agent.update` is followed by no deck frame.
 			 */
 			const deckAt = first ? 0 : untrack(deckSeen);
-			return () => (to.canvas && !first ? true : untrack(deckSeen) > deckAt) && (!first || untrack(stagePages).length > 0);
+			return () => (to.canvas && !first ? true : untrack(deckSeen) > deckAt) && (!first || untrack(canvasPages).length > 0);
 		},
 		land: (next, to) => {
 			moveCamera(next);
@@ -88,7 +88,7 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		const on = canvasOnScreen();
 		const canvas = on?.name;
 		// Not before the canvases are known: an agent's canvas read as none would land once for no canvas, then again.
-		if (!agent || !scope || (!canvas && stages().length === 0)) return;
+		if (!agent || !scope || (!canvas && canvases().length === 0)) return;
 		const to: CameraOwner = { scope, ...(canvas ? { canvas } : {}) };
 		untrack(() => landing.arrive(to, on?.formerly));
 	});
@@ -104,7 +104,7 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
  * because the deck arrives and fits itself in the first moments and this should carry
  * where that left the camera, not the {0,0,1} it started at.
  *
- * Once there is a conversation to report it for: a reading has to name whose stage it is,
+ * Once there is a conversation to report it for: a reading has to name whose canvas it is,
  * and the deck may still be arriving at 400ms. A later switch reports from its landing (`settle`).
  *
  * And again whenever this browser is come back to: the harness answers an agent's `view.camera` with

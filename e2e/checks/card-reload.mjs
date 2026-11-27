@@ -13,7 +13,7 @@ await settle(page, 900);
 await selectCard(page, NOTES);
 await settle(page, 700);
 
-const pill = canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").first();
+const pill = canvas.locator(".canvas-fixed > .card-callout:not([data-hidden])").first();
 await pill.locator('[aria-label="More"]').click({ timeout: 4000 });
 await settle(page, 150);
 const items = (await pill.locator(".callout-more [role=menuitem]").allInnerTexts()).map((one) => one.trim());

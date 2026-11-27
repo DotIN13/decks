@@ -12,7 +12,7 @@ import { setDrawing } from "../ink/ink.ts";
 import { setPenTool } from "../edit/pen-tools.ts";
 import type { EditorOptions } from "./types.ts";
 
-/** The empty picture: a board with no picture source is drawn as a blank sheet. */
+/** The empty picture: a card with no picture source is drawn as a blank sheet. */
 const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/%3E";
 
 /** What `createEditorView` reads of `createEditor` (`editor.tsx`). */
@@ -59,7 +59,7 @@ export function createEditorView(d: EditorViewNeeds) {
 			} }}
 			{...(d.options.canvasName ? { canvasName: d.options.canvasName() } : {})}
 			onTool={() => setPenTool("select")}
-			boards={d.pages}
+			cards={d.pages}
 			pen={d.pen()}
 			{...d.editing}
 			{...(d.options.onExport ? { onExport: d.options.onExport } : {})}
@@ -76,12 +76,12 @@ export function createEditorView(d: EditorViewNeeds) {
 			onSelect={(path) => {
 			d.setSelected(path);
 			d.options.onSelect?.(path);
-			/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
-			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
+			/* A press on bare canvas takes the focus, which is how an edit in a note or a card ends (as in the Decks app). */
+			if (!path) document.querySelector<HTMLElement>(".decks-canvas .canvas, .canvas")?.focus();
 			}}
 			onMove={d.movePage}
-			frame={(slot) => <ItemSlot {...slot} reload={d.reloads()[slot.board.path]} page={d.options.pages?.page?.(slot.board.path)} {...(d.options.pages?.cardScripts && !d.options.pages.cardScripts(slot.board.path) ? { cardScripts: false, ...(d.options.pages.onScriptsOn && d.editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => d.options.pages!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
-			shots={() => ({ picture: (board, scheme) => d.options.pages?.picture?.(board.path, scheme) ?? BLANK })}
+			frame={(slot) => <ItemSlot {...slot} reload={d.reloads()[slot.card.path]} page={d.options.pages?.page?.(slot.card.path)} {...(d.options.pages?.cardScripts && !d.options.pages.cardScripts(slot.card.path) ? { cardScripts: false, ...(d.options.pages.onScriptsOn && d.editable && !slot.card.path.startsWith("shared/") ? { onScriptsOn: () => d.options.pages!.onScriptsOn!(slot.card.path) } : {}) } : {})} />}
+			shots={() => ({ picture: (card, scheme) => d.options.pages?.picture?.(card.path, scheme) ?? BLANK })}
 			{...(d.options.onComment ? { onComment: d.options.onComment } : {})}
 			{...(d.options.onInk ? { onInk: d.options.onInk } : {})}
 			inkAgent={d.options.inkAgent?.()}
@@ -96,8 +96,8 @@ export function createEditorView(d: EditorViewNeeds) {
 	const root = () => (
 		<div class="decks-canvas app" data-mode={d.mode()}>
 			<div class="work">
-				<div class="surface" data-surface="stage">
-					<div class="surface-layer" data-layer="stage">
+				<div class="surface" data-surface="canvas">
+					<div class="surface-layer" data-layer="canvas">
 						{viewNode()}
 					</div>
 				</div>

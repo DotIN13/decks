@@ -25,12 +25,12 @@ const put = (root: string, relative: string, text: string) => {
 test("a deck with no lib gets the whole of it", () => {
 	const from = dir("from");
 	const to = join(dir("deck"), "lib");
-	put(from, "board.css", ".card{}");
+	put(from, "card.css", ".card{}");
 	put(from, "wasm/openjpeg.wasm", "binary");
 
 	const sync = syncRuntimeLib(from, to);
 
-	assert.deepEqual(sync.written.sort(), ["board.css", "wasm/openjpeg.wasm"]);
+	assert.deepEqual(sync.written.sort(), ["card.css", "wasm/openjpeg.wasm"]);
 	assert.equal(sync.same, 0);
 	assert.equal(readFileSync(join(to, "wasm/openjpeg.wasm"), "utf8"), "binary");
 });
@@ -38,37 +38,37 @@ test("a deck with no lib gets the whole of it", () => {
 test("an unchanged restart writes nothing at all", () => {
 	const from = dir("from");
 	const to = join(dir("deck"), "lib");
-	put(from, "board.js", "runtime");
+	put(from, "card.js", "runtime");
 	syncRuntimeLib(from, to);
 
-	const before = statSync(join(to, "board.js")).mtimeMs;
+	const before = statSync(join(to, "card.js")).mtimeMs;
 	const sync = syncRuntimeLib(from, to);
 
 	// The whole point: the watcher must not wake, so not one byte may be rewritten.
 	assert.deepEqual(sync.written, []);
 	assert.deepEqual(sync.removed, []);
 	assert.equal(sync.same, 1);
-	assert.equal(statSync(join(to, "board.js")).mtimeMs, before);
+	assert.equal(statSync(join(to, "card.js")).mtimeMs, before);
 	assert.equal(describeSync(sync), undefined);
 });
 
 test("a newer build's file replaces the deck's copy", () => {
 	const from = dir("from");
 	const to = join(dir("deck"), "lib");
-	put(from, "board.css", "old");
+	put(from, "card.css", "old");
 	syncRuntimeLib(from, to);
-	put(from, "board.css", "new, and longer");
+	put(from, "card.css", "new, and longer");
 
 	const sync = syncRuntimeLib(from, to);
 
-	assert.deepEqual(sync.written, ["board.css"]);
-	assert.equal(readFileSync(join(to, "board.css"), "utf8"), "new, and longer");
+	assert.deepEqual(sync.written, ["card.css"]);
+	assert.equal(readFileSync(join(to, "card.css"), "utf8"), "new, and longer");
 });
 
 test("a mtime that moved without the bytes changing is not a change", () => {
 	const from = dir("from");
 	const to = join(dir("deck"), "lib");
-	const source = put(from, "board.css", ".card{}");
+	const source = put(from, "card.css", ".card{}");
 	syncRuntimeLib(from, to);
 
 	// What a fresh clone or an `npm ci` does. An mtime comparison would rewrite the
@@ -82,11 +82,11 @@ test("a mtime that moved without the bytes changing is not a change", () => {
 test("same size, different bytes is still a change", () => {
 	const from = dir("from");
 	const to = join(dir("deck"), "lib");
-	put(from, "board.js", "aaaa");
+	put(from, "card.js", "aaaa");
 	syncRuntimeLib(from, to);
-	put(from, "board.js", "bbbb");
+	put(from, "card.js", "bbbb");
 
-	assert.deepEqual(syncRuntimeLib(from, to).written, ["board.js"]);
+	assert.deepEqual(syncRuntimeLib(from, to).written, ["card.js"]);
 });
 
 test("a file this build no longer ships is removed", () => {
@@ -107,7 +107,7 @@ test("a file this build no longer ships is removed", () => {
 test("a directory this build dropped goes, and names what was in it", () => {
 	const from = dir("from");
 	const to = join(dir("deck"), "lib");
-	put(from, "board.js", "runtime");
+	put(from, "card.js", "runtime");
 	put(to, "wasm/openjpeg.wasm", "gone upstream");
 	put(to, "wasm/licenses/LICENSE", "gone too");
 
@@ -119,13 +119,13 @@ test("a directory this build dropped goes, and names what was in it", () => {
 
 test("a missing runtime lib is refused, not treated as an empty one", () => {
 	const to = join(dir("deck"), "lib");
-	put(to, "board.css", "the deck's working primitives");
+	put(to, "card.css", "the deck's working primitives");
 
 	// A broken install must not be able to prune a deck down to nothing.
 	const sync = syncRuntimeLib(join(dir("from"), "does-not-exist"), to);
 
 	assert.deepEqual(sync, { written: [], removed: [], same: 0 });
-	assert.equal(readFileSync(join(to, "board.css"), "utf8"), "the deck's working primitives");
+	assert.equal(readFileSync(join(to, "card.css"), "utf8"), "the deck's working primitives");
 });
 
 function statExists(path: string): boolean {

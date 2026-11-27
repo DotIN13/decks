@@ -10,10 +10,10 @@ export interface CardSizingNeeds {
 
 export function createCardSizing(d: CardSizingNeeds) {
 	/*
-	 * Boards whose size just changed from outside a drag (`decks.canvas.fit`, an agent's `decks.canvas.update`, a write that
+	 * Cards whose size just changed from outside a drag (`decks.canvas.fit`, an agent's `decks.canvas.update`, a write that
 	 * measured taller): for `SIZE_MS` their box, title bar and outline ease to the new size rather
 	 * than jump (`canvas.css`, `[data-sizing]`). A size the person drags is never eased: it follows
-	 * the pointer, and the board takes it while `pageResize` still holds it, so nothing changes here.
+	 * the pointer, and the card takes it while `pageResize` still holds it, so nothing changes here.
 	 */
 	const SIZE_MS = 280;
 
@@ -21,7 +21,7 @@ export function createCardSizing(d: CardSizingNeeds) {
 
 	const lastSizes = new Map<string, { size: string; since: number }>();
 
-	/** A board that arrived this recently is still taking its measured height: it is not eased. */
+	/** A card that arrived this recently is still taking its measured height: it is not eased. */
 	const SETTLE_MS = 2500;
 
 	const sizingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -29,12 +29,12 @@ export function createCardSizing(d: CardSizingNeeds) {
 	createEffect(() => {
 		const held = d.editor.resizingPage();
 		const grew: string[] = [];
-		for (const board of d.props.boards) {
-			const size = `${board.w}x${board.h}`;
-			const before = lastSizes.get(board.path);
+		for (const card of d.props.cards) {
+			const size = `${card.w}x${card.h}`;
+			const before = lastSizes.get(card.path);
 			const now = performance.now();
-			lastSizes.set(board.path, { size, since: before?.since ?? now });
-			if (before !== undefined && before.size !== size && board.path !== held && now - before.since > SETTLE_MS) grew.push(board.path);
+			lastSizes.set(card.path, { size, since: before?.since ?? now });
+			if (before !== undefined && before.size !== size && card.path !== held && now - before.since > SETTLE_MS) grew.push(card.path);
 		}
 		if (grew.length === 0) return;
 		untrack(() => setSizingPaths(new Set([...sizingPaths(), ...grew])));

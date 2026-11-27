@@ -28,11 +28,11 @@ export interface BundleManifest {
 	made: string;
 	/** The deck it came from, by name: shown under the canvas's title in the switcher. */
 	from: string;
-	stage: { name: string; title: string; rev: number };
+	canvas: { name: string; title: string; rev: number };
 	/** The drawing with its imports resolved, and the folder its image fills are read against, deck-relative. */
 	pen: { doc: PenDocument; base: string };
 	/** Every card on the canvas, placed where the canvas has it. */
-	boards: Page[];
+	cards: Page[];
 	/** Card path → scheme → zip path of its picture. */
 	pictures: Record<string, Partial<Record<ThumbScheme, string>>>;
 }
@@ -117,7 +117,7 @@ function filesUnder(root: string, dir: string): string[] {
 	return out;
 }
 
-/** Every string under a `url` key in the drawing: an image fill, or a card's own `../../boards/x.html`. */
+/** Every string under a `url` key in the drawing: an image fill, or a link in a card's own folder. */
 function penUrls(value: unknown, out: string[] = []): string[] {
 	if (Array.isArray(value)) for (const one of value) penUrls(one, out);
 	else if (value && typeof value === "object") {
@@ -209,9 +209,9 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 		decks: BUNDLE_VERSION,
 		made: new Date().toISOString(),
 		from: source.deckName,
-		stage: { name: posix.basename(canvasRel), title: source.canvas.title, rev: source.canvas.rev },
+		canvas: { name: posix.basename(canvasRel), title: source.canvas.title, rev: source.canvas.rev },
 		pen: { doc: source.canvas.doc, base: `${canvasRel}/` },
-		boards: cards,
+		cards: cards,
 		pictures,
 	};
 	const bytes = zip([{ name: "manifest.json", data: Buffer.from(JSON.stringify(manifest), "utf8") }, ...entries, ...pictureEntries]);

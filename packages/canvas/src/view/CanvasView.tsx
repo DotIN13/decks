@@ -34,16 +34,16 @@ import { createSelection } from "./selection.tsx";
 
 
 /**
- * The stage: one transform over the boards, and the gestures that move it.
+ * The canvas: one transform over the cards, and the gestures that move it.
  *
- * The boards live in world coordinates and never learn about the camera except to
+ * The cards live in world coordinates and never learn about the camera except to
  * counter-scale their title bars; everything else is a single CSS transform on one
  * wrapper. That is what keeps a pan at 60fps with a dozen live documents on
  * screen — the browser composites one layer instead of re-laying-out twelve.
  *
  * Gestures follow the trackpad, because that is what this is used on: two-finger
  * scroll pans, pinch zooms, and a plain wheel zooms only when a modifier says so.
- * Space or middle-button drag pans from anywhere, including across a board.
+ * Space or middle-button drag pans from anywhere, including across a card.
  *
  * **And they follow a hand, because a phone has no trackpad either.** A touchscreen
  * sends no wheel events at all, so every one of those gestures was missing: pinching
@@ -51,7 +51,7 @@ import { createSelection } from "./selection.tsx";
  * independent one-finger pans. Two fingers are now one gesture (`touch.ts` reduces
  * them, `pinchCamera` moves the camera) and one finger pans — the rule being that a
  * finger on the canvas moves the canvas unless it landed on something that says
- * otherwise, which on a board means a title bar or a component already selected.
+ * otherwise, which on a card means a title bar or a component already selected.
  */
 export type { InkRequest, CanvasComment, CanvasShots } from "./types.ts";
 import type { InkRequest, CanvasComment, CanvasShots } from "./types.ts";
@@ -64,10 +64,10 @@ import { createResolvedColours } from "./resolved-colours.ts";
 import { createEngine } from "./engine-setup.ts";
 
 
-/** What the stage is given by its host. */
+/** What the canvas is given by its host. */
 export type CanvasViewProps = {
 	/**
-	 * Browse or edit. The stage draws the difference so it cannot be entered unnoticed.
+	 * Browse or edit. The canvas draws the difference so it cannot be entered unnoticed.
 	 *
 	 * This is the guard that replaces a confirmation dialog: pressing the pencil is one
 	 * press and immediately reversible, so what stops an accident is that the canvas *looks*
@@ -75,18 +75,18 @@ export type CanvasViewProps = {
 	 */
 	mode: "browse" | "edit";
 	/**
-	 * What the canvas should do when this conversation's boards first arrive.
+	 * What the canvas should do when this conversation's cards first arrive.
 	 *
 	 * `undefined` means *not known yet* — see the opening effect below — and an object with no
 	 * `camera` means nothing was remembered, so the canvas fits what it has.
 	 */
 	opening?: { camera?: Camera };
-	boards: Page[];
+	cards: Page[];
 	/**
-	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
-	 * against (`render/engine.ts`). Drawn under the boards, with the same camera. `edits`, when the
+	 * This chat's canvas drawing: its `.pen` document and the folder URL its image fills are read
+	 * against (`render/engine.ts`). Drawn under the cards, with the same camera. `edits`, when the
 	 * host has them: what made this drawing from the one it gave before, applied by the engines in
-	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
+	 * place of finding what changed (`view/engine.ts`, `setDoc`).
 	 */
 	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter; /** The person's own edit or step, drawn by their hand already: nothing to glide. */ own?: true };
 	/**
@@ -97,7 +97,7 @@ export type CanvasViewProps = {
 	onPenEdit?: (ops: unknown[]) => void;
 	/** Take back the person's last edit to the drawing, or put it back (`canvas.step`). */
 	onPenStep?: (direction: "undo" | "redo") => void;
-	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/CanvasInk.tsx`). */
+	/** The draw tool is on: pen, marker, eraser and lasso draw on the canvas (`pen/CanvasInk.tsx`). */
 	drawing?: boolean;
 	/** A Pencil pressed bare canvas with the select tool: turn the pen on (and leave edit mode), so the press can start a stroke. */
 	onPencil?: () => void;
@@ -106,7 +106,7 @@ export type CanvasViewProps = {
 	/**
 	 * A camera to *arrive* at rather than jump to, when the app has asked for one.
 	 *
-	 * A request with a token, so the stage can tell a new one from the one it is already carrying
+	 * A request with a token, so the canvas can tell a new one from the one it is already carrying
 	 * out, and the duration. See `state/camera.ts` for who asks; this file owns the pixels and the
 	 * clock, which is why the arithmetic is a pure function in `camera/camera.ts` and the loop is
 	 * here.
@@ -114,46 +114,46 @@ export type CanvasViewProps = {
 	glide?: { token: number; ms: number };
 	selected?: string;
 	/**
-	 * What draws one placed item's slot: the stage says where it is and what it may do, the host adds
+	 * What draws one placed item's slot: the canvas says where it is and what it may do, the host adds
 	 * what it knows of its file (`item-slot.tsx`, `editor.tsx`).
 	 */
 	frame: Component<ItemSlotProps>;
-	/** Where the picture of a board or a card comes from, for the sheet that draws every one not awake. */
+	/** Where the picture of a card comes from, for the sheet that draws every one not awake. */
 	shots: () => CanvasShots;
 	/**
-	 * Comment on a board or on drawn items, from the button in a bar or a pill: `path` is the board
+	 * Comment on a card or on drawn items, from the button in a bar or a pill: `path` is the card
 	 * (or the drawing's file, with the item ids in `items`), `anchor` where the button is on screen.
 	 * Absent: no comment buttons.
 	 */
 	onComment?: (comment: CanvasComment) => void;
 	onSelect: (path: string | undefined) => void;
 	onMove: (path: string, x: number, y: number) => void;
-	/** The board dragged to a new size, in board units. The file is what changes. */
+	/** The card dragged to a new size, in card units. The file is what changes. */
 	onResize?: (path: string, size: { w: number; h: number }) => void;
 	onHide?: (path: string) => void;
 	/** An app's window collapsed to a link to it, by its yellow light (`model/drawing.ts`, `collapseOps`). Absent: no such light. */
 	onCollapse?: (path: string) => void;
 	/**
-	 * Ink selected, handed to the agent on screen (`inkAgent`): redraw it as a drawing, make a board of it,
+	 * Ink selected, handed to the agent on screen (`inkAgent`): redraw it as a drawing, make a card of it,
 	 * or send it as it is, to be read and acted on. Without both, the pill has no such actions.
 	 */
 	onInk?: (request: InkRequest) => void;
 	inkAgent?: string;
 	/** The host's own layer in the world, in canvas units (`CanvasOptions.world`). */
 	world?: () => JSX.Element;
-	/** The host's layer under the stage's own outlines and handles (`CanvasOptions.worldUnder`). */
+	/** The host's layer under the canvas's own outlines and handles (`CanvasOptions.worldUnder`). */
 	worldUnder?: () => JSX.Element;
-	/** The stage's engine, once made: for what the editor's handle answers from its layout (`itemBox`). */
+	/** The canvas's engine, once made: for what the editor's handle answers from its layout (`itemBox`). */
 	onEngine?: (engine: CanvasEngine) => void;
 	/** A picture of a card to download, from the card pill's ⋯ menu (absent: no Export there). */
 	onExport?: (ids: string[], format?: "png" | "pdf") => void;
-	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
+	/** Delete a card: off the canvas and its file gone (the card pill's Delete). */
 	onDeleteCard?: (path: string) => void;
 	/** Load a card again in this window, from its pill's ⋯ menu (`editor.tsx`, `reload`). */
 	onReloadCard?: (path: string) => void;
-	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
+	/** The canvas being shown, by folder name: a drawing act is drawn only on its own canvas. */
 	canvasName?: string | undefined;
-	/** The boards that are news, by path, each with the colour its glow is drawn in (`items/news.ts`). */
+	/** The cards that are news, by path, each with the colour its glow is drawn in (`items/news.ts`). */
 	news?: Record<string, string>;
 	/** A card that was news was looked at (selected): said once for each change of it. */
 	onRead?: (path: string) => void;
@@ -164,29 +164,29 @@ export type CanvasViewProps = {
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
 	onTool?: (tool: "select") => void;
 	/**
-	 * A link on a card or in the drawing pointing at a board or card of the deck — `true` once the
+	 * A link on a card or in the drawing pointing at a card of the deck — `true` once the
 	 * deck has opened it. `false` is a path this deck does not hold, which the app has already said.
 	 */
 	onOpenPage?: (path: string, from: string) => boolean;
 	/**
 	 * Dropped on the composer: talk about it rather than move it.
 	 *
-	 * Dragging a note or a board onto the box you are typing in is not a request to park it
+	 * Dragging a note or a card onto the box you are typing in is not a request to park it
 	 * there, it is a request to mention it — so the drop is undone as a move and what was
 	 * dragged arrives here, for the composer to write in. Whole pills rather than ids: what was
-	 * dragged is the only thing that knows what to call it, a board by its title and an item by
-	 * its name on the stage.
+	 * dragged is the only thing that knows what to call it, a card by its title and an item by
+	 * its name on the canvas.
 	 */
 	onRefer?: (pills: Array<{ kind: "card" | "item"; id: string; label: string; name?: string }>) => void;
 };
 
 /*
- * The stage is four files: this one, which wires the pieces together and draws the tree; `input.ts`,
- * what the stage hears from the person; `items-layer.tsx`, the placed items; and `selection.tsx`, what
+ * The canvas is four files: this one, which wires the pieces together and draws the tree; `input.ts`,
+ * what the canvas hears from the person; `items-layer.tsx`, the placed items; and `selection.tsx`, what
  * is drawn over the selection and under the pointer.
  */
 export function CanvasView(props: CanvasViewProps) {
-	/* The host's board, read once: a component, not a value that changes. */
+	/* The host's card, read once: a component, not a value that changes. */
 	const Frame = untrack(() => props.frame);
 	let element!: HTMLDivElement;
 	let worldEl!: HTMLDivElement;
@@ -201,29 +201,29 @@ export function CanvasView(props: CanvasViewProps) {
 	});
 
 	/*
-	 * Fit into the canvas column rather than into the whole stage.
+	 * Fit into the canvas column rather than into the whole window.
 	 *
-	 * Every `fit` on this page goes through here, which is the point: the stage element is
+	 * Every `fit` on this page goes through here, which is the point: the canvas element is
 	 * the full window, and half of what it framed used to end up behind a panel. What the
-	 * boards should be framed into is the window minus the chrome standing beside it, and
+	 * cards should be framed into is the window minus the chrome standing beside it, and
 	 * `camera/insets.ts` is the only thing that knows how much that is.
 	 */
 	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
 		fitInto(boxes, view(), fitBox(view()));
 
 	/** A hold's menu, open at the finger (`ui/HoldMenu.tsx`): the items held, or none for bare canvas. */
-	const [holdMenu, setHoldMenu] = createSignal<{ ids: string[]; at: { x: number; y: number }; stage: { x: number; y: number } } | undefined>();
+	const [holdMenu, setHoldMenu] = createSignal<{ ids: string[]; at: { x: number; y: number }; canvas: { x: number; y: number } } | undefined>();
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
 	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(ctl.now(), view(), viewPoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
-	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
+	/** Ids for several new items at once, none the same as another, as any on the canvas, or as `also`. */
 	const freshIds = (...also: string[]) => idMaker([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
 	/** An item as the file has it, not as a preview has drawn it. */
 	const penNode = (id: string) => (props.pen ? docIndex(props.pen.doc).get(id)?.node : undefined);
 
-	/* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
+	/* What the canvas hears from the person (`input.ts`): made where its listeners were, before the engine. */
 	const input = createViewInput({
 		props,
 		element: () => element,
@@ -313,7 +313,7 @@ export function CanvasView(props: CanvasViewProps) {
 		get frameUnder() { return frameUnder; },
 		get dropSlot() { return dropSlot; },
 	});
-	/** The ink on the stage, each stroke in stage pixels, for the eraser and the lasso. */
+	/** The ink on the canvas, each stroke in canvas pixels, for the eraser and the lasso. */
 	const inkStrokes = createMemo(() => {
 		penDrawn();
 		return [...penLayer.placed.values()].flatMap((placed) => {
@@ -331,15 +331,15 @@ export function CanvasView(props: CanvasViewProps) {
 	createEffect(() => {
 		const path = props.selected;
 		if (!path || !props.onRead || !props.news?.[path]) return;
-		const board = untrack(() => props.boards.find((one) => one.path === path));
-		const change = `${board?.rev ?? 0}|${board?.namedAt ?? 0}|${board?.modifiedAt ?? 0}`;
+		const card = untrack(() => props.cards.find((one) => one.path === path));
+		const change = `${card?.rev ?? 0}|${card?.namedAt ?? 0}|${card?.modifiedAt ?? 0}`;
 		if (readFor.get(path) === change) return;
 		readFor.set(path, change);
 		props.onRead(path);
 	});
 
 	const armPenTool = (tool: PenTool) => {
-		// The board palette's tool goes down first: picking one of its tools puts this one down.
+		// The card palette's tool goes down first: picking one of its tools puts this one down.
 		if (tool !== "select") props.onTool?.("select");
 		setPenTool(tool);
 	};
@@ -348,7 +348,7 @@ export function CanvasView(props: CanvasViewProps) {
 	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null, slot?: number) => penEdit(moveOps(scene, idsToMove, dx, dy, into, slot));
 
 	/**
-	 * The frame a drop at a point would go into, or `null` for the stage itself (`editor/core/drop.ts`):
+	 * The frame a drop at a point would go into, or `null` for the canvas itself (`editor/core/drop.ts`):
 	 * what a live drag is aiming at is the editor's (`editor.dropInto`); this answers the page's checks.
 	 */
 	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => frameUnderIn(scene, point, carrying);
@@ -359,21 +359,21 @@ export function CanvasView(props: CanvasViewProps) {
 	const overLink = editor.overLink;
 
 	/*
-	 * Where the canvas opens, the first time this conversation's boards arrive.
+	 * Where the canvas opens, the first time this conversation's cards arrive.
 	 *
 	 * The view this device left it in, when there is one — and otherwise a fit, so the deck opens
 	 * looking at itself rather than at world origin.
 	 *
 	 * `props.opening` is `undefined` until the focused conversation is known, which is not always
-	 * before the boards are: fitting at that moment and being told where to look a frame later is
+	 * before the cards are: fitting at that moment and being told where to look a frame later is
 	 * a canvas that lands somewhere and then jumps. So the effect waits for the answer rather
-	 * than for the boards alone.
+	 * than for the cards alone.
 	 */
 	let fitted = false;
 	createEffect(() => {
-		if (fitted || !props.opening || props.boards.length === 0 || view().width === 0) return;
+		if (fitted || !props.opening || props.cards.length === 0 || view().width === 0) return;
 		fitted = true;
-		props.setCamera(props.opening.camera ?? frame(props.boards.map(boxOf)));
+		props.setCamera(props.opening.camera ?? frame(props.cards.map(boxOf)));
 	});
 
 	/**
@@ -402,14 +402,14 @@ export function CanvasView(props: CanvasViewProps) {
 	);
 	return (
 		<div
-			class="stage"
+			class="canvas"
 			/*
-			 * Focusable, and focused when a press lands outside a board.
+			 * Focusable, and focused when a press lands outside a card.
 			 *
-			 * A press on the canvas is a press on a `<div>`, and a `<div>` takes no focus — so the board's
+			 * A press on the canvas is a press on a `<div>`, and a `<div>` takes no focus — so the card's
 			 * frame never learned it had lost it, `focusout` never fired inside it, and an open run or caret
 			 * stayed open with its outline on while the person had visibly clicked away. Measured: pressing
-			 * bare stage left the run `contenteditable` and its border drawn.
+			 * bare canvas left the run `contenteditable` and its border drawn.
 			 *
 			 * `-1` because this is a place for focus to *land*, not something to tab to, and the outline is
 			 * suppressed because the ring would be chrome nobody asked for.
@@ -430,7 +430,7 @@ export function CanvasView(props: CanvasViewProps) {
 			data-moving={moving() || panning() || gliding() ? "true" : undefined}
 			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`), where this engine takes it (`LAYERS`). Off in the frame a zoom starts, so the layer is never stretched. */
 			data-sliding={LAYERS[ENGINE].sliding && (moving() || panning() || gliding()) && !scaling() ? "true" : undefined}
-			/* A board being moved or sized: its title bars and news glows step aside until it lands (`canvas.css`). */
+			/* A card being moved or sized: its title bars and news glows step aside until it lands (`canvas.css`). */
 			data-carrying={editor.carrying() ? "true" : undefined}
 			ref={element}
 			onWheel={input.onWheel}
@@ -440,32 +440,32 @@ export function CanvasView(props: CanvasViewProps) {
 			onDblClick={editor.onDblClick}
 			style={{ cursor: grabbing() ? "grab" : overLink() ? "pointer" : undefined }}
 		>
-			{/* The scrolled content: the world in it, and over it the stage's own chrome held to the window (`camera/scroll-area.ts`). */}
-			<div class="stage-content">
+			{/* The scrolled content: the world in it, and over it the canvas's own chrome held to the window (`camera/scroll-area.ts`). */}
+			<div class="canvas-content">
 			<div class="world" data-sizing={items.sizingPaths().size > 0 ? "true" : undefined} ref={worldEl}>
 				{/*
-				 * A place for every board on the canvas, in file order, filled while it is within reach.
+				 * A place for every card on the canvas, in file order, filled while it is within reach.
 				 *
-				 * A list of only the boards in reach was reconciled as boards came and went, and the
+				 * A list of only the cards in reach was reconciled as cards came and went, and the
 				 * reconciler kept the order by moving nodes: **moving an iframe reloads its page**, and
-				 * zooming out from 60 to 40% reloaded six loaded boards of twenty-three. Even a list that
-				 * only gains boards in the middle is diffed with moves. So each board has a slot of its own
-				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
-				 * is within reach: only a slot's inside changes, and boards still stack in file order.
+				 * zooming out from 60 to 40% reloaded six loaded cards of twenty-three. Even a list that
+				 * only gains cards in the middle is diffed with moves. So each card has a slot of its own
+				 * that never moves (`display: contents`, so it lays nothing out), filled while the card
+				 * is within reach: only a slot's inside changes, and cards still stack in file order.
 				 */}
 				{items.slots()}
 				{/*
-				 * The stage's one sheet — the drawing, and each board's picture or a hole over its
-				 * document — and the invisible shapes that catch clicks on the drawing: after the boards,
-				 * so over them; a click goes through to a board wherever nothing drawn is in the way. See
+				 * The canvas's one sheet — the drawing, and each card's picture or a hole over its
+				 * document — and the invisible shapes that catch clicks on the drawing: after the cards,
+				 * so over them; a click goes through to a card wherever nothing drawn is in the way. See
 				 * `render/engine.ts`.
 				 */}
 				{items.fileNodes()}
 				{/* The host's layer for what is someone else's (their selection's outline): before the engine's canvas, so under every outline and handle it paints. */}
 				{hostLayer(() => props.worldUnder, "world-host world-host-under")}
-				{/* The engine's canvas over the slots (`stage/engine.ts`): the pictures of boards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}
+				{/* The engine's canvas over the slots (`view/engine.ts`): the pictures of cards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}
 				<canvas
-					class="stage-engine stage-engine-over"
+					class="canvas-engine canvas-engine-over"
 					aria-hidden="true"
 					ref={(canvas) => {
 						penLayer.attachCanvas(canvas);
@@ -492,11 +492,11 @@ export function CanvasView(props: CanvasViewProps) {
 				{/* The host's layer over everything in the world (others' cursors, what agents just drew). */}
 				{hostLayer(() => props.world, "world-host")}
 			</div>
-			<div class="stage-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
-			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
+			<div class="canvas-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
+			{/* The canvas engine could not start (`penLayer.failed`): why, over the canvas, where the drawing would be. */}
 			<Show when={engineNotice()}>
 				{(notice) => (
-					<div class="stage-notice" role="alert">
+					<div class="canvas-notice" role="alert">
 						{notice()}
 					</div>
 				)}
@@ -514,12 +514,12 @@ export function CanvasView(props: CanvasViewProps) {
 								{ label: m.canvas_props_panel(), hint: m.canvas_hold_drawer(), run: () => setPropsOpen(true) },
 								{ label: m.canvas_pill_duplicate(), run: () => selection.penDuplicate() },
 								{ label: m.canvas_hold_to_front(), run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
-								...(props.onComment ? [{ label: m.canvas_hold_ask(), hint: "→", run: () => props.onComment?.({ path: props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? m.canvas_hold_an_item(), anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
+								...(props.onComment ? [{ label: m.canvas_hold_ask(), hint: "→", run: () => props.onComment?.({ path: props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? m.canvas_hold_an_item(), anchor: () => document.querySelector(".canvas-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
 								{ label: m.canvas_pill_delete(), danger: true, run: () => selection.penDeleteSelected() },
 							]
 						: [
-								{ label: m.canvas_hold_add_shape(), run: () => setInsertPanel({ tab: "shapes", at: menu.stage, client: menu.at }) },
-								{ label: m.canvas_hold_add_icon(), run: () => setInsertPanel({ tab: "icons", at: menu.stage, client: menu.at }) },
+								{ label: m.canvas_hold_add_shape(), run: () => setInsertPanel({ tab: "shapes", at: menu.canvas, client: menu.at }) },
+								{ label: m.canvas_hold_add_icon(), run: () => setInsertPanel({ tab: "icons", at: menu.canvas, client: menu.at }) },
 							];
 					return <HoldMenu at={menu.at} preview={preview} actions={actions} onClose={() => setHoldMenu(undefined)} />;
 				}}

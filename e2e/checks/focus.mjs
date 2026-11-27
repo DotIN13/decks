@@ -33,7 +33,7 @@ say("More opens a menu of Export as PNG, Export as PDF, Copy path and Delete", m
 // It hangs down from the ⋯ button, whole on the screen.
 await settle(page, 200);
 const hang = await canvas.evaluate(() => {
-	const pill = document.querySelector(".stage-fixed > .card-callout");
+	const pill = document.querySelector(".canvas-fixed > .card-callout");
 	const menu = pill?.querySelector(".callout-more");
 	const more = pill?.querySelector('[aria-label="More"]');
 	if (!pill || !menu || !more) return null;
@@ -43,7 +43,7 @@ const hang = await canvas.evaluate(() => {
 });
 say("the menu hangs down from ⋯, whole on the screen", !!hang && hang.away && hang.under && hang.onScreen, JSON.stringify(hang));
 await page.keyboard.press("Escape");
-const shut = await canvas.evaluate(() => ({ menu: !!document.querySelector(".card-callout .callout-more"), pill: !!document.querySelector(".stage-fixed > .card-callout") }));
+const shut = await canvas.evaluate(() => ({ menu: !!document.querySelector(".card-callout .callout-more"), pill: !!document.querySelector(".canvas-fixed > .card-callout") }));
 say("Escape shuts the menu and leaves the card selected", !shut.menu && shut.pill, JSON.stringify(shut));
 // Export as PNG downloads a picture of the card, taken on the server.
 await pressCardAction(page, "More");

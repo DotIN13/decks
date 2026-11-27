@@ -1,6 +1,6 @@
 /**
  * The seam answered from the TypeScript side of the engine. The only file in the editor that
- * knows `stage/engine.ts` exists.
+ * knows `view/engine.ts` exists.
  */
 import type { PenDocument } from "@decks/pen";
 import { docIndex } from "../../model/doc-index.ts";
@@ -8,7 +8,7 @@ import type { CanvasEngine } from "../../render/engine.ts";
 import type { PageBox } from "../core/model.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 
-export function tsScene(engine: CanvasEngine, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
+export function tsScene(engine: CanvasEngine, doc: () => PenDocument | undefined, cards: () => readonly PageBox[]): SceneQuery {
 	const found = (id: string) => {
 		const current = doc();
 		return current ? docIndex(current).get(id) : undefined;
@@ -21,7 +21,7 @@ export function tsScene(engine: CanvasEngine, doc: () => PenDocument | undefined
 		drawn: (id) => engine.bounds.get(id),
 		node: (id) => found(id)?.node,
 		parent: (id) => found(id)?.parent,
-		boards,
+		cards,
 		pageItem: (path) => engine.questions.pageIdOf(path),
 		under: (point) => engine.questions.pickAll(point),
 		onLine: (id, point) => engine.questions.onLine(id, point),

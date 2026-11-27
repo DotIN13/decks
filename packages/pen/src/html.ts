@@ -21,20 +21,20 @@ import { baseTheme, bool, fillsOf, isVariable, num, paddingOf, parseColor, radii
  *   `url` gives it);
  *   strokes are an outline over the children on the side pen strokes (inside, centred, outside),
  *   with the item's corners; shadows (inner ones inset), blurs, opacity and turns are CSS's own;
- * - icons are inline SVG of the icon sets the stage draws them from, as `icons` hands them over;
- *   paths, polygons and arcs are inline SVG of the outline the stage draws;
+ * - icons are inline SVG of the icon sets the canvas draws them from, as `icons` hands them over;
+ *   paths, polygons and arcs are inline SVG of the outline the canvas draws;
  * - variables are CSS custom properties, with the dark theme's values in a `prefers-color-scheme:
  *   dark` block (and under `data-theme="dark"`), and an item with a theme of its own sets its own.
  *
  * `format: "tailwind"` writes the same page with Tailwind classes (arbitrary values where Tailwind
  * has no name for one) and Tailwind's browser build from its CDN in place of inline styles.
  *
- * What the stage keeps but does not draw (shader and mesh fills, background blurs, inner shadows off
+ * What the canvas keeps but does not draw (shader and mesh fills, background blurs, inner shadows off
  * boxes, scripts) is left out here too. A note is its paper with its words; a markdown card's words
  * are written as they are.
  */
 
-/** An icon's shapes, as the stage reads them (`icons.ts` in `@decks/canvas`). */
+/** An icon's shapes, as the canvas reads them (`icons.ts` in `@decks/canvas`). */
 export interface HtmlIcon {
 	viewBox: [number, number, number, number];
 	parts: Array<{ d: string; fill: boolean; stroke: boolean; strokeWidth: number; cap: string; join: string; evenOdd: boolean }>;
@@ -50,8 +50,8 @@ export interface HtmlOptions {
 	icons?: (library: string, name: string, weight: number) => HtmlIcon | undefined;
 	/** An image fill's address as the page reads it: relative to where the page is written. Left as it is when absent. */
 	url?: (url: string) => string;
-	/** A board's address (a `browser` item's), shown in an iframe; none: a grey box with its name. */
-	board?: (node: PenNode) => string | undefined;
+	/** A card's address (a `browser` item's), shown in an iframe; none: a grey box with its name. */
+	card?: (node: PenNode) => string | undefined;
 	/** The page's title. */
 	title?: string;
 }
@@ -89,7 +89,7 @@ export function toHtml(doc: PenDocument, ids: readonly string[], options: HtmlOp
 	return `<!doctype html>\n<html lang="en">\n<head>\n${head.join("\n")}\n</head>\n<body${page}>\n${body}\n</body>\n</html>\n`;
 }
 
-/** What every page starts from: no margins, sizes include padding, the stage's paper and ink. */
+/** What every page starts from: no margins, sizes include padding, the canvas's paper and ink. */
 const BASE = `*, *::before, *::after { box-sizing: border-box; margin: 0; }
 body { margin: 0; padding: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 48px; background: #f1f1f3; color: #1f2328; font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
 @media (prefers-color-scheme: dark) { body { background: #101010; color: #e6e6e6; } }
@@ -124,8 +124,8 @@ const px = (n: number) => `${r2(n)}px`;
 
 /**
  * An angular gradient as CSS's `conic-gradient`. pen turns its start counter-clockwise from up and
- * runs clockwise; the stage takes its angles on the ellipse of the gradient's size, CSS on a circle.
- * Each stop is put at the circle's angle of the ellipse's, so the stops sit where the stage draws
+ * runs clockwise; the canvas takes its angles on the ellipse of the gradient's size, CSS on a circle.
+ * Each stop is put at the circle's angle of the ellipse's, so the stops sit where the canvas draws
  * them and only the blend between two stops of a stretched gradient differs a little.
  */
 function conic(stops: Array<{ at: number; colour: string }>, cx: number, cy: number, sw: number, sh: number, turn: number): string {
@@ -197,7 +197,7 @@ class Writer {
 		return typeof value === "number" ? r2(value) : String(value);
 	}
 
-	/** `@font-face` rules for each family and weight the page's words are set in, from the files the stage uses. */
+	/** `@font-face` rules for each family and weight the page's words are set in, from the files the canvas uses. */
 	fontFaces(): string {
 		const rules: string[] = [];
 		for (const [family, faces] of this.families) {
@@ -246,7 +246,7 @@ class Writer {
 		this.themeVars(node, parent, css);
 		const opacity = num(this.doc, node.opacity, theme, 1);
 		if (opacity < 1) css.push(["opacity", r2(Math.max(0, opacity))]);
-		// pen's blur radius is two of the Gaussian's sigmas, as the stage draws it; CSS's is one.
+		// pen's blur radius is two of the Gaussian's sigmas, as the canvas draws it; CSS's is one.
 		const blur = this.blurRadius(node, theme);
 		if (blur > 0) css.push(["filter", `blur(${px(blur / 2)})`]);
 		const turn = num(this.doc, node.rotation, theme, 0);
@@ -282,7 +282,7 @@ class Writer {
 			case "browser":
 				return this.browser(node, theme, css, attrs);
 			default: {
-				// What the stage cannot draw either: a dashed box saying what it is.
+				// What the canvas cannot draw either: a dashed box saying what it is.
 				css.push(["border", `1.5px dashed ${node.type === MISSING ? "#dc3333" : "#8c8c94"}`], ["border-radius", "6px"], ["color", "#666670"], ["font-size", "13px"], ["padding", "8px"]);
 				return `<div ${attrs}${this.attr(css)}>${escapeText(node.type === MISSING ? `missing: ${String(node.why ?? node.id)}` : node.type)}</div>`;
 			}
@@ -519,7 +519,7 @@ class Writer {
 		return `<div aria-hidden="true"${this.attr(css)}></div>`;
 	}
 
-	/** A path, a polygon, or an arc or ring: inline SVG of the outline the stage draws. */
+	/** A path, a polygon, or an arc or ring: inline SVG of the outline the canvas draws. */
 	private svgShape(node: PenNode, theme: ThemeState, css: Decl[], attrs: string): string {
 		const box = this.box(node);
 		const d = outlineOf(this.doc, node, box.w, box.h, theme);
@@ -609,7 +609,7 @@ class Writer {
 		return `<div ${attrs}${this.attr(css)}>${inner}</div>`;
 	}
 
-	/** A note, prompt or context: its paper and its words, as the stage draws one. */
+	/** A note, prompt or context: its paper and its words, as the canvas draws one. */
 	private note(node: PenNode, theme: ThemeState, css: Decl[], attrs: string): string {
 		const content = String(resolve(this.doc, node.content, theme) ?? "");
 		const paper = isMarkdown(node) ? "#ffffff" : (NOTE_PAPER[node.type] ?? "#fde68a");
@@ -635,9 +635,9 @@ class Writer {
 		return `<svg ${attrs} xmlns="http://www.w3.org/2000/svg" width="${r2(box.w)}" height="${r2(box.h)}" viewBox="${shape.viewBox.map(r2).join(" ")}"${this.attr(css)}>${parts}</svg>`;
 	}
 
-	/** A board: its page in a frame, as the canvas shows it; a grey box with its name when there is no address. */
+	/** A card: its page in a frame, as the canvas shows it; a grey box with its name when there is no address. */
 	private browser(node: PenNode, theme: ThemeState, css: Decl[], attrs: string): string {
-		const address = this.options.board?.(node);
+		const address = this.options.card?.(node);
 		const radius = this.radius(node, theme, false) ?? "12px";
 		css.push(["border", "0"], ["border-radius", radius], ["background-color", "#ffffff"], ["box-shadow", "0 0 0 1px rgba(0, 0, 0, 0.1)"]);
 		if (node.metadata?.type === MEDIA) return `<div ${attrs}${this.attr(css)}></div>`;

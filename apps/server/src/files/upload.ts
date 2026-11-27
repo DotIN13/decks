@@ -11,7 +11,7 @@ import { mediaFacts, posterPath, soundPeaks, writePoster } from "./media.ts";
  *
  * This is the first thing in Decks that writes bytes somewhere the user did not
  * name, so the shape is deliberately narrow: one file per request, one directory
- * it can land in (`assets/`, which already means "the files the boards use"), and
+ * it can land in (`assets/`, which already means "the files the cards use"), and
  * a name that is *derived* from what the browser said rather than taken from it.
  * The path decision itself is `resolveAssetWrite` in `deck/roots.ts`, because that
  * is where every path decision lives; what is here is the naming and the choice

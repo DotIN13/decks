@@ -133,7 +133,7 @@ export interface SlashCommand {
  * else a browser knows about that agent.
  *
  * **The row is the whole chat, not a summary of it.** The greeting used to send this list
- * and then seven more messages per chat — its identity, its state, the boards it holds, its
+ * and then seven more messages per chat — its identity, its state, the cards it holds, its
  * model, its catalogue, its account, its reading — which on a deck of thirty-four chats is
  * 233 messages behind one. Every one of them was a separate change to the browser's state,
  * and a change is a redraw: the page was blocked for seventeen seconds applying a greeting
@@ -176,9 +176,9 @@ export interface AgentChat {
 	 * read by the canvas, the cursors and the panel's grouping.
 	 */
 	identity: Identity;
-	/** The boards it holds — its reading. */
-	boards: string[];
-	/** The boards it has put on its stage, a subset of the above. */
+	/** The cards it holds — its reading. */
+	cards: string[];
+	/** The cards it has put on its canvas, a subset of the above. */
 	inPlay: string[];
 	/** The model and thinking level it is on, live from a running runtime or as last recorded. */
 	model?: AgentModel;
@@ -189,7 +189,7 @@ export interface AgentChat {
 	/**
 	 * Restored from a previous run and not yet resumed.
 	 *
-	 * The conversation is readable and the boards it held are known, but no runtime is
+	 * The conversation is readable and the cards it held are known, but no runtime is
 	 * running behind it — the first prompt starts one. Drawn differently because the
 	 * distinction is real: a dormant chat cannot be aborted, has no model to report and
 	 * will take a moment longer to answer.
@@ -206,7 +206,7 @@ export interface AgentChat {
 export interface Identity {
 	name: string;
 	avatar?: string;
-	/** Assigned on creation, used for cursors and board-edge tints. */
+	/** Assigned on creation, used for cursors and card-edge tints. */
 	color: string;
 	/**
 	 * What the agent says it is doing, in its own words: `["panel-css", "measuring"]`.

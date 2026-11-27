@@ -13,7 +13,7 @@ export class EngineFrames {
 	/**
 	 * The frame's one draw. Cameras, tiles from the worker and every other change only mark the canvas
 	 * to be drawn (`draw`); it is drawn once, in the next animation frame's callback (`tick`), which
-	 * runs before the browser paints, so the drawing still lands in the same frame as the board pages
+	 * runs before the browser paints, so the drawing still lands in the same frame as the card pages
 	 * the world's transform moved. A pinch's two fingers move the camera twice a frame, a wheel or a
 	 * trackpad may too, and tiles come in bursts: each drew the canvas again (2 draws a frame for a
 	 * two-event pinch, 1.2 for a wheel zoom).

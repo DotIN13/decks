@@ -16,7 +16,7 @@ import { pageClip, THUMB_WIDTH, thumbName, PictureService } from "./service.ts";
  */
 type Browser = import("playwright").Browser;
 
-const board = (path: string, rev = 1, w = 1000, h = 2000): Page => ({ path, rev, w, h, title: path, x: 0, y: 0, inContext: [] }) as Page;
+const cardAt = (path: string, rev = 1, w = 1000, h = 2000): Page => ({ path, rev, w, h, title: path, x: 0, y: 0, inContext: [] }) as Page;
 
 function fake() {
 	const opened: Array<{ url: string; viewport: unknown; scale: unknown; scheme: unknown }> = [];
@@ -63,17 +63,17 @@ test("a card is laid out and pictured at its full width and its own height, up t
 });
 
 test("a picture's name is safe for a file system and changes with the revision and the scheme", () => {
-	const name = thumbName("boards/深海/plan one.html", 7, "light");
+	const name = thumbName("pages/深海/plan one.html", 7, "light");
 	assert.match(name, /^[0-9a-f]{16}-7-light-720-whole-l\d+\.webp$/);
-	assert.notEqual(name, thumbName("boards/深海/plan one.html", 8, "light"));
-	assert.notEqual(name, thumbName("boards/深海/plan one.html", 7, "dark"));
+	assert.notEqual(name, thumbName("pages/深海/plan one.html", 8, "light"));
+	assert.notEqual(name, thumbName("pages/深海/plan one.html", 7, "dark"));
 });
 
 test("two at a time, the newest request first, and the picture is kept on disk", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
-	const asked = ["a", "b", "c", "d"].map((name) => thumbs.get(board(`boards/${name}.html`), "light"));
+	const asked = ["a", "b", "c", "d"].map((name) => thumbs.get(cardAt(`pages/${name}.html`), "light"));
 	await tick();
 	assert.equal(chrome.waiting(), 2, "two pages are open");
 	// a and b started at once, because nothing was queued then; of the two left, d is newer.
@@ -92,7 +92,7 @@ test("two at a time, the newest request first, and the picture is kept on disk",
 
 	// Asked again: answered from the disk, with no page.
 	const before = chrome.opened.length;
-	assert.equal(await thumbs.get(board("boards/a.html"), "light"), files[0]);
+	assert.equal(await thumbs.get(cardAt("pages/a.html"), "light"), files[0]);
 	assert.equal(chrome.opened.length, before);
 	thumbs.dispose();
 });
@@ -101,19 +101,19 @@ test("everybody asking for one picture shares one page, and a newer revision rem
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
-	const both = [thumbs.get(board("boards/a.html", 1), "dark"), thumbs.get(board("boards/a.html", 1), "dark")];
+	const both = [thumbs.get(cardAt("pages/a.html", 1), "dark"), thumbs.get(cardAt("pages/a.html", 1), "dark")];
 	await tick();
 	await chrome.release();
 	const [first, second] = await Promise.all(both);
 	assert.equal(first, second);
 	assert.equal(chrome.opened.length, 1);
 
-	const next = thumbs.get(board("boards/a.html", 2), "dark");
+	const next = thumbs.get(cardAt("pages/a.html", 2), "dark");
 	await tick();
 	await chrome.release();
 	await next;
 	// The whole picture of revision 2, and the rungs cut from it; nothing of revision 1.
-	assert.deepEqual(readdirSync(dir).filter((name) => !/-whole-w\d+/.test(name)), [thumbName("boards/a.html", 2, "dark")]);
+	assert.deepEqual(readdirSync(dir).filter((name) => !/-whole-w\d+/.test(name)), [thumbName("pages/a.html", 2, "dark")]);
 	assert.ok(readdirSync(dir).every((name) => name.includes("-2-dark-")));
 	thumbs.dispose();
 });
@@ -122,9 +122,9 @@ test("a request whose browser has gone is not drawn", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
-	const kept = [thumbs.get(board("boards/a.html"), "light"), thumbs.get(board("boards/b.html"), "light")];
+	const kept = [thumbs.get(cardAt("pages/a.html"), "light"), thumbs.get(cardAt("pages/b.html"), "light")];
 	let gone = false;
-	const left = thumbs.get(board("boards/c.html"), "light", () => gone);
+	const left = thumbs.get(cardAt("pages/c.html"), "light", () => gone);
 	const refused = assert.rejects(left, /nobody is waiting/);
 	gone = true;
 	await tick();
@@ -143,51 +143,51 @@ test("with no Chromium the first request says so, and the rest are refused at on
 		launches++;
 		throw new Error("Executable doesn't exist at /nowhere\nrun npx playwright install");
 	});
-	await assert.rejects(thumbs.get(board("boards/a.html"), "light"), /No Chromium.*Executable doesn't exist at \/nowhere$/);
+	await assert.rejects(thumbs.get(cardAt("pages/a.html"), "light"), /No Chromium.*Executable doesn't exist at \/nowhere$/);
 	assert.equal(thumbs.available(), false);
-	await assert.rejects(thumbs.get(board("boards/b.html"), "light"), /No Chromium/);
+	await assert.rejects(thumbs.get(cardAt("pages/b.html"), "light"), /No Chromium/);
 	assert.equal(launches, 1);
 	thumbs.dispose();
 });
 
-test("a changed board is pictured again once it settles, in the schemes somebody has asked for, behind any browser's request", async () => {
+test("a changed card is pictured again once it settles, in the schemes somebody has asked for, behind any browser's request", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, settleMs: 10 }, async () => chrome.browser);
 
 	// Nobody has asked for a picture in any scheme yet, so there is nothing to keep up.
-	thumbs.changed(board("boards/a.html", 1));
+	thumbs.changed(cardAt("pages/a.html", 1));
 	await new Promise((resolve) => setTimeout(resolve, 30));
 	assert.equal(chrome.opened.length, 0);
 
-	const first = thumbs.get(board("boards/a.html", 1), "dark");
+	const first = thumbs.get(cardAt("pages/a.html", 1), "dark");
 	await tick();
 	await chrome.release();
 	await first;
 
 	// Three writes in a row are one picture, of the last of them.
-	thumbs.changed(board("boards/a.html", 2));
-	thumbs.changed(board("boards/a.html", 3));
-	thumbs.changed(board("boards/a.html", 4));
+	thumbs.changed(cardAt("pages/a.html", 2));
+	thumbs.changed(cardAt("pages/a.html", 3));
+	thumbs.changed(cardAt("pages/a.html", 4));
 	await new Promise((resolve) => setTimeout(resolve, 30));
 	await chrome.release();
 	await tick();
 	// Retaken as its far rungs, of revision 4; the whole picture of revision 1 stays to stand in until a whole one is asked for.
-	assert.deepEqual(readdirSync(dir).sort(), [thumbName("boards/a.html", 1, "dark"), ...[192, 480].map((width) => thumbName("boards/a.html", 4, "dark", "small", width))].sort());
+	assert.deepEqual(readdirSync(dir).sort(), [thumbName("pages/a.html", 1, "dark"), ...[192, 480].map((width) => thumbName("pages/a.html", 4, "dark", "small", width))].sort());
 	assert.equal(chrome.opened.length, 2);
 	assert.equal(chrome.opened[1]?.scheme, "dark");
 
 	// A change that is not to the file (who wrote it, when it was seen) takes no picture.
-	thumbs.changed(board("boards/a.html", 4));
+	thumbs.changed(cardAt("pages/a.html", 4));
 	await new Promise((resolve) => setTimeout(resolve, 30));
 	assert.equal(chrome.opened.length, 2);
 
 	// With both pages busy, a browser's request goes ahead of pictures taken ahead of time.
-	const busy = [thumbs.get(board("boards/x.html"), "dark"), thumbs.get(board("boards/y.html"), "dark")];
+	const busy = [thumbs.get(cardAt("pages/x.html"), "dark"), thumbs.get(cardAt("pages/y.html"), "dark")];
 	await tick();
-	thumbs.changed(board("boards/b.html", 1));
+	thumbs.changed(cardAt("pages/b.html", 1));
 	await new Promise((resolve) => setTimeout(resolve, 30));
-	const asked = thumbs.get(board("boards/c.html", 1), "dark");
+	const asked = thumbs.get(cardAt("pages/c.html", 1), "dark");
 	await chrome.release();
 	await chrome.release();
 	await Promise.all(busy);
@@ -199,39 +199,39 @@ test("a changed board is pictured again once it settles, in the schemes somebody
 	thumbs.dispose();
 });
 
-test("a deleted board's pictures are deleted with it", async () => {
+test("a deleted card's pictures are deleted with it", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
-	const both = [thumbs.get(board("boards/a.html"), "light"), thumbs.get(board("boards/b.html"), "dark")];
+	const both = [thumbs.get(cardAt("pages/a.html"), "light"), thumbs.get(cardAt("pages/b.html"), "dark")];
 	await tick();
 	await chrome.release();
 	await chrome.release();
 	await Promise.all(both);
-	thumbs.forget("boards/a.html");
-	assert.deepEqual(readdirSync(dir).filter((name) => !/-whole-w\d+/.test(name)), [thumbName("boards/b.html", 1, "dark")]);
+	thumbs.forget("pages/a.html");
+	assert.deepEqual(readdirSync(dir).filter((name) => !/-whole-w\d+/.test(name)), [thumbName("pages/b.html", 1, "dark")]);
 	thumbs.dispose();
 });
 
-test("a flow document is measured in the page and pictured to that height, without changing the board's size", async () => {
+test("a flow document is measured in the page and pictured to that height, without changing the card's size", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	// The record still carries the 240px placeholder; the page says 1234.
-	const flow = board("boards/notes.html", 3, 720, 240);
+	const flow = cardAt("pages/notes.html", 3, 720, 240);
 	const asked = thumbs.get(flow, "light");
 	await tick();
 	await chrome.release();
 	await asked;
 	assert.deepEqual(chrome.opened[0]?.viewport, { width: 720, height: 540 }, "laid out in a window no shorter than three quarters of its width");
 	assert.deepEqual(chrome.clips, [1234], "pictured to the height its page measured");
-	assert.equal(flow.h, 240, "the board keeps the size its file states");
+	assert.equal(flow.h, 240, "the card keeps the size its file states");
 	thumbs.dispose();
 });
 
 test("each rung of the ladder has a name of its own beside the whole picture", async () => {
-	const whole = thumbName("boards/a.html", 3, "light", "whole");
-	const rungs = [192, 480, 800].map((width) => thumbName("boards/a.html", 3, "light", "small", width));
+	const whole = thumbName("pages/a.html", 3, "light", "whole");
+	const rungs = [192, 480, 800].map((width) => thumbName("pages/a.html", 3, "light", "small", width));
 	assert.equal(new Set([whole, ...rungs]).size, 4);
 	assert.match(rungs[2]!, /-whole-w800-l\d+\.webp$/);
 });
@@ -239,16 +239,16 @@ test("each rung of the ladder has a name of its own beside the whole picture", a
 test("what stands in for a picture: this revision at the nearest size, else the newest earlier revision", () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => fake().browser);
-	const a = board("boards/a.html", 4);
+	const a = cardAt("pages/a.html", 4);
 	assert.equal(thumbs.nearest(a, "light", 192), undefined, "nothing at all: the caller waits");
 	// An earlier revision's whole picture, from before a look change.
-	const old = join(dir, thumbName("boards/a.html", 3, "light", "whole").replace(/-l\d+\.webp$/, ".jpg"));
+	const old = join(dir, thumbName("pages/a.html", 3, "light", "whole").replace(/-l\d+\.webp$/, ".jpg"));
 	writeFileSync(old, "old");
 	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: old, exact: false });
 	assert.equal(thumbs.nearest(a, "dark", 192), undefined, "another scheme's picture does not stand in");
 	// This revision's 480 beats any earlier revision, for a 192 and for the whole picture alike.
-	const whole = thumbName("boards/a.html", 4, "light", "whole");
-	const at480 = join(dir, thumbName("boards/a.html", 4, "light", "small"));
+	const whole = thumbName("pages/a.html", 4, "light", "whole");
+	const at480 = join(dir, thumbName("pages/a.html", 4, "light", "small"));
 	writeFileSync(at480, "480");
 	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: at480, exact: false });
 	assert.deepEqual(thumbs.nearest(a, "light", "whole"), { file: at480, exact: false });
@@ -263,11 +263,11 @@ test("what stands in for a picture: this revision at the nearest size, else the 
 test("a whole picture somebody asks for is taken before the background's small ones", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const cards = ["a", "b", "c", "d"].map((n) => board(`boards/${n}.html`));
+	const cards = ["a", "b", "c", "d"].map((n) => cardAt(`pages/${n}.html`));
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, cards: () => cards }, async () => chrome.browser);
 	const sweep = thumbs.index();
 	await tick();
-	const asked = thumbs.picture(board("boards/z.html"), "light", "whole");
+	const asked = thumbs.picture(cardAt("pages/z.html"), "light", "whole");
 	// The two pages open are the background's; the next one opened is the one asked for.
 	await chrome.release();
 	await tick();
@@ -279,10 +279,10 @@ test("a whole picture somebody asks for is taken before the background's small o
 	thumbs.dispose();
 });
 
-test("the indexer takes every board's small pictures, not its whole one, and says how far it has got", async () => {
+test("the indexer takes every card's small pictures, not its whole one, and says how far it has got", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const cards = [board("boards/a.html"), board("boards/b.html"), board("boards/c.html")];
+	const cards = [cardAt("pages/a.html"), cardAt("pages/b.html"), cardAt("pages/c.html")];
 	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, cards: () => cards }, async () => chrome.browser);
 	assert.deepEqual(thumbs.progress(), { total: 3, ready: 0, working: false, failed: 0 });
 	const sweep = thumbs.index();
@@ -316,8 +316,8 @@ test("a card is pictured on the web app's measure.html as the frame draws it, in
 	const before = [thumbName(path, 3, "light", "whole"), thumbName(path, 3, "light", "small", 480), thumbName(path, 2, "light", "small", 192)].map((name) => name.replace(/-l\d+\.webp$/, "-l3.webp"));
 	for (const name of before) writeFileSync(join(dir, name), "old");
 	assert.match(thumbName(path, 3, "light"), /-l6\.webp$/, "a card's pictures are named in the card look");
-	assert.match(thumbName("canvases/plan/boards/old.html", 3, "light"), /-l3\.webp$/, "an old page's keep the page look, which the migrations read");
-	const card = board(path, 3, 800, 300);
+	assert.match(thumbName("canvases/plan/pages/old.html", 3, "light"), /-l3\.webp$/, "an old page's keep the page look, which the migrations read");
+	const card = cardAt(path, 3, 800, 300);
 	assert.deepEqual(thumbs.nearest(card, "light", "whole"), { file: join(dir, before[0]!), exact: false }, "the older look stands in until the new picture comes");
 	const asked = thumbs.get(card, "light");
 	await tick();

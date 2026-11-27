@@ -38,7 +38,7 @@ say("the tool column and the zoom are on the page, and the frame draws none", Ob
 // --- a tool pressed on the page arms the canvas, which keeps the keyboard ----------------------------
 // A place the frame calls bare canvas and the page leaves to the frame.
 const spots = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const out = [];
 	for (let y = 200; y < 700; y += 40) for (let x = 480; x < 1200; x += 40) if ([0, 120].every((dx) => [0, 80].every((dy) => document.elementFromPoint(x + dx, y + dy) === stage))) out.push({ x, y });
 	return out;
@@ -54,7 +54,7 @@ say("there is bare canvas to press", !!spot, JSON.stringify(spot));
 await focusCanvas(page);
 await page.mouse.click(spot.x, spot.y);
 await page.locator('.pen-tools [data-tool="note"]').first().click();
-const armed = await until(() => canvas.evaluate(() => document.querySelector(".stage")?.dataset.penTool === "note"));
+const armed = await until(() => canvas.evaluate(() => document.querySelector(".canvas")?.dataset.penTool === "note"));
 say("the note tool pressed on the page arms the canvas in its frame", !!armed);
 say("…and the keyboard stays with the canvas", (await page.evaluate(() => document.activeElement?.tagName)) === "IFRAME");
 const had = new Set((drawn().children ?? []).map((node) => node.id));

@@ -6,10 +6,10 @@ export interface Camera {
 	/**
 	 * How big the canvas is, in CSS pixels, when the browser is the one reporting.
 	 *
-	 * Not world units and not divided by the zoom: it is the room a board has on screen,
-	 * which is what an agent choosing a board size actually needs. It is the window *minus
+	 * Not world units and not divided by the zoom: it is the room a card has on screen,
+	 * which is what an agent choosing a card size actually needs. It is the window *minus
 	 * the chrome standing beside it* (`web/lib/insets.ts`) rather than `innerWidth`, because
-	 * a panel that covers a third of the window is not room a board can use.
+	 * a panel that covers a third of the window is not room a card can use.
 	 *
 	 * Optional because most cameras are computed — `fitInto`, `zoomAbout` and every rewind
 	 * make one — and only a reading taken from a live browser can know this. An agent that
@@ -20,19 +20,19 @@ export interface Camera {
 }
 
 /**
- * The server asking the browser to do something to the stage, and awaiting it.
+ * The server asking the browser to do something to the canvas, and awaiting it.
  *
  * Reads that the server can answer itself never become one of these; this is only
  * for what only the browser knows or only the browser can do.
  */
-export interface StageCall {
+export interface CanvasCall {
 	id: string;
 	/**
 	 * Which agent asked.
 	 *
 	 * The canvas is *per conversation* — it draws the focused agent's in-play set and
 	 * nothing else — so the browser has to know whose `decks.view.focus` it is carrying out. Without
-	 * this it could not tell, and an agent you were not watching flew your camera to a board
+	 * this it could not tell, and an agent you were not watching flew your camera to a card
 	 * that is not on your canvas at all.
 	 */
 	agentId: string;
@@ -40,17 +40,17 @@ export interface StageCall {
 	args: unknown;
 }
 
-export type StageResult = { id: string; value?: unknown; error?: string };
+export type CanvasResult = { id: string; value?: unknown; error?: string };
 
 /**
- * What an agent is doing to a board, for the cursor and the editing marks the canvas draws.
+ * What an agent is doing to a card, for the cursor and the editing marks the canvas draws.
  *
- * `edit` is a write or edit tool naming the board's file; the rest are stage verbs. Said by
+ * `edit` is a write or edit tool naming the card's file; the rest are canvas verbs. Said by
  * the server from what it already sees, so an agent never has to point at its own work.
  */
 export type ActKind = "edit" | "new" | "resize" | "move" | "show" | "hide" | "draw";
 
-/** A box on a stage, both corners, in stage coordinates: what a `draw` act outlines. */
+/** A box on a canvas, both corners, in canvas coordinates: what a `draw` act outlines. */
 export interface ActBox {
 	x1: number;
 	y1: number;

@@ -1,7 +1,11 @@
 {
 	"counts": {
-		"board": 102,
-		"boards": 136,
-		"stage": 205
+		"server": 22,
+		"web": 0,
+		"canvas": 20,
+		"agent-ui": 0,
+		"card-host": 0,
+		"packages": 6,
+		"runtime": 0
 	}
 }

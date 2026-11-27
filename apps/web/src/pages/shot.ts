@@ -2,12 +2,12 @@ import type { PenDocument } from "@decks/pen";
 import { CanvasEngine } from "@decks/canvas/host";
 
 /**
- * One stage, drawn for a picture: the page the server's Chromium loads to take `decks.canvas.screenshot`
- * and the drawing's Export (`server/stage/shots.ts`).
+ * One canvas, drawn for a picture: the page the server's Chromium loads to take `decks.canvas.screenshot`
+ * and the drawing's Export (`server/canvas/shots.ts`).
  *
- * The same pieces as the canvas, and nothing else: the stage's engine (`render/engine.ts`) on its
- * canvas, over the boards as live frames, framed on the box in the address. No socket, no chrome,
- * no camera to move. When the boards say they are ready and the drawing has stopped redrawing for
+ * The same pieces as the canvas, and nothing else: the canvas's engine (`render/engine.ts`) on its
+ * canvas, over the cards as live frames, framed on the box in the address. No socket, no chrome,
+ * no camera to move. When the cards say they are ready and the drawing has stopped redrawing for
  * fonts, icons and images, `window.__shotReady` is set and the picture is taken.
  */
 
@@ -15,8 +15,8 @@ type ShotWindow = Window & { __shotReady?: boolean; __shotFailed?: string };
 const shotWindow = window as ShotWindow;
 
 const query = new URLSearchParams(location.search);
-const stage = query.get("stage") ?? "";
-/** A .pen file to draw instead of a stage: a saved frame, by its path (`/api/pen-file`). */
+const canvas = query.get("canvas") ?? "";
+/** A .pen file to draw instead of a canvas: a saved frame, by its path (`/api/pen-file`). */
 const penPath = query.get("pen");
 const box = { x1: Number(query.get("x1")), y1: Number(query.get("y1")), x2: Number(query.get("x2")), y2: Number(query.get("y2")) };
 const scheme = query.get("scheme") === "dark" ? "dark" : "light";
@@ -30,9 +30,9 @@ async function main(): Promise<void> {
 	// The harness's canvas pass for the canvas this page draws (`server/src/auth/passes.ts`).
 	const pass = query.get("pass");
 	const headers: Record<string, string> = pass ? { Authorization: `Bearer ${pass}` } : {};
-	const response = penPath ? await fetch(`/api/pen-file?path=${encodeURIComponent(penPath)}`, { headers }) : await fetch(`/api/stage-pen/${encodeURIComponent(stage)}`, { headers });
-	if (!response.ok) throw new Error(penPath ? `no pen file "${penPath}" (${response.status}): ${await response.text()}` : `no stage "${stage}" (${response.status})`);
-	const { doc, base, boards } = (await response.json()) as { doc: PenDocument; base: string; boards: Array<{ path: string; x: number; y: number; w: number; h: number }> };
+	const response = penPath ? await fetch(`/api/pen-file?path=${encodeURIComponent(penPath)}`, { headers }) : await fetch(`/api/canvas-pen/${encodeURIComponent(canvas)}`, { headers });
+	if (!response.ok) throw new Error(penPath ? `no pen file "${penPath}" (${response.status}): ${await response.text()}` : `no canvas "${canvas}" (${response.status})`);
+	const { doc, base, cards } = (await response.json()) as { doc: PenDocument; base: string; cards: Array<{ path: string; x: number; y: number; w: number; h: number }> };
 
 	const view = { width: innerWidth, height: innerHeight };
 	const zoom = view.width / (box.x2 - box.x1);
@@ -40,15 +40,15 @@ async function main(): Promise<void> {
 	const world = document.getElementById("world")!;
 	world.style.transform = `translate(${view.width / 2}px, ${view.height / 2}px) scale(${zoom}) translate(${-camera.x}px, ${-camera.y}px)`;
 
-	// The boards in the box, as the frames the canvas would show, under the engine's canvas.
-	const inView = boards.filter((b) => b.x < box.x2 && b.x + b.w > box.x1 && b.y < box.y2 && b.y + b.h > box.y1);
+	// The cards in the box, as the frames the canvas would show, under the engine's canvas.
+	const inView = cards.filter((b) => b.x < box.x2 && b.x + b.w > box.x1 && b.y < box.y2 && b.y + b.h > box.y1);
 	const ready = inView.map(
-		(board) =>
+		(card) =>
 			new Promise<void>((resolve) => {
 				const frame = document.createElement("iframe");
-				frame.src = `/api/card/${board.path.split("/").map(encodeURIComponent).join("/")}`;
+				frame.src = `/api/card/${card.path.split("/").map(encodeURIComponent).join("/")}`;
 				frame.setAttribute("scrolling", "no");
-				Object.assign(frame.style, { left: `${board.x}px`, top: `${board.y}px`, width: `${board.w}px`, height: `${board.h}px` });
+				Object.assign(frame.style, { left: `${card.x}px`, top: `${card.y}px`, width: `${card.w}px`, height: `${card.h}px` });
 				world.append(frame);
 				const started = performance.now();
 				const wait = () => {
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
 	engine.previews.setWriter({ color: writerColor ?? (getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#3b5cf6"), ...(writerName ? { name: writerName } : {}) });
 	engine.attachCanvas(document.querySelector("canvas.over") as HTMLCanvasElement);
 	// Every card is live here, so the engine leaves a hole over each and fetches no pictures.
-	engine.cardLayer.setCards(boards.map((board) => ({ ...board, live: true })));
+	engine.cardLayer.setCards(cards.map((card) => ({ ...card, live: true })));
 	engine.setDoc(doc, base);
 	engine.setCamera(camera);
 
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
 	const started = performance.now();
 	for (;;) {
 		await new Promise((resolve) => setTimeout(resolve, 100));
-		if (failed) throw new Error(`the stage engine did not start: ${failed}`);
+		if (failed) throw new Error(`the canvas engine did not start: ${failed}`);
 		const drawingShown = doc.children.length === 0 || engine.tiles.tileCount() > 0;
 		if (drawingShown && performance.now() - lastDrawn > QUIET_MS) break;
 		if (performance.now() - started > PAGE_MS) break;

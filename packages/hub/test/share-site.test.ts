@@ -69,12 +69,12 @@ test("two harnesses and a friend's share in step through a hub with a memory sto
 	const sf = new HarnessSync({ deck: f, studio: url, key: "friend", log: quiet });
 
 	write(join(a, "canvases", "plan", "canvas.pen"), serialize({ version: "2.14", children: [{ id: "n1", type: "note", content: "one", x: 0, y: 0 }] } as never));
-	write(join(a, "canvases", "plan", "boards", "plan.html"), "<h1>Plan</h1>");
+	write(join(a, "canvases", "plan", "cards", "plan.html"), "<h1>Plan</h1>");
 	await sa.sync();
 	await sb.sync();
 	const id = store.canvases("ada").find((c) => c.name === "plan")!.id;
 	assert.equal(penAt(join(b, "canvases", "plan")).children[0]!.id, "n1", "the canvas reached the second harness");
-	assert.equal(readFileSync(join(b, "canvases", "plan", "boards", "plan.html"), "utf8"), "<h1>Plan</h1>", "and its board");
+	assert.equal(readFileSync(join(b, "canvases", "plan", "cards", "plan.html"), "utf8"), "<h1>Plan</h1>", "and its card");
 
 	// Both edit different items; after a round, both have both edits, merged by the hub.
 	const docA = penAt(join(a, "canvases", "plan"));
@@ -109,7 +109,7 @@ test("the handler refuses what a harness may not do", async () => {
 	assert.equal((await call("/sync/v1/canvases", "nobody")).status, 401);
 	const id = store.canvases("ada")[0]!.id;
 	assert.equal((await call(`/sync/v1/canvases/${id}/files?path=${encodeURIComponent("../../.ssh/x")}`, "mini", { method: "PUT", body: "x" })).status, 400);
-	assert.equal((await call(`/sync/v1/canvases/${id}/files?path=boards/x.html`, "friend", { method: "PUT", body: "x" })).status, 403, "a viewer may not write");
+	assert.equal((await call(`/sync/v1/canvases/${id}/files?path=cards/x/index.html`, "friend", { method: "PUT", body: "x" })).status, 403, "a viewer may not write");
 	assert.equal((await call(`/sync/v1/canvases/${id}/edits`, "friend", { method: "POST", body: JSON.stringify({ base: 1, edits: [] }) })).status, 403);
 	const tooMany = Array.from({ length: EDITS_MAX + 1 }, (_, i) => ({ op: "set", id: "n1", path: ["x"], value: i }));
 	const over = await call(`/sync/v1/canvases/${id}/edits`, "mini", { method: "POST", body: JSON.stringify({ base: 1, edits: tooMany }) });

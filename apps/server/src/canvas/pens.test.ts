@@ -61,7 +61,7 @@ test("a failed edit writes nothing; a hand edit is read back; a broken file keep
 	}
 });
 
-test("an arrow to a board is drawn on edit, and follows the board when it moves", () => {
+test("an arrow to a card is drawn on edit, and follows the card when it moves", () => {
 	const dir = deck();
 	const pens = new CanvasPens(dir, () => {});
 	try {
@@ -87,7 +87,7 @@ test("an arrow to a board is drawn on edit, and follows the board when it moves"
 	}
 });
 
-test("a stage's boards are browser items: synced in, read back in order, moved, resized and removed", () => {
+test("a canvas's cards are browser items: synced in, read back in order, moved, resized and removed", () => {
 	const dir = deck();
 	const pens = new CanvasPens(dir, () => {});
 	try {
@@ -139,7 +139,7 @@ test("the person's edits undo and redo, and a step is refused once an agent has 
 	}
 });
 
-test("what is drawn on a stage, for placement: top-level items, not boards, not arrows", () => {
+test("what is drawn on a canvas, for placement: top-level items, not cards, not arrows", () => {
 	const dir = deck();
 	const pens = new CanvasPens(dir, () => {});
 	try {
@@ -158,7 +158,7 @@ test("what is drawn on a stage, for placement: top-level items, not boards, not 
 	}
 });
 
-test("a stage's name is its own: kept as written, changed freely, and the folder never moves", () => {
+test("a canvas's name is its own: kept as written, changed freely, and the folder never moves", () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-titles-"));
 	const pens = new CanvasPens(root, () => {});
 	try {
@@ -170,14 +170,14 @@ test("a stage's name is its own: kept as written, changed freely, and the folder
 		assert.deepEqual(pens.names(), [folder], "renaming moved no folder");
 		assert.throws(() => pens.setTitle(folder, "   "), /empty/);
 		mkdirSync(join(root, "old-one"));
-		assert.equal(pens.titleOf("old-one"), "old-one", "a stage from before titles is called by its folder");
+		assert.equal(pens.titleOf("old-one"), "old-one", "a canvas from before titles is called by its folder");
 	} finally {
 		pens.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
-test("a stage's imports are read from inside the deck, used for its boxes and its frame, and never saved", () => {
+test("a canvas's imports are read from inside the deck, used for its boxes and its frame, and never saved", () => {
 	const dir = deck();
 	const pens = new CanvasPens(dir, () => {});
 	try {
@@ -222,7 +222,7 @@ test("an item saved as a frame goes to its canvas's own frames/, placed there by
 		const file = JSON.parse(readFileSync(path, "utf8"));
 		assert.equal(file.children[0].id, "agent-card");
 		assert.equal(file.children[0].reusable, true);
-		assert.equal(file.children[0].x, undefined, "where it sat on the stage is not part of the frame");
+		assert.equal(file.children[0].x, undefined, "where it sat on the canvas is not part of the frame");
 		const onCanvas = JSON.parse(readFileSync(join(dir, "canvases", one, "canvas.pen"), "utf8")).children[0];
 		assert.deepEqual(onCanvas, { type: "ref", id: "card", ref: "frames/agent-card", x: 40, y: 50 });
 		assert.deepEqual(pens.read(one).children[0]!.box, { x1: 40, y1: 50, x2: 240, y2: 130 });

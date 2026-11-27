@@ -68,7 +68,7 @@ export function chatTable(host: ChatTableHost): PersonVerbs {
 		"chat.preview": async ([id, entry], call) => {
 			const agent = need(id);
 			const entryId = entry === null || entry === undefined ? null : String(entry);
-			call.tell({ type: "chat.preview", agentId: agent.id, entryId, boards: entryId ? host.cards.cardsAt(agent.conversation, entryId) : {} });
+			call.tell({ type: "chat.preview", agentId: agent.id, entryId, cards: entryId ? host.cards.cardsAt(agent.conversation, entryId) : {} });
 		},
 		"chat.rewind": async ([id, entry], call) => {
 			const agent = need(id);
@@ -115,7 +115,7 @@ export function chatTable(host: ChatTableHost): PersonVerbs {
 					notice(call, "warn", `Could not restore ${path}: ${(error as Error).message}`);
 				}
 			}
-			notice(call, "info", restored === 0 ? "Those boards are already as they were." : `Restored ${restored} board${restored === 1 ? "" : "s"}.`);
+			notice(call, "info", restored === 0 ? "Those cards are already as they were." : `Restored ${restored} card${restored === 1 ? "" : "s"}.`);
 			return { restored };
 		},
 	};

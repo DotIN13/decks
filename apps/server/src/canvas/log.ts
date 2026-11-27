@@ -33,7 +33,7 @@ export interface ChangeRecord {
 
 /** A canvas's drawing whole, as a reader over HTTP is given it (`CanvasLog.frame`). */
 export interface CanvasFrame {
-	stage: string;
+	canvas: string;
 	rev: number;
 	doc: PenDocument;
 	base: string;
@@ -184,7 +184,7 @@ export class CanvasLog {
 		const from = direction === "undo" ? history.undo : history.redo;
 		const to = direction === "undo" ? history.redo : history.undo;
 		const last = from[from.length - 1];
-		if (!last) throw new PenError(direction === "undo" ? "Nothing on this stage to undo." : "Nothing to redo.");
+		if (!last) throw new PenError(direction === "undo" ? "Nothing on this canvas to undo." : "Nothing to redo.");
 		const current = this.of.get(name);
 		const now = current.text ?? serialize(current.doc);
 		const expected = direction === "undo" ? last.after : last.before;
@@ -221,7 +221,7 @@ export class CanvasLog {
 		const doc = this.of.files.withImported(name, entry.doc);
 		const made = [...(this.madeLately.get(name) ?? []), ...(this.made.get(name) ?? [])];
 		const by = this.writers.get(name);
-		return { stage: name, rev: entry.rev, doc, base: `${fileUrl(this.of.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}), ...(by ? { by } : {}) };
+		return { canvas: name, rev: entry.rev, doc, base: `${fileUrl(this.of.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}), ...(by ? { by } : {}) };
 	}
 
 	/** The browsers' edits written since the drawing was last sent, taken: the next frame or delta says it has them. */

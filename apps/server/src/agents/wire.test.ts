@@ -34,9 +34,9 @@ test("the preview does not stop halfway through a character", () => {
 });
 
 test("the row the server keeps is not touched", () => {
-	const kept = tool({ args: { path: "boards/plan.html" }, result: "z".repeat(TOOL_PREVIEW * 3) });
+	const kept = tool({ args: { path: "pages/plan.html" }, result: "z".repeat(TOOL_PREVIEW * 3) });
 	forBrowser(kept);
-	assert.deepEqual(kept.args, { path: "boards/plan.html" });
+	assert.deepEqual(kept.args, { path: "pages/plan.html" });
 	assert.equal(kept.result?.length, TOOL_PREVIEW * 3);
 	assert.equal(kept.full, undefined);
 });

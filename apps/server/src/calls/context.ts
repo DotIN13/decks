@@ -27,7 +27,7 @@ export interface VerbContext {
 	askedWorkspace(raw: unknown): string;
 	/**
 	 * The canvas a call means when it names none: the one the call says it was made on (a person's or a
-	 * card's `X-Decks-Stage`), the canvas showing an app, the canvas the person is looking at for their
+	 * card's `X-Decks-Canvas`), the canvas showing an app, the canvas the person is looking at for their
 	 * own calls. None for an agent: an agent has no home canvas, and names the canvas in every call, so
 	 * its work lands where it meant whatever the person is looking at.
 	 */
@@ -99,13 +99,13 @@ export function verbContext(deps: { canvas: CanvasService; agent: AgentHooks; po
 	const viewport = () => service.viewport(agent.id);
 	/** The drawing's files, or the sentence that says this server keeps none. */
 	const needPens = () => {
-		if (!service.pens) throw new Error("This server keeps no stage drawing.");
+		if (!service.pens) throw new Error("This server keeps no canvas drawing.");
 		return service.pens;
 	};
 	/** This agent's canvas folder, claimed the first time it draws. */
 	const needCanvas = () => {
 		const name = agent.canvasName?.();
-		if (!name) throw new Error("This stage has no drawing: the server keeps no stage files.");
+		if (!name) throw new Error("This canvas has no drawing: the server keeps no canvas files.");
 		return name;
 	};
 	/** The shared Chrome, or the sentence that says this server has none. */
@@ -196,7 +196,7 @@ export function verbContext(deps: { canvas: CanvasService; agent: AgentHooks; po
 			...(!shared && pens.rights.studioId(name) ? { studio: pens.rights.studioId(name) } : {}),
 			open: agent
 				.agents()
-				.filter((other) => (other.id === agent.id && !agent.app ? mine : other.stage) === name)
+				.filter((other) => (other.id === agent.id && !agent.app ? mine : other.canvas) === name)
 				.map((other) => other.name),
 			cards,
 		};

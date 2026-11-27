@@ -21,7 +21,7 @@ export interface DrawingWriter {
 	color: string;
 }
 
-/** A card as the stage places it: its box, whether its page is showing, and its picture. */
+/** A card as the canvas places it: its box, whether its page is showing, and its picture. */
 export interface SceneCard {
 	path: string;
 	/** Its item on the drawing, when known: a glide's offset is kept under it (`engine.rs`, `offsets`). */
@@ -40,7 +40,7 @@ export interface SceneCard {
 	ready?: boolean;
 	/** The writer's colour, when the card is news. */
 	news?: string;
-	/** Draw the news mark as an outline: the board has no page to draw its glow. */
+	/** Draw the news mark as an outline: the card has no page to draw its glow. */
 	glow?: boolean;
 	/** Its title and kind, painted on its paper while it has no picture (`engine.rs`, `frame`). */
 	title?: string;
@@ -50,10 +50,10 @@ export interface SceneCard {
 	status?: string;
 }
 
-/** An app's window bar, in stage units: painted by the engine in every state; the page's iframe sits below it. */
+/** An app's window bar, in canvas units: painted by the engine in every state; the page's iframe sits below it. */
 export const APP_BAR = 44;
 
-/** A stroke of ink the drawing does not hold yet, as the page shaped it (`strokeShape`), in stage pixels. */
+/** A stroke of ink the drawing does not hold yet, as the page shaped it (`strokeShape`), in canvas pixels. */
 export interface LiveInk {
 	id: string;
 	/** SVG path data: a filled outline, or a centre line stroked `size` wide. */
@@ -94,7 +94,7 @@ export type ToWorker =
 	| { type: "pixels"; on: boolean }
 	/** How long after the camera last changed the worker still paints one tile a batch (`AFTER_MOVE_MS` in `render.worker.ts`): for measuring in one page. */
 	| { type: "afterMove"; ms: number }
-	/** The stage is sharp and idle: make what a first gesture would otherwise make (`WorkerEngine::warm`). */
+	/** The canvas is sharp and idle: make what a first gesture would otherwise make (`WorkerEngine::warm`). */
 	| { type: "warm" }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
@@ -144,7 +144,7 @@ export type FromWorker =
 	| { type: "picture"; url: string; bitmap: ImageBitmap; width: number; height: number }
 	| { type: "resync" }
 	| { type: "error"; message: string }
-	/** The worker could not open a device: the stage shows the notice (`backends/notice.ts`). */
+	/** The worker could not open a device: the canvas shows the notice (`backends/notice.ts`). */
 	| { type: "failed"; message: string }
 	/** The worker's device or context was lost: the page starts both engines again. */
 	| { type: "lost" };

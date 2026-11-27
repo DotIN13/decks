@@ -21,7 +21,7 @@ try {
 	await rest(b.page);
 
 	// A moves over its canvas; B sees a cursor for it, named as another window of the same person.
-	const box = await frameA.locator(".stage").boundingBox();
+	const box = await frameA.locator(".canvas").boundingBox();
 	for (let i = 0; i < 8; i += 1) {
 		await a.page.mouse.move(box.x + box.width * (0.3 + i * 0.03), box.y + box.height * 0.5);
 		await a.page.waitForTimeout(60);
@@ -55,7 +55,7 @@ try {
 	const where = await frameB.evaluate((path) => {
 		const ring = document.querySelector(".frame-presence-outline");
 		const node = document.querySelector(`.card-node[data-path="${path}"]`);
-		const canvas = document.querySelector("canvas.stage-engine-over");
+		const canvas = document.querySelector("canvas.canvas-engine-over");
 		const r = ring.getBoundingClientRect();
 		const c = node.getBoundingClientRect();
 		return {

@@ -15,7 +15,7 @@ export interface EngineNeeds {
 
 export function createEngine(d: EngineNeeds) {
 	/*
-	 * The stage's engine (`stage/engine.ts`): the drawing and the boards' pictures, drawn with WebGPU
+	 * The canvas's engine (`view/engine.ts`): the drawing and the cards' pictures, drawn with WebGPU
 	 * on two canvases, one under the item slots and one over them, in the same call that moves the
 	 * slots (`writeTransform`). The document, the window's size and the colour scheme reach it here.
 	 */
@@ -23,7 +23,7 @@ export function createEngine(d: EngineNeeds) {
 
 	d.props.onEngine?.(penLayer);
 
-	/* An engine that cannot start says so over the stage (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
+	/* An engine that cannot start says so over the canvas (`view/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
 	const [engineNotice, setEngineNotice] = createSignal<string>();
 
 	penLayer.failed = (notice) => setEngineNotice(notice);
@@ -32,7 +32,7 @@ export function createEngine(d: EngineNeeds) {
 
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
 	const scenePages = createMemo(() =>
-		d.props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h })),
+		d.props.cards.map((card) => ({ path: card.path, x: card.x, y: card.y, w: card.w, h: card.h })),
 	);
 
 	const scene = tsScene(penLayer, () => d.props.pen?.doc, scenePages);
@@ -43,7 +43,7 @@ export function createEngine(d: EngineNeeds) {
 
 	/*
 	 * The over canvas is inside the world only to sit after the item slots and before the
-	 * selection's outlines and handles. The engine places it, in stage units, at the rectangle it last
+	 * selection's outlines and handles. The engine places it, in canvas units, at the rectangle it last
 	 * drew (the window and a margin round it), so a pan moves it with the world until it is drawn again.
 	 */
 	createEffect(() => {

@@ -55,7 +55,7 @@ export const isMarkdownText = (node: PenNode): boolean => node.type === "text" &
  * so the frame's drop slots are the gaps between lines and pen.dev opens it as a column with its
  * pictures. Decks draws it on the card's paper when it has no fill of its own.
  *
- * It was `decks.card` until a card became a board drawn in the stage's own page (a `browser` item with
+ * It was `decks.card` until a card became a card drawn in the canvas's own page (a `browser` item with
  * that tag). A frame still tagged so is read as a markdown card, and rewritten once when its harness
  * starts (`migrations/2026-10-28-markdown-cards.ts`).
  */
@@ -65,10 +65,10 @@ export const OLD_CARD = "decks.card";
 export const isCard = (node: PenNode | undefined): boolean => node?.type === "frame" && (node.metadata?.type === CARD || node.metadata?.type === OLD_CARD);
 
 /**
- * A film or a sound on the stage: `metadata: { type: "decks.media", kind, file }`, on pen's own
+ * A film or a sound on the canvas: `metadata: { type: "decks.media", kind, file }`, on pen's own
  * rectangle, filled with the still that stands for it.
  *
- * A rectangle rather than a `browser`, which is what a board is, because a board *is* a page and a
+ * A rectangle rather than a `browser`, which is what a card is, because a card *is* a page and a
  * film is a picture that moves: pen.dev opens this as a rectangle showing the poster, which is the
  * right thing to show for something that is not playing. Nothing decodes until it is pressed —
  * forty-eight films playing cost a thousand times what forty-eight stills cost.
@@ -114,7 +114,7 @@ export interface TextStyle {
 
 export interface Placed {
 	node: PenNode;
-	/** Box on the stage, in stage pixels. */
+	/** Box on the canvas, in canvas pixels. */
 	box: Frame;
 	/** The parent item, undefined at the top. */
 	parent: string | undefined;
@@ -192,7 +192,7 @@ export function textStyleOf(doc: PenDocument, node: PenNode, theme: ThemeState):
 const TEXTY = new Set(["text", "note", "prompt", "context"]);
 
 /**
- * Lay out the expanded document: every item's box on the stage.
+ * Lay out the expanded document: every item's box on the canvas.
  *
  * `nodes` is the output of `expand`, so instances are already copies and every id is unique.
  */
@@ -369,7 +369,7 @@ export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { t
 		return { w: hugW, h: hugH, count: flow.length, locals };
 	};
 
-	/** Place an item at its stage position, then its children. */
+	/** Place an item at its canvas position, then its children. */
 	const place = (node: PenNode, at: { x: number; y: number }, size: { w: number; h: number }, parent: string | undefined, theme: ThemeState) => {
 		const t = withTheme(theme, node);
 		placed.set(node.id, { node, box: { x: at.x, y: at.y, w: size.w, h: size.h }, parent, theme: t, order: order++ });

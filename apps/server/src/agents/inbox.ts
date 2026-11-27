@@ -83,7 +83,7 @@ export class Inbox {
 		if (!this.outside) return;
 		this.of.said(text, parts);
 		// What it reads has the note first (what the person was looking at); the conversation shows the words.
-		this.of.turns.leave({ from: PERSON, fromName: "The person", task: note ? `${note}\n\n${text}` : text, boards: [], at: Date.now(), person: true });
+		this.of.turns.leave({ from: PERSON, fromName: "The person", task: note ? `${note}\n\n${text}` : text, cards: [], at: Date.now(), person: true });
 		this.of.notice("info", `${this.of.name()} works in ${this.outside.client}, outside Decks: it reads this with its next call.`);
 		this.changed();
 	}

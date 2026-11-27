@@ -79,7 +79,7 @@ const onScreen = (r) => r && r.x > 380 && r.y > 30 && r.x + r.width < 1370 && r.
 	say(`${label}: …its blue shadow past that`, blue(bBlue), JSON.stringify(bBlue));
 	say(`${label}: …and neither by the plain card`, !red(aOut) && !blue(aOut), JSON.stringify(aOut));
 }
-// --- a screenshot: the native renderer (`stage-shot`), each card its picture, as `decks canvas screenshot` draws it ---
+// --- a screenshot: the native renderer (`canvas-shot`), each card its picture, as `decks canvas screenshot` draws it ---
 {
 	const shot = await call("canvas.screenshot", [{ of: [plain.value.id, framed.value.id], scale: 1, scheme: "dark" }]);
 	const v = shot.value ?? {};

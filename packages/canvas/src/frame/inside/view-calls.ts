@@ -5,7 +5,7 @@ import { type FramePage } from "../protocol.ts";
 import { type Start } from "../protocol.ts";
 import type { Accessor } from "solid-js";
 import { untrack } from "solid-js";
-import type { Page, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, CanvasCall } from "@decks/protocol";
 import { runViewCall } from "../../camera/view-ops.ts";
 import { cardShot } from "../../items/card-surface.tsx";
 import { handsOn } from "../../camera/touched.ts";
@@ -29,14 +29,14 @@ export function createViewCalls(d: ViewCallsNeeds) {
 	 * An agent's `decks view …` on this canvas, from the stream: carried out as the page carries it out
 	 * for a canvas it holds (`view-ops.ts`), and answered to the harness.
 	 */
-	const viewCall = (call: StageCall) => {
+	const viewCall = (call: CanvasCall) => {
 		if (call.op === "shot") return void shootCard(call);
 		let value: unknown;
 		/** Where this call moved the view, and the card it picked: said to the page once it is done. */
 		let moved: { camera: Camera; selected?: string } | undefined;
 		try {
 			value = runViewCall(call, {
-				boards: () => untrack(d.pages) as Page[],
+				cards: () => untrack(d.pages) as Page[],
 				viewport: () => ({ width: innerWidth, height: innerHeight }),
 				focused: () => untrack(d.agent),
 				canvasOnScreen: () => d.start.canvas.name,
@@ -83,14 +83,14 @@ export function createViewCalls(d: ViewCallsNeeds) {
 	};
 
 	/*
-	 * A card as the person has it now, for an agent's `decks canvas screenshot` of it (`stage.call` op
+	 * A card as the person has it now, for an agent's `decks canvas screenshot` of it (`decks.call` op
 	 * `shot`): its live root written out (`card-snapshot.ts`) and drawn by the harness's Chrome, so the
 	 * picture has what they typed, scrolled and drew in it. `none` when the card is not mounted here, and
 	 * the harness takes its own picture from the file.
 	 */
 	const NONE_AFTER = 1500;
 
-	const shootCard = async (call: StageCall) => {
+	const shootCard = async (call: CanvasCall) => {
 		const path = (call.args as { path?: unknown } | undefined)?.path;
 		let value: unknown;
 		try {

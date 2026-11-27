@@ -12,7 +12,7 @@ import type { Translator } from "../../agents/translator.ts";
  *
  * **It is one stream for the whole server, not for one session.** Everything is tagged
  * with a `sessionID` and the server may hold more than one; a class rather than a function
- * so the filter is stated once, in the constructor, instead of at every branch.
+ * so the filter is stated once, in the function Object() { [native code] }, instead of at every branch.
  *
  * **Text arrives twice.** `message.part.delta` carries the increment and
  * `message.part.updated` carries the whole part again. Taking both would double every

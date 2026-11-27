@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Page, Camera, ServerMessage, StageCall, StageResult, WebStatus } from "@decks/protocol";
+import type { Page, Camera, ServerMessage, CanvasCall, CanvasResult, WebStatus } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { withCardSize } from "@decks/deck-kit";
 
@@ -19,7 +19,7 @@ import type { AppCheck } from "../apps/check.ts";
  * Two kinds of operation, and the difference matters. A **read** — which cards
  * exist, what one says, where the roots are — the server can answer itself, so it
  * does, immediately. A **camera** operation only the browser can carry out, so it
- * becomes a `stage.call` frame and is awaited.
+ * becomes a `decks.call` frame and is awaited.
  *
  * With no browser connected the second kind resolves as a no-op and says so in the
  * result rather than hanging: an agent working while nobody is watching should
@@ -46,14 +46,14 @@ export interface CanvasServiceHost {
 	views?(path: string): Promise<{ controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } | undefined>;
 	reading?(path: string, rev: number): { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number };
 	/** Send to the focused browser, and resolve when it answers. */
-	call(call: Omit<StageCall, "id">, timeoutMs?: number): Promise<unknown>;
+	call(call: Omit<CanvasCall, "id">, timeoutMs?: number): Promise<unknown>;
 	/** Send to every browser, and resolve with every answer that came in time. Optional: `call` is the fallback. */
-	callAll?(call: Omit<StageCall, "id">, timeoutMs?: number): Promise<unknown[]>;
+	callAll?(call: Omit<CanvasCall, "id">, timeoutMs?: number): Promise<unknown[]>;
 	/** Is anyone looking? */
 	connected(): boolean;
 	broadcast(message: ServerMessage): void;
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
-	stagesChanged?(): void;
+	canvasesChanged?(): void;
 	/** Say who last wrote a card, as the person's own edits do (`CardService.wrote`). */
 	wrote?(path: string, who: string): void;
 	/** Give a canvas a name; the first name anyone chooses names its folder too (`admin.ts`). Returns the folder. */
@@ -79,7 +79,7 @@ export interface CanvasServiceHost {
 	 * gave back all four places from before.
 	 *
 	 * Optional, like `AgentHooks.positions`, so a host that does not arrange omits it and a
-	 * test can build one without a canvas behind it. `CanvasService.boards` falls back to the deck's
+	 * test can build one without a canvas behind it. `CanvasService.cards` falls back to the deck's
 	 * own list; no id means the conversation on screen, which is what a card's own code gets.
 	 */
 	cards?(agentId?: string): Page[];
@@ -174,8 +174,8 @@ export class CanvasService {
 	) {}
 
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
-	stagesChanged(): void {
-		this.host.stagesChanged?.();
+	canvasesChanged(): void {
+		this.host.canvasesChanged?.();
 	}
 
 	/** A card as its file has it, not as a canvas places it. */
@@ -224,7 +224,7 @@ export class CanvasService {
 		 * The host's arrangement when there is one, and the deck's own list when there is not.
 		 *
 		 * A card's `x`/`y` on the loader is zero — it has carried no place of its own since positions
-		 * became per canvas — so returning `deck.boards` here for a real app would tell every agent that
+		 * became per canvas — so returning `deck.cards` here for a real app would tell every agent that
 		 * every card is at the origin, which is worse than saying nothing.
 		 */
 		return (this.host.cards?.(agentId) ?? this.deck.cards).map((card) => {
@@ -277,7 +277,7 @@ export class CanvasService {
 	 */
 	move(agentId: string, path: string, at: { x: number; y: number }): Page {
 		const card = this.host.place(agentId, path, at.x, at.y);
-		if (!card) throw new Error(`No such board: ${path}`);
+		if (!card) throw new Error(`No such card: ${path}`);
 		this.host.broadcast({ type: "card.changed", path: card.path, rev: card.rev, card });
 		return card;
 	}
@@ -290,14 +290,14 @@ export class CanvasService {
 	/**
 	 * Set a card's size: the one number in the file, written by the thing that owns it.
 	 *
-	 * An agent editing `<meta name="board">` by hand works and is a bad idea — it is JSON
+	 * An agent editing `<meta name="card">` by hand works and is a bad idea — it is JSON
 	 * inside an HTML attribute, and the write has to keep every other byte where it was.
 	 * Here the deck's own record is refreshed as part of the write, so a resize can never
 	 * be a change the canvas does not know about.
 	 */
 	resize(path: string, size: { w?: number; h?: number }): Page {
 		const card = this.deck.card(path);
-		if (!card) throw new Error(`No such board: ${path}`);
+		if (!card) throw new Error(`No such card: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
 		return this.host.writeCard(path, withCardSize(html, size));
@@ -319,12 +319,12 @@ export class CanvasService {
 	 * a **flow** document, whose `.doc` is `width: 100%` of the frame, the "content width" it read
 	 * back was the frame's own width, so every fit added the margin and grew the card by 48px.
 	 */
-	async fit(path: string, options?: { margin?: number; w?: number }): Promise<{ board: Page; content: { w: number; h: number }; reading: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }; views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } }> {
+	async fit(path: string, options?: { margin?: number; w?: number }): Promise<{ card: Page; content: { w: number; h: number }; reading: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }; views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } }> {
 		// The record first: an agent calls this straight after writing the content, and
 		// the revision we wait for a measurement of has to be the one now on disk.
 		this.deck.refresh(path);
 		const card = this.deck.card(path);
-		if (!card) throw new Error(`No such board: ${path}`);
+		if (!card) throw new Error(`No such card: ${path}`);
 
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
 
@@ -346,7 +346,7 @@ export class CanvasService {
 		const reading = away ?? this.host.reading?.(path, card.rev) ?? {};
 		// Six seconds at most: the check is advice, and a fit that hangs on it is worse than one without it.
 		const views = await Promise.race([this.host.views?.(path) ?? Promise.resolve(undefined), new Promise<undefined>((done) => setTimeout(() => done(undefined), 6000))]).catch(() => undefined);
-		return { board: h === card.h && w === card.w ? card : this.resize(path, { w, h }), content: measured, reading, ...(views ? { views } : {}) };
+		return { card: h === card.h && w === card.w ? card : this.resize(path, { w, h }), content: measured, reading, ...(views ? { views } : {}) };
 	}
 
 	/**
@@ -377,7 +377,7 @@ export class CanvasService {
 		const first = await Promise.race([canvas.then((extent) => extent ?? away), away.then((extent) => extent ?? canvas)]);
 		if (!first) {
 			throw new Error(
-				`Nothing has measured ${path} yet. A board is measured in the frame showing it, so put it on the canvas — decks canvas insert '{"type":"board","board":"${path}"}' — and ask again.`,
+				`Nothing has measured ${path} yet. A card is measured in the frame showing it, so put it on the canvas — decks canvas insert '{"type":"card","card":"${path}"}' — and ask again.`,
 			);
 		}
 		return first;
@@ -445,10 +445,10 @@ export class CanvasService {
 	async show(
 		agentId: string,
 		paths: string[],
-		options: { fit?: "board" | "all"; highlight?: string; animate?: boolean; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }>; stage?: string; timeoutMs?: number } = {},
+		options: { fit?: "card" | "all"; highlight?: string; animate?: boolean; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }>; canvas?: string; timeoutMs?: number } = {},
 	): Promise<{ shown: string[]; deferred?: string }> {
 		for (const path of paths) {
-			if (!this.deck.card(path)) throw new Error(`No such board: ${path}`);
+			if (!this.deck.card(path)) throw new Error(`No such card: ${path}`);
 		}
 		/*
 		 * Drawn items travel as boxes rather than as ids, because where an item *is* is a
@@ -460,7 +460,7 @@ export class CanvasService {
 		const answer = await this.ask(agentId, { op: "show", args: { paths, ...args } }, timeoutMs);
 		const result = (answer ?? {}) as { shown?: unknown; deferred?: unknown; skipped?: unknown; error?: unknown };
 		// With a canvas named (`view.focus`), a browser showing another says so, as does one that is not there.
-		const why = typeof result.deferred === "string" ? result.deferred : options.stage && typeof result.skipped === "string" ? result.skipped : options.stage && typeof result.error === "string" ? result.error : undefined;
+		const why = typeof result.deferred === "string" ? result.deferred : options.canvas && typeof result.skipped === "string" ? result.skipped : options.canvas && typeof result.error === "string" ? result.error : undefined;
 		return {
 			shown: Array.isArray(result.shown) ? result.shown.filter((path): path is string => typeof path === "string") : [],
 			...(why ? { deferred: why } : {}),
@@ -477,9 +477,9 @@ export class CanvasService {
 	 * canvas it shows), so the answer is a count rather than a guess.
 	 */
 	async reloadEverywhere(agentId: string, path: string, canvas?: string): Promise<number> {
-		if (!this.deck.card(path)) throw new Error(`No such board: ${path}`);
+		if (!this.deck.card(path)) throw new Error(`No such card: ${path}`);
 		if (!this.host.connected()) return 0;
-		const call = { op: "reload" as const, agentId, args: { path, count: true, ...(canvas ? { stage: canvas } : {}) } };
+		const call = { op: "reload" as const, agentId, args: { path, count: true, ...(canvas ? { canvas: canvas } : {}) } };
 		const answers = this.host.callAll ? await this.host.callAll(call, 1500) : [await this.host.call(call, 1500)];
 		return answers.reduce<number>((sum, answer) => sum + (typeof (answer as { pages?: unknown } | undefined)?.pages === "number" ? (answer as { pages: number }).pages : 0), 0);
 	}
@@ -492,7 +492,7 @@ export class CanvasService {
 	 */
 	async mayMove(agentId: string, canvas: string, person = false, keep = false): Promise<{ apply: boolean; onScreen: boolean; offered?: string }> {
 		// `keep`: the canvas is opened as a tab (`view.open`), so the page keeps it and the one the camera leaves in its row.
-		const answer = (await this.ask(agentId, { op: "goto", args: { stage: canvas, ...(person ? { person: true } : {}), ...(keep ? { keep: true } : {}) } })) as { apply?: unknown; onScreen?: unknown; offered?: unknown } | undefined;
+		const answer = (await this.ask(agentId, { op: "goto", args: { canvas, ...(person ? { person: true } : {}), ...(keep ? { keep: true } : {}) } })) as { apply?: unknown; onScreen?: unknown; offered?: unknown } | undefined;
 		if (typeof answer?.offered === "string") return { apply: false, onScreen: true, offered: answer.offered };
 		return { apply: true, onScreen: answer?.onScreen === true };
 	}
@@ -502,7 +502,7 @@ export class CanvasService {
 	}
 
 	/**
-	 * A card as the person's browser has it now (`stage.call` op `shot`): drawn there by
+	 * A card as the person's browser has it now (`decks.call` op `shot`): drawn there by
 	 * HTML-in-Canvas, or from a snapshot the server's Chrome draws, so it shows what the person did
 	 * on the page. `none` when no browser is looking or it has no live page for the card.
 	 */
@@ -515,7 +515,7 @@ export class CanvasService {
 	}
 
 	/** One thing asked of the person's page for an agent (`view.called`), answered by the first page to say; `skipped` when no page is there. */
-	async ask(agentId: string, call: Omit<StageCall, "id" | "agentId">, timeoutMs?: number): Promise<unknown> {
+	async ask(agentId: string, call: Omit<CanvasCall, "id" | "agentId">, timeoutMs?: number): Promise<unknown> {
 		if (!this.host.connected()) {
 			// Not an error: an agent can do useful work with nobody watching, and it
 			// should be told rather than blocked.
@@ -525,4 +525,4 @@ export class CanvasService {
 	}
 }
 
-export type { StageResult };
+export type { CanvasResult };

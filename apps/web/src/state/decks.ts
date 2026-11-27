@@ -4,15 +4,15 @@ import { authHeaders } from "../lib/session.ts";
 import { notice } from "./notices.ts";
 import { call } from "./socket.ts";
 import { rewatch } from "./pens.ts";
-import { stageOf } from "./canvases.ts";
+import { canvasOf } from "./canvases.ts";
 
 /**
  * The person's clicks on the canvas, as verbs: the same `POST /api/v1/<verb>` an agent's `decks`
  * command and an app's SDK call (`packages/sdk`), sent with this tab's person token (`lib/session.ts`),
  * which is what makes them the person's. The canvas and the agent they act on go as parameters.
  *
- * Whose stage a click acts on is read when it is sent: the canvas on screen and the conversation
- * the person is in, which App names once (`setPersonStage`). Through the relay to another server
+ * Whose canvas a click acts on is read when it is sent: the canvas on screen and the conversation
+ * the person is in, which App names once (`setPersonCanvas`). Through the relay to another server
  * the prefix comes along (`apiBase`), as for every other request this page makes.
  *
  * A refusal is said as a notice, which is what the person saw when these went over the socket;
@@ -20,13 +20,13 @@ import { stageOf } from "./canvases.ts";
  */
 let onScreen: () => string | undefined = () => undefined;
 let talkingTo: () => string | undefined = () => undefined;
-export function setPersonStage(stage: () => string | undefined, agent: () => string | undefined): void {
-	onScreen = stage;
+export function setPersonCanvas(canvas: () => string | undefined, agent: () => string | undefined): void {
+	onScreen = canvas;
 	talkingTo = agent;
 }
 
 /** The canvas on screen, named on a card's agent call this page makes (`canvas/pass.ts`). */
-export function stageOnScreen(): string | undefined {
+export function canvasNameOnScreen(): string | undefined {
 	return onScreen();
 }
 
@@ -40,7 +40,7 @@ let clientBase: string | undefined;
 function decks(): Decks {
 	const base = `${location.origin}${apiBase().replace(/\/api$/, "")}`;
 	if (!client || clientBase !== base) {
-		client = connect({ url: base, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: authHeaders() });
+		client = connect({ url: base, canvas: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: authHeaders() });
 		clientBase = base;
 	}
 	return client;
@@ -49,7 +49,7 @@ function decks(): Decks {
 /** Call one verb as the person; a refusal is a notice and an `undefined`. */
 export async function act<T = unknown>(verb: string, args: unknown[], agent?: string): Promise<T | undefined> {
 	try {
-		// A click about one conversation (moving it to a stage) names it and no canvas: the agent wins.
+		// A click about one conversation (moving it to a canvas) names it and no canvas: the agent wins.
 		const connection = agent ? connect({ url: decks().address, agent, notes: () => {}, headers: authHeaders() }) : decks();
 		return (await connection.call(verb, args)).value as T;
 	} catch (error) {
@@ -67,13 +67,13 @@ export async function act<T = unknown>(verb: string, args: unknown[], agent?: st
 async function sendDrawingEdit(agentId: string, ops: unknown[], edit?: string): Promise<boolean> {
 	let done: unknown;
 	try {
-		const connection = edit ? connect({ url: decks().address, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: { ...authHeaders(), "x-decks-edit": edit } }) : decks();
+		const connection = edit ? connect({ url: decks().address, canvas: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: { ...authHeaders(), "x-decks-edit": edit } }) : decks();
 		done = (await connection.call("canvas.batch", [ops])).value;
 	} catch (error) {
 		notice("warn", error instanceof DecksError || error instanceof Error ? error.message : String(error));
 		done = undefined;
 	}
-	if (done === undefined) rewatch(stageOf(agentId)?.name);
+	if (done === undefined) rewatch(canvasOf(agentId)?.name);
 	return done !== undefined;
 }
 

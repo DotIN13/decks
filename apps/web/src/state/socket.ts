@@ -130,7 +130,7 @@ function connect(onStateChange: (connected: boolean) => void): Line {
 			const id = `p${(nextId += 1).toString(36)}`;
 			return new Promise((resolve) => {
 				pending.set(id, resolve as (answer: LineAnswer) => void);
-				post({ type: "line.call", id, verb, args: [...args], ...(options?.edit ? { edit: options.edit } : {}), ...(options?.canvas ?? onScreen() ? { stage: options?.canvas ?? onScreen() } : {}), ...(options?.agent ?? talkingTo() ? { agent: options?.agent ?? talkingTo() } : {}) });
+				post({ type: "line.call", id, verb, args: [...args], ...(options?.edit ? { edit: options.edit } : {}), ...(options?.canvas ?? onScreen() ? { canvas: options?.canvas ?? onScreen() } : {}), ...(options?.agent ?? talkingTo() ? { agent: options?.agent ?? talkingTo() } : {}) });
 			});
 		},
 		send: post,
@@ -183,11 +183,11 @@ function saidDown(up: boolean): void {
 	downNotice = undefined;
 }
 
-/** The canvas on screen and the agent the person is talking to, named by App: what a call acts on unless it says otherwise (`X-Decks-Stage`, `X-Decks-Agent`). */
+/** The canvas on screen and the agent the person is talking to, named by App: what a call acts on unless it says otherwise (`X-Decks-Canvas`, `X-Decks-Agent`). */
 let onScreen: () => string | undefined = () => undefined;
 let talkingTo: () => string | undefined = () => undefined;
-export function setOnScreen(stage: () => string | undefined, agent?: () => string | undefined): void {
-	onScreen = stage;
+export function setOnScreen(canvas: () => string | undefined, agent?: () => string | undefined): void {
+	onScreen = canvas;
 	if (agent) talkingTo = agent;
 }
 

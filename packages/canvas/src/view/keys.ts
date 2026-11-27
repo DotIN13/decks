@@ -41,7 +41,7 @@ export function listenKeys(d: ListenKeysNeeds) {
 		 */
 		const zoom = zoomKey(event);
 		if (zoom) {
-			if (zoom === "fit") d.pushCamera(d.frame(d.props.boards.map(boxOf)));
+			if (zoom === "fit") d.pushCamera(d.frame(d.props.cards.map(boxOf)));
 			else d.pushCamera(zoomAbout(d.ctl.now(), d.view(), d.centre(), zoom === "in" ? 1.2 : 1 / 1.2));
 			event.preventDefault();
 			return;

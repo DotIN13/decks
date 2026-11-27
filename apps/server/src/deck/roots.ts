@@ -123,7 +123,7 @@ export function resolveRoots(deckRoot: string, declared: Array<{ path: string; w
 /**
  * Where a dropped file may be written, and the only write decision in the app.
  *
- * One directory — `<deck>/assets`, which is already "the images the boards use"
+ * One directory — `<deck>/assets`, which is already "the images the cards use"
  * (§2), or the `files/` of the canvas the file was dropped on (`folder`, a deck path
  * the caller worked out from `deck/layout.ts`) — and one plain file name inside it. The name is *rejected* rather than
  * cleaned here: `files/upload.ts` sanitises what the browser sent, and this is
@@ -152,7 +152,7 @@ export function resolveAssetWrite(deckRoot: string, name: string, folder = "asse
  * A file request -> an absolute path inside the deck or a declared root.
  *
  * `from` is the card the request came from, deck-relative, so a path resolves
- * the way it looks like it should: `../docs/notes.md` in `boards/sources.html`
+ * the way it looks like it should: `../docs/notes.md` in `cards/sources.html`
  * means what it would mean in an `<img src>`, because a card is a document and
  * that is a document's rule. Without a `from` a relative path is deck-relative,
  * which is what the agent's own tools use.

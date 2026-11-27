@@ -23,7 +23,7 @@ import { formatNumber, m } from "@decks/i18n";
  *    because success is the state you should be able to skim past. Failure is the exception
  *    and gets a shape of its own rather than a colour: a triangle, which also survives being
  *    read by somebody who cannot tell red from grey.
- * 2. **The name, in mono**, small and uppercase: `read`, `bash`, `stage_eval` — an
+ * 2. **The name, in mono**, small and uppercase: `read`, `bash`, `canvas_eval` — an
  *    identifier, and the string the runtime uses. It gives ground before the title does,
  *    because an MCP tool is called `mcp__server__tool` and would otherwise take the row.
  * 3. **The description** beside it, the widest thing in the row: the path, the command, the

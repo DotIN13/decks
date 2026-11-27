@@ -3,7 +3,7 @@
  *
  * The side panel's right edge and the line above the conversation are both handles of this kind,
  * and both had learned the same lesson separately: a drag must end however the button comes up.
- * On the handle, anywhere in the window, outside it, over a board's frame (which swallows the
+ * On the handle, anywhere in the window, outside it, over a card's frame (which swallows the
  * pointer), on a lost capture, or when the window loses focus. A mouse moved with no button held
  * ends it too, so a release nobody reported cannot leave the handle stuck to the pointer.
  *

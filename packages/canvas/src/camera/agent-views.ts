@@ -10,9 +10,9 @@ const PREFIX = "decks.views:";
 /** One deck's views, read once and written back on every change. */
 export interface AgentViews {
 	/** What this conversation was last left looking at on this canvas, if it has been left there yet. */
-	of(agentId: string, stage: string | undefined): AgentView | undefined;
+	of(agentId: string, canvas: string | undefined): AgentView | undefined;
 	/** Remember it, for this agent on this canvas, on this device. */
-	keep(agentId: string, stage: string | undefined, view: AgentView): void;
+	keep(agentId: string, canvas: string | undefined, view: AgentView): void;
 	/** Drop the views of agents that no longer exist, so the key cannot grow forever. */
 	retain(agentIds: string[]): void;
 }
@@ -47,7 +47,7 @@ export function createAgentViews(deckPath: string, storage: ViewStorage | undefi
 			}
 		} catch {
 			// A browser with storage switched off, or a value some older build wrote. An
-			// unreadable view is no view: the conversation then opens where it holds boards,
+			// unreadable view is no view: the conversation then opens where it holds cards,
 			// which is the answer a first visit gives.
 			held = {};
 		}
@@ -68,20 +68,20 @@ export function createAgentViews(deckPath: string, storage: ViewStorage | undefi
 		 * first canvas this agent is asked about (the one it is on as the upgrade lands), and dropped: it
 		 * comes back where it was left and no longer stands in for every canvas.
 		 */
-		of: (agentId, stage) => {
+		of: (agentId, canvas) => {
 			const views = read();
-			const key = keyOf(agentId, stage);
-			if (views[key] || !stage || !views[agentId]) return views[key];
+			const key = keyOf(agentId, canvas);
+			if (views[key] || !canvas || !views[agentId]) return views[key];
 			views[key] = views[agentId]!;
 			delete views[agentId];
 			write();
 			return views[key];
 		},
-		keep: (agentId, stage, view) => {
+		keep: (agentId, canvas, view) => {
 			const views = read();
-			views[keyOf(agentId, stage)] = { camera: { ...view.camera }, ...(view.selected ? { selected: view.selected } : {}) };
+			views[keyOf(agentId, canvas)] = { camera: { ...view.camera }, ...(view.selected ? { selected: view.selected } : {}) };
 			// The view kept before canvases were part of the key is replaced by this canvas's own.
-			if (stage) delete views[agentId];
+			if (canvas) delete views[agentId];
 			write();
 		},
 		retain: (agentIds) => {
@@ -96,7 +96,7 @@ export function createAgentViews(deckPath: string, storage: ViewStorage | undefi
 }
 
 /** The key one view is kept under: the agent, and the canvas it was on. */
-const keyOf = (agentId: string, stage: string | undefined) => (stage ? `${agentId}@${stage}` : agentId);
+const keyOf = (agentId: string, canvas: string | undefined) => (canvas ? `${agentId}@${canvas}` : agentId);
 /** Which agent a key is for. */
 const agentOf = (key: string) => key.split("@")[0]!;
 

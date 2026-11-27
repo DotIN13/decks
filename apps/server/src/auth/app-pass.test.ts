@@ -34,7 +34,7 @@ test("a tab's app pass opens its one app from another site, on the token that as
 		assert.equal(open.headers.get("referrer-policy"), "no-referrer");
 		assert.equal((await fetch(`${origin}/app/notes/`, { headers: studio })).status, 403, "without it, another site is refused");
 		assert.equal((await fetch(`${origin}/app/other/?decks_pass=${encodeURIComponent(answer.pass)}`, { headers: studio })).status, 403, "another app");
-		assert.equal((await fetch(`${origin}/api/v1/boards`, { method: "POST", headers: { authorization: `Bearer ${answer.pass}`, "content-type": "application/json" }, body: "{}" })).status, 401, "it calls nothing");
+		assert.equal((await fetch(`${origin}/api/v1/cards`, { method: "POST", headers: { authorization: `Bearer ${answer.pass}`, "content-type": "application/json" }, body: "{}" })).status, 401, "it calls nothing");
 		app.tokens.revoke(site.id);
 		assert.equal((await fetch(`${origin}${answer.url}`, { headers: studio })).status, 403, "the token that asked taken back: the pass with it");
 	} finally {
@@ -71,7 +71,7 @@ test("an app pass for a frame in the Decks window opens its one app by its path,
 		assert.equal((await fetch(`${origin}/app/notes/`, { headers: sandboxed })).status, 403, "without the pass in its path, a frame with no origin is refused");
 		assert.equal((await fetch(`${origin}${answer.url.replace("/notes/", "/other/")}`, { headers: sandboxed })).status, 401, "another app");
 		assert.equal((await fetch(`${origin}/app/notes/?decks_pass=${encodeURIComponent(answer.pass)}`, { headers: sandboxed })).status, 403, "it is not a tab's pass");
-		assert.equal((await fetch(`${origin}/api/v1/boards`, { method: "POST", headers: { authorization: `Bearer ${answer.pass}`, "content-type": "application/json" }, body: "{}" })).status, 401, "it calls nothing");
+		assert.equal((await fetch(`${origin}/api/v1/cards`, { method: "POST", headers: { authorization: `Bearer ${answer.pass}`, "content-type": "application/json" }, body: "{}" })).status, 401, "it calls nothing");
 		app.tokens.revoke((app.tokens.verify(person.token) as { id: string }).id);
 		assert.equal((await fetch(`${origin}${answer.url}`, { headers: sandboxed })).status, 401, "the token that asked taken back: the pass with it");
 	} finally {

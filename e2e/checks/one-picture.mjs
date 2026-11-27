@@ -89,7 +89,7 @@ for (const target of TARGETS) {
 	// In, below the live zoom, resting between: only higher rungs are fetched.
 	const before = asked.length;
 	for (let i = 0; i < 4; i++) {
-		if (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) break;
+		if (await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.live === "true")) break;
 		await zoomStep(page, -30);
 		await settle(page, 400);
 	}

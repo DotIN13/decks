@@ -58,7 +58,7 @@ await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
 const taskMs = async () => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "TaskDuration").value * 1000;
 
 await page.click('.v3-tool[data-tool="pen"]');
-await canvas.waitForSelector(".stage-ink");
+await canvas.waitForSelector(".canvas-ink");
 
 await canvas.evaluate(() => {
 	/*
@@ -73,7 +73,7 @@ await canvas.evaluate(() => {
 	 * characters"). The pen here never means to rest.
 	 */
 	globalThis.__decksKnobs.noHold = true;
-	const sheet = () => document.querySelector(".stage-ink");
+	const sheet = () => document.querySelector(".canvas-ink");
 	let state;
 	const send = (type, x, y, pressure) =>
 		sheet().dispatchEvent(new PointerEvent(type, { pointerId: 7, pointerType: state.pen ? "pen" : "mouse", isPrimary: true, button: type === "pointermove" ? -1 : 0, buttons: type === "pointerup" ? 0 : 1, pressure, clientX: x, clientY: y, bubbles: true, composed: true }));

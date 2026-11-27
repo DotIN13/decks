@@ -31,10 +31,10 @@ const gdocs = JSON.parse(readFileSync(resolve(runtime, "gdocs-tools.json"), "utf
 
 /** One call back to Decks; a failed answer is thrown, so it reads as a failed tool call. */
 async function callDecks(path: string, body: Record<string, unknown>, what: string): Promise<string> {
-  const url = process.env.DECKS_STAGE_URL
+  const url = process.env.DECKS_CANVAS_URL
   const token = process.env.DECKS_OPENCODE_SECRET
   if (!url || !token) throw new Error(`This OpenCode session was not started by Decks, so there is no ${what} to reach.`)
-  const response = await fetch(url.replace(/\/stage\/eval$/, path), {
+  const response = await fetch(url.replace(/\/canvas\/eval$/, path), {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify(body),

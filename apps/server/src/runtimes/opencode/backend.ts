@@ -253,7 +253,7 @@ export class OpencodeBackend extends SharedServerBackend {
 		// words change is the server's own doing.
 		const handle = await opencodeManager.acquire({
 			cwd: deck.path,
-			decksUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
+			decksUrl: `http://127.0.0.1:${this.context.port}/api/canvas/eval`,
 			decksPort: this.context.port,
 			config: { instructions: [this.briefingFile()] },
 		});

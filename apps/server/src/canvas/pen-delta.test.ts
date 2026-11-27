@@ -30,8 +30,8 @@ test("canvas.changed carries an edit, a reroute and a hand edit of the file as e
 		pens.edit(name, [{ op: "update", id: "a", set: { x: 40, fill: "#f00" } }, { op: "insert", node: { type: "ellipse", id: "b" } }] as never);
 		take();
 		// Written by hand, as an agent's own tools would.
-		mkdirSync(join(deck, "stages", name), { recursive: true });
-		writeFileSync(join(deck, "stages", name, "stage.pen"), JSON.stringify({ version: "2.14", children: [{ type: "ellipse", id: "b", x: 5 }, { type: "note", id: "n", content: "hi" }] }, null, 2));
+		mkdirSync(join(deck, "canvases", name), { recursive: true });
+		writeFileSync(join(deck, "canvases", name, "canvas.pen"), JSON.stringify({ version: "2.14", children: [{ type: "ellipse", id: "b", x: 5 }, { type: "note", id: "n", content: "hi" }] }, null, 2));
 		take();
 	} finally {
 		pens.close();

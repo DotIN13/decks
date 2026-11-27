@@ -6,7 +6,7 @@ import { createDrawingSync } from "./drawing-sync.ts";
 import { createPending } from "./drawing-pending.ts";
 
 /**
- * The edits that made a drawing from the one before it (`from`): the stage's engines apply them in
+ * The edits that made a drawing from the one before it (`from`): the canvas's engines apply them in
  * place of working out what changed, when `from` is the drawing they hold. A host that hears a
  * drawing's changes as edits (the Decks app's `canvas.changed`, a mounted canvas's own `onEdits`)
  * hands them along with the drawing they make.
@@ -50,14 +50,14 @@ export interface Drawing {
 	follow(edits: readonly PenEdit[], made?: readonly string[]): boolean;
 	/** The host did not make the person's edit (or step) of this name: it is no longer shown. */
 	refused(edit: string): void;
-	/** The edits that made `doc` from the drawing before it, when it is the drawing now and they are known: the stage applies them. */
+	/** The edits that made `doc` from the drawing before it, when it is the drawing now and they are known: the canvas applies them. */
 	editsTo(doc: PenDocument): DocEdits | undefined;
-	/** Whether `doc` is the person's own edit or step, shown at once by their hand: nothing for the stage to glide. */
+	/** Whether `doc` is the person's own edit or step, shown at once by their hand: nothing for the canvas to glide. */
 	ownTo(doc: PenDocument): boolean;
-	/** A board on the drawing (by its deck path) moved or resized: its item moved or resized. */
+	/** A card on the drawing (by its deck path) moved or resized: its item moved or resized. */
 	movePage(path: string, x: number, y: number): void;
 	resizePage(path: string, size: { w: number; h: number }): void;
-	/** A board taken off the drawing (its file is the host's business): its item deleted. */
+	/** A card taken off the drawing (its file is the host's business): its item deleted. */
 	removePage(path: string): void;
 	/** An app's window collapsed (its yellow light): its item gone and a link to the app where its corner was, as one edit. */
 	collapsePage(path: string): void;
@@ -71,8 +71,8 @@ export interface DrawingOptions {
 	/** How many edits undo reaches back. */
 	depth?: number;
 	/**
-	 * How words are measured to lay an edit out, as the host's server measures them: the stage
-	 * engine's (`stage/measure.ts`), so a card sized by its words and the arrows joined to it come
+	 * How words are measured to lay an edit out, as the host's server measures them: the canvas
+	 * engine's (`view/measure.ts`), so a card sized by its words and the arrows joined to it come
 	 * out where the server's drawing will have them. Default: pen's estimate.
 	 */
 	measure?: MeasureText;
@@ -137,12 +137,12 @@ export function cardFrame(doc: PenDocument, node: PenNode): Pick<Page, "corners"
 	return out;
 }
 
-/** The drawing's boards, as the stage takes them. Top-level only: a board's x and y are the canvas's. */
+/** The drawing's cards, as the canvas takes them. Top-level only: a card's x and y are the canvas's. */
 export function pagesOf(doc: PenDocument): Page[] {
-	const boards: Page[] = [];
+	const cards: Page[] = [];
 	for (const node of doc.children ?? []) {
 		if (!isPage(node)) continue;
-		boards.push({
+		cards.push({
 			path: pagePath(node),
 			title: typeof node.name === "string" && node.name ? node.name : itemTitle(node) ?? pagePath(node),
 			x: num(node.x, 0),
@@ -156,37 +156,37 @@ export function pagesOf(doc: PenDocument): Page[] {
 			...cardFrame(doc, node),
 		});
 	}
-	return boards;
+	return cards;
 }
 
 /**
- * A host's list of boards (its server's), with what the person's edits on their way do to them: a
- * board moved or sized on the drawing shown is where the drawing has it, and one taken off is gone,
- * until the host's drawing (`given`) and so its list have it too. Boards the edits do not touch, and
+ * A host's list of cards (its server's), with what the person's edits on their way do to them: a
+ * card moved or sized on the drawing shown is where the drawing has it, and one taken off is gone,
+ * until the host's drawing (`given`) and so its list have it too. Cards the edits do not touch, and
  * fields the drawing does not hold (a height the page raised), are the list's.
  */
 export function pagesAhead(list: Page[], given: PenDocument, shown: PenDocument): Page[] {
 	if (given === shown) return list;
-	const byPath = (doc: PenDocument) => new Map(pagesOf(doc).map((board) => [board.path, board]));
+	const byPath = (doc: PenDocument) => new Map(pagesOf(doc).map((card) => [card.path, card]));
 	const was = byPath(given);
 	const now = byPath(shown);
 	const out: Page[] = [];
-	for (const board of list) {
-		const a = was.get(board.path);
-		const b = now.get(board.path);
+	for (const card of list) {
+		const a = was.get(card.path);
+		const b = now.get(card.path);
 		if (a && !b) continue;
 		if (!a || !b || (a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h)) {
-			out.push(board);
+			out.push(card);
 			continue;
 		}
-		out.push({ ...board, x: b.x, y: b.y, ...(a.w !== b.w ? { w: b.w } : {}), ...(a.h !== b.h ? { h: b.h } : {}) });
+		out.push({ ...card, x: b.x, y: b.y, ...(a.w !== b.w ? { w: b.w } : {}), ...(a.h !== b.h ? { h: b.h } : {}) });
 	}
 	return out;
 }
 
 /**
  * Edits made one after another, as one list of ops: run after run of plain updates (what the arrow keys,
- * a colour or a board's move write) folded into one update an item, each field as the last set it, and
+ * a colour or a card's move write) folded into one update an item, each field as the last set it, and
  * anything else kept as it was, in order.
  */
 export function together(edits: readonly (readonly unknown[])[]): unknown[] {
@@ -238,7 +238,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	const measure = options.measure;
 	/**
 	 * `ops` applied to `prev` as the server applies them; throws when refused. The arrows an edit
-	 * touches are routed by the stage engine as it lays the edit out (`reroute_after`), as the server
+	 * touches are routed by the canvas engine as it lays the edit out (`reroute_after`), as the server
 	 * routes them, so the page lays nothing out for them here.
 	 */
 	const applied = (prev: PenDocument, ops: unknown[]) => apply(prev, ops as Parameters<typeof apply>[1], { theme: baseTheme(prev, look()), share: true, ...(measure ? { measure } : {}) }).doc;
@@ -252,7 +252,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		ownDoc = own ? next : undefined;
 		setDoc(next);
 	};
-	/** Show `next` in place of what is shown, with what changed between them for the stage. */
+	/** Show `next` in place of what is shown, with what changed between them for the canvas. */
 	const showOver = (next: PenDocument) => {
 		const now = untrack(doc);
 		show(next, { from: now, edits: next === now ? [] : diff(now, next) });
@@ -375,7 +375,7 @@ export function collapseOps(doc: PenDocument, path: string, id: string): Op[] | 
 	];
 }
 
-/** What a document or an app item adds to its board record: its kind, and its file or its app. */
+/** What a document or an app item adds to its card record: its kind, and its file or its app. */
 function itemFields(node: PenNode): { item?: "document" | "app"; file?: string; app?: string } {
 	const kind = itemKind(node);
 	const meta = (node.metadata ?? {}) as { path?: unknown; name?: unknown };

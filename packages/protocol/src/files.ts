@@ -14,9 +14,9 @@ export const CONFIRM_UPLOAD_BYTES = 100 * 1024 * 1024;
 /**
  * Where a dropped file landed, as `POST /api/upload` answers.
  *
- * `path` is deck-relative — the same currency `decks.board.create` and the file
- * picker deal in — so the caller turns it into a board-relative `data-embed`
- * itself rather than the server guessing which board asked.
+ * `path` is deck-relative — the same currency `decks.card.create` and the file
+ * picker deal in — so the caller turns it into a card-relative `data-embed`
+ * itself rather than the server guessing which card asked.
  */
 export interface UploadedAsset {
 	path: string;

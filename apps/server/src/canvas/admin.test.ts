@@ -22,9 +22,9 @@ function put(file: string, data: string | Uint8Array): void {
  */
 
 function fixture() {
-	const root = mkdtempSync(join(tmpdir(), "decks-stage-admin-"));
+	const root = mkdtempSync(join(tmpdir(), "decks-canvas-admin-"));
 	const deckPath = join(root, "decks");
-	mkdirSync(join(deckPath, "boards"), { recursive: true });
+	mkdirSync(join(deckPath, "cards"), { recursive: true });
 	put(join(deckPath, "canvases", "t", "cards", "plan", "index.html"), "<title>Plan</title>PLAN");
 	const deck = Deck.open(deckPath);
 	const pens = new CanvasPens(deckPath, () => undefined);
@@ -32,7 +32,7 @@ function fixture() {
 	pens.cards.syncCards("deploy", [{ path: "canvases/t/cards/plan/index.html", x: 10, y: 20, w: 800, h: 500, title: "Plan" }]);
 	// A second canvas that keeps its own copy of the card in its folder.
 	pens.claim("deploy-copy");
-	mkdirSync(join(deckPath, "canvases", "deploy-copy", "boards"), { recursive: true });
+	mkdirSync(join(deckPath, "canvases", "deploy-copy", "cards"), { recursive: true });
 	put(join(deckPath, "canvases", "deploy-copy", "cards", "plan", "index.html"), "<title>Plan</title>PLAN");
 	deck.refresh("canvases/deploy-copy/cards/plan/index.html");
 	pens.cards.syncCards("deploy-copy", [{ path: "canvases/deploy-copy/cards/plan/index.html", x: 10, y: 20, w: 800, h: 500, title: "Plan" }]);
@@ -40,7 +40,7 @@ function fixture() {
 	return { deckPath, deck, pens, context, done: () => (pens.close(), rmSync(root, { recursive: true, force: true })) };
 }
 
-test("a rename moves the folder and re-points the boards kept in it, keeping their ids", () => {
+test("a rename moves the folder and re-points the cards kept in it, keeping their ids", () => {
 	const { deckPath, deck, pens, context, done } = fixture();
 	try {
 		const before = pens.cards.cards("deploy-copy");
@@ -60,7 +60,7 @@ test("a rename moves the folder and re-points the boards kept in it, keeping the
 	}
 });
 
-test("a delete takes the stage and the boards kept in its folder, and never the deck's own boards", () => {
+test("a delete takes the canvas and the cards kept in its folder, and never the deck's own cards", () => {
 	const { deckPath, deck, pens, context, done } = fixture();
 	try {
 		deleteCanvas(context, "deploy-copy");
@@ -74,7 +74,7 @@ test("a delete takes the stage and the boards kept in its folder, and never the 
 	}
 });
 
-test("neither is allowed while an agent on that stage is in the middle of a turn", () => {
+test("neither is allowed while an agent on that canvas is in the middle of a turn", () => {
 	const { context, done } = fixture();
 	try {
 		const busy = { name: "Ada", conversation: { running: true }, seat: { canvasFolder: () => "deploy" } } as unknown as DeckAgent;

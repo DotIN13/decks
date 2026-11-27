@@ -23,12 +23,12 @@ function put(file: string, data: string | Uint8Array): void {
  */
 
 const card = (title: string, w = 900, h = 400) =>
-	`<!doctype html><html><head><title>${title}</title><meta name="board" content='{"w":${w},"h":${h},"bg":"grid"}' /></head><body class="board"></body></html>`;
+	`<!doctype html><html><head><title>${title}</title><meta name="card" content='{"w":${w},"h":${h},"bg":"grid"}' /></head><body class="card-page"></body></html>`;
 
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-pen-calls-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	put(join(deck, "canvases", "t", "cards", "a", "index.html"), card("Revenue is up"));
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
@@ -104,7 +104,7 @@ test("a field pen has no place for, or one Decks does not draw, is a note and ne
 	}
 });
 
-test("canvas.read of one item, by id or a board's path, and to a depth", async () => {
+test("canvas.read of one item, by id or a card's path, and to a depth", async () => {
 	const { must, call, cleanup } = await open();
 	try {
 		await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }]);
@@ -112,11 +112,11 @@ test("canvas.read of one item, by id or a board's path, and to a depth", async (
 		const panel = (await must("canvas.read", [{ of: "panel" }])).value;
 		assert.deepEqual(panel.items.map((n: { id: string }) => n.id), ["panel"]);
 		assert.equal(panel.items[0].children[0].children[0].id, "cell");
-		const board = (await must("canvas.read", [{ of: "canvases/t/cards/a/index.html" }])).value.items;
-		assert.equal(board.length, 1);
-		assert.equal(board[0].type, "card", "a library board lands as a card");
+		const card = (await must("canvas.read", [{ of: "canvases/t/cards/a/index.html" }])).value.items;
+		assert.equal(card.length, 1);
+		assert.equal(card[0].type, "card", "a library card lands as a card");
 		const top = (await must("canvas.read", [{ depth: 0 }])).value.items;
-		assert.deepEqual(top.map((n: { id: string; childCount?: number; children?: unknown }) => [n.id, n.childCount, n.children]), [[board[0].id, undefined, undefined], ["panel", 1, undefined]]);
+		assert.deepEqual(top.map((n: { id: string; childCount?: number; children?: unknown }) => [n.id, n.childCount, n.children]), [[card[0].id, undefined, undefined], ["panel", 1, undefined]]);
 		const one = (await must("canvas.read", [{ of: "panel", depth: 1 }])).value.items[0];
 		assert.equal(one.children[0].id, "row");
 		assert.equal(one.children[0].childCount, 1);

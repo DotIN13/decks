@@ -1147,7 +1147,7 @@ export class GoogleView {
 	}
 
 	private key(event: KeyboardEvent): void {
-		// The board's own keys (its editor, its undo) are not this page's: the Doc keeps them.
+		// The card's own keys (its editor, its undo) are not this page's: the Doc keeps them.
 		event.stopPropagation();
 		if (event.isComposing) return;
 		const mod = event.metaKey || event.ctrlKey;

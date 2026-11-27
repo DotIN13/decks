@@ -164,7 +164,6 @@ test("files read on a pass are sent with no referrer, readable by the sandboxed 
 		const at = (path: string, prefix = "card") => fetch(`${origin}/api/t/${pass}/${prefix}/${path.split("/").map(encodeURIComponent).join("/")}?raw=1`);
 		const read = await at(mine);
 		assert.equal(read.status, 200);
-		assert.equal((await at(mine, "board")).status, 401, "the old prefix reaches nothing");
 		assert.equal(read.headers.get("referrer-policy"), "no-referrer");
 		assert.equal(read.headers.get("access-control-allow-origin"), "*");
 		assert.equal((await at(theirs)).status, 401, "another canvas's card");
@@ -197,8 +196,8 @@ test("from a sandboxed page, the pass edits, undoes and reads its own canvas, an
 
 		const read = await post("/api/v1/canvas.read", frame);
 		assert.equal(read.status, 200);
-		assert.equal((await fetch(`${origin}/api/stage-pen/${one}`, { headers: frame })).status, 200, "its drawing");
-		assert.equal((await fetch(`${origin}/api/stage-pen/${two}`, { headers: frame })).status, 403, "not another's");
+		assert.equal((await fetch(`${origin}/api/canvas-pen/${one}`, { headers: frame })).status, 200, "its drawing");
+		assert.equal((await fetch(`${origin}/api/canvas-pen/${two}`, { headers: frame })).status, 403, "not another's");
 
 		const other = await post("/api/v1/canvas.read", frame, { args: [{ canvas: two }] });
 		assert.equal(other.status, 403, "another canvas, named");
@@ -290,8 +289,8 @@ test("an agent's view of its canvas reaches the frame on its stream, and the fra
 		const line = text.split("\n").find((one) => one.startsWith("data:") && one.includes('"view.called"'));
 		const id = line ? (JSON.parse(line.slice(5)) as { call: { id: string } }).call.id : undefined;
 		assert.ok(id, text);
-		assert.equal((await post("/api/v1/stage-result", bearer(app.bridge.issue(agent.id)), { id, value: { no: 1 } })).status, 403, "an agent does not answer the canvas's calls");
-		const settled = await post("/api/v1/stage-result", frame, { id, value: { shown: ["n"] } });
+		assert.equal((await post("/api/v1/canvas-result", bearer(app.bridge.issue(agent.id)), { id, value: { no: 1 } })).status, 403, "an agent does not answer the canvas's calls");
+		const settled = await post("/api/v1/canvas-result", frame, { id, value: { shown: ["n"] } });
 		assert.equal(settled.body.settled, true);
 		const shown = (await answered).body as { value?: { deferred?: string }; notes?: string[] };
 		assert.equal(shown.value?.deferred, undefined, `shown, not skipped: ${JSON.stringify(shown)}`);

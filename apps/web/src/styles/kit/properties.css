@@ -1,7 +1,7 @@
 @layer components {
 	/*
 	 * The drawing's properties panel and its insert panel (`canvas/pen/Properties.tsx`, `Insert.tsx`),
-	 * and the marks the stage draws for arrows that keep to a side.
+	 * and the marks the canvas draws for arrows that keep to a side.
 	 *
 	 * **The properties panel scrolls down and never across.** It is 276px wide, and every row in it is
 	 * built to fit that: number fields in grids of columns that may shrink to nothing

@@ -13,7 +13,7 @@ import type { SceneQuery } from "./scene.ts";
 
 /** Where a new id comes from: each call one not used before. */
 export type NextId = () => string;
-/** A board moved to its own new corner, as `onMove` takes it. */
+/** A card moved to its own new corner, as `onMove` takes it. */
 export type PageMove = { path: string; x: number; y: number };
 
 /** Ids for several new items at once, none the same as another or as any already taken. */
@@ -29,7 +29,7 @@ export function idMaker(taken: Iterable<string>): NextId {
 const own = (value: unknown) => (typeof value === "number" ? value : 0);
 
 /**
- * What moving an item by `dx dy` sets. An arrow's point ends are on the stage rather than in its
+ * What moving an item by `dx dy` sets. An arrow's point ends are on the canvas rather than in its
  * box, so they move with it; its joined ends stay joined (`moveArrowEnds`).
  */
 export function movedBy(node: PenNode, dx: number, dy: number): Record<string, unknown> {
@@ -54,13 +54,13 @@ function pinned(node: PenNode, moving: ReadonlySet<string>, scene: SceneQuery): 
 	return ends.some((end) => end !== undefined && !moving.has(end) && joinsSomething(scene, end));
 }
 
-/** Whether an arrow's end names something still on the stage: an item, or a board by its path. */
+/** Whether an arrow's end names something still on the canvas: an item, or a card by its path. */
 function joinsSomething(scene: SceneQuery, end: string): boolean {
-	return !!scene.node(end) || scene.boards().some((board) => board.path === end);
+	return !!scene.node(end) || scene.cards().some((card) => card.path === end);
 }
 
 /**
- * Where an arrow's two ends are drawn now, on the stage: the first and last point of its line,
+ * Where an arrow's two ends are drawn now, on the canvas: the first and last point of its line,
  * the first subpath of its geometry, through its box. Undefined for an arrow with no geometry yet.
  */
 function arrowEndsDrawn(node: PenNode): { from: [number, number]; to: [number, number] } | undefined {
@@ -103,7 +103,7 @@ function freedEnds(node: PenNode, scene: SceneQuery, gone: ReadonlySet<string> =
  * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
  * because a group's box starts where its children do, not at its own `x` and `y`.
  *
- * `into` is the parent the drag lets go in (`null` the stage), `undefined` when the parent is not
+ * `into` is the parent the drag lets go in (`null` the canvas), `undefined` when the parent is not
  * in question (the drag was held with ⌘, a nudge, nothing carried): then it is the plain move.
  * `slot` is where in a frame that stacks its children the first item goes.
  */
@@ -122,8 +122,8 @@ export function moveOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 		// Not into another frame: an arrow that cannot move gets nothing.
 		if ((into === undefined || into === (scene.item(id)?.parent ?? null)) && pinned(node, moving, scene)) return [];
 		/*
-		 * Into a frame, or out of one onto the stage: a `move` with the parent and the box the
-		 * item ends up at **in stage coordinates**, which the server turns into the frame's own
+		 * Into a frame, or out of one onto the canvas: a `move` with the parent and the box the
+		 * item ends up at **in canvas coordinates**, which the server turns into the frame's own
 		 * x and y. Writing x and y here instead is what made a frame a trap, since a child's are
 		 * measured from its frame's corner.
 		 */
@@ -197,11 +197,11 @@ export function deleteOps(ids: readonly string[], scene?: SceneQuery): Op[] {
 	return [...freeing, ...deleting];
 }
 
-/** Boards moved by `dx dy`, each to its own new corner, rounded; a path not on the stage is left out. */
-export function pageMoves(boards: readonly PageBox[], paths: readonly string[], dx: number, dy: number): PageMove[] {
+/** Cards moved by `dx dy`, each to its own new corner, rounded; a path not on the canvas is left out. */
+export function pageMoves(cards: readonly PageBox[], paths: readonly string[], dx: number, dy: number): PageMove[] {
 	return paths.flatMap((path) => {
-		const board = boards.find((candidate) => candidate.path === path);
-		return board ? [{ path, x: Math.round(board.x + dx), y: Math.round(board.y + dy) }] : [];
+		const card = cards.find((candidate) => candidate.path === path);
+		return card ? [{ path, x: Math.round(card.x + dx), y: Math.round(card.y + dy) }] : [];
 	});
 }
 
@@ -281,7 +281,7 @@ const insertOp = (node: PenNode, box: Partial<Box>, parent: string | undefined):
 const typingBox = (tool: MakingTool, x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h: tool === "card" ? 80 : h });
 
 /**
- * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
+ * One item of a tool, at its own size, at a canvas point: a click with a tool armed, and a pick
  * from the canvas menu. From the insert panel (`centred`) the item is put with its middle there; from a click, its corner.
  * A note's height and a text's height are its words', so their box leaves them out.
  */

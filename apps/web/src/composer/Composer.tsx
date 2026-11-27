@@ -114,11 +114,11 @@ export function Composer(props: {
 	onDraftTaken?: () => void;
 	/** Files dropped on the bar: the app copies them into the deck and hands back mentions. */
 	onDropFiles?: (files: File[]) => void;
-	/** A board's or card's title by its path, for the name on a pill's card. */
+	/** A card's title by its path, for the name on a pill's card. */
 	titleOf?: TitleOf;
 	/** A drawn item's name by its id, for a comment on one. */
 	itemName?: ItemName;
-	/** Show what a pill is about: the board, card or item on the canvas, the file. */
+	/** Show what a pill is about: the card, card or item on the canvas, the file. */
 	onShowPill?: (pill: DraftMention, comment?: WaitingComment) => void;
 	/**
 	 * Where a line will land, in a word: "to Sable", "note on risk-model".
@@ -201,7 +201,7 @@ export function Composer(props: {
 	};
 
 	/**
-	 * What you had typed on each agent's stage, per canvas, on this device (`parked.ts`).
+	 * What you had typed on each agent's canvas, per canvas, on this device (`parked.ts`).
 	 *
 	 * Written on every change rather than only on a switch, so a draft outlives a change of
 	 * page and a reload. `held` is the page the field is showing.
@@ -259,7 +259,7 @@ export function Composer(props: {
 			// A draft addressed to one conversation is not put into another's field.
 			if (handed.agentId === undefined || handed.agentId === props.agentId) {
 				const kept = handed.comment ? props.comments?.find((candidate) => candidate.id === handed.comment) : undefined;
-				// A comment kept on a board arrives as a pill, and so does a board or an item dragged
+				// A comment kept on a card arrives as a pill, and so does a card or an item dragged
 				// onto the bar, and a file attached or dropped; plain words go in at the caret; anything
 				// else replaces what is there.
 				if (kept) field?.append(pillFor(kept));
@@ -447,7 +447,7 @@ export function Composer(props: {
 	 *
 	 * A Chinese, Japanese or Korean IME uses Enter to accept the candidate it is showing.
 	 * Unguarded, that keypress reaches this handler like any other and ships the half-typed
-	 * pinyin instead of the sentence — the bug the board
+	 * pinyin instead of the sentence — the bug the card
 	 * `enter-during-chinese-input-no-longer-sends` is about, fixed there and not to be
 	 * reintroduced here.
 	 *
@@ -537,7 +537,7 @@ export function Composer(props: {
 					if (!props.onDropFiles || !carriesFiles(event.dataTransfer)) return;
 					event.preventDefault();
 					// The bar's, not the canvas's: the document's own guard would take this for a
-					// file dropped on empty canvas and make a board of it.
+					// file dropped on empty canvas and make a card of it.
 					event.stopPropagation();
 					setDropping(false);
 					const files = Array.from(event.dataTransfer?.files ?? []);
@@ -632,7 +632,7 @@ export function Composer(props: {
 						</Show>
 					</p>
 				</Show>
-				{/* The controls row. `dockrow` is only the two control sizes the board fixes
+				{/* The controls row. `dockrow` is only the two control sizes the card fixes
 				    for this row (26px, 34 under a finger); the layout is here. */}
 				<div class="dock-row mt-2 flex items-center gap-1.5">
 					<Show

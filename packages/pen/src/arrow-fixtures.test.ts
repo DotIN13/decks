@@ -6,7 +6,7 @@ import { arrowPoints, arrowShape, arrowStyle } from "./arrows.ts";
 import type { Frame, Placed } from "./layout.ts";
 
 /*
- * The cases the stage engine's Rust router is held to (`packages/stage/crates/scene/src/arrows.rs`,
+ * The cases the canvas engine's Rust router is held to (`packages/stage/crates/scene/src/arrows.rs`,
  * its test `arrows_match_pen`): boxes, sides, join points, bends and all three routes, each with
  * the points and the path pen makes of them. A change to `arrows.ts` fails here until the file is
  * written again (`UPDATE_ARROW_FIXTURES=1`), and then fails the Rust test until the port follows.

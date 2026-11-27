@@ -21,7 +21,7 @@ function fake(seed: Record<string, string> = {}): ViewStorage & { written: Map<s
 	};
 }
 
-const view = { camera: { x: 100, y: 200, zoom: 0.5 }, selected: "boards/plan.html" };
+const view = { camera: { x: 100, y: 200, zoom: 0.5 }, selected: "cards/plan/index.html" };
 
 test("a view comes back after a reload", () => {
 	const store = fake();

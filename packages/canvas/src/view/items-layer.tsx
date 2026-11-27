@@ -20,12 +20,12 @@ import { createAppStates } from "./app-states.ts";
 import { createMedia } from "./media.ts";
 import { createPinchPictures } from "./pinch-pictures.ts";
 
-/** What the items layer needs of the stage around it. */
+/** What the items layer needs of the canvas around it. */
 type ItemsLayerDeps = {
 	props: CanvasViewProps;
 	/** The host's slot for one placed item (`props.frame`, read once). */
 	Frame: Component<ItemSlotProps>;
-	/** The stage element, set once it is mounted. */
+	/** The canvas element, set once it is mounted. */
 	element: () => HTMLDivElement | undefined;
 	ctl: CameraController;
 	view: () => Viewport;
@@ -37,7 +37,7 @@ type ItemsLayerDeps = {
 	resolveColour: (colour: string) => string;
 	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
-	/** What an item's slot asks of the stage's fingers (`input.ts`). */
+	/** What an item's slot asks of the canvas's fingers (`input.ts`). */
 	gestures: ItemSlotProps["gestures"];
 };
 
@@ -45,7 +45,7 @@ type ItemsLayerDeps = {
 export type LiveFile = { id: string; file: string; name: string };
 
 /**
- * The placed items: cards, documents, apps and boards, which of them are near, have a slot and are
+ * The placed items: cards, documents and apps, which of them are near, have a slot and are
  * awake, how the sheet draws each, their sizes easing, the SVGs shown live, and the one film or sound
  * playing. Made inside `CanvasView`, after the editor, which it reads.
  */
@@ -110,7 +110,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		get pageIndex() { return pageIndex; },
 		get isLive() { return isLive; },
 	});
-	// The boards a drag carries go with it on the engine's carried layer (`editor/dom/controller.ts`).
+	// The cards a drag carries go with it on the engine's carried layer (`editor/dom/controller.ts`).
 	/** The items whose carried picture is on screen: their slots hide where they were picked up (`item-slot.tsx`). */
 	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.carrying = setCarriedPages;
@@ -140,11 +140,11 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		if (!element) return [];
 		const r = element.getBoundingClientRect();
 		const nodes = renderedPaths();
-		return props.boards
-			.map((board) => {
-				const a = toScreen(ctl.now(), view(), { x: board.x, y: board.y });
-				const b = toScreen(ctl.now(), view(), { x: board.x + board.w, y: board.y + board.h });
-				return { path: board.path, node: nodes.has(board.path), rev: board.rev, sized: board.sized, rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
+		return props.cards
+			.map((card) => {
+				const a = toScreen(ctl.now(), view(), { x: card.x, y: card.y });
+				const b = toScreen(ctl.now(), view(), { x: card.x + card.w, y: card.y + card.h });
+				return { path: card.path, node: nodes.has(card.path), rev: card.rev, sized: card.sized, rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
 			});
 	};
 	probes.cards = cardsOnScreen;

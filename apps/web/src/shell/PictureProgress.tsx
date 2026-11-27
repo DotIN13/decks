@@ -21,7 +21,7 @@ const EVERY_MS = 1000;
  * this asks how far it has got each second, and only while the menu is open, since the menu's
  * contents exist only then.
  */
-/** `quietWhenDone`: shown only while pictures are being made, after a rule; nothing once every board has its pictures. */
+/** `quietWhenDone`: shown only while pictures are being made, after a rule; nothing once every card has its pictures. */
 export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 	const [progress, setProgress] = createSignal<Progress | undefined>();
 	let timer: ReturnType<typeof setTimeout> | undefined;

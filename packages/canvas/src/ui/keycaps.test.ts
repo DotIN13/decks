@@ -42,7 +42,7 @@ test("a hyphenated gesture stays one phrase", () => {
 });
 
 test("a sentence is a sentence", () => {
-	for (const phrase of ["drop a file on a board", "drag a board's title", "the properties sheet", "click a turn on the right spine"]) {
+	for (const phrase of ["drop a file on a card", "drag a card's title", "the properties sheet", "click a turn on the right spine"]) {
 		assert.equal(caps(phrase), phrase, phrase);
 	}
 });

@@ -7,8 +7,8 @@ import { cleanPictures, pictureHash } from "./clean.ts";
 import { CARD_LOOK, PICTURE_LOOK } from "./ladder.ts";
 
 const card = "canvases/a/cards/one/index.html";
-const page = "shared/canvases/ada/notes/boards/old.html";
-const gone = "canvases/a/boards/converted.html";
+const page = "shared/canvases/ada/notes/pages/old.html";
+const gone = "canvases/a/pages/converted.html";
 
 function folder(files: Record<string, number>): string {
 	const dir = mkdtempSync(join(tmpdir(), "decks-clean-"));
@@ -27,7 +27,7 @@ test("the daily clean removes pictures of pages gone, of an old look, and plain 
 		`${c}-7-light-720-whole-w480-l${CARD_LOOK}.astc.br`,
 		`${c}-7-dark-720-whole-w192-l${CARD_LOOK}.astc`, // no brotli copy yet: kept
 		`${p}-3-light-720-whole-w480-l${PICTURE_LOOK}.webp`,
-		"stages",
+		"canvases",
 	];
 	const drop = [
 		`${c}-7-light-720-whole-w480-l${CARD_LOOK}.astc`, // its .br is beside it
@@ -35,8 +35,8 @@ test("the daily clean removes pictures of pages gone, of an old look, and plain 
 		`${g}-2-light-720-whole-w480-l${PICTURE_LOOK}.webp`, // a page the deck no longer has
 		`${g}-2-dark-720-whole-l${PICTURE_LOOK}.webp`,
 	];
-	const dir = folder(Object.fromEntries([...keep.filter((n) => n !== "stages"), ...drop].map((n) => [n, 100])));
-	mkdirSync(join(dir, "stages"));
+	const dir = folder(Object.fromEntries([...keep.filter((n) => n !== "canvases"), ...drop].map((n) => [n, 100])));
+	mkdirSync(join(dir, "canvases"));
 	const done = cleanPictures(dir, [card, page]);
 	assert.deepEqual(readdirSync(dir).sort(), keep.sort());
 	assert.deepEqual(done, { removed: 4, bytes: 400, orphans: 2, oldLooks: 1, plainPacked: 1 });

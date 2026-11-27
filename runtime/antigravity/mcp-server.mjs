@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
  * Decks puts on the CLI's PATH (`apps/server/src/runtimes/decks-env.ts`).
  *
  * The body is one HTTP call back to the Decks server that spawned the CLI. The *CLI process*
- * carries `DECKS_STAGE_URL` and `DECKS_STAGE_TOKEN` in its environment and the MCP child inherits
+ * carries `DECKS_CANVAS_URL` and `DECKS_CANVAS_TOKEN` in its environment and the MCP child inherits
  * them — the token is this agent's identity, minted per agent.
  *
  * No dependencies and no package.json: the MCP protocol is JSON-RPC 2.0 over stdio, which is
@@ -21,8 +21,8 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-const STAGE_URL = process.env.DECKS_STAGE_URL ?? "";
-const STAGE_TOKEN = process.env.DECKS_STAGE_TOKEN ?? "";
+const CANVAS_URL = process.env.DECKS_CANVAS_URL ?? "";
+const CANVAS_TOKEN = process.env.DECKS_CANVAS_TOKEN ?? "";
 
 /** The Google Docs tools, worded in `runtime/gdocs-tools.json` as every runtime has them. */
 const GDOCS = JSON.parse(readFileSync(resolve(HERE, "../gdocs-tools.json"), "utf8"));
@@ -70,10 +70,10 @@ process.stdin.on("data", (chunk) => {
 
 /** A Google Docs tool: the same server, the same token, its own route. */
 async function callGdocs(name, args) {
-	if (!STAGE_URL || !STAGE_TOKEN) throw new Error("This antigravity session was not started by Decks, so there is no Google Docs to reach.");
-	const response = await fetch(STAGE_URL.replace(/\/stage\/eval$/, "/gdocs/call"), {
+	if (!CANVAS_URL || !CANVAS_TOKEN) throw new Error("This antigravity session was not started by Decks, so there is no Google Docs to reach.");
+	const response = await fetch(CANVAS_URL.replace(/\/canvas\/eval$/, "/gdocs/call"), {
 		method: "POST",
-		headers: { "content-type": "application/json", authorization: `Bearer ${STAGE_TOKEN}` },
+		headers: { "content-type": "application/json", authorization: `Bearer ${CANVAS_TOKEN}` },
 		body: JSON.stringify({ tool: name, args: args ?? {} }),
 	});
 	if (!response.ok) throw new Error(`Decks answered ${response.status}.`);

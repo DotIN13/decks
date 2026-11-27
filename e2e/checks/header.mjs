@@ -95,10 +95,10 @@ const windows = async () => ((await call("canvas.read", [{ canvas: CANVAS, depth
 say("the app has no window on the canvas yet", (await windows()).length === 0);
 await page.locator('.tab-acts [data-act="canvas"]').click();
 const onCanvas = async () => (await page.evaluate(() => location.hash)).startsWith("#canvas/") || (await page.evaluate(() => location.hash)) === "";
-say("On canvas brings the canvas forward", (await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".tab-acts").count()) === 0 ? true : undefined))) === true, await page.evaluate(() => location.hash));
+say("On canvas brings the canvas forward", (await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await page.locator(".tab-acts").count()) === 0 ? true : undefined))) === true, await page.evaluate(() => location.hash));
 const placed = await until(async () => ((await windows()).length === 1 ? (await windows())[0] : undefined));
 say("…puts a window for the app there, since it had none", !!placed, JSON.stringify(placed ?? (await windows())));
-const picked = await until(async () => ((await (await canvasFrame(page)).locator(".stage-fixed > .card-callout:not([data-hidden])").count()) === 1 ? true : undefined), 6000);
+const picked = await until(async () => ((await (await canvasFrame(page)).locator(".canvas-fixed > .card-callout:not([data-hidden])").count()) === 1 ? true : undefined), 6000);
 say("…and selects it: its pill is showing", picked === true);
 await shot("app-on-canvas");
 void onCanvas;
@@ -118,7 +118,7 @@ const before = page.frames().find((one) => !one.isDetached() && /kind=card/.test
 await page.locator('.tab-acts [data-act="reload"]').click();
 say("Reload makes the card's frame again", (await until(async () => (before?.isDetached() && cardFrames() >= 1 ? true : undefined))) === true, String(cardFrames()));
 await page.locator('.tab-acts [data-act="canvas"]').click();
-const selected = await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await (await canvasFrame(page)).locator(`.card-node[data-path="${card("plan")}"][data-selected="true"]`).count()) === 1 ? true : undefined), 8000);
+const selected = await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await (await canvasFrame(page)).locator(`.card-node[data-path="${card("plan")}"][data-selected="true"]`).count()) === 1 ? true : undefined), 8000);
 say("On canvas goes to the card's canvas with the card selected", selected === true);
 
 // --- a document in front ---------------------------------------------------------------------------------------------------
@@ -145,7 +145,7 @@ const docFoot = await until(async () => {
 say("a document runs to the foot of the window too, and its last lines scroll clear of the composer", !!docFoot && docFoot.bottom === docFoot.window && docFoot.pad > 40, JSON.stringify(docFoot ?? page.frames().map((one) => one.url().slice(-40))));
 await shot("document-light");
 await page.locator('.tab-acts [data-act="canvas"]').click();
-say("On canvas goes to the document's place and selects it", (await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await (await canvasFrame(page)).locator('.card-node[data-path^="item:"][data-selected="true"]').count()) === 1 ? true : undefined), 8000)) === true);
+say("On canvas goes to the document's place and selects it", (await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await (await canvasFrame(page)).locator('.card-node[data-path^="item:"][data-selected="true"]').count()) === 1 ? true : undefined), 8000)) === true);
 
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 link.close?.();

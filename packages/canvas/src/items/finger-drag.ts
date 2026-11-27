@@ -10,7 +10,7 @@ export interface FingerDragNeeds {
 export function createFingerDrag(d: FingerDragNeeds) {
 	/*
 	 * A finger on the item, as a finger on the drawing is: it pans the canvas, selected or not (`panTouch`:
-	 * the cover keeps the browser's scroll off, so the stage's own pool pans), and only a tap selects; a tap
+	 * the cover keeps the browser's scroll off, so the canvas's own pool pans), and only a tap selects; a tap
 	 * on the item already selected activates it. Held still for `HOLD_MS`, the item is selected and the
 	 * finger is claimed (`claimTouch`): moving from there carries it, moved once, on the lift. A tap is a
 	 * lift near where the finger landed, with no second finger down meanwhile and no moving canvas caught
@@ -21,11 +21,11 @@ export function createFingerDrag(d: FingerDragNeeds) {
 		event.preventDefault();
 		const wasSelected = d.props.selected;
 		d.props.gestures.panTouch(event.pointerId);
-		// Whether this finger caught a glide or a coast: the stage judges it as the press bubbles on to it.
+		// Whether this finger caught a glide or a coast: the canvas judges it as the press bubbles on to it.
 		let stopping = false;
 		queueMicrotask(() => (stopping = d.props.gestures.caught()));
 		const from = { x: event.clientX, y: event.clientY };
-		const origin = { x: d.props.board.x, y: d.props.board.y };
+		const origin = { x: d.props.card.x, y: d.props.card.y };
 		const scale = d.props.zoom || 1;
 		let to: { x: number; y: number } | undefined;
 		let travelled = false;

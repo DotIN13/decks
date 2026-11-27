@@ -25,7 +25,7 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  * Tokens made before there was one kind (`dk_p_` a tab's or a terminal's, `dk_s_` a site's) are read
  * as harness tokens of the same subject: they are found by their hash, as any is, and given the new
  * lives once, from the moment the harness that knows them first starts, so nobody is signed out by
- * the change. A board's token (`dk_b_`), which nothing asks for any more, is dropped.
+ * the change. A card's token (`dk_b_`), which nothing asks for any more, is dropped.
  */
 
 /** Days the `decks` command's token in a terminal may go unused before it stops working (`DECKS_TOKEN_DAYS`, 30 unless set). */
@@ -221,7 +221,7 @@ export class TokenStore {
 				version = typeof parsed.v === "number" ? parsed.v : 0;
 				for (const one of parsed.tokens ?? []) {
 					if (typeof one?.hash !== "string" || typeof one.id !== "string" || !one.principal) continue;
-					// A board's token from before, or an app's: nothing is given one any more.
+					// A card's token from before, or an app's: nothing is given one any more.
 					if (!SUBJECTS.has(one.principal.kind)) continue;
 					if (one.idle !== undefined && now - one.last > one.idle) continue;
 					this.byHash.set(one.hash, { ...one, kept: true });

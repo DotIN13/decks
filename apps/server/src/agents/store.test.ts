@@ -9,8 +9,8 @@ import { AgentStore, type AgentRecord } from "./store.ts";
 
 function deckOn(): { deck: Deck; root: string; cleanup: () => void } {
 	const root = mkdtempSync(join(tmpdir(), "decks-agent-store-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
-	writeFileSync(join(root, "boards", "plan.html"), '<!doctype html><body class="board"></body>');
+	mkdirSync(join(root, "cards"), { recursive: true });
+	writeFileSync(join(root, "cards", "plan.html"), '<!doctype html><body class="card-page"></body>');
 	return { deck: Deck.open(root), root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
@@ -21,8 +21,8 @@ function record(over: Partial<AgentRecord> = {}): AgentRecord {
 		resumeRef: "/sessions/one.jsonl",
 		name: "Kestrel",
 		color: "#3b5cf6",
-		context: ["boards/plan.html"],
-		inPlay: ["boards/plan.html"],
+		context: ["pages/plan.html"],
+		inPlay: ["pages/plan.html"],
 		createdAt: 1000,
 		lastAt: 2000,
 		...over,
@@ -31,7 +31,7 @@ function record(over: Partial<AgentRecord> = {}): AgentRecord {
 
 const items: ChatItem[] = [
 	{ kind: "user", id: "agent-1:u1", text: "what is the plan", at: 1500 },
-	{ kind: "assistant", id: "agent-1:a2", text: "on the board", at: 1600 },
+	{ kind: "assistant", id: "agent-1:a2", text: "on the card", at: 1600 },
 ];
 
 test("a record and its transcript come back as they went in", () => {
@@ -46,28 +46,28 @@ test("a record and its transcript come back as they went in", () => {
 	cleanup();
 });
 
-test("a stage's arrangement is written and read back, one bad place dropped", () => {
+test("a canvas's arrangement is written and read back, one bad place dropped", () => {
 	const { deck, cleanup } = deckOn();
 	const store = new AgentStore(deck);
 
-	store.write(record({ positions: { "boards/plan.html": { x: 8, y: 16 } } }), items);
-	assert.deepEqual(store.read("agent-1")?.record.positions, { "boards/plan.html": { x: 8, y: 16 } });
+	store.write(record({ positions: { "pages/plan.html": { x: 8, y: 16 } } }), items);
+	assert.deepEqual(store.read("agent-1")?.record.positions, { "pages/plan.html": { x: 8, y: 16 } });
 	writeFileSync(
 		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
-		JSON.stringify({ ...record(), positions: { "boards/plan.html": { x: "left", y: 0 }, "boards/notes.html": { x: 8, y: 16 } } }),
+		JSON.stringify({ ...record(), positions: { "pages/plan.html": { x: "left", y: 0 }, "pages/notes.html": { x: 8, y: 16 } } }),
 	);
-	assert.deepEqual(store.read("agent-1")?.record.positions, { "boards/notes.html": { x: 8, y: 16 } });
+	assert.deepEqual(store.read("agent-1")?.record.positions, { "pages/notes.html": { x: 8, y: 16 } });
 	cleanup();
 });
 
-test("a record that named a shared canvas says so once, for the stage to be read back from it", () => {
+test("a record that named a shared canvas says so once, for the canvas to be read back from it", () => {
 	const { deck, cleanup } = deckOn();
 	const store = new AgentStore(deck);
 
 	store.write(record(), items);
 	writeFileSync(
 		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
-		JSON.stringify({ ...record(), inPlay: undefined, canvas: "cv_7f2a", canvases: ["cv_7f2a"], role: "dispatcher" }),
+		JSON.stringify({ ...record(), inPlay: undefined, fromCanvas: "cv_7f2a", canvases: ["cv_7f2a"], role: "dispatcher" }),
 	);
 	const back = store.read("agent-1")?.record;
 	assert.equal(back?.fromCanvas, "cv_7f2a");
@@ -162,12 +162,12 @@ test("the list draws a row from its record, without reading the transcript", () 
 	mkdirSync(join(deck.path, ".decks", "agents", "agent-1"), { recursive: true });
 	writeFileSync(
 		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
-		JSON.stringify(record({ lastLine: "on the board" })),
+		JSON.stringify(record({ lastLine: "on the card" })),
 	);
 
 	const listed = store.list();
 	assert.equal(listed.length, 1);
-	assert.equal(listed[0]?.record.lastLine, "on the board", "the preview is on the record");
+	assert.equal(listed[0]?.record.lastLine, "on the card", "the preview is on the record");
 	assert.deepEqual(store.readItems("agent-1"), [], "and the missing transcript is simply empty");
 	cleanup();
 });

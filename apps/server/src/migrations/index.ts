@@ -5,6 +5,7 @@ import { migrated as markdownCardsMigrated, migrateMarkdownCards } from "./2026-
 import { migrated as documentsAndAppsMigrated, migrateDocumentsAndApps } from "./2026-10-29-documents-and-apps.ts";
 import { migrated as boardsToCardsMigrated, migrateBoardsToCards } from "./2026-10-29-boards-to-cards.ts";
 import { countsOf, migrated as boardLeftoversMigrated, migrateBoardLeftovers } from "./2026-10-30-board-leftovers.ts";
+import { describeNames, migrated as namesMigrated, migrateNames } from "./2026-11-26-card-and-canvas-names.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { openOldShapes } from "../deck/old-shapes.ts";
@@ -34,6 +35,7 @@ import { breakingPart, compareSemver, derivedVersion, holdsADeck, NONE, parseSem
  * | 2026-10-29-documents-and-apps.ts           | at open | `runAtOpen`, below; the same way |
  * | 2026-10-29-boards-to-cards.ts              | at open | `runAtOpen`, below; the same way, after documents and apps |
  * | 2026-10-30-board-leftovers.ts              | at open | `runAtOpen`, below; the same way, with a report beside its backup |
+ * | 2026-11-26-card-and-canvas-names.ts        | at open | `runAtOpen`, below; the same way, with the data folder |
  *
  * Each at-open migration carries a semantic version, the deck's once it has run, and the deck keeps
  * the last one run on it in `.decks/migrations.json` (`version.ts`, which says which part a change moves). A deck at `LATEST` opens without any migration looking at it; one behind runs only
@@ -152,6 +154,17 @@ export const MIGRATIONS: readonly Migration[] = [
 			if (ran && plan.canvases.length) [`the last boards on the canvases are gone: ${c.fileCards} file card(s), ${c.cards + c.pictureCards} card(s) (${c.pictureCards} of a picture), ${c.documents + c.apps} document or app item(s), ${c.removed} removed; ${c.deleted} board file(s) deleted`, ...(backup ? [`what changed is backed up in ${backup}`] : []), ...(report ? [`the report is ${report}`] : [])].forEach(say);
 		},
 		dryRun: (deck, log) => void migrateBoardLeftovers(deck, { dryRun: true, log }),
+	},
+	{
+		// Breaking: what is kept on disk says card and canvas, which an older build does not read.
+		version: "0.6.0",
+		id: "2026-11-26-card-and-canvas-names",
+		migrated: namesMigrated,
+		run: (deck, options, say) => {
+			const { plan, ran, backup } = migrateNames(deck, { ...(options.dataDir ? { dataDir: options.dataDir } : {}), log: say });
+			if (ran && (plan.rewrites.length || plan.trust)) [`card and canvas names on disk: ${describeNames(plan).map((line) => line.replace(/^would /, "")).join("; ")}`, ...(backup ? [`what changed is backed up in ${backup}`] : [])].forEach(say);
+		},
+		dryRun: (deck, log) => void migrateNames(deck, { dryRun: true, log }),
 	},
 ];
 

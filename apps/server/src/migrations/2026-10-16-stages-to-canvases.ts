@@ -1,7 +1,20 @@
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { slug } from "@decks/deck-kit";
-import { CANVAS_DIR, CANVAS_FILE, CANVAS_META, movedPath } from "../canvas/canvas-files.ts";
+import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "../canvas/canvas-files.ts";
+
+/**
+ * A deck-relative path written before canvases moved out of `stages/`, pointed at where it is now:
+ * `stages/<n>/…` → `canvases/<m>/…`, `stage.pen` → `canvas.pen`. `renamed` gives a folder its new name
+ * where the move renamed it.
+ */
+export function movedPath(path: string, renamed: ReadonlyMap<string, string>): string {
+	const match = /^stages\/([^/]+)(\/.*)?$/.exec(path);
+	if (!match) return path;
+	const name = renamed.get(match[1]!) ?? match[1]!;
+	const rest = (match[2] ?? "").replace(/^\/stage\.pen$/, `/${CANVAS_FILE}`).replace(/^\/stage\.json$/, `/${CANVAS_META}`);
+	return `${CANVAS_DIR}/${name}${rest}`;
+}
 
 /**
  * 2026-10-16: `stages/<name>/stage.pen` and `stage.json` become `canvases/<name>/canvas.pen` and

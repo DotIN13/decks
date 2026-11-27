@@ -5,8 +5,6 @@ description: How to write a card. One format: a one-screen piece of HTML you des
 
 # Card authoring
 
-Everything that used to be a board is a card. A board file left in a deck from before cards (`boards/…`) is a plain file: read it with your own tools, and write what it said as a card if it is wanted again.
-
 **One screen**
 
 - A card is read in about ten seconds. One idea, the title is the finding as a sentence, one main
@@ -162,7 +160,7 @@ does at rest only what its resting look needs, and saves the heavy work for when
 export default function (card) {
 	let scene; // the heavy part, made only when the card is first used
 	const start = async () => {
-		scene ??= await makeScene(card.root.getElementById("stage"));
+		scene ??= await makeScene(card.root.getElementById("scene"));
 		scene.play();
 		card.root.getElementById("hint").hidden = true;
 	};

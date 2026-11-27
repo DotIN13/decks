@@ -1,72 +1,72 @@
 /*
- * The canvas's own surfaces — the ones that are not the chrome and not a board.
+ * The canvas's own surfaces — the ones that are not the chrome and not a card.
  *
  * In `styles/` beside the others rather than in `index.css` for the reason stated at the top
  * of that file — a surface with its own vocabulary is easier to read as a file than as a section.
  */
 @layer decks.surface {
-	/* --- the stage --------------------------------------------------------------- */
+	/* --- the canvas --------------------------------------------------------------- */
 
-.stage {
+.canvas {
 	position: absolute;
 	inset: 0;
 	/*
-	 * The stage scrolls, and its scroll is the camera's position (`camera/scroll-area.ts`): a pan is
+	 * The canvas scrolls, and its scroll is the camera's position (`camera/scroll-area.ts`): a pan is
 	 * the browser scrolling it on its compositor, with no frame of ours in the way. It used to be
 	 * `clip`, which cannot scroll, because the browser scrolls a scroll container to show a focused
-	 * caret and the camera did not know: a card opened for typing slid the stage up for good. Now
+	 * caret and the camera did not know: a card opened for typing slid the canvas up for good. Now
 	 * such a scroll is a scroll like any other, and the camera follows it (`CanvasView.tsx`, `onScroll`).
 	 * No bars, no rubber band, and no swipe back a page at an edge.
 	 */
 	overflow: scroll;
 	scrollbar-width: none;
 	overscroll-behavior: none;
-	background: var(--canvas-stage);
-	/* Fingers pan the stage natively; a pinch is ours (Safari's gesture events), and nothing zooms the page. */
+	background: var(--canvas-ground);
+	/* Fingers pan the canvas natively; a pinch is ours (Safari's gesture events), and nothing zooms the page. */
 	touch-action: pan-x pan-y;
 }
-	.stage::-webkit-scrollbar {
+	.canvas::-webkit-scrollbar {
 	display: none;
 }
-	/* What scrolls: room to scroll in, the world placed in it, and the stage's own chrome held to the window. */
-	.stage-content {
+	/* What scrolls: room to scroll in, the world placed in it, and the canvas's own chrome held to the window. */
+	.canvas-content {
 	position: relative;
 	width: 200000px;
 	height: 200000px;
-	/* Room, not a target: a press on bare canvas lands on the stage itself, as it always has. */
+	/* Room, not a target: a press on bare canvas lands on the canvas itself, as it always has. */
 	pointer-events: none;
 }
-	.stage-content > .world {
+	.canvas-content > .world {
 	pointer-events: auto;
 }
 	/*
-	 * The stage's chrome over the canvas (pills, the insert menu, the ink sheet, a notice), in the
+	 * The canvas's chrome over the canvas (pills, the insert menu, the ink sheet, a notice), in the
 	 * window's coordinates as before: held to the window while the content scrolls under it. Only
 	 * what is in it takes the pointer.
 	 */
-	.stage-fixed {
+	.canvas-fixed {
 	position: sticky;
 	z-index: 1;
 	top: 0;
 	left: 0;
 	pointer-events: none;
 }
-	.stage-fixed > * {
+	.canvas-fixed > * {
 	pointer-events: auto;
 }
-	.stage[data-panning="true"] {
+	.canvas[data-panning="true"] {
 	cursor: grabbing;
 }
 	/*
- * While the camera's scale is moving, every board gets a layer of its own.
+ * While the camera's scale is moving, every card gets a layer of its own.
  *
  * A pan is a transform over pictures the compositor already holds, which is why it stays
- * smooth with a dozen boards on the canvas. A zoom asks for every one of them to be drawn
- * again at a size it has never been drawn at, and a board is an iframe — a whole document
- * to redraw, per board, per frame. `will-change: transform` hands the board to the
+ * smooth with a dozen cards on the canvas. A zoom asks for every one of them to be drawn
+ * again at a size it has never been drawn at, and a card is an iframe — a whole document
+ * to redraw, per card, per frame. `will-change: transform` hands the card to the
  * compositor, which stretches the picture it has rather than waking the main thread.
  *
- * Measured, 12 boards in view at 4× CPU throttle: 134ms of work per finger movement
+ * Measured, 12 cards in view at 4× CPU throttle: 134ms of work per finger movement
  * becomes 56ms — the same as a pan. At rest the two are the same picture: 0.2% of pixels
  * differ, at the edges of letters, because the layer is redrawn once the scale settles.
  *
@@ -79,12 +79,12 @@
  * dropping these layers only cost it a long frame at each end of a zoom.
  */
 /*
- * The same for what is not a frame and is drawn in the stage's own page: a card's root (`card.ts`), a
+ * The same for what is not a frame and is drawn in the canvas's own page: a card's root (`card.ts`), a
  * document's editor and an app's window (`item-surfaces.tsx`). Each is as much a page to redraw at every
  * step of a zoom, and was redrawn at each one before it was named here.
  */
 /* Not an app's window: its frame is a layer of its own already, and adding and dropping one round it at each zoom made the app repaint, a white flash at its edges. */
-.stage[data-scaling="true"] .card-node :is(.card-host, .document-surface) {
+.canvas[data-scaling="true"] .card-node :is(.card-host, .document-surface) {
 	will-change: transform;
 }
 /*
@@ -92,10 +92,10 @@
  * moves, and the sheet draws their pictures over where they are, so no card is laid out, painted or
  * given a layer at any step. They stay mounted, and show again at rest under their pictures.
  */
-.stage[data-card-pictures="true"] .card-node .card-surface {
+.canvas[data-card-pictures="true"] .card-node .card-surface {
 	visibility: hidden;
 }
-.stage[data-card-pictures="true"] .card-node .card-host {
+.canvas[data-card-pictures="true"] .card-node .card-host {
 	will-change: auto;
 }
 /*
@@ -112,11 +112,11 @@
  * frame the zoom changes — so the layer is never a stretched picture; see the note below for the
  * gesture-wide version this is not.
  */
-.stage[data-sliding="true"] .world {
+.canvas[data-sliding="true"] .world {
 	will-change: transform;
 }
 	/*
- * ### What is left of the boards being soft at high zoom
+ * ### What is left of the cards being soft at high zoom
  *
  * This box used to say it was *not* the layers, on the strength of a measurement taken in a
  * headless Chrome on a software rasterizer: removing the world's `will-change`, re-taking that
@@ -126,14 +126,14 @@
  *
  * **The world carries no `will-change` at rest or while the scale moves, and that is the fix.**
  * (It does while the camera pans at one zoom, `data-sliding` above, where the matrix is exact.) On a 2× display at 400%,
- * taking it off sharpens the board at once — because the declaration is a promise to hold the
+ * taking it off sharpens the card at once — because the declaration is a promise to hold the
  * raster and apply the camera to it as a matrix, and a zoom is then the same picture stretched.
  * It used to be permanent, so every zoom was paid for that way.
  *
  * **What was tried in between, and why it is not here.** Scoping the promise to a *gesture*
- * (`.stage[data-moving="true"] .world`, with a 300ms tail, then narrowed to gestures that change
+ * (`.canvas[data-moving="true"] .world`, with a 300ms tail, then narrowed to gestures that change
  * the scale) does restore the cheap pan — and it flashes: a layer built and torn down under the
- * pointer, worst over a board, where the frame's own layer is recomposed at the same moment. It
+ * pointer, worst over a card, where the frame's own layer is recomposed at the same moment. It
  * also leaked: a camera moved without a gesture (an agent's `decks.view.focus`, a restored view) could
  * leave the promise held over a scale it no longer matched, which is the softness back through a
  * side door. Two bugs for one optimisation, so the promise is gone and the pan pays for itself.
@@ -141,18 +141,18 @@
  * **The cost, so it is not rediscovered as a mystery.** A pan is now a transform the main thread
  * paints rather than a matrix over pictures the compositor holds. That was measured once, for the
  * opposite decision: 16.6 documents repainted and 28ms of main thread per pan step against 0 —
- * with twelve boards in view at 4× CPU throttle. With a handful of boards on screen it is the
- * same work the app did before the promotion was ever added; if a deck with many boards open pans
+ * with twelve cards in view at 4× CPU throttle. With a handful of cards on screen it is the
+ * same work the app did before the promotion was ever added; if a deck with many cards open pans
  * badly, the answer is `[data-scaling]` above plus a *scale*-only promise, or the canvas
  * renderers, and both are worth measuring rather than guessing.
  *
  * What remains is the frame's own raster: an iframe draws its document at its own scale, and the
  * compositor upscales that picture past some zoom. The levers are the same three they were — lay
- * the boards out at the new zoom instead of scaling them (a document reflow per step), or accept it.
+ * the cards out at the new zoom instead of scaling them (a document reflow per step), or accept it.
  */
 
 /*
- * There is deliberately no ring around the stage in edit mode, and this is where it was.
+ * There is deliberately no ring around the canvas in edit mode, and this is where it was.
  *
  * It was an inset ring of the accent at 55%, around the whole canvas — the standing sign that
  * a click was going to move something, standing in for a confirmation dialog on the pencil.
@@ -178,17 +178,17 @@
 	 * camera rather than moved by it. A page asleep over a picture there has no paper of its own, or
 	 * it would cover the picture it is asleep over.
 	 */
-	.stage-engine {
+	.canvas-engine {
 	position: absolute;
 	top: 0;
 	left: 0;
 	pointer-events: none;
 }
-	.stage-engine-over {
+	.canvas-engine-over {
 	transform-origin: 0 0;
 }
-	/* The engine could not start (`stage/backends/notice.ts`): said once, centred over the empty stage, above the boards but under the chrome. */
-	.stage-notice {
+	/* The engine could not start (`stage/backends/notice.ts`): said once, centred over the empty canvas, above the cards but under the chrome. */
+	.canvas-notice {
 	position: absolute;
 	z-index: var(--canvas-z-float);
 	top: 50%;
@@ -207,19 +207,19 @@
 	text-wrap: balance;
 	pointer-events: none;
 }
-	/* A slot's surface has no ground of its own: a board's, or a sleeping card's, covered the picture the sheet draws under it. */
-	.stage[data-engine] .card-node > .surface {
+	/* A slot's surface has no ground of its own: a card's, or a sleeping card's, covered the picture the sheet draws under it. */
+	.canvas[data-engine] .card-node > .surface {
 	background: transparent;
 }
-	/* --- a board on the stage ---------------------------------------------------- */
+	/* --- a card on the canvas ---------------------------------------------------- */
 
 .card-node {
 	position: absolute;
 }
 	/*
-	 * A board whose size changed from outside a drag (`Stage`'s `sizingPaths`): its box, its title
+	 * A card whose size changed from outside a drag (`Canvas`'s `sizingPaths`): its box, its title
 	 * bar and its selection outline ease to the new size together, on the app's curve. Its page
-	 * lays out at each step, which one board can afford for a quarter of a second.
+	 * lays out at each step, which one card can afford for a quarter of a second.
 	 */
 	.card-node[data-sizing="true"],
 	.card-node[data-sizing="true"] > .surface,
@@ -230,10 +230,10 @@
 	 * hit areas (a handle still answers its 44 pt), but show nothing of their own. Opacity, not
 	 * visibility, so a check that asks whether a selection shows still gets yes.
 	 */
-	.stage[data-engine-overlays="true"] .world > :is(.pen-kin, .pen-selection, .pen-selection-box, .pen-hover, .pen-join, .pen-insert, .pen-slots, .pen-slot-frame, .pen-guides, .pen-measure, .pen-draft, .pen-draft-line, .pen-side) {
+	.canvas[data-engine-overlays="true"] .world > :is(.pen-kin, .pen-selection, .pen-selection-box, .pen-hover, .pen-join, .pen-insert, .pen-slots, .pen-slot-frame, .pen-guides, .pen-measure, .pen-draft, .pen-draft-line, .pen-side) {
 	opacity: 0;
 }
-	.stage[data-engine-overlays="true"] .world > :is(.pen-handle, .pen-anchor) {
+	.canvas[data-engine-overlays="true"] .world > :is(.pen-handle, .pen-anchor) {
 	background: transparent !important;
 	box-shadow: none !important;
 	border-color: transparent !important;
@@ -255,7 +255,7 @@
 	
 	
 	/*
- * With a pointer that hovers, the buttons take no room until the board or its bar is under it: the
+ * With a pointer that hovers, the buttons take no room until the card or its bar is under it: the
  * title and the path have the whole bar at rest, and give way to the buttons on hover. A touch
  * screen has no hover, so there they are always shown (the (hover: none) rule below).
  */
@@ -272,10 +272,10 @@
  *
  * Not a styling preference: it is the difference between a pan that moves pictures and a
  * pan that redraws documents. The surface holds an iframe, and when the box that holds an
- * iframe paints a `box-shadow` or an `outline`, Chrome repaints **every board's document on
+ * iframe paints a `box-shadow` or an `outline`, Chrome repaints **every card's document on
  * every step** of a pan or a zoom — a transform change that should cost the compositor a
  * matrix instead costs the main thread a paint of sixteen web pages. Measured on sixteen
- * boards at 4× CPU throttle, one step of a pan: 16.6 documents repainted, 28ms of main
+ * cards at 4× CPU throttle, one step of a pan: 16.6 documents repainted, 28ms of main
  * thread; the same shadow on a sibling, 0 repainted, 16ms. (`/tmp` repro, September 2026;
  * the app measured the same shape, 42ms → 20ms.) Radius and clipping on the surface itself
  * are fine — only the decorations that paint *outside* the box trigger it.
@@ -286,8 +286,8 @@
 }
 .card-node > .shade {
 	position: absolute;
-	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px)); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
-	/* No shadow: a board lies flat on the canvas, its edge the 1px outline alone. */
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px)); /* A card keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
+	/* No shadow: a card lies flat on the canvas, its edge the 1px outline alone. */
 	inset: 0;
 	outline: 1px solid var(--canvas-line);
 	pointer-events: none;
@@ -295,9 +295,9 @@
 	/*
  * A card that is news (`items/news.ts`): an agent named it and the person has not read it.
  *
- * A soft shadow in the writer's colour all round the board — even, not thrown down, so it
- * reads as the board glowing rather than floating — over a quiet dark one for depth,
- * breathing until the board is read: zoomed in on and rested on, opened in the focus view,
+ * A soft shadow in the writer's colour all round the card — even, not thrown down, so it
+ * reads as the card glowing rather than floating — over a quiet dark one for depth,
+ * breathing until the card is read: zoomed in on and rested on, opened in the focus view,
  * or previewed on the dashboard. A box of its own beside the shade, never the
  * surface, for the reason the shadow is: paint outside the surface's box makes Chrome repaint
  * every document on a pan.
@@ -329,25 +329,25 @@
 }
 	/*
 	 * Still while the camera moves. The breath is an animation the page restyles every frame, one per
-	 * board that is news: measured on a stage of four hundred news boards, 2,300 style recalculations
+	 * card that is news: measured on a canvas of four hundred news cards, 2,300 style recalculations
 	 * per step of a pan, the largest single cost of the pan. Paused while moving, it costs nothing per
 	 * frame and breathes on from there once the camera rests. Paused, not removed: removing it jumped
 	 * the glow to full strength, from a breath that rests at 65%, so every pan darkened it.
 	 */
-	.stage[data-moving="true"] .card-node > .news-glow::after {
+	.canvas[data-moving="true"] .card-node > .news-glow::after {
 	animation-play-state: paused;
 }
 	/*
-	 * A board being moved or sized: every glow is gone at once and fades back in where the board
+	 * A card being moved or sized: every glow is gone at once and fades back in where the card
 	 * lands, as the title bars do (`.bar-layer[data-moving]`). A filter, not the opacity, which
 	 * already carries the slow fade of being read; and none at rest, so it costs nothing then.
 	 */
-	.stage[data-carrying="true"] .card-node > .news-glow {
+	.canvas[data-carrying="true"] .card-node > .news-glow {
 	visibility: hidden;
 	filter: opacity(0);
 	transition: none;
 }
-	.stage:not([data-carrying="true"]) .card-node > .news-glow {
+	.canvas:not([data-carrying="true"]) .card-node > .news-glow {
 	transition: opacity var(--read-ms, 1500ms) ease-out, filter 90ms ease-out;
 }
 	/* Being read — zoomed in on, mostly on screen, at rest: the glow fades over the read's own
@@ -370,7 +370,7 @@
 	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 	background: var(--canvas-bg);
 }
-	/* On a touch screen the page is covered until the item is activated (`item-slot.tsx`): a finger on it is the stage's. */
+	/* On a touch screen the page is covered until the item is activated (`item-slot.tsx`): a finger on it is the canvas's. */
 	.card-node > .touch-cover {
 	position: absolute;
 	inset: 0;
@@ -382,11 +382,11 @@
 	.card-node[data-active] > .surface {
 	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--canvas-accent) 60%, transparent);
 }
-	/* A board's place among the others, which never moves (`Stage`): no box of its own. */
+	/* A card's place among the others, which never moves (`Canvas`): no box of its own. */
 	.world > .card-slot {
 	display: contents;
 }
-/* Carried by a drag: the sheet's carried layer shows the board's picture under the pointer, and the
+/* Carried by a drag: the sheet's carried layer shows the card's picture under the pointer, and the
    page waits here, unseen, for the move to land (`PenLayer.carry`). Kept, not unloaded. */
 .card-node[data-carried] > :is(.shade, .surface) {
 	visibility: hidden;
@@ -415,27 +415,27 @@
 	
 	
 	/*
-	 * A board's title bar, on a desktop (`BoardFrame`, `Stage.placeBar`): in a layer over the canvas
+	 * A card's title bar, on a desktop (`BoardFrame`, `Stage.placeBar`): in a layer over the canvas
 	 * that does not zoom, so it is 24 screen pixels tall at every zoom and only moved. Its buttons are
-	 * every action the touch screens' pill has, shown while the board or its bar is under the pointer
-	 * or the board is selected; at rest the title and the path have the whole bar.
+	 * every action the touch screens' pill has, shown while the card or its bar is under the pointer
+	 * or the card is selected; at rest the title and the path have the whole bar.
 	 */
-	.stage-fixed > .bar-layer {
+	.canvas-fixed > .bar-layer {
 	position: absolute;
 	inset: 0;
 	/* Never scrolled to show a bar's button past the edge, as `hidden` would be. */
 	overflow: clip;
 	pointer-events: none;
 }
-	.stage-fixed > .bar-layer[data-hidden="true"] {
+	.canvas-fixed > .bar-layer[data-hidden="true"] {
 	display: none;
 }
 	/*
-	 * Zoomed out below 50% (`Stage`'s `BAR_ZOOM`), a bar loses its title and path and keeps its
-	 * buttons, which show as they do above it (on hover, or for the selected board), until the bar is
+	 * Zoomed out below 50% (`Canvas`'s `BAR_ZOOM`), a bar loses its title and path and keeps its
+	 * buttons, which show as they do above it (on hover, or for the selected card), until the bar is
 	 * too narrow to hold them (`data-tight`). There is never a ⋯ to hold them instead.
 	 */
-	.stage-fixed > .bar-layer[data-low="true"] .chrome :is(.title, .file) {
+	.canvas-fixed > .bar-layer[data-low="true"] .chrome :is(.title, .file) {
 	display: none;
 }
 	/* Narrower on screen than its buttons need (`Stage.positionBar`): no buttons, only the title if it is shown. */
@@ -443,16 +443,16 @@
 	display: none !important;
 }
 	/*
-	 * A board being moved or sized, by its bar, its edge or its handles: every bar is gone at once,
-	 * and fades back in where the board lands, as the touch screens' pill does (`.card-callout`).
+	 * A card being moved or sized, by its bar, its edge or its handles: every bar is gone at once,
+	 * and fades back in where the card lands, as the touch screens' pill does (`.card-callout`).
 	 * Hidden, not removed, so a drag that began on a bar keeps the element holding its pointer.
 	 */
-	.stage-fixed > .bar-layer[data-moving="true"] .chrome {
+	.canvas-fixed > .bar-layer[data-moving="true"] .chrome {
 	visibility: hidden;
 	opacity: 0;
 	transition: none;
 }
-	.stage-fixed > .bar-layer:not([data-moving="true"]) .chrome {
+	.canvas-fixed > .bar-layer:not([data-moving="true"]) .chrome {
 	transition: opacity 90ms ease-out;
 }
 	.bar-layer .chrome {
@@ -533,7 +533,7 @@
 	width: 13px;
 	height: 13px;
 }
-	/* A hairline before Hide: the one action that takes the board away. */
+	/* A hairline before Hide: the one action that takes the card away. */
 	.bar-layer .chrome .act.hide {
 	position: relative;
 	margin-left: 7px;
@@ -548,7 +548,7 @@
 	content: "";
 }
 	/* The band along an awake item's edge that moves it (`item-slot.tsx`): invisible, a move cursor. */
-	.stage .card-edge {
+	.canvas .card-edge {
 	position: absolute;
 	/* Over the surface's own edge ring (`.surface > .edge`, 1), which would otherwise take its inner part. */
 	z-index: 2;
@@ -557,7 +557,7 @@
 }
 	/*
 	 * An SVG shown live (`CanvasView.tsx`, `liveFiles`): under the sheet, which draws a hole where it is. It
-	 * never takes the pointer: the stage picks, moves and sizes it as a drawn item.
+	 * never takes the pointer: the canvas picks, moves and sizes it as a drawn item.
 	 */
 	.world > .file-live {
 	position: absolute;
@@ -573,11 +573,11 @@
 	user-select: none;
 }
 	/*
-	 * The stage's one sheet (`render/engine.ts`): the drawing, and each board as its picture or as
+	 * The canvas's one sheet (`render/engine.ts`): the drawing, and each card as its picture or as
 	 * a hole over its document, painted in a worker and placed by the camera it was drawn for. Over
-	 * the boards' surfaces, and never in the way of a gesture.
+	 * the cards' surfaces, and never in the way of a gesture.
 	 */
-	.world > .stage-sheet {
+	.world > .canvas-sheet {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -586,15 +586,15 @@
 	pointer-events: none;
 }
 	/*
-	 * What an agent pins over a board — its cursor, what it holds, what it just wrote, a mark — stays
-	 * over the sheet, which draws the board itself (its picture, or a hole over its page) and would
+	 * What an agent pins over a card — its cursor, what it holds, what it just wrote, a mark — stays
+	 * over the sheet, which draws the card itself (its picture, or a hole over its page) and would
 	 * otherwise paint them out.
 	 *
 	 * **Only these.** The shadow and the news glow stay under the sheet: they paint outside the
-	 * board's box, where the sheet is clear unless a backdrop is drawn there, and the sheet draws both
-	 * itself for a board on a backdrop (`pen/scene.ts`). Lifting every board's shadow and glow over
+	 * card's box, where the sheet is clear unless a backdrop is drawn there, and the sheet draws both
+	 * itself for a card on a backdrop (`pen/scene.ts`). Lifting every card's shadow and glow over
 	 * the sheet was measured: each one overlapping a GPU layer became a layer of its own, and a glide
-	 * across thirteen boards dropped to a frame every 90 to 140ms. These exist only while an agent is
+	 * across thirteen cards dropped to a frame every 90 to 140ms. These exist only while an agent is
 	 * at work, so they cost that only then.
 	 */
 	.world > .card-slot > .card-node > .agent-cursor {
@@ -714,7 +714,7 @@
 	opacity: 0.6;
 	pointer-events: none;
 }
-	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
+	/* A card's hover outline follows the card's own corners, and so does a note's or a card's, which share them. */
 	.world > :is(.pen-hover, .pen-selection):is([data-page="true"], [data-round="true"]) {
 	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 }
@@ -780,7 +780,7 @@
 	border-radius: 2px;
 	background: var(--canvas-panel);
 	box-shadow: inset 0 0 0 1.5px var(--canvas-accent);
-	/* A finger on a handle resizes: the stage's native scroll (`touch-action: pan-x pan-y`) must not take it and cancel the press. */
+	/* A finger on a handle resizes: the canvas's native scroll (`touch-action: pan-x pan-y`) must not take it and cancel the press. */
 	touch-action: none;
 }
 	/* A resize handle answers a press 15 screen pixels across, whatever its drawn size (`--hit`, `editor/core/overlay.ts`, `hitReach`). */
@@ -1019,11 +1019,11 @@
 	position: absolute;
 	pointer-events: none;
 }
-	/* A tool is armed: the press is the drawing's, even over a board, and the cursor says so. */
-	.stage[data-pen-tool] {
+	/* A tool is armed: the press is the drawing's, even over a card, and the cursor says so. */
+	.canvas[data-pen-tool] {
 	cursor: crosshair;
 }
-	.stage[data-pen-tool] .world > .card-slot > .card-node {
+	.canvas[data-pen-tool] .world > .card-slot > .card-node {
 	pointer-events: none;
 }
 	/*
@@ -1343,7 +1343,7 @@
 	border-radius: 8px;
 	filter: drop-shadow(0 10px 14px rgb(0 0 0 / 22%));
 }
-	.stage[data-ghosting] :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-handle, .pen-anchor) { visibility: hidden; }
+	.canvas[data-ghosting] :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-handle, .pen-anchor) { visibility: hidden; }
 	.pen-card-editor .pce-ghost {
 	position: absolute;
 	z-index: 5;
@@ -1377,7 +1377,7 @@
 	color: var(--canvas-fg);
 	cursor: default;
 }
-	/* Shown over a selection, gone while the camera moves and back with a fade, as the board pill is. */
+	/* Shown over a selection, gone while the camera moves and back with a fade, as the card pill is. */
 	.pen-card-editor .pce-bar[data-off] { display: none; }
 	.pen-card-editor .pce-bar:not([data-hidden]) {
 	transition: opacity 90ms ease-out;
@@ -1494,7 +1494,7 @@
  * Its slot is held whether or not it is showing, so a row does not reflow under the cursor
  * and the name truncates at the same place either way.
  *
- * Shown on approach, like the board's own ×, and kept when focused by the keyboard — which
+ * Shown on approach, like the card's own ×, and kept when focused by the keyboard — which
  * is the only way to reach it without a pointer.
  */
 
@@ -1503,11 +1503,11 @@
  *
  * The transcript used to dim along with it, which made sense while the control was a bar
  * outside the panel. Now the control is a button on the message itself, and fading the
- * thing under the cursor is exactly wrong — so the signal is on the boards, where the
+ * thing under the cursor is exactly wrong — so the signal is on the cards, where the
  * change actually is. It is also the only signal: Escape leaves, and the message that
  * started it holds the other way back.
  */
-.stage[data-previewing="true"] .card-node > .shade {
+.canvas[data-previewing="true"] .card-node > .shade {
 	outline-color: var(--canvas-warn);
 }
 	/* The same rules, under the same query. */
@@ -1523,8 +1523,8 @@
 /* An item's slot (`item-slot.tsx`), in both the Decks app and any host of the canvas. */
 @layer decks.surface {
 	/* An item's title above it, to move it by, outside its box so the item and the sheet's picture of
-	   it both start at the box's top. Sized in stage pixels, so it
-	   scales with the board and a zoom writes nothing to it. */
+	   it both start at the box's top. Sized in canvas pixels, so it
+	   scales with the card and a zoom writes nothing to it. */
 	/*
 	 * Every item's title is painted by the engine above it, in every state (`engine.rs`, `paint_title`),
 	 * so it is always there while the item is on screen: the bar on the page stays as the grip to drag
@@ -1546,7 +1546,7 @@
 		color: var(--canvas-muted);
 		cursor: grab;
 		user-select: none;
-		/* A finger on the bar carries the board, as its edge does: never a native scroll of the stage. */
+		/* A finger on the bar carries the card, as its edge does: never a native scroll of the canvas. */
 		touch-action: none;
 	}
 	/* A card whose scripts are off here (pasted from a friend's canvas), and the button that turns them on: above it, at its right. */
@@ -1566,7 +1566,7 @@
 	}
 }
 
-/* ---- a document or an app item, in a board's place (`item-surfaces.tsx`) ------------------- */
+/* ---- a document or an app item, in a card's place (`item-surfaces.tsx`) ------------------- */
 
 @layer decks.surface {
 	/*

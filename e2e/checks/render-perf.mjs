@@ -135,7 +135,7 @@ const quiet = (quietMs = 1500, cap = 30000) =>
 			while (performance.now() - t0 < cap) {
 				await new Promise((done) => setTimeout(done, 100));
 				const n = globalThis.__decksProbes?.sheet?.tiles ?? 0;
-				const d = document.querySelector(".stage")?.dataset;
+				const d = document.querySelector(".canvas")?.dataset;
 				if (n !== last || d?.moving === "true" || d?.gliding === "true") {
 					last = n;
 					at = performance.now();
@@ -159,7 +159,7 @@ const frame = () => canvas.evaluate(() => new Promise((done) => requestAnimation
 /** Put helpers in the page: the camera, wheel events on the stage, one a frame. */
 const helpers = () =>
 	canvas.evaluate(() => {
-		const stage = () => document.querySelector(".stage");
+		const stage = () => document.querySelector(".canvas");
 		const centre = () => {
 			const r = stage().getBoundingClientRect();
 			return { x: r.left + r.width / 2, y: r.top + r.height / 2 };

@@ -20,20 +20,20 @@ const parts: MessagePart[] = [
 	{ type: "text", text: " and move " },
 	{ type: "mention", kind: "item", id: "rect-9", name: "a square", from: "you", path: "canvases/md", exact: "@item:rect-9" },
 ];
-const text = "A comment on a board. The quoted words are what I selected:\n\n1. canvases/md/cards/sdk/index.html\n   > SDK; each\n   test note\n\nKeep [comment 1] and move @item:rect-9";
+const text = "A comment on a card. The quoted words are what I selected:\n\n1. canvases/md/cards/sdk/index.html\n   > SDK; each\n   test note\n\nKeep [comment 1] and move @item:rect-9";
 
 test("parts from a browser are kept as `MessagePart`s, anything else dropped", () => {
 	assert.deepEqual(cleanParts(parts), parts);
 	assert.equal(cleanParts("no"), undefined);
 	assert.equal(cleanParts([{ type: "text", text: "only words" }]), undefined, "no pill: the text is the message");
 	const cleaned = cleanParts([
-		{ type: "mention", kind: "board", id: "boards/a.html", from: "someone", extra: 1, label: 5 },
+		{ type: "mention", kind: "card", id: "canvases/t/cards/a/index.html", from: "someone", extra: 1, label: 5 },
 		{ type: "mention", kind: "script", id: "x" },
 		{ type: "mention", kind: "file", name: "no id" },
 		null,
 		{ type: "text", text: "x".repeat(30_000) },
 	])!;
-	assert.deepEqual(cleaned[0], { type: "mention", kind: "card", id: "boards/a.html", name: "boards/a.html", from: "you" }, "a pill kept before cards says board, and is read as a card's");
+	assert.deepEqual(cleaned[0], { type: "mention", kind: "card", id: "canvases/t/cards/a/index.html", name: "canvases/t/cards/a/index.html", from: "you" }, "only the fields a pill has, from the person");
 	assert.equal(cleaned.length, 2);
 	assert.equal((cleaned[1] as { text: string }).text.length, 20_000);
 });
@@ -55,7 +55,7 @@ test("a user message keeps its parts in the history and when the transcript is l
 test("a queued message keeps its parts until it is sent, and the queue row shows only its text", () => {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-parts-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	try {
 		const agent = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });

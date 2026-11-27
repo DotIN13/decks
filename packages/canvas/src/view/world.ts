@@ -21,11 +21,11 @@ export interface WorldNeeds {
 export function createWorld(d: WorldNeeds) {
 	/**
 	 * The camera: where it is, whether it is moving, and the one place that moves it (`camera/controller.ts`).
-	 * The stage hands it the window, how to place the world and the drawing at a camera, and its host's
+	 * The canvas hands it the window, how to place the world and the drawing at a camera, and its host's
 	 * camera to follow.
 	 */
 	/*
-	 * The stage scrolls (`camera/scroll-area.ts`): the camera's position is the stage's scroll, and the
+	 * The canvas scrolls (`camera/scroll-area.ts`): the camera's position is the canvas's scroll, and the
 	 * world is placed in the scrolled content at `origin`, scaled by the zoom. A pan is the browser
 	 * scrolling, which moves the world on its compositor; a step of ours (a zoom, a key, a glide, a
 	 * drag) sets the scroll and, when the zoom or the origin changed, the world's transform.
@@ -101,7 +101,7 @@ export function createWorld(d: WorldNeeds) {
 			}
 			placeWorld(cam.zoom);
 			placeScroll(cam);
-			// The drawing moves in the same call as the boards, so the two can never be a frame apart.
+			// The drawing moves in the same call as the cards, so the two can never be a frame apart.
 			d.penLayer.setCamera(cam);
 		},
 		follow: (cam) => d.penLayer.setCamera(cam),
@@ -138,7 +138,7 @@ export function createWorld(d: WorldNeeds) {
 	});
 
 	/*
-	 * The stage scrolled: the browser has moved the world already, and the camera follows. A scroll
+	 * The canvas scrolled: the browser has moved the world already, and the camera follows. A scroll
 	 * this file set (`placeScroll`) comes back here too, and is not the person's.
 	 */
 	const scrolled = () => {

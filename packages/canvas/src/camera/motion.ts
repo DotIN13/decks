@@ -23,13 +23,13 @@ export function createMotion(d: MotionNeeds) {
 	 *
 	 * The two are not the same kind of work, and the difference is the whole reason this
 	 * signal exists. Moving the world is a transform the compositor already holds pictures
-	 * for, so a pan costs almost nothing however many boards are on the canvas. Scaling it
-	 * asks every board's document to be drawn again at a size it has never been drawn at —
-	 * and a board is an iframe, which is a whole document to redraw. Measured on twelve
-	 * boards at 4× CPU throttle: 69ms of work per finger movement while panning, 134ms
-	 * while pinching, and the gap grows with the number of boards in view.
+	 * for, so a pan costs almost nothing however many cards are on the canvas. Scaling it
+	 * asks every card's document to be drawn again at a size it has never been drawn at —
+	 * and a card is an iframe, which is a whole document to redraw. Measured on twelve
+	 * cards at 4× CPU throttle: 69ms of work per finger movement while panning, 134ms
+	 * while pinching, and the gap grows with the number of cards in view.
 	 *
-	 * So while the scale is moving, the boards are put on layers of their own
+	 * So while the scale is moving, the cards are put on layers of their own
 	 * (`index.css`), which lets the compositor stretch the picture it already has instead
 	 * of the main thread drawing a new one: 134ms → 56ms, with nothing to see at rest
 	 * (measured: 0.2% of pixels differ, at the edges of letters). It is switched off again
@@ -46,7 +46,7 @@ export function createMotion(d: MotionNeeds) {
 	 * `scaling` answers "is the picture the wrong size"; this answers "is the picture in
 	 * motion", and the canvas renderers need the second one too. A pan repaints the page, so
 	 * Chrome reports every drawable element as changed on every step, and a renderer that
-	 * reads a `paint` event as "this document changed" redraws every board on every step of
+	 * reads a `paint` event as "this document changed" redraws every card on every step of
 	 * a pan for nothing. Same tail as the scale settle, for the same reason.
 	 */
 	const [moving, setMoving] = createSignal(false);

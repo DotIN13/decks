@@ -33,7 +33,7 @@ import { createOverlayModel } from "./overlay-model.ts";
 import { createPenActions } from "./pen-actions.ts";
 import { createPillObstacles } from "./pill-obstacles.ts";
 
-/** What the selection's drawing needs of the stage around it. */
+/** What the selection's drawing needs of the canvas around it. */
 type SelectionDeps = {
 	props: CanvasViewProps;
 	ctl: CameraController;
@@ -56,17 +56,17 @@ type SelectionDeps = {
 
 /**
  * What is drawn over the selection and under the pointer: outlines, handles, anchors, the hover,
- * grip, kin and distance boxes, the overlay they make together, and the pills over a board, drawn
+ * grip, kin and distance boxes, the overlay they make together, and the pills over a card, drawn
  * items and the lasso, with what the pills do. Made inside `CanvasView`, after the editor, which it reads.
  */
 export function createSelection(deps: SelectionDeps) {
 	const { props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld } = deps;
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
 
-	/** More than one thing picked together, boards among them or not: the pill goes over the whole group (`calloutItems`). */
+	/** More than one thing picked together, cards among them or not: the pill goes over the whole group (`calloutItems`). */
 	const groupPicked = () => editor.pagePicks().length + editor.items().length > 1;
-	// After the editor, which it reads: a stage made with a board already selected reads it at once.
-	const calloutPage = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
+	// After the editor, which it reads: a canvas made with a card already selected reads it at once.
+	const calloutPage = createMemo(() => (props.selected && !groupPicked() ? props.cards.find((card) => card.path === props.selected) : undefined));
 	const calloutPath = createMemo(() => calloutPage()?.path);
 
 	/** Select what was just asked for, which the drawing does not have until the server answers. */
@@ -82,7 +82,7 @@ export function createSelection(deps: SelectionDeps) {
 				drag: shownDrag(),
 				glide: editor.glide(),
 				resize: editor.shownResize(),
-				boards: scene.boards(),
+				cards: scene.cards(),
 				pagePicks: editor.pagePicks(),
 				pageDrag: editor.pageDrag(),
 				ownDrag: editor.ownDrag(),
@@ -103,7 +103,7 @@ export function createSelection(deps: SelectionDeps) {
 	 */
 	const penAnchors = createMemo(() => arrowAnchors(penHandles(), { editable: !!props.onPenEdit, drafting: !!editor.draft(), resizing: !!editor.resize() }, scene));
 	/*
-	 * Where each selected item is, for the properties panel's position and size: the box the stage
+	 * Where each selected item is, for the properties panel's position and size: the box the canvas
 	 * draws, kept current as the drawing changes (`state/pen-tools.ts`).
 	 */
 	createEffect(() => {
@@ -115,8 +115,8 @@ export function createSelection(deps: SelectionDeps) {
 		}
 		setPenBoxes(boxes);
 	});
-	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
-	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: ctl.zoom() }));
+	/** The selected card's box, when it alone is selected and can be resized: the same eight handles as an item. */
+	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), cards: scene.cards(), zoom: ctl.zoom() }));
 
 	const { pillObstacles } = createPillObstacles({
 		props,

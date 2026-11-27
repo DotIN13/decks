@@ -15,12 +15,12 @@ function put(file: string, data: string | Uint8Array): void {
 
 function deck(): string {
 	const root = realPathOf(mkdtempSync(join(tmpdir(), "decks-watch-")));
-	mkdirSync(join(root, "boards"), { recursive: true });
+	mkdirSync(join(root, "cards"), { recursive: true });
 	return root;
 }
 
 function card(w: number): string {
-	return `<!doctype html><html><head><title>A</title><meta name="board" content='{"w":${w},"h":600}'></head><body class="board"></body></html>`;
+	return `<!doctype html><html><head><title>A</title><meta name="card" content='{"w":${w},"h":600}'></head><body class="card-page"></body></html>`;
 }
 
 /** Wait for the changes to satisfy `done`, or give up. Real events, so real time. */
@@ -59,9 +59,9 @@ async function watching(root: string, changes: DeckChange[]): Promise<() => void
 	return stop;
 }
 
-const boards = (changes: DeckChange[]) => changes.filter((c) => c.kind === "card").map((c) => c.path);
+const cards = (changes: DeckChange[]) => changes.filter((c) => c.kind === "card").map((c) => c.path);
 
-test("an in-place write to a board is reported as that board", async () => {
+test("an in-place write to a card is reported as that card", async () => {
 	const root = deck();
 	const file = join(root, "canvases", "t", "cards", "a", "index.html");
 	put(file, card(800));
@@ -70,7 +70,7 @@ test("an in-place write to a board is reported as that board", async () => {
 	const stop = await watching(root, changes);
 	try {
 		put(file, card(860));
-		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/a/index.html")));
+		assert.ok(await until(changes, (seen) => cards(seen).includes("canvases/t/cards/a/index.html")));
 	} finally {
 		stop();
 		rmSync(root, { recursive: true, force: true });
@@ -85,7 +85,7 @@ test("an in-place write to a board is reported as that board", async () => {
  * replaced inode, and the rename it did report named the temp file. So the interesting
  * assertion is not that the rename is noticed but that the *next ordinary write* still is.
  */
-test("a board is still heard after a rename replaces its file", async () => {
+test("a card is still heard after a rename replaces its file", async () => {
 	const root = deck();
 	const file = join(root, "canvases", "t", "cards", "a", "index.html");
 	put(file, card(800));
@@ -93,7 +93,7 @@ test("a board is still heard after a rename replaces its file", async () => {
 	const changes: DeckChange[] = [];
 	const stop = await watching(root, changes);
 	try {
-		const temp = join(root, "boards", ".tmp-a");
+		const temp = join(root, "cards", ".tmp-a");
 		put(temp, card(860));
 		renameSync(temp, file);
 		assert.ok(await until(changes, (seen) => seen.some((c) => c.kind === "rescan")), "a rename asks for a rescan");
@@ -101,7 +101,7 @@ test("a board is still heard after a rename replaces its file", async () => {
 		changes.length = 0;
 		put(file, card(920));
 		assert.ok(
-			await until(changes, (seen) => boards(seen).includes("canvases/t/cards/a/index.html") || seen.some((c) => c.kind === "rescan")),
+			await until(changes, (seen) => cards(seen).includes("canvases/t/cards/a/index.html") || seen.some((c) => c.kind === "rescan")),
 			"the write after the rename is still heard",
 		);
 	} finally {
@@ -121,7 +121,7 @@ test("the revision store is not watched, or every save would loop", async () => 
 		put(join(root, "canvases", "t", "cards", "b", "index.html"), card(800));
 		// The card is the thing that proves the watcher was listening at all; under load the watcher may
 		// say "look at everything" (a rescan) instead, as in the test above.
-		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/b/index.html") || seen.some((c) => c.kind === "rescan")));
+		assert.ok(await until(changes, (seen) => cards(seen).includes("canvases/t/cards/b/index.html") || seen.some((c) => c.kind === "rescan")));
 		assert.deepEqual(
 			// The probe that proved the watcher listening (`watching`) may still be heard late.
 			changes.filter((c) => c.kind === "asset").map((c) => c.path).filter((path) => path !== "probe.txt"),

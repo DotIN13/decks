@@ -13,7 +13,7 @@ import type { Box } from "../model/boxes.ts";
  * A view is kept per key on this device. The camera on screen has an **owner**, the key it last
  * landed for, and it is kept only under that owner: when the key on screen changes and when the
  * page goes. Between a switch and its landing there is no owner, so nothing is kept. Before,
- * whatever camera was on screen was kept under the agent being left, and a canvas with no boards
+ * whatever camera was on screen was kept under the agent being left, and a canvas with no cards
  * kept the last agent's camera: one round trip gave an agent another agent's view, for good.
  *
  * One path for every arrival, an agent picked, its canvas changed by anyone, the page opened: a
@@ -24,9 +24,9 @@ import type { Box } from "../model/boxes.ts";
 export interface LandingHost {
 	views(): AgentViews;
 	camera(): Camera;
-	/** The card or board selected, kept with the view. */
+	/** The card selected, kept with the view. */
 	selected(): string | undefined;
-	/** Everything on the canvas on screen, boards and drawing alike, in canvas units. */
+	/** Everything on the canvas on screen, cards and drawing alike, in canvas units. */
 	boxes(): Box[];
 	viewport(): Viewport;
 	/** The part of the viewport the canvas has, without the panels standing over it. */

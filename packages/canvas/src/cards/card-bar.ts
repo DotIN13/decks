@@ -29,7 +29,7 @@ export function createCardBar(d: CardBarNeeds) {
 	 * zoom, in two rows that scroll sideways when the screen is narrower than them. Above the words, or
 	 * under them when the app's own bars or the screen's top are in the way, and never past an edge.
 	 * It goes the moment the camera moves and comes back with a fade where the words came to rest, as
-	 * the board pill does (`placing`).
+	 * the card pill does (`placing`).
 	 */
 	let wanted = false;
 

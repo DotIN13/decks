@@ -18,8 +18,10 @@ test("the table has every call of the redesign, each named once", () => {
 		"ports", "now", "pair.code", "studio.login", "studio.code", "studio.status", "studio.disconnect",
 		// For a caller with no disk, and for an agent that works outside Decks.
 		"file.list", "file.find", "file.read", "file.write", "file.edit", "file.grep", "file.move", "file.delete", "agent.news",
+		// For a test or a script that waits on another agent's work by its id.
+		"agent.wait",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 96);
+	assert.equal(VERBS.length, 97);
 	assert.equal(VERB_BY_NAME.size, VERBS.length, "a name finds only the table's calls");
 });
 
@@ -35,7 +37,6 @@ test("every call says what it touches and whether it changes it, in the redesign
 	assert.equal(count("screen", "read"), 2, "camera and viewport only read the screen");
 	assert.equal(count("screen", "change"), 6);
 	assert.ok(VERBS.filter((verb) => verb.group === "view").every((verb) => verb.touches === "screen"), "view calls never write files");
-	assert.equal(VERB_BY_NAME.get("web.board"), undefined, "the shared tab has no board: its status is web.status");
 });
 
 test("every canvas call takes an optional canvas, last", () => {
@@ -49,7 +50,7 @@ test("every canvas call takes an optional canvas, last", () => {
 
 test("arguments that fit pass, and the wrong ones get a sentence with the signature", () => {
 	const insert = VERB_BY_NAME.get("canvas.insert")!;
-	assert.equal(checkArgs(insert, [{ type: "board", board: "boards/a.html" }, { beside: "boards/b.html" }]), undefined);
+	assert.equal(checkArgs(insert, [{ type: "card", card: "canvases/plan/cards/a/index.html" }, { beside: "canvases/plan/cards/b/index.html" }]), undefined);
 	assert.equal(checkArgs(insert, [{ type: "note", content: "hi" }, { at: { x1: 0, y1: 0 }, canvas: "plan" }]), undefined);
 	assert.match(checkArgs(insert, [{ type: "note" }, { besides: "x" }])!, /has no key "besides"/);
 	assert.match(checkArgs(insert, [])!, /canvas\.insert needs item/);
@@ -66,14 +67,14 @@ test("arguments that fit pass, and the wrong ones get a sentence with the signat
 
 test("left-out optionals may be sent as null, but a null that means something is kept", () => {
 	assert.equal(checkArgs(VERB_BY_NAME.get("view.camera")!, [null]), undefined);
-	assert.equal(checkArgs(VERB_BY_NAME.get("view.cursor")!, ["boards/a.html", null]), undefined);
-	assert.equal(checkArgs(VERB_BY_NAME.get("canvas.fit")!, ["boards/a.html", { margin: null }]), undefined);
+	assert.equal(checkArgs(VERB_BY_NAME.get("view.cursor")!, ["canvases/plan/cards/a/index.html", null]), undefined);
+	assert.equal(checkArgs(VERB_BY_NAME.get("canvas.fit")!, ["canvases/plan/cards/a/index.html", { margin: null }]), undefined);
 	assert.match(checkArgs(VERB_BY_NAME.get("card.list")!, [1, 2])!, /takes 0 arguments/);
 });
 
 test("batch ops are checked op by op, pen edits among them", () => {
 	const batch = VERB_BY_NAME.get("canvas.batch")!;
-	assert.equal(checkArgs(batch, [[{ op: "insert", item: { type: "note", id: "n1" }, below: "boards/a.html" }, { op: "update", id: "n1", set: { content: "yo" } }, { op: "delete", id: "n2" }]]), undefined);
+	assert.equal(checkArgs(batch, [[{ op: "insert", item: { type: "note", id: "n1" }, below: "canvases/plan/cards/a/index.html" }, { op: "update", id: "n1", set: { content: "yo" } }, { op: "delete", id: "n2" }]]), undefined);
 	assert.ok(checkArgs(batch, [[{ op: "explode", id: "n1" }]]));
 	assert.equal(checkArgs(batch, [[{ op: "insert", node: { type: "note", id: "n1", text: "hi" }, box: { x1: 0, y1: 0 } }]]), undefined);
 });
@@ -83,7 +84,7 @@ test("shapes print as TypeScript, named ones by name", () => {
 	assert.equal(tsOf(VERB_BY_NAME.get("card.list")!.result!), "Card[]");
 	assert.equal(tsOf(VERB_BY_NAME.get("card.canvases")!.result!), "Placement[]");
 	assert.match(tsOf(VERB_BY_NAME.get("card.get")!.result!, true), /^\{ path: string; title: string; lastWrittenBy\?: string \}$/);
-	assert.equal(tsOf(Placement, true), "{ card: string; canvas: string; box: Box; clipped?: boolean }", "no board field beside card");
+	assert.equal(tsOf(Placement, true), "{ card: string; canvas: string; box: Box; clipped?: boolean }", "a placement's fields");
 });
 
 test("JSON Schema writes named shapes out and refuses unknown keys", () => {
@@ -99,13 +100,10 @@ test("command names are noun then verb", () => {
 	assert.deepEqual(commandOf(VERB_BY_NAME.get("canvas.copyShared")!), ["canvas", "copy-shared"]);
 });
 
-test("the names from before cards are gone", () => {
-	for (const old of ["board.list", "board.create", "board.get", "board.canvases", "board.url", "apps.board", "newBoard", "fit", "show", "hide", "move", "boards", "pen.read", "pen.edit", "pen.create", "pen.save", "pen.file", "stages", "open", "newStage", "title", "me", "agents", "send", "queue", "report", "reload", "url", "resolve", "camera", "viewport", "screenshot", "cursor"]) {
+test("the old names of calls are gone", () => {
+	for (const old of ["fit", "show", "hide", "move", "pen.read", "pen.edit", "pen.create", "pen.save", "pen.file", "open", "title", "me", "agents", "send", "queue", "report", "reload", "url", "resolve", "camera", "viewport", "screenshot", "cursor"]) {
 		assert.equal(VERB_BY_NAME.get(old), undefined, `${old} is not a call`);
 	}
-	const fields = (verb: string, param: number) => Object.keys((VERB_BY_NAME.get(verb)!.params[param]!.schema as { properties: object }).properties);
-	assert.ok(!fields("agent.send", 1).includes("boards") && !fields("agent.queue", 1).includes("boards"), "a hand-off names cards");
-	assert.ok(!fields("view.reload", 0).includes("board"), "a reload names a card");
 });
 
 test("the SDK's generated files match the table", async () => {

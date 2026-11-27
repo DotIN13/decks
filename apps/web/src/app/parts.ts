@@ -8,7 +8,7 @@ import { can } from "../connections/backend.ts";
 import { scheme } from "../lib/theme.ts";
 import { installTooltips } from "../shell/tooltip.ts";
 import { preview, state } from "../state/deck.ts";
-import { setPersonStage } from "../state/decks.ts";
+import { setPersonCanvas } from "../state/decks.ts";
 import { ensureHistory } from "../state/history.ts";
 import { mode, setMode } from "../state/selection.ts";
 import { setOnScreen } from "../state/socket.ts";
@@ -28,7 +28,7 @@ import { installKeys } from "./keys.ts";
 import { createCameraLanding, reportCameraOnArrival } from "./landing.ts";
 import { createFraming } from "./links.ts";
 import { createOnScreen } from "./on-screen.ts";
-import { focusAgent, moveConversation, openAppsPanel, showPanel, viewOnlyStage } from "./person.ts";
+import { focusAgent, moveConversation, openAppsPanel, showPanel, viewOnlyCanvas } from "./person.ts";
 import { createPills } from "./pills.ts";
 import { listenToHarness, type FrameHooks } from "./socket-messages.ts";
 import { installViewport } from "./viewport.ts";
@@ -72,7 +72,7 @@ export function createParts() {
 	const { prefs, setPrefs, raise } = createAlerts({ focusAgent: (id) => focusAgent(id) });
 
 	const onScreen = createOnScreen();
-	const { views, stagePen, stagePages } = onScreen;
+	const { views, canvasPen, canvasPages } = onScreen;
 	parkOnLeaving(() => park());
 
 	/*
@@ -85,7 +85,7 @@ export function createParts() {
 
 	/* A backend that cannot write is read, and so is a friend's canvas shared with you to view: no edit mode and no pen, whichever key asked for them. */
 	createEffect(() => {
-		if (can("write") && !viewOnlyStage()) return;
+		if (can("write") && !viewOnlyCanvas()) return;
 		if (mode() !== "browse") setMode("browse");
 		if (drawing()) setDrawing(false);
 	});
@@ -100,7 +100,7 @@ export function createParts() {
 	/*
 	 * Start measuring the chrome.
 	 *
-	 * Before the socket, deliberately: the first `deck.state` can arrive with boards in it
+	 * Before the socket, deliberately: the first `deck.state` can arrive with cards in it
 	 * and trigger the opening fit, and a fit that runs before anything has been measured
 	 * frames into the whole window and then never runs again.
 	 */
@@ -108,7 +108,7 @@ export function createParts() {
 	// A person's change goes to the canvas they are looking at, named on the frame (`state/socket.ts`).
 	setOnScreen(() => canvasOnScreen()?.name, () => state.focused);
 	// The same two for the person's clicks sent as verbs (`state/decks.ts`).
-	setPersonStage(() => canvasOnScreen()?.name, () => state.focused);
+	setPersonCanvas(() => canvasOnScreen()?.name, () => state.focused);
 	// One camera reading at startup, and again whenever this browser is come back to (`app/landing.ts`).
 	reportCameraOnArrival();
 
@@ -134,7 +134,7 @@ export function createParts() {
 	});
 
 	const files = createFileDrops();
-	// A paste, and a drop on the canvas, over a board or not (`app/files/drops.ts`).
+	// A paste, and a drop on the canvas, over a card or not (`app/files/drops.ts`).
 	files.install({
 		preview,
 		// A paste with the focus on this page: items copied on a canvas, or words, go to the canvas on screen.
@@ -150,7 +150,7 @@ export function createParts() {
 
 	/** Bumped to say "put the cursor in the search field" — the panel watches it. */
 	const [findAt, setFindAt] = createSignal(0);
-	// The two app-wide shortcuts: `⌘K` to find a board, Escape to drop a selection.
+	// The two app-wide shortcuts: `⌘K` to find a card, Escape to drop a selection.
 	installKeys({ openPanel: () => showPanel(true), find: setFindAt });
 
 	/* The layout: phone or not, the conversation folded or a sheet (`app/chat-layout.ts`). */
@@ -163,22 +163,22 @@ export function createParts() {
 	onMount(() => onCleanup(syncRings()));
 	const { presenting, present } = createPresenting();
 
-	/* A board put on the canvas is flown to once the server has placed it (`app/links.ts`). */
-	const { frameWhenPlaced, playAndFrame } = createFraming(stagePages);
+	/* A card put on the canvas is flown to once the server has placed it (`app/links.ts`). */
+	const { frameWhenPlaced, playAndFrame } = createFraming(canvasPages);
 	/** The deck's apps, for the panel's Apps tab (`app/apps-panel.ts`). */
-	const apps = createAppsPanel(stagePages, (path) => frameWhenPlaced(path));
+	const apps = createAppsPanel(canvasPages, (path) => frameWhenPlaced(path));
 
 	/* The camera, and whose it is (`app/landing.ts`). */
-	const { park, personMoved } = createCameraLanding({ views, stagePen, stagePages, deckSeen });
+	const { park, personMoved } = createCameraLanding({ views, canvasPen, canvasPages, deckSeen });
 
 	/** The editor on screen (`createFramedEditor`), for what this app asks of it from outside: the scheme, a selection. */
 	const [editorHandle, setEditorHandle] = createSignal<FramedHandle>();
 	/** The drawn items selected on the canvas, for the panel's Canvas tab. */
 	const [penSelected, setPenSelected] = createSignal<string[]>([]);
 	/* What a row, a pill or a sent message names, found on the canvas (`app/pills.ts`). */
-	const pills = createPills({ stagePen, editorHandle, setPenSelected, playAndFrame });
+	const pills = createPills({ canvasPen, editorHandle, setPenSelected, playAndFrame });
 
-	// The app's scheme, to the editor at each switch: it draws ink, cards and board pages in it.
+	// The app's scheme, to the editor at each switch: it draws ink, cards and card pages in it.
 	createEffect(() => {
 		const dark = scheme() === "dark";
 		untrack(editorHandle)?.setDark(dark);
@@ -186,7 +186,7 @@ export function createParts() {
 
 	/** What the canvas host (`tabs/kinds/canvas-host.tsx`) needs of this page. */
 	const canvasHost: CanvasHostInputs = {
-		stagePen,
+		canvasPen,
 		personMoved,
 		setPenSelected,
 		setEditorHandle,

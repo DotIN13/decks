@@ -11,7 +11,7 @@ export interface CardEditorProps {
 	caretAt?: { x: number; y: number };
 	/** Items in the card the editor keeps but cannot type into, by id: what to call each (`card-frame.ts`). */
 	held?: Record<string, string>;
-	/** The camera's zoom: the editor is drawn in the stage's units, its style bar in the screen's. */
+	/** The camera's zoom: the editor is drawn in the canvas's units, its style bar in the screen's. */
 	zoom: number;
 	class?: string;
 	style: JSX.CSSProperties;

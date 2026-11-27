@@ -14,7 +14,7 @@ import { type CanvasViewProps } from "./CanvasView.tsx";
 /** What `feedEngine` reads of `CanvasView` (`CanvasView.tsx`), each read when it is used. */
 export interface FeedEngineNeeds {
 	readonly element: HTMLDivElement;
-	readonly coloursFor: (dark: string, stage: HTMLElement) => { dark: string; accent: [number, number, number]; panel: [number, number, number]; guide: [number, number, number]; };
+	readonly coloursFor: (dark: string, canvas: HTMLElement) => { dark: string; accent: [number, number, number]; panel: [number, number, number]; guide: [number, number, number]; };
 	readonly selection: ReturnType<typeof createSelection>;
 	readonly ctl: CameraController;
 	readonly setEngineOverlays: Setter<boolean>;
@@ -46,7 +46,7 @@ export function feedEngine(d: FeedEngineNeeds) {
 	};
 
 	/*
-	 * The drawing is edited in both modes — browse keeps the boards' pages as they are, edit opens
+	 * The drawing is edited in both modes — browse keeps the cards' pages as they are, edit opens
 	 * them for editing too — but not while the pen is out: ink has its own selection (the lasso).
 	 */
 	createEffect(() => {

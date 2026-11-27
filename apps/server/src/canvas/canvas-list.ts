@@ -3,7 +3,7 @@ import type { ServerMessage } from "@decks/protocol";
 import type { CanvasPens } from "./pens.ts";
 
 /**
- * Every canvas in the deck, and who is on it: the manager's whole list (`protocol/StageRow`).
+ * Every canvas in the deck, and who is on it: the manager's whole list (`protocol/CanvasRow`).
  *
  * Built from two records that already exist — the folders under `canvases/`, and each session's
  * own canvas field — because a canvas nobody has open is still a canvas, and an agent with a canvas
@@ -11,8 +11,8 @@ import type { CanvasPens } from "./pens.ts";
  * and the manager draws nothing rather than an empty room.
  */
 export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id: string; name: string; color: string; seat: { canvasFolder(): string | undefined } }>): ServerMessage {
-	const stages = pens.names().map((name) => {
-		const { boards: cards, rev, shot, words } = pens.summary(name);
+	const canvases = pens.names().map((name) => {
+		const { cards: cards, rev, shot, words } = pens.summary(name);
 		let changedAt: number | undefined;
 		try {
 			changedAt = Math.round(statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : pens.folderOf(name)).mtimeMs);
@@ -25,7 +25,7 @@ export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id
 			title: pens.titleOf(name),
 			...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role } } : !pens.rights.yoursAlone(name) ? { othersEdit: true as const } : {}),
 			...(changedAt ? { changedAt } : {}),
-			boards: cards,
+			cards: cards,
 			rev,
 			shot,
 			words,
@@ -35,5 +35,5 @@ export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id
 				.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),
 		};
 	});
-	return { type: "canvas.list", stages };
+	return { type: "canvas.list", canvases };
 }

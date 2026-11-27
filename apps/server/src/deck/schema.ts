@@ -11,7 +11,7 @@ default and a warning, never a refusal to open the deck — and writing preserve
  *
  * **It holds no card state.** A place belongs to a canvas (`AgentRecord.positions`), a size belongs
  * to the card's own file, and this app never writes this file at all: what is left is the deck's
- * name and the roots its embeds may reach. A `boards` map from an older build is still read — for
+ * name and the roots its embeds may reach. A `cards` map from an older build is still read — for
  * the arrangement, which seeds a canvas — and is not written back.
  */
 export interface DeckFile {
@@ -26,7 +26,7 @@ export interface DeckFile {
 interface ParsedDeckFile {
 	file: DeckFile;
 	/**
-	 * The arrangement an older `boards` map held, kept as a **seed** rather than as state.
+	 * The arrangement an older `cards` map held, kept as a **seed** rather than as state.
 	 *
 	 * Where a card sits belongs to a canvas now, so this is never written back and never read after
 	 * the first send. It is the place a conversation that has not moved that card starts from, so a
@@ -41,14 +41,14 @@ interface ParsedDeckFile {
 /**
  * The keys this build understands.
  *
- * `boards` and `sizes` are here and not on `DeckFile`: both are names an older build wrote for card
+ * `cards` and `sizes` are here and not on `DeckFile`: both are names an older build wrote for card
  * state, and both are consumed so a write drops them rather than carrying them forward forever. A
- * `boards` map still gives up its `x`/`y` as the arrangement a canvas is seeded from; its `w`/`h`, and
+ * `cards` map still gives up its `x`/`y` as the arrangement a canvas is seeded from; its `w`/`h`, and
  * everything under `sizes`, are ignored — a size is the card file's business.
  */
-const KNOWN = new Set(["version", "name", "boards", "sizes", "roots"]);
+const KNOWN = new Set(["version", "name", "places", "sizes", "roots"]);
 
-/** `oldPlaces`: whether the deck is old enough to hold a `boards` map of places (`old-shapes.ts`); read unless said not. */
+/** `oldPlaces`: whether the deck is old enough to hold a `cards` map of places (`old-shapes.ts`); read unless said not. */
 export function parseDeckFile(text: string, options: { oldPlaces?: boolean } = {}): ParsedDeckFile {
 	const warnings: string[] = [];
 	let raw: unknown;
@@ -71,8 +71,8 @@ export function parseDeckFile(text: string, options: { oldPlaces?: boolean } = {
 		warnings.push(`deck.json version ${String(source.version)} is newer than this build understands.`);
 	}
 
-	// And the places an older `boards` map held, a seed rather than state: in a deck old enough to hold one (`old-shapes.ts`).
-	const arrangement = options.oldPlaces === false ? {} : oldCardPlaces(source.boards, normalizeCardPath, warnings);
+	// And the places an older `cards` map held, a seed rather than state: in a deck old enough to hold one (`old-shapes.ts`).
+	const arrangement = options.oldPlaces === false ? {} : oldCardPlaces(source.places, normalizeCardPath, warnings);
 
 	if (source.roots !== undefined) {
 		if (Array.isArray(source.roots)) file.roots = source.roots as DeckFile["roots"];
@@ -94,9 +94,9 @@ export function normalizeCardPath(path: string): string {
 export function serializeDeckFile(file: DeckFile): string {
 	// version first, then the parts a human scans for, then whatever else was
 	// in the file — key order is the only formatting a JSON file has.
-	// `boards` and `sizes` are destructured only to be dropped: `boards` is the older name for the
+	// `cards` and `sizes` are destructured only to be dropped: `cards` is the older name for the
 	// arrangement, and a size is the card file's own business now, so neither is carried forward.
-	const { version, name, roots, boards: _legacy, sizes: _sizes, ...rest } = file;
+	const { version, name, roots, places: _places, sizes: _sizes, ...rest } = file;
 	const ordered: Record<string, unknown> = { version: version ?? 1 };
 	if (name !== undefined) ordered.name = name;
 	if (roots !== undefined) ordered.roots = roots;

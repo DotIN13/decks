@@ -17,20 +17,20 @@ import { createPresses } from "./presses.ts";
 
 
 
-/** What the stage's input needs of the stage around it. */
+/** What the canvas's input needs of the canvas around it. */
 export type ViewInputDeps = {
 	props: CanvasViewProps;
-	/** The stage element, set once it is mounted. */
+	/** The canvas element, set once it is mounted. */
 	element: () => HTMLDivElement;
 	ctl: CameraController;
 	view: () => Viewport;
 	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
-	/** The editor, made after the input: read only once the stage is running. */
+	/** The editor, made after the input: read only once the canvas is running. */
 	editor: () => CanvasEditor;
-	/** The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`). */
+	/** The canvas scrolled: the camera follows (`CanvasView.tsx`, `scrolled`). */
 	scrolled: () => void;
-	/** The stage's size, measured on mount and whenever it changes. */
+	/** The canvas's size, measured on mount and whenever it changes. */
 	measured: (viewport: Viewport) => void;
 	/** A sideways scroll over a card's wide table (`penLayer.scrollBy`): whether something took it. */
 	scrollBy: (at: { x: number; y: number }, by: number) => boolean;
@@ -38,9 +38,9 @@ export type ViewInputDeps = {
 };
 
 /**
- * What the stage hears from the person: the DOM listeners set up on mount, the wheel and the
+ * What the canvas hears from the person: the DOM listeners set up on mount, the wheel and the
  * trackpad, fingers and their pinch, the scroll the camera follows, the camera's keys, and whether a
- * press is held. Made inside `CanvasView`, so its effects and listeners belong to the stage.
+ * press is held. Made inside `CanvasView`, so its effects and listeners belong to the canvas.
  */
 export function createViewInput(deps: ViewInputDeps) {
 	const { props, ctl, view, frame, worldAt } = deps;
@@ -80,7 +80,7 @@ export function createViewInput(deps: ViewInputDeps) {
 		const observer = new ResizeObserver(measure);
 		observer.observe(element);
 		measure();
-		// Everything on the canvas assumes a stage pixel is a client pixel; say so if it is not.
+		// Everything on the canvas assumes a canvas pixel is a client pixel; say so if it is not.
 		checkCanvasOrigin(element);
 		onCleanup(() => observer.disconnect());
 
@@ -103,11 +103,11 @@ export function createViewInput(deps: ViewInputDeps) {
 	const { onWheel } = wheeling;
 
 	/**
-	 * A press on a drawn item's click shape (`render/engine.ts`, `attachHits`). Only items over a board have one, to take
-	 * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
+	 * A press on a drawn item's click shape (`render/engine.ts`, `attachHits`). Only items over a card have one, to take
+	 * the press from the card's page; on bare canvas the press is the canvas's and `pickAt` finds the item.
 	 */
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
-	/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
+	/** Bare canvas or something drawn on it: either way not a card, and the canvas's to handle. */
 	const onCanvas = (target: EventTarget | null) => target === el() || onDrawn(target);
 
 	const fingers = createFingers({

@@ -2,7 +2,7 @@
  * A drop eases in. What a drag let go of glides from where the pointer left it to where it lands,
  * and whatever the layout moved to make room (or to close the gap it left) glides there too: 150 ms,
  * ease-out. The maths is here; the engine runs it at the drawing that answers the drop
- * (`stage/engine.ts`, `settle`), so nothing is drawn where it lands before it has glided there.
+ * (`view/engine.ts`, `settle`), so nothing is drawn where it lands before it has glided there.
  */
 import type { Offset, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
@@ -16,7 +16,7 @@ export const easeOut = (k: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, k
 /**
  * Where everything a drop can move is as it is let go: each carried item where the drag has it,
  * and every other child of each frame it leaves or joins, and of each frame those sit in, up to
- * the top, where they are now. Drawn boxes, in stage pixels.
+ * the top, where they are now. Drawn boxes, in canvas pixels.
  */
 export function landingBoxes(scene: SceneQuery, ids: readonly string[], offset: Offset, into: string | null | undefined): Map<string, Rect> {
 	const out = new Map<string, Rect>();
@@ -85,7 +85,7 @@ export const RATE = 14;
 export const RISE_RATE = 7;
 /** How fast an appeared item's transparency goes, per second: faded in within about 500 ms. */
 export const FADE_RATE = 6;
-/** How far below its place an appeared item starts, in stage pixels. */
+/** How far below its place an appeared item starts, in canvas pixels. */
 export const RISE = 40;
 /** Under this many pixels a shift is done. */
 const SETTLED_PX = 0.5;

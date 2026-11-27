@@ -3,7 +3,7 @@ import { measureFrame } from "./measure-page.ts";
 
 /**
  * One card (or a page), measured for `decks.canvas.fit` when no canvas has measured it
- * (`server/stage/shots.ts`).
+ * (`server/canvas/shots.ts`).
  *
  * A card is measured where it is drawn, and a card nobody is looking at is drawn nowhere: an agent
  * writing on its own canvas while the person looks at another was told "nothing has measured" on most
@@ -13,7 +13,7 @@ import { measureFrame } from "./measure-page.ts";
  * plain frame got none of that: a script that asked its card for `on` or `file` threw, a height set a
  * moment after waking was never seen, and fit read the card without its script.
  *
- * Anything else the deck lists (a document page, a board on a friend's canvas) is laid out in a frame
+ * Anything else the deck lists (a document page, a card on a friend's canvas) is laid out in a frame
  * at its own size and measured as a page (`pages/measure-page.ts`).
  *
  * **The card's picture is taken here too** (`picture=1`, `server/pictures/service.ts`): the same card,

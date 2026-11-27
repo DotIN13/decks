@@ -41,7 +41,7 @@ const watched = async (press, ms) => {
 			);
 			return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 		};
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const before = camera();
 		const samples = [];
 		const start = performance.now();
@@ -102,7 +102,7 @@ const stealing = (await canvasFrame(page)).evaluate(async () => {
 		);
 		return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 	};
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	// The page presses the plan's row meanwhile: wait for the glide it starts, then a little into it.
 	const until = performance.now() + 2000;
 	while (stage.dataset.gliding !== "true" && performance.now() < until) await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -153,7 +153,7 @@ await page.emulateMedia({ reducedMotion: null });
 // --- and the default stays instant for input --------------------------------------------
 
 const wheeled = await (await canvasFrame(page)).evaluate(async () => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const said = [];
 	for (let i = 0; i < 10; i++) {
 		stage.dispatchEvent(new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true }));

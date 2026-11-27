@@ -20,11 +20,11 @@ export interface PressNeeds {
 
 export function createPress(d: PressNeeds) {
 	/**
-	 * A press on the stage (`core/dispatch.ts` decides what it starts). The drawing, in either mode:
+	 * A press on the canvas (`core/dispatch.ts` decides what it starts). The drawing, in either mode:
 	 * an armed tool makes its item; otherwise a press on an item picks it up, a shift-press adds it
 	 * to the selection or takes it out, and a drag on empty canvas draws a marquee. A finger goes to
-	 * the stage's pool, and on the drawing it taps and carries. The camera pans with Space and a
-	 * drag, the middle button, a scroll or a pinch: that is the stage's (`PointerHost`, `pan`).
+	 * the canvas's pool, and on the drawing it taps and carries. The camera pans with Space and a
+	 * drag, the middle button, a scroll or a pinch: that is the canvas's (`PointerHost`, `pan`).
 	 *
 	 * Touch is asked of the event rather than of the screen size: a laptop with a touchscreen has
 	 * both, and each pointer should mean what it means. `preventDefault` is not called for a finger —
@@ -63,8 +63,8 @@ export function createPress(d: PressNeeds) {
 				if (!act.carry || !d.dragPage(act.path, event, element)) d.selectPage(act.path);
 				return;
 			case "touch":
-				// The touch first: it clears the selection for a finger on bare stage, which a board's picture lies on,
-				// so selecting the board before it was undone by the same press.
+				// The touch first: it clears the selection for a finger on bare canvas, which a card's picture lies on,
+				// so selecting the card before it was undone by the same press.
 				d.host.beginTouch(event);
 				if (act.picture) {
 					d.selectPage(act.picture);

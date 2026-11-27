@@ -22,7 +22,7 @@ const REST_MS = 250;
 const FETCHES = 6;
 
 /**
- * A card picture compressed for the GPU, as the server sends it (`apps/server/src/boards/astc.ts`):
+ * A card picture compressed for the GPU, as the server sends it (`apps/server/src/pictures/astc.ts`):
  * `DKA1`, width, height and the number of sizes, each size's length, then the sizes' ASTC blocks.
  * What `putCompressedPicture` takes: the bytes, and `[at, length, …]` of each size.
  */
@@ -64,8 +64,8 @@ export class EnginePictures {
 	constructor(private readonly of: CanvasEngine) {}
 
 	/**
-	 * Pictures fetched, by key: the address fetched (a board's may carry a size), the board's own
-	 * address for it, stand-in retries, and for a board's the copy's width (0: the whole picture).
+	 * Pictures fetched, by key: the address fetched (a card's may carry a size), the card's own
+	 * address for it, stand-in retries, and for a card's the copy's width (0: the whole picture).
 	 */
 	picturesAsked = new Map<string, { url: string; source: string; tries: number; size?: number; failed?: number }>();
 
@@ -99,9 +99,9 @@ export class EnginePictures {
 	fitTimer: ReturnType<typeof setTimeout> | undefined;
 
 	/**
-	 * Board pictures waiting to be copied to the GPU, `PICTURES_PER_FRAME` a frame. Copying one is done
+	 * Card pictures waiting to be copied to the GPU, `PICTURES_PER_FRAME` a frame. Copying one is done
 	 * on the page's thread (`copyExternalImageToTexture`), about 2 ms on an iPad mini, and a pan below
-	 * the live zoom that brought a dozen boards in copied them all in one frame: the top cost of that pan.
+	 * the live zoom that brought a dozen cards in copied them all in one frame: the top cost of that pan.
 	 */
 	putQueue: Array<() => void> = [];
 
@@ -117,7 +117,7 @@ export class EnginePictures {
 
 	private picturesTimer: ReturnType<typeof setTimeout> | undefined;
 
-	/** The pictures put on the page engine, of boards and of fills: for checks. */
+	/** The pictures put on the page engine, of cards and of fills: for checks. */
 	picturesPut = 0;
 
 	/** The widest and tallest a picture is kept (the device's limit, or 4096): bigger ones are resized. */

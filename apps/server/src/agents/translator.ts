@@ -30,7 +30,7 @@ export class Translator {
 	constructor(
 		readonly agentId: string,
 		private readonly emit: (message: ServerMessage) => void,
-		/** The deck, so a tool call on a card reads as `boards/plan.html`. */
+		/** The deck, so a tool call on a card reads as `cards/plan.html`. */
 		private readonly deckPath?: string,
 		/**
 		 * The transcript reached a stable shape — persist it (`agents/store.ts`).
@@ -389,7 +389,7 @@ export class Translator {
  * The name alone says nothing — six `edit` chips in a row are six identical rows —
  * and the arguments in full are too much, so each tool contributes the one argument
  * that identifies it. The name is not repeated here: the chip prints it separately,
- * and "read read boards/plan.html" is what happens when both do it.
+ * and "read read cards/plan.html" is what happens when both do it.
  *
  * Unknown tools (an extension's, an MCP server's) fall back to the first short
  * string they were given, which is right more often than not.
@@ -400,7 +400,7 @@ export function titleFor(name: string, args: unknown): string {
 	 * `mcp__<server>__<tool>` is one tool with a routing prefix on it, and the switch below
 	 * cares about the tool.
 	 *
-	 * Decks' own `stage_eval` arrives as `mcp__decks__stage_eval`, matched nothing, and fell
+	 * Decks' own `canvas_eval` arrives as `mcp__decks__canvas_eval`, matched nothing, and fell
 	 * to the default — which looks for any string argument under 120 characters and finds
 	 * none, because the argument is a program. So the row that says what the agent just did
 	 * to your canvas was the one row in the conversation with nothing in its description.
@@ -427,7 +427,7 @@ export function titleFor(name: string, args: unknown): string {
 		case "find":
 		case "ls":
 			return first("path", "glob", "pattern") ?? "";
-		case "stage_eval":
+		case "canvas_eval":
 			return truncate((first("code") ?? "").split("\n").find((line) => line.trim()) ?? "", 72);
 		default: {
 			const hint = Object.values(a).find((value) => typeof value === "string" && value.length < 120);

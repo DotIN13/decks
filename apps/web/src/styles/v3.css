@@ -4,10 +4,10 @@
  * hand, and floating bars of 16px corners on a plain ground.
  *
  * **The canvas keeps its own look.** The v3 colours are set on `body`, so the chrome and every
- * menu portalled into the body take them; `.stage` sets the old ones back for everything drawn on
- * the canvas (the selection, the pills, the handles, the cursors), and the stage engine reads its
- * accent off the root element, which this sheet leaves alone. Only the ground under the boards,
- * `--stage`, is the design's.
+ * menu portalled into the body take them; `.canvas` sets the old ones back for everything drawn on
+ * the canvas (the selection, the pills, the handles, the cursors), and the canvas engine reads its
+ * accent off the root element, which this sheet leaves alone. Only the ground under the cards,
+ * `--ground`, is the design's.
  *
  * Last in `index.css`, and in the components layer, so a rule here wins a tie with the sheets it
  * restyles and still loses to a utility.
@@ -43,7 +43,7 @@ body {
 
 	/* The app's own tokens, as v3 has them, for the chrome. */
 	--bg: var(--v3-bg);
-	--stage: var(--v3-bg);
+	--ground: var(--v3-bg);
 	--panel: var(--v3-panel);
 	--fg: var(--v3-fg);
 	--muted: var(--v3-fg2);
@@ -75,7 +75,7 @@ body {
 	/*
 	 * In dark the navy wash read as a smudge. The open tab is a clear blue, light enough to read
 	 * as blue on the dark panel, with pale-blue words; a chosen row is a quiet lifted grey, so blue
-	 * marks only which tab you are on. (Board "Five dark-mode highlights…", the 3 + 4 column.)
+	 * marks only which tab you are on. (Card "Five dark-mode highlights…", the 3 + 4 column.)
 	 */
 	--v3-tab-on: rgb(59 130 246 / 22%);
 	--v3-tab-on-fg: #d6e5ff;
@@ -91,7 +91,7 @@ body {
 }
 
 /* The canvas, as it was: everything drawn on it reads the old tokens. */
-.stage {
+.canvas {
 	--panel: var(--color-grey-50);
 	--fg: var(--color-grey-1100);
 	--muted: var(--color-grey-700);
@@ -106,7 +106,7 @@ body {
 	--shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 18px rgb(0 0 0 / 6%);
 	--radius-panel: 12px;
 }
-[data-color-scheme="dark"] .stage {
+[data-color-scheme="dark"] .canvas {
 	--panel: var(--color-grey-1000);
 	--fg: var(--color-grey-100);
 	--muted: var(--color-grey-500);
@@ -118,7 +118,7 @@ body {
 	--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
 }
 @media (pointer: coarse) {
-	.stage {
+	.canvas {
 		--radius-panel: 26px;
 	}
 }
@@ -785,7 +785,7 @@ body {
 		min-width: 0;
 		padding: 0;
 	}
-	/* The deck's mark, as v3 draws it: a 26px square with a 1.4px ring, the boards inside. */
+	/* The deck's mark, as v3 draws it: a 26px square with a 1.4px ring, the cards inside. */
 	.v3-panel .switcher,
 	.v3-deck .switcher {
 		display: flex;
@@ -3602,22 +3602,22 @@ body {
 
 /* ---- the canvas manager, as drawn: a plain head, find and order in one row, one blue button ---- */
 @layer components {
-	body .stage-box {
+	body .canvas-box {
 		width: min(94vw, 900px);
 		border-radius: 14px;
 		background: var(--v3-panel);
 	}
-	body .stage-head {
+	body .canvas-head {
 		gap: 12px;
 		padding: 16px 20px 14px;
 		border-bottom: 0;
 	}
-	body .stage-title {
+	body .canvas-title {
 		font-size: 15px;
 		font-weight: 600;
 		letter-spacing: 0;
 	}
-	body .stage-new {
+	body .canvas-new {
 		height: 30px;
 		border-radius: 7px;
 		background: var(--v3-accent);
@@ -3625,12 +3625,12 @@ body {
 		font-size: 13px;
 		font-weight: 500;
 	}
-	.stage-tools {
+	.canvas-manager-tools {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 	}
-	body .stage-search {
+	body .canvas-search {
 		height: 30px;
 		flex: 1;
 		gap: 7px;
@@ -3639,40 +3639,40 @@ body {
 		border-radius: 6px;
 		background: var(--v3-bg2);
 	}
-	body .stage-search:focus-within {
+	body .canvas-search:focus-within {
 		background: var(--v3-panel);
 		box-shadow:
 			inset 0 0 0 1px var(--v3-accent),
 			0 0 0 3px color-mix(in srgb, var(--v3-accent) 18%, transparent);
 	}
-	body .stage-search > input {
+	body .canvas-search > input {
 		font-size: 12.5px;
 	}
-	body .stage-sort {
+	body .canvas-sort {
 		padding: 2px;
 		gap: 1px;
 		border-radius: 7px;
 		background: var(--v3-bg2);
 		box-shadow: none;
 	}
-	body .stage-sort > button {
+	body .canvas-sort > button {
 		height: 26px;
 		padding: 0 10px;
 		border-radius: 5px;
 		font-size: 12px;
 	}
-	body .stage-sort > button:hover {
+	body .canvas-sort > button:hover {
 		background: transparent;
 	}
-	body .stage-sort > button[data-on="true"] {
+	body .canvas-sort > button[data-on="true"] {
 		background: var(--v3-panel);
 		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
 		font-weight: 500;
 	}
-	[data-color-scheme="dark"] body .stage-sort > button[data-on="true"] {
+	[data-color-scheme="dark"] body .canvas-sort > button[data-on="true"] {
 		background: #4a4a4a;
 	}
-	body .stage-card[data-here] .stage-open {
+	body .canvas-card[data-here] .canvas-open {
 		border-color: var(--v3-accent);
 		box-shadow: 0 0 0 1px var(--v3-accent);
 	}
@@ -3680,7 +3680,7 @@ body {
 
 /* ---- the canvas manager on a phone: a drawer from the foot of the screen, the canvases a list ---- */
 @layer components {
-	body .stage-manager[data-form="drawer"] {
+	body .canvas-manager[data-form="drawer"] {
 		place-items: end stretch;
 		padding: 0;
 		background: rgb(10 10 12 / 30%);
@@ -3689,7 +3689,7 @@ body {
 		transition: opacity 240ms var(--v3-ease);
 	}
 	/* The drawer comes up and goes down; `CanvasManager.tsx` waits the same 300ms before it is taken away. */
-	body .stage-manager[data-form="drawer"] .stage-box {
+	body .canvas-manager[data-form="drawer"] .canvas-box {
 		width: 100%;
 		height: min(82dvh, 100dvh - 56px);
 		border: 0;
@@ -3699,67 +3699,67 @@ body {
 		transform: translateY(100%);
 		transition: transform 300ms var(--v3-ease);
 	}
-	body .stage-manager[data-form="drawer"][data-open] .stage-box {
+	body .canvas-manager[data-form="drawer"][data-open] .canvas-box {
 		transform: none;
 	}
 	/* The head is the handle: a finger on it drags the drawer, so the browser pans nothing. */
-	body .stage-manager[data-form="drawer"] .stage-head {
+	body .canvas-manager[data-form="drawer"] .canvas-head {
 		gap: 10px;
 		padding: 8px 16px 10px;
 		touch-action: none;
 	}
-	.stage-grab {
+	.canvas-grab {
 		align-self: center;
 		width: 36px;
 		height: 5px;
 		border-radius: 3px;
 		background: color-mix(in srgb, var(--v3-fg, currentColor) 22%, transparent);
 	}
-	body .stage-manager[data-form="drawer"] .stage-title {
+	body .canvas-manager[data-form="drawer"] .canvas-title {
 		font-size: 17px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-new {
+	body .canvas-manager[data-form="drawer"] .canvas-new {
 		height: 36px;
 		padding: 0 14px 0 11px;
 		border-radius: 18px;
 		font-size: 15px;
 	}
 	/* Naming a new canvas takes the row: the heading gives it up. */
-	body .stage-manager[data-form="drawer"] .stage-title-row:has(> .stage-new-form) > .stage-title {
+	body .canvas-manager[data-form="drawer"] .canvas-title-row:has(> .canvas-new-form) > .canvas-title {
 		display: none;
 	}
-	body .stage-manager[data-form="drawer"] .stage-new-form {
+	body .canvas-manager[data-form="drawer"] .canvas-new-form {
 		flex: 1;
 	}
-	body .stage-manager[data-form="drawer"] .stage-new-form .stage-icon {
+	body .canvas-manager[data-form="drawer"] .canvas-new-form .canvas-icon {
 		flex: none;
 		width: 36px;
 		height: 36px;
 	}
 	/* 16px in every field: under that, iOS zooms the page when the field takes the keyboard. */
-	body .stage-manager[data-form="drawer"] .stage-new-field,
-	body .stage-manager[data-form="drawer"] .stage-search > input {
+	body .canvas-manager[data-form="drawer"] .canvas-new-field,
+	body .canvas-manager[data-form="drawer"] .canvas-search > input {
 		height: 36px;
 		font-size: 16px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-search {
+	body .canvas-manager[data-form="drawer"] .canvas-search {
 		height: 38px;
 		border-radius: 10px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-sort > button {
+	body .canvas-manager[data-form="drawer"] .canvas-sort > button {
 		height: 34px;
 		padding: 0 12px;
 		font-size: 14px;
 	}
 	/* A list: one canvas a row, a small picture, its name and line, and rename and delete at the end. */
-	body .stage-manager[data-form="drawer"] .stage-wall {
+	body .canvas-manager[data-form="drawer"] .canvas-wall {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 		padding: 2px 8px 16px;
 		overscroll-behavior: contain;
 	}
-	body .stage-manager[data-form="drawer"] .stage-card {
+	body .canvas-manager[data-form="drawer"] .canvas-card {
 		flex: none;
 		flex-direction: row;
 		align-items: center;
@@ -3769,10 +3769,10 @@ body {
 		padding: 8px;
 		border-radius: 14px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-card[data-here] {
+	body .canvas-manager[data-form="drawer"] .canvas-card[data-here] {
 		background: var(--v3-bg2);
 	}
-	body .stage-manager[data-form="drawer"] .stage-open {
+	body .canvas-manager[data-form="drawer"] .canvas-open {
 		flex: none;
 		width: 76px;
 		border-radius: 8px;
@@ -3780,16 +3780,16 @@ body {
 		transform: none;
 		box-shadow: none;
 	}
-	body .stage-manager[data-form="drawer"] .stage-card[data-here] .stage-open {
+	body .canvas-manager[data-form="drawer"] .canvas-card[data-here] .canvas-open {
 		box-shadow: 0 0 0 1px var(--v3-accent);
 	}
-	body .stage-manager[data-form="drawer"] .stage-shot {
+	body .canvas-manager[data-form="drawer"] .canvas-shot {
 		padding: 3px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-empty > span {
+	body .canvas-manager[data-form="drawer"] .canvas-manager-empty > span {
 		display: none;
 	}
-	body .stage-manager[data-form="drawer"] .stage-empty > svg {
+	body .canvas-manager[data-form="drawer"] .canvas-manager-empty > svg {
 		width: 16px;
 		height: 16px;
 	}
@@ -3798,7 +3798,7 @@ body {
 	 * row's centre line with the picture and with rename and delete. In the panel the faces end the
 	 * name's own line; here that set them above the row's other marks.
 	 */
-	body .stage-manager[data-form="drawer"] .stage-foot {
+	body .canvas-manager[data-form="drawer"] .canvas-foot {
 		display: grid;
 		flex: 1;
 		order: 2;
@@ -3807,35 +3807,35 @@ body {
 		gap: 1px 10px;
 		padding: 0;
 	}
-	body .stage-manager[data-form="drawer"] .stage-name-row {
+	body .canvas-manager[data-form="drawer"] .canvas-name-row {
 		display: contents;
 	}
-	body .stage-manager[data-form="drawer"] .stage-name-row > .row-label,
-	body .stage-manager[data-form="drawer"] .stage-rename {
+	body .canvas-manager[data-form="drawer"] .canvas-name-row > .row-label,
+	body .canvas-manager[data-form="drawer"] .canvas-rename {
 		grid-column: 1;
 		align-self: end;
 	}
 	/* The name, edited where it is: its letters stay where they were, and the row is no taller for the field. */
-	body .stage-manager[data-form="drawer"] .stage-rename {
+	body .canvas-manager[data-form="drawer"] .canvas-rename {
 		width: calc(100% + 7px);
 		height: 27px;
 		margin: 0 0 0 -7px;
 		font-size: 16px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-meta {
+	body .canvas-manager[data-form="drawer"] .canvas-meta {
 		grid-column: 1;
 		align-self: start;
 	}
-	body .stage-manager[data-form="drawer"] .stage-faces {
+	body .canvas-manager[data-form="drawer"] .canvas-faces {
 		grid-column: 2;
 		grid-row: 1 / span 2;
 		padding-left: 5px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-faces:empty {
+	body .canvas-manager[data-form="drawer"] .canvas-faces:empty {
 		display: none;
 	}
 	/* A long name takes a second line, not an ellipsis. */
-	body .stage-manager[data-form="drawer"] .stage-name-row > .row-label {
+	body .canvas-manager[data-form="drawer"] .canvas-name-row > .row-label {
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;
@@ -3844,13 +3844,13 @@ body {
 		overflow-wrap: anywhere;
 		white-space: normal;
 	}
-	body .stage-manager[data-form="drawer"] .stage-meta {
+	body .canvas-manager[data-form="drawer"] .canvas-meta {
 		overflow: hidden;
 		font-size: 13px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	body .stage-manager[data-form="drawer"] .stage-acts {
+	body .canvas-manager[data-form="drawer"] .canvas-acts {
 		position: static;
 		flex: none;
 		order: 3;
@@ -3858,26 +3858,26 @@ body {
 		opacity: 1;
 		transform: none;
 	}
-	body .stage-manager[data-form="drawer"] .stage-acts .stage-icon {
+	body .canvas-manager[data-form="drawer"] .canvas-acts .canvas-icon {
 		width: 36px;
 		height: 36px;
 		border: 0;
 		background: none;
 		box-shadow: none;
 	}
-	body .stage-manager[data-form="drawer"] .stage-acts .stage-icon > svg {
+	body .canvas-manager[data-form="drawer"] .canvas-acts .canvas-icon > svg {
 		width: 17px;
 		height: 17px;
 	}
-	body .stage-manager[data-form="drawer"] .stage-confirm {
+	body .canvas-manager[data-form="drawer"] .canvas-confirm {
 		height: 36px;
 		padding: 0 14px;
 		border-radius: 18px;
 		font-size: 14px;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		body .stage-manager[data-form="drawer"],
-		body .stage-manager[data-form="drawer"] .stage-box {
+		body .canvas-manager[data-form="drawer"],
+		body .canvas-manager[data-form="drawer"] .canvas-box {
 			transition: none;
 		}
 	}
@@ -4150,7 +4150,7 @@ body {
 	}
 }
 
-/* The frame-rate meter (`perf/fps.tsx`, Settings › Boards): a card at the top right of the canvas, under the bar there, out of the pointer's way. */
+/* The frame-rate meter (`perf/fps.tsx`, Settings › Cards): a card at the top right of the canvas, under the bar there, out of the pointer's way. */
 @layer components {
 	.fps-meter {
 		position: fixed;

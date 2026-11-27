@@ -33,8 +33,8 @@ const canvas = await canvasFrame(page);
 // The frame finds the places empty of the canvas's own things; the page says which are not under its chrome.
 const places = () =>
 	canvas.evaluate(() => {
-		if (document.querySelector(".stage")?.dataset.gliding === "true") return [];
-		const stage = document.querySelector(".stage");
+		if (document.querySelector(".canvas")?.dataset.gliding === "true") return [];
+		const stage = document.querySelector(".canvas");
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		const out = [];
@@ -52,11 +52,11 @@ for (const deadline = Date.now() + 8000; !clear && Date.now() < deadline; ) {
 	clear = await firstOnCanvas(page, await places());
 	if (!clear) await settle(page, 200);
 }
-const why = clear ? "" : await canvas.evaluate(() => JSON.stringify({ cam: globalThis.__decksProbes.cameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live }));
+const why = clear ? "" : await canvas.evaluate(() => JSON.stringify({ cam: globalThis.__decksProbes.cameraTransform(), gliding: document.querySelector(".canvas")?.dataset.gliding, live: document.querySelector(".canvas")?.dataset.live }));
 say("the canvas has a clear place for a tall card", !!clear, JSON.stringify(clear?.screen) + why);
 
 const scrolled = () => canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	return { top: stage.scrollTop, left: stage.scrollLeft, overflow: getComputedStyle(stage).overflow };
 });
 

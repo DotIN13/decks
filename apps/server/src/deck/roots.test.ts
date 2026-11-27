@@ -16,55 +16,55 @@ function fixture() {
 	const deck = join(base, "deck");
 	const outside = join(base, "outside");
 	const shared = join(base, "shared");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "pages"), { recursive: true });
 	mkdirSync(outside, { recursive: true });
 	mkdirSync(shared, { recursive: true });
-	writeFileSync(join(deck, "boards", "a.html"), "<title>a</title>");
+	writeFileSync(join(deck, "pages", "a.html"), "<title>a</title>");
 	writeFileSync(join(deck, "note.md"), "in deck");
 	writeFileSync(join(outside, "secret.txt"), "not yours");
 	writeFileSync(join(shared, "report.html"), "<p>shared</p>");
 	symlinkSync(outside, join(deck, "escape"));
-	symlinkSync(join(outside, "secret.txt"), join(deck, "boards", "linked.txt"));
+	symlinkSync(join(outside, "secret.txt"), join(deck, "pages", "linked.txt"));
 	return { base, deck, outside, shared };
 }
 
-test("a board resolves inside the deck, whatever the URL looked like", () => {
+test("a card resolves inside the deck, whatever the URL looked like", () => {
 	const { deck } = fixture();
-	assert.equal(resolveInDeck(deck, "boards/a.html"), join(deck, "boards", "a.html"));
-	assert.equal(resolveInDeck(deck, "/boards/a.html"), join(deck, "boards", "a.html"));
-	assert.equal(resolveInDeck(deck, "boards\\a.html"), join(deck, "boards", "a.html"));
+	assert.equal(resolveInDeck(deck, "pages/a.html"), join(deck, "pages", "a.html"));
+	assert.equal(resolveInDeck(deck, "/pages/a.html"), join(deck, "pages", "a.html"));
+	assert.equal(resolveInDeck(deck, "pages\\a.html"), join(deck, "pages", "a.html"));
 });
 
-test("a board path that climbs out is refused", () => {
+test("a card path that climbs out is refused", () => {
 	const { deck } = fixture();
 	assert.throws(() => resolveInDeck(deck, "../outside/secret.txt"), PathRefused);
-	assert.throws(() => resolveInDeck(deck, "boards/../../outside/secret.txt"), PathRefused);
+	assert.throws(() => resolveInDeck(deck, "pages/../../outside/secret.txt"), PathRefused);
 	assert.throws(() => resolveInDeck(deck, ""), PathRefused);
-	assert.throws(() => resolveInDeck(deck, "boards/a\0.html"), PathRefused);
+	assert.throws(() => resolveInDeck(deck, "pages/a\0.html"), PathRefused);
 });
 
 test("a symlink out of the deck is refused, directory or file", () => {
 	const { deck } = fixture();
 	// Both of these are inside the deck by string and outside it in fact.
 	assert.throws(() => resolveInDeck(deck, "escape/secret.txt"), PathRefused);
-	assert.throws(() => resolveInDeck(deck, "boards/linked.txt"), PathRefused);
+	assert.throws(() => resolveInDeck(deck, "pages/linked.txt"), PathRefused);
 });
 
-test("a file request resolves relative to the board that asked", () => {
+test("a file request resolves relative to the card that asked", () => {
 	const { deck, shared } = fixture();
 	const roots = resolveRoots(deck, [{ path: shared, writable: false }]);
 
-	// `../../shared/report.html` from `boards/sources.html` means what it would
-	// mean in an <img src> on that card: up out of `boards/`, up out of the deck,
+	// `../../shared/report.html` from `pages/sources.html` means what it would
+	// mean in an <img src> on that card: up out of `pages/`, up out of the deck,
 	// then down into the sibling directory a root declared.
 	assert.equal(
-		resolveFileRequest(roots, { path: "../../shared/report.html", from: "boards/sources.html" }),
+		resolveFileRequest(roots, { path: "../../shared/report.html", from: "pages/sources.html" }),
 		join(shared, "report.html"),
 	);
 	// One `..` fewer stays inside the deck and therefore resolves to a file that is
 	// not there — which is a 404, not a way out.
 	assert.equal(
-		resolveFileRequest(roots, { path: "../shared/report.html", from: "boards/sources.html" }),
+		resolveFileRequest(roots, { path: "../shared/report.html", from: "pages/sources.html" }),
 		join(deck, "shared", "report.html"),
 	);
 	// Without a `from`, a relative path is deck-relative, which is what the
@@ -130,8 +130,8 @@ test("a dropped file may only be written into the deck's assets/", () => {
 test("every shape of escape from assets/ is refused", () => {
 	const { deck } = fixture();
 	for (const name of [
-		"../boards/a.html",
-		"..\\boards\\a.html",
+		"../pages/a.html",
+		"..\\pages\\a.html",
 		"../../outside/secret.txt",
 		"sub/photo.png",
 		"/etc/passwd",

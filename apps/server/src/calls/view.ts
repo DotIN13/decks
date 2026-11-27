@@ -35,7 +35,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Verbs, "view"> {
 			},
 			focus: async (target: string | string[], options?: { canvas?: string; highlight?: string; animate?: boolean }) => {
 				const wanted = Array.isArray(target) ? target : [target];
-				if (wanted.length === 0) throw new Error("focus names a board's path or an item's id, or a list of them.");
+				if (wanted.length === 0) throw new Error("focus names a card's path or an item's id, or a list of them.");
 				/*
 				 * Which canvas: the one named, else the one a card's path names (`canvases/<name>/…`), else your own.
 				 * One not your own is gone to first, by goto's rule, so one call shows the card.
@@ -75,7 +75,7 @@ export function viewVerbs(ctx: VerbContext): Pick<Verbs, "view"> {
 						...(options?.highlight ? { highlight: options.highlight } : {}),
 						...(options?.animate ? { animate: true } : {}),
 						...(items.length ? { items } : {}),
-						stage: name,
+						canvas: name,
 					});
 				// Just moved there: the screen's frame for that canvas takes a moment to come up, so the card is shown once it has, asked briefly a few times.
 				const settling = (said?: string) => !!said && /did not answer|shows another canvas|none of those cards/.test(said);

@@ -53,7 +53,7 @@ await fitCanvas(page);
 /** The arrow drawn between the two shapes, so the act below can clear it out of its way. */
 let arrowDrawn;
 const candidates = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	const found = [];
 	for (let y = 160; y < 820; y += 40) {
@@ -81,7 +81,7 @@ say("the shapes button opens the insert panel on its shapes", await page.locator
 await page.locator('.insert-panel .insert-cell[data-shape="Decision"]').click();
 // Picked on the page: the canvas, in its frame, hears which shape a moment later, and the press waits for that.
 await settle(page, 200);
-const armed = await canvas.evaluate(() => document.querySelector(".stage")?.dataset.penTool);
+const armed = await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.penTool);
 say("a pick arms the shape tool and closes the panel", armed === "shape" && (await page.locator(".insert-panel").count()) === 0, armed);
 const had = new Set(shapesNow().map((n) => n.id));
 await page.mouse.click(spots[0].x, spots[0].y);
@@ -170,7 +170,7 @@ await page.locator('.v3-tool[data-tool="shape"]').click();
 await page.locator('.v3-menu-row:has-text("More shapes")').click();
 await page.locator('.insert-panel .insert-cell[data-shape="Process"]').click();
 // Picked on the page: the canvas hears of it a moment later, and the press waits for that.
-await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.penTool === "shape", null, { timeout: 3000 });
+await canvas.waitForFunction(() => document.querySelector(".canvas")?.dataset.penTool === "shape", null, { timeout: 3000 });
 await settle(page, 200);
 const had2 = new Set(shapesNow().map((n) => n.id));
 await page.mouse.click(spots[1].x, spots[1].y);
@@ -225,7 +225,7 @@ for (let i = 0; i < 12; i++) {
 	if (right < 360) break;
 	// Scrolled where the stage itself is under the pointer: a live board's page keeps a wheel over it.
 	const at = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		for (let y = 160; y < 800; y += 20) for (let x = 1300; x > 360; x -= 20) if (document.elementFromPoint(x, y) === stage) return { x, y };
 	});
 	await page.mouse.move(at?.x ?? 900, at?.y ?? 500);
@@ -234,7 +234,7 @@ for (let i = 0; i < 12; i++) {
 }
 await settle(page, 400);
 const room = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 170; y < 800; y += 40) {
@@ -305,7 +305,7 @@ if (arrowDrawn) {
  * test; now the browser is asked whether the point is on what the path draws.
  */
 const diagonals = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	const found = [];
@@ -447,7 +447,7 @@ if (diagonal) {
 	await settle(page, 300);
 	// A fresh shape where the screen is, so what this selects does not depend on where the checks above left the camera.
 	const at = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage").getBoundingClientRect();
+		const stage = document.querySelector(".canvas").getBoundingClientRect();
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const sx = stage.left + stage.width * 0.45, sy = stage.top + stage.height * 0.4;
 		return { x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d, zoom: m.a };
@@ -461,7 +461,7 @@ if (diagonal) {
 	say("a shape is on screen to select", !!middle, JSON.stringify(middle));
 	if (middle) {
 		await page.mouse.click(middle.x, middle.y);
-		const labels = await until(() => canvas.evaluate(() => [...document.querySelectorAll(".stage-fixed > .card-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
+		const labels = await until(() => canvas.evaluate(() => [...document.querySelectorAll(".canvas-fixed > .card-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
 		say("a selected shape gets the pill: zoom, comment, duplicate and more", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "More"]), JSON.stringify(labels));
 		const before = onDisk().children.length;
 		// Pressed by its coordinates: a locator's click scrolls its target into view, and the stage is a scroll container.
@@ -469,16 +469,16 @@ if (diagonal) {
 			const r = await canvas.locator(selector).first().boundingBox();
 			await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
 		};
-		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Duplicate"]');
+		await pressOn('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Duplicate"]');
 		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));
 		say("…its Duplicate makes a copy", !!copy, `${before} -> ${onDisk().children.length}`);
 		// The copy is selected once the drawing has it: the outline moves onto it.
 		await until(() => canvas.evaluate((id) => { const r = globalThis.__decksProbes?.penBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
 		await settle(page, 300);
 		// Delete sits in the pill's ⋯ menu.
-		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="More"]');
+		await pressOn('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="More"]');
 		await settle(page, 100);
-		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]');
+		await pressOn('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]');
 		const gone = await until(() => (onDisk().children.length === before ? true : undefined));
 		say("…and its Delete takes the copy away and leaves the first", !!gone && onDisk().children.some((n) => n.id === target?.id) && !onDisk().children.some((n) => n.id === copy?.id), `${onDisk().children.length}`);
 	}
@@ -493,7 +493,7 @@ if (diagonal) {
 	await page.keyboard.press("Escape");
 	await settle(page, 300);
 	const at = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage").getBoundingClientRect();
+		const stage = document.querySelector(".canvas").getBoundingClientRect();
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const toStage = (sx, sy) => ({ x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d });
 		return { a: toStage(stage.left + stage.width * 0.3, stage.top + stage.height * 0.3), b: toStage(stage.left + stage.width * 0.6, stage.top + stage.height * 0.55), zoom: m.a };

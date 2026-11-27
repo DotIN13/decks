@@ -156,7 +156,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * has no Chromium, 404 for no such canvas; the card draws its plain tile for either.
 	 */
 	api.get(
-		"/stage-thumb/:name",
+		"/canvas-thumb/:name",
 		asyncRoute(async (req, res) => {
 			const shots = app.canvas.shots;
 			const pens = app.canvas.pens;
@@ -219,7 +219,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * One canvas, for `shot.html` to draw (`canvas/shots.ts`): its `.pen` document, the folder its
 	 * image fills are read against, and where each card on it is.
 	 */
-	api.get("/stage-pen/:name", (req, res) => {
+	api.get("/canvas-pen/:name", (req, res) => {
 		const pens = app.canvas.pens;
 		const name = String(req.params.name ?? "");
 		if (!pens || !pens.names().includes(name)) {
@@ -237,7 +237,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			return card ? [{ ...card, x, y, w, h }] : [];
 		});
 // Squeezed: a frame reads this whole each time it starts, and a large canvas's is most of a megabyte as it stands.
-		sendSqueezedJson(req, res, { doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.cards.cards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
+		sendSqueezedJson(req, res, { doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), cards });
 	});
 
 	/**
@@ -252,9 +252,9 @@ export function register(api: Router, { app }: RouteDeps): void {
 		}
 		try {
 			const frame = pens.files.fileFrame(req.query.path);
-			const cards = frame.stage ? pens.cards.cards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			const cards = frame.canvas ? pens.cards.cards(frame.canvas).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
 			res.setHeader("Cache-Control", "no-store");
-			res.json({ doc: frame.doc, base: frame.base, boards: cards });
+			res.json({ doc: frame.doc, base: frame.base, cards });
 		} catch (error) {
 			res.status(404).type("text").send((error as Error).message);
 		}
@@ -271,7 +271,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * `X-Shot-Box`, how it was taken in `X-Shot-How`, and the file is named `name` when given.
 	 */
 	api.get(
-		"/stage-shot",
+		"/canvas-shot",
 		asyncRoute(async (req, res) => {
 			const agent = app.agents.get(String(req.query.agent ?? ""));
 			const canvas = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : agent?.seat.canvasFolder(false);
@@ -286,7 +286,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const scale = typeof req.query.scale === "string" && Number.isFinite(Number(req.query.scale)) ? Number(req.query.scale) : 2;
 			const live = req.query.live === "1" || req.query.live === "true";
 			const options = { canvas, ...(of !== undefined ? { of } : {}), format, scale, scheme: req.query.scheme === "dark" ? "dark" : "light", ...(live ? { live } : {}) };
-			const { status, answer } = await runVerb(app, req.principal, { ...req.headers, "x-decks-stage": canvas }, "canvas.screenshot", [options], req.socket.remoteAddress);
+			const { status, answer } = await runVerb(app, req.principal, { ...req.headers, "x-decks-canvas": canvas }, "canvas.screenshot", [options], req.socket.remoteAddress);
 			if (!answer.ok) {
 				res.status(status === 422 ? 503 : status).type("text").send(answer.error ?? "The picture could not be taken.");
 				return;
@@ -321,7 +321,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			if (!actsAsPerson(principal) && principal?.kind !== "canvas") throw new UploadRefused("Only the person, a front end paired with this harness, or a canvas frame sends this.", 403);
 			const path = normalizeCardPath(typeof req.query.path === "string" ? req.query.path : "");
 			if (!app.deck.card(path)) {
-				res.status(404).type("text").send("No such board.");
+				res.status(404).type("text").send("No such card.");
 				return;
 			}
 			if (principal?.kind === "canvas" && !cardOnCanvas(app, path, principal.canvas)) throw new UploadRefused(`${path} is not on this canvas.`, 403);

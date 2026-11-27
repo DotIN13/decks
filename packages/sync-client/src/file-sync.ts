@@ -45,7 +45,7 @@ export function landingFor(deck: string, path: string): { full: string } | { ref
 	return { full };
 }
 
-/** `boards/plan.html` kept beside a conflict as `boards/plan.conflict-20261103-0012.html`; a second one the same minute gets the seconds too. */
+/** `cards/plan.html` kept beside a conflict as `cards/plan.conflict-20261103-0012.html`; a second one the same minute gets the seconds too. */
 export function conflictName(path: string, now = new Date()): string {
 	const at = path.lastIndexOf("/");
 	const file = path.slice(at + 1);
@@ -56,19 +56,19 @@ export function conflictName(path: string, now = new Date()): string {
 	return `${path.slice(0, at + 1)}${stem}.conflict-${stamp}${ext}`;
 }
 
-/** A link in a board's text: in quotes, `url(…)` or a markdown link, with a file extension. */
+/** A link in a card's text: in quotes, `url(…)` or a markdown link, with a file extension. */
 const LINK = /(["'(])((?:\.{1,2}\/)*[A-Za-z0-9_ -￿][^"'()\s<>?#|*:]*\.[A-Za-z0-9]{1,8})(?=[?#"')])/g;
 
 /**
- * A canvas's files, the part of its bundle that is not its drawing: its own `boards/`, `cards/`,
- * `frames/` and `files/`, the deck's `assets/` and `docs/` files its boards point at, and pictures.
+ * A canvas's files, the part of its bundle that is not its drawing: its own `cards/`, `cards/`,
+ * `frames/` and `files/`, the deck's `assets/` and `docs/` files its cards point at, and pictures.
  * Each goes whole, by hash, with the version both sides last agreed on: sent, taken, deleted on the
  * side it was not deleted on, or kept beside Studio's as a conflict when both changed.
  */
 export class FileSync {
-	/** The deck files each canvas's boards point at, by canvas name, and each board's links by its deck path with its size and time. */
+	/** The deck files each canvas's cards point at, by canvas name, and each card's links by its deck path with its size and time. */
 	private links = new Map<string, Set<string>>();
-	private boardLinks = new Map<string, { size: number; mtimeMs: number; targets: string[] }>();
+	private cardLinks = new Map<string, { size: number; mtimeMs: number; targets: string[] }>();
 	/** Each canvas's bundle as the plan read it, so the pass that follows does not walk it again. */
 	private planned = new Map<string, Map<string, string>>();
 
@@ -108,12 +108,12 @@ export class FileSync {
 		this.planned.clear();
 	}
 
-	/** A canvas no longer synced: the deck files its boards pointed at no longer matter to it. */
+	/** A canvas no longer synced: the deck files its cards pointed at no longer matter to it. */
 	forget(name: string) {
 		this.links.delete(name);
 	}
 
-	/** Whether a canvas's boards point at this deck file (`assets/…`, `docs/…`). */
+	/** Whether a canvas's cards point at this deck file (`assets/…`, `docs/…`). */
 	pointsAt(name: string, path: string): boolean {
 		return this.links.get(name)?.has(path) === true;
 	}
@@ -128,7 +128,7 @@ export class FileSync {
 		return `${canvasFolder(name)}/${path}`;
 	}
 
-	/** What a board's text points at, read again only when the board's size or time changed. */
+	/** What a card's text points at, read again only when the card's size or time changed. */
 	private linksOf(deckPath: string): string[] {
 		const full = join(this.o.deck, deckPath);
 		let st;
@@ -137,7 +137,7 @@ export class FileSync {
 		} catch {
 			return [];
 		}
-		const kept = this.boardLinks.get(deckPath);
+		const kept = this.cardLinks.get(deckPath);
 		if (kept && kept.size === st.size && kept.mtimeMs === st.mtimeMs) return kept.targets;
 		let text: string;
 		try {
@@ -153,7 +153,7 @@ export class FileSync {
 			if (MIRRORED.includes(served.path.split("/")[0]!) && !secretLooking(served.path)) targets.add(served.path);
 		}
 		const one = { size: st.size, mtimeMs: st.mtimeMs, targets: [...targets] };
-		this.boardLinks.set(deckPath, one);
+		this.cardLinks.set(deckPath, one);
 		return one.targets;
 	}
 
@@ -177,10 +177,10 @@ export class FileSync {
 		};
 		for (const part of [...OWN_PARTS, ...(isShared(name) ? MIRRORED : [])]) walk(`${folder}/${part}`);
 		if (isShared(name)) return out;
-		// The deck files this canvas's boards point at: `../assets/x` beside its boards is the deck's assets/x (`deck/layout.ts`).
+		// The deck files this canvas's cards point at: `../assets/x` beside its cards is the deck's assets/x (`deck/layout.ts`).
 		const named = new Set<string>();
 		for (const [path, deckPath] of [...out]) {
-			// A board, or anything in a card's folder that can name a file (`cards/<name>/`, its HTML, styles and scripts).
+			// A card, or anything in a card's folder that can name a file (`cards/<name>/`, its HTML, styles and scripts).
 			if (!(path.startsWith("boards/") || path.startsWith("cards/")) || !/\.(?:x?html?|mdx?|css|m?js)$/i.test(path)) continue;
 			for (const target of this.linksOf(deckPath)) {
 				named.add(target);
@@ -237,7 +237,7 @@ export class FileSync {
 		/*
 		 * Deleted on one side, from a file both last agreed on: gone from the folder, it is deleted in
 		 * Studio (unless Studio's copy is newer, which then comes back); gone from Studio and unchanged
-		 * here, it is deleted here. Without this a deleted board came straight back.
+		 * here, it is deleted here. Without this a deleted card came straight back.
 		 */
 		for (const [path, was] of Object.entries(known)) {
 			if (path.startsWith(`${PICTURES}/`)) continue;

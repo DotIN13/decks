@@ -6,7 +6,7 @@ import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { camera, glide } from "../../state/camera.ts";
 import { state } from "../../state/deck.ts";
-import { stages } from "../../state/canvases.ts";
+import { canvases } from "../../state/canvases.ts";
 import { setDrawingEditor } from "../../state/decks.ts";
 import { offer } from "../../state/notices.ts";
 import { m } from "@decks/i18n";
@@ -25,7 +25,7 @@ import { openAt, openItem } from "../open.ts";
 
 /** What the canvas host needs of the page around it. */
 export interface CanvasHostInputs {
-	stagePen: NonNullable<FramedEditorOptions["state"]>["pen"];
+	canvasPen: NonNullable<FramedEditorOptions["state"]>["pen"];
 	personMoved: (next: Camera) => void;
 	setPenSelected: (ids: string[]) => void;
 	setEditorHandle: (handle: FramedHandle | undefined) => void;
@@ -43,15 +43,15 @@ export interface CanvasHostInputs {
 
 /** The canvas: made once, as a component, so nothing read while it is made makes it again. */
 export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
-	const { stagePen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, underSheet, openAppsPanel, files, frameWhenPlaced, moveConversation } = props.host;
+	const { canvasPen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, underSheet, openAppsPanel, files, frameWhenPlaced, moveConversation } = props.host;
 	/**
 	 * A file of any kind, chosen in the file picker and placed in the middle of the view by what it is:
 	 * the frame's tool column's "Add a file" (`frame/chrome.tsx`), which asks the page for its picker.
 	 */
 	const openFileAtMiddle = () => {
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage) return;
-		void files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
+		const canvas = document.querySelector(".canvas, iframe.canvas-frame");
+		if (!canvas) return;
+		void files.fileAt({ x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 }, false).then((path) => {
 			if (!path) return;
 			setSelected(path);
 			frameWhenPlaced(path);
@@ -84,7 +84,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		pageKeys: TOOL_KEYS,
 		onSelection: (ids) => setPenSelected([...ids]),
 		state: {
-			pen: stagePen,
+			pen: canvasPen,
 			camera: [camera, personMoved],
 			glide,
 			selected: [selected, (path) => setSelected(path)],
@@ -106,7 +106,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			pass: canvasPass,
 			// Between canvases that are yours alone the frame moves in place; a friend's, or one someone else may edit, gets a frame of its own.
 			inPlace: (from, to) => [from, to].every((name) => {
-				const row = stages().find((one) => one.name === name);
+				const row = canvases().find((one) => one.name === name);
 				return !!row && !row.shared && !row.othersEdit;
 			}),
 			// The canvas tabs last in front keep their frames behind this one, within the device's budget (`tabs/budget.ts`): coming back to one is showing it.
@@ -148,8 +148,8 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 	 * or an agent was, or what to do first (UI review). Empty is no cards and no words; it never takes a press.
 	 */
 	const empty = () => {
-		const row = stages().find((one) => one.name === canvasOnScreen()?.name);
-		return !!row && row.boards === 0 && !row.words.trim();
+		const row = canvases().find((one) => one.name === canvasOnScreen()?.name);
+		return !!row && row.cards === 0 && !row.words.trim();
 	};
 	const agentName = () => state.identities[state.focused ?? ""]?.name ?? m.canvas_empty_agent();
 	return (

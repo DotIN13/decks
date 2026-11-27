@@ -46,7 +46,7 @@ export function createWrites(d: WritesNeeds) {
 		);
 
 	/**
-	 * The same change, drawn on the stage and not saved: what a colour picker sends while the hand is
+	 * The same change, drawn on the canvas and not saved: what a colour picker sends while the hand is
 	 * still down, so the colour follows the pointer and the file takes one edit when it lifts
 	 * (`state/pen-tools.ts`, `penLive`).
 	 */

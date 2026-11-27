@@ -8,7 +8,7 @@ import type { DocVersion } from "../index.ts";
  *
  * Content-addressed, so a return to an old text costs nothing, and keyed by whatever the
  * resolver calls the document. An app that already keeps versions of its files passes its own
- * store (Decks passes the store its boards use); the two here are for everyone else.
+ * store (Decks passes the store its cards use); the two here are for everyone else.
  */
 export interface VersionStore {
 	/** Keep `text` as the newest version of `key` and return its id. Keeping the same text twice is free. */

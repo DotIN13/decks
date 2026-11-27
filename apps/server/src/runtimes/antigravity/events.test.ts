@@ -82,7 +82,7 @@ test("a tool call opens at ACTIVE and closes at DONE with its result", () => {
 		state: "ACTIVE",
 		step_type: "tool",
 		tool_name: "call_mcp_tool",
-		tool_info: { name: "call_mcp_tool", parameters: { ServerName: "decks", ToolName: "stage_eval", Arguments: { code: "return 1" } } },
+		tool_info: { name: "call_mcp_tool", parameters: { ServerName: "decks", ToolName: "canvas_eval", Arguments: { code: "return 1" } } },
 	});
 	t.step({
 		step_index: 2,
@@ -96,7 +96,7 @@ test("a tool call opens at ACTIVE and closes at DONE with its result", () => {
 	assert.equal(calls.length, 1, "one chip, not two");
 	assert.equal(calls[0]!.name, "call_mcp_tool");
 	// The chip names the tool inside the CLI's one lever, so a canvas call is readable.
-	assert.equal(calls[0]!.title, "call_mcp_tool · stage_eval");
+	assert.equal(calls[0]!.title, "call_mcp_tool · canvas_eval");
 	assert.equal(calls[0]!.state, "done");
 	assert.equal(calls[0]!.result, "4");
 });
@@ -118,8 +118,8 @@ test("a failed tool reads as failed", () => {
 test("a reply and a tool call are two things in the column", () => {
 	const t = transcript();
 	t.step({ step_index: 1, state: "ACTIVE", step_type: "agent_response", text_delta: "Let me look" });
-	t.step({ step_index: 2, state: "ACTIVE", step_type: "tool", tool_name: "stage_eval", tool_info: { name: "stage_eval", parameters: { code: "1" } } });
-	t.step({ step_index: 2, state: "DONE", step_type: "tool", tool_name: "stage_eval", tool_info: { name: "stage_eval", parameters: {}, output: "4" } });
+	t.step({ step_index: 2, state: "ACTIVE", step_type: "tool", tool_name: "canvas_eval", tool_info: { name: "canvas_eval", parameters: { code: "1" } } });
+	t.step({ step_index: 2, state: "DONE", step_type: "tool", tool_name: "canvas_eval", tool_info: { name: "canvas_eval", parameters: {}, output: "4" } });
 	const assistant = t.translator.history().filter((item) => item.kind === "assistant");
 	const call = tools(t.translator);
 	assert.equal(assistant.length, 1, "the bubble closes before the chip opens");

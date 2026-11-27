@@ -31,7 +31,7 @@ export function canvasNameReminder(pens: CanvasPens | undefined, canvas: string 
 		return `[Decks] The canvas beside your chat is called "${pens.titleOf(canvas)}", which says nothing about what is on it. Name it for its content with decks canvas rename "…" --canvas ${canvas}.`;
 	}
 	// Named before anything was on it: that was a choice about what would go there, and it stands.
-	const then = new Set(naming.boards ?? []);
+	const then = new Set(naming.cards ?? []);
 	if (then.size === 0) return undefined;
 	const fresh = cards.filter((path) => !then.has(path)).length;
 	if (fresh >= NEW_AT_LEAST && fresh > cards.length / 2) {

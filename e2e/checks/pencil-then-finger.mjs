@@ -38,7 +38,7 @@ const cdp = await context.newCDPSession(page);
 const box = await (await page.$("iframe.canvas-frame")).boundingBox();
 
 await page.locator('.v3-tool[data-tool="pen"]').tap();
-await canvas.waitForSelector(".stage-ink");
+await canvas.waitForSelector(".canvas-ink");
 
 /** A pencil stroke, in page coordinates. */
 const pencil = async (from, to) => {
@@ -50,7 +50,7 @@ const pencil = async (from, to) => {
 	await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: to.x, y: to.y, button: "left", buttons: 0, clickCount: 1, pointerType: "pen" });
 };
 const scroll = () => canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	return stage ? `${Math.round(stage.scrollLeft)},${Math.round(stage.scrollTop)}` : "";
 });
 
@@ -58,9 +58,9 @@ const at = { x: box.x + box.width * 0.55, y: box.y + box.height * 0.8 };
 const first = strokes();
 await pencil(at, { x: at.x + 120, y: at.y + 30 });
 say("a pencil stroke lands in the canvas file", !!(await until(() => strokes() > first)), `${first} → ${strokes()}`);
-say("after a pencil stroke, the glass lets fingers through", await canvas.evaluate(() => !!document.querySelector(".stage-ink[data-pencil]")));
+say("after a pencil stroke, the glass lets fingers through", await canvas.evaluate(() => !!document.querySelector(".canvas-ink[data-pencil]")));
 
-const glass = await canvas.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".stage-ink"), { x: box.width * 0.3, y: box.height * 0.4 });
+const glass = await canvas.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".canvas-ink"), { x: box.width * 0.3, y: box.height * 0.4 });
 say("a finger over the canvas finds the stage, not the glass", !glass);
 
 // A touch within half a second of the pencil's lift is taken for a palm (`CanvasInk.tsx`, `PALM_AFTER_MS`): the finger comes after it.

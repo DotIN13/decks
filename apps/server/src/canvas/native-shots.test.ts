@@ -17,7 +17,7 @@ const doc = {
 	version: "2.14",
 	children: [
 		{ type: "rectangle", id: "r", x: 20, y: 20, width: 100, height: 60, fill: "#2563eb" },
-		{ type: "browser", id: "board:b", x: 200, y: 20, width: 120, height: 90, url: "boards/b.html" },
+		{ type: "browser", id: "card:b", x: 200, y: 20, width: 120, height: 90, url: "pages/b.html" },
 		{ type: "text", id: "sum", x: 20, y: 300, content: "Area $\\pi r^2$" },
 	],
 };
@@ -25,7 +25,7 @@ const doc = {
 function request(dir: string, box: NativeRequest["box"], extra: Partial<NativeRequest> = {}): NativeRequest {
 	const w = box.x2 - box.x1;
 	const h = box.y2 - box.y1;
-	return { doc, base: `${pathToFileURL(dir).href}/`, boards: [], box, scale: 1, width: w, height: h, scheme: "light", format: "png", out: join(dir, "out.png"), ...extra };
+	return { doc, base: `${pathToFileURL(dir).href}/`, cards: [], box, scale: 1, width: w, height: h, scheme: "light", format: "png", out: join(dir, "out.png"), ...extra };
 }
 
 test("without the binary built, it says how to build it", async () => {
@@ -35,10 +35,10 @@ test("without the binary built, it says how to build it", async () => {
 	assert.match(!outcome.ok ? outcome.why : "", /cargo build --release -p stage-shot/);
 });
 
-test("a board with no picture of its revision is said, before anything is drawn", async () => {
-	const shots = new NativeShots({ cardPicture: (path) => ({ why: `the board ${path} has no picture` }) }, () => "/nonexistent/stage-shot");
-	const outcome = await shots.take(request(tmpdir(), { x1: 0, y1: 0, x2: 400, y2: 200 }, { boards: [{ path: "boards/b.html", x: 200, y: 20, w: 120, h: 90 }] }));
-	assert.deepEqual(outcome, { ok: false, why: "the board boards/b.html has no picture" });
+test("a card with no picture of its revision is said, before anything is drawn", async () => {
+	const shots = new NativeShots({ cardPicture: (path) => ({ why: `the card ${path} has no picture` }) }, () => "/nonexistent/canvas-shot");
+	const outcome = await shots.take(request(tmpdir(), { x1: 0, y1: 0, x2: 400, y2: 200 }, { cards: [{ path: "pages/b.html", x: 200, y: 20, w: 120, h: 90 }] }));
+	assert.deepEqual(outcome, { ok: false, why: "the card pages/b.html has no picture" });
 });
 
 test("drawn natively: a PNG of the box's size; math in the box sends it elsewhere", { skip: built ? false : "stage-shot is not built" }, async () => {

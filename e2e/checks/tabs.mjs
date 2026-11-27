@@ -61,7 +61,7 @@ say("the side panel lists the card of the canvas in front", !!(await until(() =>
 // --- an edit there lands on that canvas --------------------------------------------------------------------
 const canvas = await canvasFrame(page);
 const spots = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const out = [];
 	for (let y = 260; y < 700; y += 40) for (let x = 480; x < 1200; x += 40) if ([0, 120].every((dx) => [0, 80].every((dy) => document.elementFromPoint(x + dx, y + dy) === stage))) out.push({ x, y });
 	return out;
@@ -71,7 +71,7 @@ for (const one of spots) if ((await onCanvasAt(page, one.x, one.y)) && (await on
 say("there is bare canvas to press", !!spot);
 if (spot) {
 	await page.locator('.pen-tools [data-tool="note"]').first().click();
-	await until(() => canvas.evaluate(() => document.querySelector(".stage")?.dataset.penTool === "note"));
+	await until(() => canvas.evaluate(() => document.querySelector(".canvas")?.dataset.penTool === "note"));
 	await page.mouse.click(spot.x, spot.y);
 	await until(() => canvas.evaluate(() => document.activeElement?.matches?.("textarea.pen-text") === true));
 	await page.keyboard.type("on tab two");

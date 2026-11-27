@@ -31,8 +31,8 @@ function getPage(url: string, headers: Record<string, string>): Promise<{ status
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-gate-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
-	writeFileSync(join(deck, "boards", "a.html"), `<!doctype html><html><head><title>A</title><meta name="board" content='{"w":400,"h":300}' /></head><body></body></html>`);
+	mkdirSync(join(deck, "pages"), { recursive: true });
+	writeFileSync(join(deck, "pages", "a.html"), `<!doctype html><html><head><title>A</title><meta name="card" content='{"w":400,"h":300}' /></head><body></body></html>`);
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));
@@ -70,7 +70,7 @@ test("with no token, a command from this machine is refused, and so is a read of
 		assert.equal((await fetch(`${origin}/api/deck`)).status, 401);
 		assert.equal((await fetch(`${origin}/api/harness`)).status, 401);
 		assert.equal((await fetch(`${origin}/api/v1/events`)).status, 401);
-		const named: Array<Record<string, string>> = [{ "x-decks-person": "1" }, { "x-decks-agent": "anyone" }, { "x-decks-app": "notes" }, { "x-decks-board": "boards%2Fa.html" }, { "x-decks-session": "ses_1" }, { "x-decks-key": "guess" }];
+		const named: Array<Record<string, string>> = [{ "x-decks-person": "1" }, { "x-decks-agent": "anyone" }, { "x-decks-app": "notes" }, { "x-decks-session": "ses_1" }, { "x-decks-key": "guess" }];
 		for (const header of named) {
 			assert.equal((await post("/api/v1/now", header)).status, 401, JSON.stringify(header));
 		}
@@ -91,7 +91,7 @@ test("the doors and the public files are open without a token; no page, file or 
 		assert.equal(hello.paired, false);
 		assert.equal((await fetch(`${origin}/api/sdk/decks.mjs`)).status, 200);
 		for (const site of ["same-origin", "cross-site", "none"]) {
-			for (const path of ["/api/card/boards/a.html", "/api/f/boards/a.html", "/api/thumb/boards/a.html", "/api/avatar/a1", "/api/stage-thumb/main", "/api/file?path=boards/a.html"]) {
+			for (const path of ["/api/card/pages/a.html", "/api/f/pages/a.html", "/api/thumb/pages/a.html", "/api/avatar/a1", "/api/canvas-thumb/main", "/api/file?path=pages/a.html"]) {
 				assert.equal((await fetch(`${origin}${path}`, { headers: { "sec-fetch-site": site, "sec-fetch-dest": "image" } })).status, 401, `${path} from ${site}: every read carries a pass or a token`);
 			}
 		}
@@ -125,21 +125,19 @@ test("decks login trades a code from decks pair code for a person token, which c
 	}
 });
 
-test("a board has no token: the routes that made one are gone, and a person's token reads a board's page", async () => {
+test("a card has no token: the routes that made one are gone, and a person's token reads a card's page", async () => {
 	const { app, origin, post, bearer, cleanup } = await open();
 	try {
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
-		assert.equal((await post("/api/tokens", person, { kind: "board", path: "boards/a.html" })).status, 404);
-		assert.equal((await post("/api/v1/board-token", person, { path: "boards/a.html" })).status, 404);
-		const page = await fetch(`${origin}/api/card/boards/a.html`, { headers: person });
+		assert.equal((await post("/api/tokens", person, { kind: "card", path: "pages/a.html" })).status, 404);
+		const page = await fetch(`${origin}/api/card/pages/a.html`, { headers: person });
 		assert.equal(page.status, 200);
-		// An old board's page is its file, sandboxed as a card from someone else is: nothing put in it.
+		// A page that is no card is its file, sandboxed as a card from someone else is: nothing put in it.
 		assert.match(page.headers.get("content-security-policy") ?? "", /^sandbox allow-scripts\b(?!.*allow-same-origin)/);
-		assert.equal(await page.text(), `<!doctype html><html><head><title>A</title><meta name="board" content='{"w":400,"h":300}' /></head><body></body></html>`);
-		assert.equal((await post("/api/boards/delete", person, { path: "boards/a.html" })).status, 404, "no board delete for another front end");
+		assert.equal(await page.text(), `<!doctype html><html><head><title>A</title><meta name="card" content='{"w":400,"h":300}' /></head><body></body></html>`);
 		// No revision preview: the address falls through to the page, as any unknown one does.
 		assert.doesNotMatch((await fetch(`${origin}/api/revision/abc`, { headers: person })).headers.get("cache-control") ?? "", /immutable/, "no revision preview");
-		assert.equal((await post("/api/tickets", person, { paths: ["/api/card/boards/a.html"] })).status, 404, "no tickets at all");
+		assert.equal((await post("/api/tickets", person, { paths: ["/api/card/pages/a.html"] })).status, 404, "no tickets at all");
 	} finally {
 		cleanup();
 	}
@@ -150,12 +148,12 @@ test("the harness's own Chromium reads what it draws on a pass it made for no ca
 	try {
 		const { HARNESS_ID } = await import("./passes.ts");
 		const own = bearer(app.passes.canvas("", "view", HARNESS_ID).pass);
-		assert.equal((await fetch(`${origin}/api/card/boards/a.html`, { headers: own })).status, 200);
+		assert.equal((await fetch(`${origin}/api/card/pages/a.html`, { headers: own })).status, 200);
 		assert.equal((await post("/api/v1/card.list", own)).status, 403, "no verb");
 		assert.equal((await fetch(`${origin}/api/deck`, { headers: own })).status, 403, "nothing of the person's");
 		// Made by anyone else, a pass for no canvas is nothing.
 		const person = app.tokens.issue({ kind: "person" });
-		assert.equal((await fetch(`${origin}/api/card/boards/a.html`, { headers: bearer(app.passes.canvas("", "view", person.id).pass) })).status, 401);
+		assert.equal((await fetch(`${origin}/api/card/pages/a.html`, { headers: bearer(app.passes.canvas("", "view", person.id).pass) })).status, 401);
 	} finally {
 		cleanup();
 	}

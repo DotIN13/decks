@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { forgetCardModules, loadCardModule } from "./card-modules.ts";
+import { loadCardModule } from "./card-modules.ts";
 
 /** The card's files, served by a stand-in for `fetch`; each fetch counted. */
 const files = new Map<string, string>();
@@ -57,7 +57,6 @@ test("a new version of a card lets the old one go, and runs its own", async () =
 	const count = fetched.length;
 	await loadCardModule(path, "http://deck.test/canvases/c/cards/clock@1/index.html.m0.js", "clock@1");
 	assert.equal(fetched.length, count + 1);
-	forgetCardModules(path);
 });
 
 test("an error in a card's script names the card's file and its own line", async () => {

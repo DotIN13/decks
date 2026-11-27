@@ -14,7 +14,7 @@ import { fillsOf, parseColor, type ThemeState } from "./values.ts";
  * into the instance's `descendants`, which is where pen keeps it.
  *
  * **Positions.** The file keeps pen's own numbers: `x` and `y` from the parent's corner, and a
- * `width` and `height`. An operation may give a `box` instead — `{ x1, y1, x2, y2 }` on the stage —
+ * `width` and `height`. An operation may give a `box` instead — `{ x1, y1, x2, y2 }` on the canvas —
  * and it is turned into those numbers against wherever the parent actually is, so an agent never
  * adds a parent's corner or a width itself. Inside a row or column layout the parent decides the
  * position, so only the size is taken from the box.
@@ -388,7 +388,7 @@ function updateInside(doc: PenDocument, path: string, set: Record<string, unknow
 	return { op: "update", id: path };
 }
 
-/** Turn a stage box into pen's own numbers for this item, against where its parent really is. */
+/** Turn a canvas box into pen's own numbers for this item, against where its parent really is. */
 function placeBox(doc: PenDocument, id: string, box: Partial<Box>, options: ApplyOptions, how: { floor?: boolean } = {}): string | undefined {
 	const found = located(doc, id);
 	const node = found.node;

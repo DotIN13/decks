@@ -7,6 +7,10 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Agents_AgentsInputs */
 /** @typedef {{}} Agents_Browse_LabelInputs */
 /** @typedef {{}} Agents_Browse_TitleInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Canvas_LabelInputs */
+/** @typedef {{}} Agents_Canvas_NoneInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Canvas_TitleInputs */
+/** @typedef {{}} Agents_CanvasesInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_CloseInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_BodyInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_TitleInputs */
@@ -77,10 +81,6 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Agents_Stack_LabelInputs */
 /** @typedef {{ count: NonNullable<unknown>, shown: NonNullable<unknown> }} Agents_Stack_MoreInputs */
 /** @typedef {{ name: NonNullable<unknown>, status: NonNullable<unknown> }} Agents_Stack_SwitchInputs */
-/** @typedef {{ name: NonNullable<unknown> }} Agents_Stage_LabelInputs */
-/** @typedef {{}} Agents_Stage_NoneInputs */
-/** @typedef {{ name: NonNullable<unknown> }} Agents_Stage_TitleInputs */
-/** @typedef {{}} Agents_StagesInputs */
 /** @typedef {{}} Agents_Status_DoneInputs */
 /** @typedef {{}} Agents_Status_IdleInputs */
 /** @typedef {{}} Agents_Status_ThinkingInputs */
@@ -227,6 +227,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Canvas_Empty_AgentInputs */
 /** @typedef {{ agent: NonNullable<unknown> }} Canvas_Empty_BodyInputs */
 /** @typedef {{}} Canvas_Empty_TitleInputs */
+/** @typedef {{ why: NonNullable<unknown> }} Canvas_Engine_FailedInputs */
 /** @typedef {{}} Canvas_Frame_TitleInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_BendInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_JoinInputs */
@@ -277,6 +278,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Canvas_Media_PlayInputs */
 /** @typedef {{}} Canvas_Media_SeekInputs */
 /** @typedef {{}} Canvas_Media_UnmuteInputs */
+/** @typedef {{}} Canvas_No_BackendInputs */
 /** @typedef {{}} Canvas_Paste_Kind_CardInputs */
 /** @typedef {{}} Canvas_Paste_Kind_DocumentInputs */
 /** @typedef {{}} Canvas_Paste_Kind_FileInputs */
@@ -492,8 +494,6 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Canvas_Shape_TerminatorInputs */
 /** @typedef {{}} Canvas_Shape_TrapezoidInputs */
 /** @typedef {{}} Canvas_Shape_TriangleInputs */
-/** @typedef {{ why: NonNullable<unknown> }} Canvas_Stage_FailedInputs */
-/** @typedef {{}} Canvas_Stage_No_BackendInputs */
 /** @typedef {{}} Canvas_Tool_ArrowInputs */
 /** @typedef {{}} Canvas_Tool_CardInputs */
 /** @typedef {{}} Canvas_Tool_FileInputs */
@@ -798,7 +798,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Composer_Queue_Send_Now_TitleInputs */
 /** @typedef {{}} Composer_Queue_ShowInputs */
 /** @typedef {{ count: NonNullable<unknown>, name: NonNullable<unknown> }} Composer_Queue_TitleInputs */
-/** @typedef {{}} Composer_Recipient_BoardInputs */
+/** @typedef {{}} Composer_Recipient_CardInputs */
 /** @typedef {{ label: NonNullable<unknown> }} Composer_Recipient_ChipInputs */
 /** @typedef {{}} Composer_Recipient_LabelInputs */
 /** @typedef {{}} Composer_Recipient_NoneInputs */
@@ -1639,6 +1639,62 @@ export const agents_browse_title = /** @type {((inputs?: Agents_Browse_TitleInpu
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.agents_browse_title(inputs)
 	return __en.agents_browse_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Canvases, currently {name}" |
+*
+* @param {Agents_Canvas_LabelInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const agents_canvas_label = /** @type {((inputs: Agents_Canvas_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Canvas_LabelInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.agents_canvas_label(inputs)
+	return __en.agents_canvas_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Canvases, this chat is on none" |
+*
+* @param {Agents_Canvas_NoneInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const agents_canvas_none = /** @type {((inputs?: Agents_Canvas_NoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Canvas_NoneInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.agents_canvas_none(inputs)
+	return __en.agents_canvas_none(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Canvas: {name}" |
+*
+* @param {Agents_Canvas_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const agents_canvas_title = /** @type {((inputs: Agents_Canvas_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Canvas_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.agents_canvas_title(inputs)
+	return __en.agents_canvas_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Canvases" |
+*
+* @param {Agents_CanvasesInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const agents_canvases = /** @type {((inputs?: Agents_CanvasesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_CanvasesInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.agents_canvases(inputs)
+	return __en.agents_canvases(inputs)
 });
 /**
 * | output |
@@ -2624,62 +2680,6 @@ export const agents_stack_switch = /** @type {((inputs: Agents_Stack_SwitchInput
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.agents_stack_switch(inputs)
 	return __en.agents_stack_switch(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "Canvases, currently {name}" |
-*
-* @param {Agents_Stage_LabelInputs} inputs
-* @param {{ locale?: "en" | "zh-CN" }} options
-* @returns {LocalizedString}
-*/
-export const agents_stage_label = /** @type {((inputs: Agents_Stage_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Stage_LabelInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "zh-CN") return __zh_cn2.agents_stage_label(inputs)
-	return __en.agents_stage_label(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "Canvases, this chat is on none" |
-*
-* @param {Agents_Stage_NoneInputs} inputs
-* @param {{ locale?: "en" | "zh-CN" }} options
-* @returns {LocalizedString}
-*/
-export const agents_stage_none = /** @type {((inputs?: Agents_Stage_NoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Stage_NoneInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "zh-CN") return __zh_cn2.agents_stage_none(inputs)
-	return __en.agents_stage_none(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "Canvas: {name}" |
-*
-* @param {Agents_Stage_TitleInputs} inputs
-* @param {{ locale?: "en" | "zh-CN" }} options
-* @returns {LocalizedString}
-*/
-export const agents_stage_title = /** @type {((inputs: Agents_Stage_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Stage_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "zh-CN") return __zh_cn2.agents_stage_title(inputs)
-	return __en.agents_stage_title(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "Canvases" |
-*
-* @param {Agents_StagesInputs} inputs
-* @param {{ locale?: "en" | "zh-CN" }} options
-* @returns {LocalizedString}
-*/
-export const agents_stages = /** @type {((inputs?: Agents_StagesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_StagesInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "zh-CN") return __zh_cn2.agents_stages(inputs)
-	return __en.agents_stages(inputs)
 });
 /**
 * | output |
@@ -4728,6 +4728,20 @@ export const canvas_empty_title = /** @type {((inputs?: Canvas_Empty_TitleInputs
 /**
 * | output |
 * | --- |
+* | "The canvas could not start: {why}" |
+*
+* @param {Canvas_Engine_FailedInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_engine_failed = /** @type {((inputs: Canvas_Engine_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Engine_FailedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_engine_failed(inputs)
+	return __en.canvas_engine_failed(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Canvas" |
 *
 * @param {Canvas_Frame_TitleInputs} inputs
@@ -5424,6 +5438,20 @@ export const canvas_media_unmute = /** @type {((inputs?: Canvas_Media_UnmuteInpu
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.canvas_media_unmute(inputs)
 	return __en.canvas_media_unmute(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This browser can't draw the canvas: it needs WebGPU or WebGL 2." |
+*
+* @param {Canvas_No_BackendInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_no_backend = /** @type {((inputs?: Canvas_No_BackendInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_No_BackendInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_no_backend(inputs)
+	return __en.canvas_no_backend(inputs)
 });
 /**
 * | output |
@@ -8441,34 +8469,6 @@ export const canvas_shape_triangle = /** @type {((inputs?: Canvas_Shape_Triangle
 /**
 * | output |
 * | --- |
-* | "The stage could not start: {why}" |
-*
-* @param {Canvas_Stage_FailedInputs} inputs
-* @param {{ locale?: "en" | "zh-CN" }} options
-* @returns {LocalizedString}
-*/
-export const canvas_stage_failed = /** @type {((inputs: Canvas_Stage_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Stage_FailedInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "zh-CN") return __zh_cn2.canvas_stage_failed(inputs)
-	return __en.canvas_stage_failed(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "This browser can't draw the stage: it needs WebGPU or WebGL 2." |
-*
-* @param {Canvas_Stage_No_BackendInputs} inputs
-* @param {{ locale?: "en" | "zh-CN" }} options
-* @returns {LocalizedString}
-*/
-export const canvas_stage_no_backend = /** @type {((inputs?: Canvas_Stage_No_BackendInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Stage_No_BackendInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "zh-CN") return __zh_cn2.canvas_stage_no_backend(inputs)
-	return __en.canvas_stage_no_backend(inputs)
-});
-/**
-* | output |
-* | --- |
 * | "Arrow: drag from one thing to another and it stays joined" |
 *
 * @param {Canvas_Tool_ArrowInputs} inputs
@@ -11019,7 +11019,7 @@ export const chat_tm_restore = /** @type {((inputs?: Chat_Tm_RestoreInputs, opti
 /**
 * | output |
 * | --- |
-* | "Write the boards back to how they were here. The conversation stays where it is." |
+* | "Write the cards back to how they were here. The conversation stays where it is." |
 *
 * @param {Chat_Tm_Restore_NoteInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options
@@ -12184,7 +12184,7 @@ export const composer_mode_edit = /** @type {((inputs?: Composer_Mode_EditInputs
 /**
 * | output |
 * | --- |
-* | "Stop asking about board edits. Commands still ask." |
+* | "Stop asking about card edits. Commands still ask." |
 *
 * @param {Composer_Mode_Edit_NoteInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options
@@ -12408,7 +12408,7 @@ export const composer_pill_canvas_on = /** @type {((inputs: Composer_Pill_Canvas
 /**
 * | output |
 * | --- |
-* | "On the canvas, a board or card: {path}" |
+* | "On the canvas, a card: {path}" |
 *
 * @param {Composer_Pill_CardInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options
@@ -12731,16 +12731,16 @@ export const composer_queue_title = /** @type {((inputs: Composer_Queue_TitleInp
 /**
 * | output |
 * | --- |
-* | "a board" |
+* | "a card" |
 *
-* @param {Composer_Recipient_BoardInputs} inputs
+* @param {Composer_Recipient_CardInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options
 * @returns {LocalizedString}
 */
-export const composer_recipient_board = /** @type {((inputs?: Composer_Recipient_BoardInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Composer_Recipient_BoardInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+export const composer_recipient_card = /** @type {((inputs?: Composer_Recipient_CardInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Composer_Recipient_CardInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "zh-CN") return __zh_cn2.composer_recipient_board(inputs)
-	return __en.composer_recipient_board(inputs)
+	if (locale === "zh-CN") return __zh_cn2.composer_recipient_card(inputs)
+	return __en.composer_recipient_card(inputs)
 });
 /**
 * | output |
@@ -16141,7 +16141,7 @@ export const files_cancelled = /** @type {((inputs?: Files_CancelledInputs, opti
 /**
 * | output |
 * | --- |
-* | "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a board." |
+* | "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a card." |
 *
 * @param {Files_Canvas_SubInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options
@@ -16282,7 +16282,7 @@ export const files_done = /** @type {((inputs?: Files_DoneInputs, options?: { lo
 /**
 * | output |
 * | --- |
-* | "It is shown on the board, where it is." |
+* | "It is shown on the card, where it is." |
 *
 * @param {Files_Embed_SubInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options

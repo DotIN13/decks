@@ -5,6 +5,10 @@
 /** @typedef {{}} Agents_AgentsInputs */
 /** @typedef {{}} Agents_Browse_LabelInputs */
 /** @typedef {{}} Agents_Browse_TitleInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Canvas_LabelInputs */
+/** @typedef {{}} Agents_Canvas_NoneInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Canvas_TitleInputs */
+/** @typedef {{}} Agents_CanvasesInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_CloseInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_BodyInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_TitleInputs */
@@ -75,10 +79,6 @@
 /** @typedef {{}} Agents_Stack_LabelInputs */
 /** @typedef {{ count: NonNullable<unknown>, shown: NonNullable<unknown> }} Agents_Stack_MoreInputs */
 /** @typedef {{ name: NonNullable<unknown>, status: NonNullable<unknown> }} Agents_Stack_SwitchInputs */
-/** @typedef {{ name: NonNullable<unknown> }} Agents_Stage_LabelInputs */
-/** @typedef {{}} Agents_Stage_NoneInputs */
-/** @typedef {{ name: NonNullable<unknown> }} Agents_Stage_TitleInputs */
-/** @typedef {{}} Agents_StagesInputs */
 /** @typedef {{}} Agents_Status_DoneInputs */
 /** @typedef {{}} Agents_Status_IdleInputs */
 /** @typedef {{}} Agents_Status_ThinkingInputs */
@@ -225,6 +225,7 @@
 /** @typedef {{}} Canvas_Empty_AgentInputs */
 /** @typedef {{ agent: NonNullable<unknown> }} Canvas_Empty_BodyInputs */
 /** @typedef {{}} Canvas_Empty_TitleInputs */
+/** @typedef {{ why: NonNullable<unknown> }} Canvas_Engine_FailedInputs */
 /** @typedef {{}} Canvas_Frame_TitleInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_BendInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_JoinInputs */
@@ -275,6 +276,7 @@
 /** @typedef {{}} Canvas_Media_PlayInputs */
 /** @typedef {{}} Canvas_Media_SeekInputs */
 /** @typedef {{}} Canvas_Media_UnmuteInputs */
+/** @typedef {{}} Canvas_No_BackendInputs */
 /** @typedef {{}} Canvas_Paste_Kind_CardInputs */
 /** @typedef {{}} Canvas_Paste_Kind_DocumentInputs */
 /** @typedef {{}} Canvas_Paste_Kind_FileInputs */
@@ -490,8 +492,6 @@
 /** @typedef {{}} Canvas_Shape_TerminatorInputs */
 /** @typedef {{}} Canvas_Shape_TrapezoidInputs */
 /** @typedef {{}} Canvas_Shape_TriangleInputs */
-/** @typedef {{ why: NonNullable<unknown> }} Canvas_Stage_FailedInputs */
-/** @typedef {{}} Canvas_Stage_No_BackendInputs */
 /** @typedef {{}} Canvas_Tool_ArrowInputs */
 /** @typedef {{}} Canvas_Tool_CardInputs */
 /** @typedef {{}} Canvas_Tool_FileInputs */
@@ -796,7 +796,7 @@
 /** @typedef {{}} Composer_Queue_Send_Now_TitleInputs */
 /** @typedef {{}} Composer_Queue_ShowInputs */
 /** @typedef {{ count: NonNullable<unknown>, name: NonNullable<unknown> }} Composer_Queue_TitleInputs */
-/** @typedef {{}} Composer_Recipient_BoardInputs */
+/** @typedef {{}} Composer_Recipient_CardInputs */
 /** @typedef {{ label: NonNullable<unknown> }} Composer_Recipient_ChipInputs */
 /** @typedef {{}} Composer_Recipient_LabelInputs */
 /** @typedef {{}} Composer_Recipient_NoneInputs */
@@ -1589,6 +1589,22 @@ export const agents_browse_title = /** @type {(inputs: Agents_Browse_TitleInputs
 	return /** @type {LocalizedString} */ (`Browse: read the cards, move and retype what is drawn`)
 };
 
+export const agents_canvas_label = /** @type {(inputs: Agents_Canvas_LabelInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Canvases, currently ${i?.name}`)
+};
+
+export const agents_canvas_none = /** @type {(inputs: Agents_Canvas_NoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Canvases, this chat is on none`)
+};
+
+export const agents_canvas_title = /** @type {(inputs: Agents_Canvas_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Canvas: ${i?.name}`)
+};
+
+export const agents_canvases = /** @type {(inputs: Agents_CanvasesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Canvases`)
+};
+
 export const agents_close = /** @type {(inputs: Agents_CloseInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Close ${i?.name}`)
 };
@@ -1882,22 +1898,6 @@ export const agents_stack_more = /** @type {(inputs: Agents_Stack_MoreInputs) =>
 
 export const agents_stack_switch = /** @type {(inputs: Agents_Stack_SwitchInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Switch to ${i?.name} — ${i?.status}`)
-};
-
-export const agents_stage_label = /** @type {(inputs: Agents_Stage_LabelInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`Canvases, currently ${i?.name}`)
-};
-
-export const agents_stage_none = /** @type {(inputs: Agents_Stage_NoneInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Canvases, this chat is on none`)
-};
-
-export const agents_stage_title = /** @type {(inputs: Agents_Stage_TitleInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`Canvas: ${i?.name}`)
-};
-
-export const agents_stages = /** @type {(inputs: Agents_StagesInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Canvases`)
 };
 
 export const agents_status_done = /** @type {(inputs: Agents_Status_DoneInputs) => LocalizedString} */ () => {
@@ -2484,6 +2484,10 @@ export const canvas_empty_title = /** @type {(inputs: Canvas_Empty_TitleInputs) 
 	return /** @type {LocalizedString} */ (`This canvas is empty`)
 };
 
+export const canvas_engine_failed = /** @type {(inputs: Canvas_Engine_FailedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`The canvas could not start: ${i?.why}`)
+};
+
 export const canvas_frame_title = /** @type {(inputs: Canvas_Frame_TitleInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Canvas`)
 };
@@ -2682,6 +2686,10 @@ export const canvas_media_seek = /** @type {(inputs: Canvas_Media_SeekInputs) =>
 
 export const canvas_media_unmute = /** @type {(inputs: Canvas_Media_UnmuteInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Sound on`)
+};
+
+export const canvas_no_backend = /** @type {(inputs: Canvas_No_BackendInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This browser can't draw the canvas: it needs WebGPU or WebGL 2.`)
 };
 
 export const canvas_paste_kind_card = /** @type {(inputs: Canvas_Paste_Kind_CardInputs) => LocalizedString} */ () => {
@@ -3553,14 +3561,6 @@ export const canvas_shape_triangle = /** @type {(inputs: Canvas_Shape_TriangleIn
 	return /** @type {LocalizedString} */ (`Triangle`)
 };
 
-export const canvas_stage_failed = /** @type {(inputs: Canvas_Stage_FailedInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`The stage could not start: ${i?.why}`)
-};
-
-export const canvas_stage_no_backend = /** @type {(inputs: Canvas_Stage_No_BackendInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`This browser can't draw the stage: it needs WebGPU or WebGL 2.`)
-};
-
 export const canvas_tool_arrow = /** @type {(inputs: Canvas_Tool_ArrowInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Arrow: drag from one thing to another and it stays joined`)
 };
@@ -4296,7 +4296,7 @@ export const chat_tm_restore = /** @type {(inputs: Chat_Tm_RestoreInputs) => Loc
 };
 
 export const chat_tm_restore_note = /** @type {(inputs: Chat_Tm_Restore_NoteInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Write the boards back to how they were here. The conversation stays where it is.`)
+	return /** @type {LocalizedString} */ (`Write the cards back to how they were here. The conversation stays where it is.`)
 };
 
 export const chat_tm_rewind_note = /** @type {(inputs: Chat_Tm_Rewind_NoteInputs) => LocalizedString} */ () => {
@@ -4637,7 +4637,7 @@ export const composer_mode_edit = /** @type {(inputs: Composer_Mode_EditInputs) 
 };
 
 export const composer_mode_edit_note = /** @type {(inputs: Composer_Mode_Edit_NoteInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Stop asking about board edits. Commands still ask.`)
+	return /** @type {LocalizedString} */ (`Stop asking about card edits. Commands still ask.`)
 };
 
 export const composer_mode_label = /** @type {(inputs: Composer_Mode_LabelInputs) => LocalizedString} */ () => {
@@ -4701,7 +4701,7 @@ export const composer_pill_canvas_on = /** @type {(inputs: Composer_Pill_Canvas_
 };
 
 export const composer_pill_card = /** @type {(inputs: Composer_Pill_CardInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`On the canvas, a board or card: ${i?.path}`)
+	return /** @type {LocalizedString} */ (`On the canvas, a card: ${i?.path}`)
 };
 
 export const composer_pill_file = /** @type {(inputs: Composer_Pill_FileInputs) => LocalizedString} */ (i) => {
@@ -4795,8 +4795,8 @@ export const composer_queue_title = /** @type {(inputs: Composer_Queue_TitleInpu
 	return /** @type {LocalizedString} */ ("composer_queue_title");
 };
 
-export const composer_recipient_board = /** @type {(inputs: Composer_Recipient_BoardInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`a board`)
+export const composer_recipient_card = /** @type {(inputs: Composer_Recipient_CardInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`a card`)
 };
 
 export const composer_recipient_chip = /** @type {(inputs: Composer_Recipient_ChipInputs) => LocalizedString} */ (i) => {
@@ -5792,7 +5792,7 @@ export const files_cancelled = /** @type {(inputs: Files_CancelledInputs) => Loc
 };
 
 export const files_canvas_sub = /** @type {(inputs: Files_Canvas_SubInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a board.`)
+	return /** @type {LocalizedString} */ (`Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a card.`)
 };
 
 export const files_canvas_title = /** @type {(inputs: Files_Canvas_TitleInputs) => LocalizedString} */ () => {
@@ -5835,7 +5835,7 @@ export const files_done = /** @type {(inputs: Files_DoneInputs) => LocalizedStri
 };
 
 export const files_embed_sub = /** @type {(inputs: Files_Embed_SubInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`It is shown on the board, where it is.`)
+	return /** @type {LocalizedString} */ (`It is shown on the card, where it is.`)
 };
 
 export const files_embed_title = /** @type {(inputs: Files_Embed_TitleInputs) => LocalizedString} */ () => {

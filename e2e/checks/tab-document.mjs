@@ -49,7 +49,7 @@ say("New tab on the document's pill opens it as a tab of this window, in front",
 say("…and not the browser's tab", page.context().pages().length === pagesBefore);
 const frameEl = page.locator('.surface[data-surface="document"] iframe.document-frame');
 say("the document is in a frame of its own, sandboxed as the canvas's is", (await until(() => frameEl.count())) === 1 && !(await frameEl.getAttribute("sandbox")).includes("allow-same-origin") && (await frameEl.getAttribute("sandbox")) === (await page.locator("iframe.canvas-frame").getAttribute("sandbox")));
-say("the canvas is out of sight, and its tools with it", !(await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 0);
+say("the canvas is out of sight, and its tools with it", !(await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await page.locator(".pen-tools").count()) === 0);
 // The document's frame is another frame of the canvas-frame page: found by what it shows.
 const inDoc = async (run, arg) => {
 	for (const one of page.frames()) {
@@ -91,12 +91,12 @@ say("taken off its canvas, the document in the tab is still typed into and saved
 
 // --- behind another tab and back, closed --------------------------------------------------------------------
 await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
-say("the home chip brings the canvas forward, the document's tab still in the row", (await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await chip.getAttribute("data-front")) !== "true" ? true : undefined))) === true);
+say("the home chip brings the canvas forward, the document's tab still in the row", (await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await chip.getAttribute("data-front")) !== "true" ? true : undefined))) === true);
 await settle(page, 300);
 await chip.click();
 say("brought forward again, it shows what was typed", !!(await until(async () => ((await inDoc(() => document.querySelector(".document-tab .document-surface")?.innerText ?? ""))?.includes("Typed in the tab.") ? true : undefined))));
 await chip.locator(".tab-chip-close").click();
-say("the ✕ closes it, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="document"]').count()) === 0 && (await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
+say("the ✕ closes it, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="document"]').count()) === 0 && (await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
 say("…the same canvas frame, not one made anew", (await canvas.evaluate(() => (globalThis.__decksProbes?.frameDrawn?.().children ?? []).length)) > 0);
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));

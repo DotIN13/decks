@@ -7,14 +7,14 @@ import { onCleanup, onMount } from "solid-js";
  * page-zoom block and the dock measurement — six unrelated wires in one closure.
  */
 export function installKeys(deps: {
-	/** Show the boards panel, and put the cursor in its search field. */
+	/** Show the cards panel, and put the cursor in its search field. */
 	openPanel(): void;
 	/** A token that changes to say "search now" — `Date.now()`, for the field to key on. */
 	find(at: number): void;
 }) {
 	onMount(() => {
 		/*
-		 * `⌘K` — which is what the full-screen board browser became.
+		 * `⌘K` — which is what the full-screen card browser became.
 		 *
 		 * That modal covered the canvas you were looking at in order to help you find something
 		 * on it. The panel's list is where it went — the whole deck, in three sections — so the

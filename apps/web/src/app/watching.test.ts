@@ -6,12 +6,12 @@ const NOW = 1_700_000_000_000;
 
 const act = { lastWrittenBy: "a1", namedAt: NOW - 1000, seenAt: undefined as number | undefined };
 
-test("a board named by the agent on screen was watched being named", () => {
+test("a card named by the agent on screen was watched being named", () => {
 	assert.equal(watchedBeingNamed(act, { focused: "a1" }), true);
 });
 
 test("the same act read anywhere else is news", () => {
-	assert.equal(watchedBeingNamed(act, { focused: "b2" }), false, "another agent's stage");
+	assert.equal(watchedBeingNamed(act, { focused: "b2" }), false, "another agent's canvas");
 	assert.equal(watchedBeingNamed(act, {}), false, "no conversation open");
 });
 

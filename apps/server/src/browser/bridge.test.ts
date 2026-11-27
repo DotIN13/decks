@@ -332,7 +332,7 @@ test("a control the page hides and paints over is clicked through its reference"
 	assert.match(bridge.status().actions.at(-1)?.text ?? "", /hidden behind what the page paints/);
 });
 
-test("submit waits for the user's Allow on the status board, and a Deny is a refusal, not an error", async () => {
+test("submit waits for the user's Allow on the status card, and a Deny is a refusal, not an error", async () => {
 	const denied = bridge.submit("Create account");
 	await until("a pending question", () => bridge.status().pending !== undefined);
 	const question = bridge.status().pending!;
@@ -460,7 +460,7 @@ test("a label used on the page and in an open dialog means the dialog's, and a h
 test("a click on a button that sends waits for the person's Allow, and a No leaves the page as it was", async () => {
 	await bridge.open(`data:text/html,${encodeURIComponent('<!doctype html><title>Letters</title><button onclick="document.title=\'sent\'">Send request</button>')}`);
 	const asked = bridge.click("Send request");
-	await until("the question on the board", () => bridge.status().pending !== undefined);
+	await until("the question on the card", () => bridge.status().pending !== undefined);
 	assert.match(bridge.status().pending!.text, /Send request/);
 	bridge.answer(bridge.status().pending!.id, false);
 	const result = await asked;

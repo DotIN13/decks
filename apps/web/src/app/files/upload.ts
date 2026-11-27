@@ -24,7 +24,7 @@ const agreed = new WeakSet<File>();
 
 /**
  * Whether a file may be sent: a big one is asked about first, since it takes a while to send and
- * keeps a lot of the deck's disk. A caller that makes something before uploading (a board for the
+ * keeps a lot of the deck's disk. A caller that makes something before uploading (a card for the
  * file) asks this first, so a "no" leaves nothing behind.
  */
 export async function mayUpload(file: File): Promise<boolean> {

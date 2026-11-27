@@ -1,12 +1,12 @@
 import { knobs, probes } from "../base/debug.ts";
 import renderWorkerUrl from "./render.worker.ts?worker&url";
 /**
- * The stage's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
+ * The canvas's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
  *
  * The page engine owns a copy of the drawing, kept on the server's revision by its edits
- * (`canvas.changed`), and answers what the stage asks of the drawing: where each item is, what is
+ * (`canvas.changed`), and answers what the canvas asks of the drawing: where each item is, what is
  * under a point, what a marquee holds, a card's links. Each frame it draws two canvases in the same
- * call that moves the board pages (`frame`): under them, the boards' pictures; over them, the
+ * call that moves the card pages (`frame`): under them, the cards' pictures; over them, the
  * worker's tiles, then what a gesture is moving and the stroke under the pen, drawn fresh.
  *
  * Fonts, pictures, icons and the markdown reader are the app's own, fetched here and handed to both
@@ -20,7 +20,7 @@ import { cardReader, mathTypesetter } from "./reader.ts";
 import { setCanvasWords } from "./measure.ts";
 import type { DocEdits } from "../model/drawing.ts";
 import type { FromWorker, ToWorker } from "./types.ts";
-import { detect, type Detected, type StageModule } from "./backends/detect.ts";
+import { detect, type Detected, type EngineModule } from "./backends/detect.ts";
 import { takeWarm, warmEngine } from "./warm.ts";
 import { PICTURES, readGpuClass } from "./device.ts";
 import { noticeFor } from "./backends/notice.ts";
@@ -34,7 +34,7 @@ import { EngineTiles, webKit } from "./engine-tiles.ts";
 import { EMPTY, EngineLayout } from "./engine-layout.ts";
 import { EngineFrames } from "./engine-frames.ts";
 
-/** What the stage last did, for checks and the crash recorder to read: the old sheet's counters, and the engine's. */
+/** What the canvas last did, for checks and the crash recorder to read: the old sheet's counters, and the engine's. */
 /**
  * `shown` counts the page's draws and `tiles` the worker's tiles that reached the page. `sharpAt` is
  * the `performance.now()` of the first draw at rest after a batch from a worker that had every
@@ -60,7 +60,7 @@ import { EngineFrames } from "./engine-frames.ts";
  * way), but a fast pan was filled in 17 to 48 ms instead of 7 to 8, every tile waiting for its read
  * back from the worker's device. WebKit is told by its user agent: AppleWebKit without Chrome's,
  * Chromium's or Edge's name (Chrome on a Mac says AppleWebKit too; Chrome on iOS says CriOS, and is
- * WebKit). `knobs.tilePixels` (`debug.ts`; true or false), set before the stage opens, says it instead.
+ * WebKit). `knobs.tilePixels` (`debug.ts`; true or false), set before the canvas opens, says it instead.
  */
 export function pixelsFirst(): boolean {
 	const forced = knobs.tilePixels;
@@ -78,8 +78,8 @@ const ZOOM_RATE_MS = 100;
 const FAST_HOLD_MS = 250;
 
 /** The engine's compiled module, for the worker to start from (`boot`). */
-function moduleOf(stage: StageModule): WebAssembly.Module | undefined {
-	const module: unknown = stage.engineModule();
+function moduleOf(wasm: EngineModule): WebAssembly.Module | undefined {
+	const module: unknown = wasm.engineModule();
 	return module instanceof WebAssembly.Module ? module : undefined;
 }
 
@@ -130,21 +130,21 @@ export class CanvasEngine {
 	base = "";
 	over: HTMLCanvasElement | undefined;
 	private size = { w: 0, h: 0 };
-	/** The stage rectangle the canvas was last drawn for: the window's, at the camera then. */
+	/** The world rectangle the canvas was last drawn for: the window's, at the camera then. */
 	drawnAt: { x: number; y: number; zoom: number } | undefined;
 	/** A batch came from a worker with nothing left to paint: the next draw at rest is a sharp one (`sharpAt`). */
 	sharpNext = false;
 	/** As `sharpNext`, for `settledAt`: the next draw at rest shows the window filled in. */
 	settledNext = false;
-	/** A stage engine that could not start: the stage shows these words (`backends/notice.ts`) rather than drawing nothing silently. */
+	/** A canvas engine that could not start: the canvas shows these words (`backends/notice.ts`) rather than drawing nothing silently. */
 	failed: ((notice: string) => void) | undefined;
-	/** After each new layout, so the stage can redraw a selection round what moved. */
+	/** After each new layout, so the canvas can redraw a selection round what moved. */
 	drawn: (() => void) | undefined;
 	/** After each frame is on screen. */
 	presented: (() => void) | undefined;
-	/** The boards drawn as their picture, when that changes. */
+	/** The cards drawn as their picture, when that changes. */
 	pictured: ((paths: ReadonlySet<string>) => void) | undefined;
-	/** The live boards a drag carries as their picture, whose pages wait unseen. */
+	/** The live cards a drag carries as their picture, whose pages wait unseen. */
 	carrying: ((paths: ReadonlySet<string>) => void) | undefined;
 
 	/** Every item as laid out, by id, with its node; and what each item covers. */
@@ -152,7 +152,7 @@ export class CanvasEngine {
 	bounds: ReadonlyMap<string, Frame> = new Map<string, Frame>();
 	/** The document the layout was made from. */
 	drawnDoc: PenDocument | undefined;
-	/** Not used by this engine: kept so the stage can treat both alike. */
+	/** Not used by this engine: kept so the canvas can treat both alike. */
 	drewDrawing = true;
 	onCarryPending: ((pending: boolean) => void) | undefined;
 	/**
@@ -163,7 +163,7 @@ export class CanvasEngine {
 	onGlide: ((shifts: ReadonlyMap<string, { dx: number; dy: number }> | undefined) => void) | undefined;
 
 	/**
-	 * The canvas, once the stage has made it: among the board pages, after them. The boards'
+	 * The canvas element, once the canvas view has made it: among the card pages, after them. The cards'
 	 * pictures, the drawing and what a gesture moves are all drawn on it.
 	 */
 	attachCanvas(canvas: HTMLCanvasElement): void {
@@ -175,7 +175,7 @@ export class CanvasEngine {
 	}
 	private started = false;
 	lastOps = 0;
-	/** The graphics API the stage draws with, `"webgpu"` or `"webgl2"`, once open. */
+	/** The graphics API the canvas draws with, `"webgpu"` or `"webgl2"`, once open. */
 	private backend = "";
 	/** The worker's, which it opens the page's first. */
 	private workerBackend = "";
@@ -194,22 +194,22 @@ export class CanvasEngine {
 
 	/**
 	 * An error out of an engine: it cannot be trusted to draw again, so both are started again, as
-	 * after a lost GPU. The drawing, boards, camera and fonts are held here and given back to them.
+	 * after a lost GPU. The drawing, cards, camera and fonts are held here and given back to them.
 	 */
 	recover(error: unknown, where: string): void {
 		const message = String((error as Error)?.message ?? error);
 		if (this.recovery.note() === "stop") {
-			console.error(`stage engine: ${where} failed again (${message}); stopped`);
+			console.error(`canvas engine: ${where} failed again (${message}); stopped`);
 			this.lose();
-			this.fail(new Error(`The stage kept failing (${message}). Reload the page to draw it again.`));
+			this.fail(new Error(`The canvas kept failing (${message}). Reload the page to draw it again.`));
 			return;
 		}
-		console.error(`stage engine: ${where} failed (${message}); starting the engines again`);
+		console.error(`canvas engine: ${where} failed (${message}); starting the engines again`);
 		void this.restart();
 	}
 
 	private fail(error: unknown): void {
-		console.error(`stage engine: ${String((error as Error)?.message ?? error)}`);
+		console.error(`canvas engine: ${String((error as Error)?.message ?? error)}`);
 		this.failed?.(noticeFor(error));
 	}
 
@@ -242,12 +242,12 @@ export class CanvasEngine {
 		this.tiles.postedContent = 0;
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
 		const found = (this.detected ??= warmed?.detected ?? (await detect()));
-		const stage = warmed?.stage ?? (await found.backend.load());
+		const wasm = warmed?.wasm ?? (await found.backend.load());
 		if (this.disposed) return;
-		this.stageModule = stage;
-		if (!warmed) this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(stage) });
+		this.wasmModule = wasm;
+		if (!warmed) this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(wasm) });
 		this.fitCanvases();
-		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
+		const gpu = await wasm.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
 		this.lowMemory = !!found.lowMemory;
 		// Fonts already handed to an engine before (this is a restart) are read from their files again.
 		await Promise.all(this.faces.fonts.map(async (font) => (font.bytes ??= new Uint8Array(await font.blob.arrayBuffer()))));
@@ -261,15 +261,15 @@ export class CanvasEngine {
 		const self = this;
 		probes.engine = {
 			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.cardPictures.maxPicture, restarts: this.restarts, pictures: this.cardPictures.picturesPut, paused: this.paused, cardsSent: { ...this.cardLayer.cardsSent } }),
-			/** The boards a drag carries as their picture, and by how far. */
+			/** The cards a drag carries as their picture, and by how far. */
 			get carried() {
-				// Live pages carried as their picture, and boards already drawn as pictures that the drag moves.
+				// Live pages carried as their picture, and cards already drawn as pictures that the drag moves.
 				const drawn = new Set([...(JSON.parse(self.page?.carrying() ?? "[]") as string[]), ...self.cardLayer.carriedPaths.filter((path) => (JSON.parse(self.page?.pictured() ?? "[]") as string[]).includes(path))]);
 				return { paths: drawn, ...self.cardLayer.carriedBy };
 			},
 		};
 		// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
-		this.page = new stage.PageEngine(EMPTY, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
+		this.page = new wasm.PageEngine(EMPTY, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
 		this.tiles.warmed = false;
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
@@ -299,7 +299,7 @@ export class CanvasEngine {
 	/**
 	 * The device is gone (`backends/webgpu.ts`, `backends/webgl.ts`), or the worker's: nothing more
 	 * is drawn, and the engines are let go while their context is lost, so what they free is freed
-	 * on nothing. The drawing, the boards, the camera and the fonts stay here for `restart`.
+	 * on nothing. The drawing, the cards, the camera and the fonts stay here for `restart`.
 	 */
 	private lose(): void {
 		if (this.paused) return;
@@ -474,7 +474,7 @@ export class CanvasEngine {
 		 * A drawing that arrives ends any preview: whatever a drag was showing is now the drawing itself.
 		 * The page applies a preview to its own copy and takes it back after, so it is taken back before
 		 * the edits rather than over them. Lifted items stay lifted, drawn where the drawing now has them,
-		 * until the stage puts the gesture down.
+		 * until the canvas puts the gesture down.
 		 */
 		this.page.setPreview("null");
 		this.cardLayer.shown = undefined;
@@ -498,7 +498,7 @@ export class CanvasEngine {
 		// A drop that moved things glides them in from where they were let go, and any other change from where it was drawn, from this very frame.
 		const gliding = this.glides.settling ? this.glides.startGlide() : this.glides.glideFrom(drawnBefore);
 		if (!gliding) this.frames.draw();
-		// A drag of boards alone that was let go: its arrows are now the drawing's own, routed where the boards landed.
+		// A drag of cards alone that was let go: its arrows are now the drawing's own, routed where the cards landed.
 		if (this.cardLayer.cardsOnly && !this.cardLayer.carriedCount) this.cardLayer.landCards();
 		else if (this.cardLayer.cardsOnly) this.cardLayer.cardsAnswered = true;
 		// A gesture let go: the drawing that answers it is here, so what it lifted goes back into the tiles.
@@ -552,10 +552,10 @@ export class CanvasEngine {
 	}
 
 	/**
-	 * The stage rectangle the canvas covers: the sheet, the window and `SHEET_MARGIN` of it on each
+	 * The world rectangle the canvas covers: the sheet, the window and `SHEET_MARGIN` of it on each
 	 * side, placed round the camera and left there while the window stays inside it.
 	 *
-	 * The stage scrolls (`camera/scroll-area.ts`): a pan is the browser moving the world, and this
+	 * The canvas scrolls (`camera/scroll-area.ts`): a pan is the browser moving the world, and this
 	 * canvas with it, on its compositor. So the canvas is not drawn again for each step of a pan, which
 	 * would put our code back in every frame; it is drawn round the camera once, with room on each
 	 * side, and again only when the window reaches its edge (`setCamera`), the zoom changes, or the
@@ -583,12 +583,12 @@ export class CanvasEngine {
 	}
 
 	/**
-	 * The canvas sits in the world (`CanvasView.tsx`), after the board pages, so it is placed in stage
+	 * The canvas sits in the world (`CanvasView.tsx`), after the card pages, so it is placed in canvas
 	 * units at the rectangle it was drawn for and scaled by one over the zoom: the world's transform
 	 * undone, so it covers exactly the window.
 	 */
 	/**
-	 * Hold the canvas where it is while the scale moves (`CanvasView`, `holdStill`): the stage leaves the world
+	 * Hold the canvas where it is while the scale moves (`CanvasView`, `holdStill`): the canvas leaves the world
 	 * where it is too, so the canvas keeps covering the window, and every frame draws the window at the
 	 * camera into it as before. Setting its transform at each step, even on a promised layer, made
 	 * Chromium rebuild its paint property tree and assign every layer on the page again, a frame's
@@ -618,7 +618,7 @@ export class CanvasEngine {
 		if (scheme === this.scheme) return;
 		this.scheme = scheme;
 		if (this.page) {
-			// The stage is drawn again in the other scheme: cards' colours, papers, ink.
+			// The canvas is drawn again in the other scheme: cards' colours, papers, ink.
 			this.page.setMarkdownReader(cardReader(scheme));
 			this.page.setDark(scheme === "dark");
 			this.layout.whole(this.doc);
@@ -627,7 +627,7 @@ export class CanvasEngine {
 		this.frames.draw();
 	}
 
-	/** In the call that moves the board pages, and drawn there, so the two land in one frame. */
+	/** In the call that moves the card pages, and drawn there, so the two land in one frame. */
 	setCamera(camera: Camera): void {
 		// Zooming once the zoom changes while the camera moves, until it rests (`setMoving`): a pan at one zoom keeps the exact scale.
 		if (this.moving && camera.zoom !== this.camera.zoom) this.zooming = true;
@@ -711,7 +711,7 @@ export class CanvasEngine {
 	private fastZoom = false;
 	private fastTimer: ReturnType<typeof setTimeout> | undefined;
 
-	/** The stage point at the window's top-left, from the camera's centre. */
+	/** The canvas point at the window's top-left, from the camera's centre. */
 	corner(): { x: number; y: number } {
 		return { x: this.camera.x - this.view.width / 2 / this.camera.zoom, y: this.camera.y - this.view.height / 2 / this.camera.zoom };
 	}
@@ -730,14 +730,14 @@ export class CanvasEngine {
 		const half = this.zooming && knobs.halfZoom;
 		const sent = { zoom, dpr: half ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming, fast: this.fastZoom };
 		this.post({ type: "camera", x, y, width, height, ...sent });
-		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
+		const want = this.wasmModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
 		if (want !== undefined && want !== this.tiles.wantScale) {
 			this.tiles.wantScale = want;
 			this.tiles.dropUnwanted();
 		}
 	}
 	/** The engine's module, for `scaleFor`. */
-	private stageModule: StageModule | undefined;
+	private wasmModule: EngineModule | undefined;
 
 
 	lowMemory = false;

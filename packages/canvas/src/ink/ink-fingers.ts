@@ -11,7 +11,7 @@ export function createInkFingers(d: InkFingersNeeds) {
 	/*
 	 * Two fingers tapped together take back the last edit, three put it back, as in a notes app. A tap
 	 * is every finger down and up within a moment, none of them having travelled; watched on the
-	 * window, because a finger this sheet lets through is captured by the stage beneath it.
+	 * window, because a finger this sheet lets through is captured by the canvas beneath it.
 	 */
 	const fingers = new Map<number, { x: number; y: number }>();
 

@@ -175,9 +175,6 @@
       "title": {
        "type": "string"
       },
-      "board": {
-       "type": "string"
-      },
       "box": {
        "type": "object",
        "properties": {
@@ -433,9 +430,6 @@
        "type": "string"
       },
       "title": {
-       "type": "string"
-      },
-      "board": {
        "type": "string"
       },
       "box": {
@@ -933,9 +927,6 @@
              "title": {
               "type": "string"
              },
-             "board": {
-              "type": "string"
-             },
              "box": {
               "type": "object",
               "properties": {
@@ -1135,9 +1126,6 @@
               "type": "string"
              },
              "title": {
-              "type": "string"
-             },
-             "board": {
               "type": "string"
              },
              "box": {

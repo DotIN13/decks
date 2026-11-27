@@ -1,15 +1,15 @@
 /**
  * A thing put into a message as a pill (`@decks/agent-ui` `composer/draft.ts`): a comment, a card (or
- * an old board), a drawn item, a file. Kept with the message as it was sent, so the conversation draws
+ * an old card), a drawn item, a file. Kept with the message as it was sent, so the conversation draws
  * the same pill with the same card after a reload and on another device, without reading it back out of
- * the text. A message saved before cards says `"board"` for a card: whoever reads one reads it as `"card"`.
+ * the text. A message saved before cards says `"card"` for a card: whoever reads one reads it as `"card"`.
  */
 export interface MessageMention {
 	type: "mention";
 	kind: "comment" | "card" | "item" | "file";
-	/** The comment's id, a board's or a file's path, an item's id on the stage. */
+	/** The comment's id, a card's or a file's path, an item's id on the canvas. */
 	id: string;
-	/** What it is called: the board or card a comment is on, the board's title, the item's name, the file's name. */
+	/** What it is called: the card a comment is on, the card's title, the item's name, the file's name. */
 	name: string;
 	/** Who put it in: you, or the canvas (a card's script can hand a comment over). */
 	from: "you" | "canvas";
@@ -17,11 +17,11 @@ export interface MessageMention {
 	label?: string;
 	quote?: string;
 	note?: string;
-	/** Where it is: the board or card a comment is on, a board's or a file's path, an item's canvas. */
+	/** Where it is: the card a comment is on, a card's or a file's path, an item's canvas. */
 	path?: string;
 	/** A comment on drawn items: their ids. */
 	items?: string[];
-	/** A comment inside a component of a board: its name. */
+	/** A comment inside a component of a card: its name. */
 	component?: string;
 	/** The words the agent received for it. */
 	exact?: string;

@@ -20,10 +20,10 @@ function put(file: string, data: string | Uint8Array): void {
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-verbs-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	put(
 		join(deck, "canvases", "t", "cards", "tall", "index.html"),
-		`<!doctype html><html><head><title>Tall</title><meta name="board" content='{"w":900,"h":400,"bg":"grid"}' /></head><body class="board"></body></html>`,
+		`<!doctype html><html><head><title>Tall</title><meta name="card" content='{"w":900,"h":400,"bg":"grid"}' /></head><body class="card-page"></body></html>`,
 	);
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
@@ -120,7 +120,7 @@ test("a change goes to the deck, and its notes come back beside the value", asyn
 		assert.ok(made.body.ok, made.body.error);
 		const path = (made.body.value as { path: string }).path;
 		assert.match(path, /^canvases\/[^/]+\/cards\/the-finding\//, "made in the caller's canvas");
-		assert.ok(existsSync(join(deck, path)), "the board's file was written");
+		assert.ok(existsSync(join(deck, path)), "the card's file was written");
 		assert.ok(made.body.notes.length > 0, "card.create tells the caller the card's width, as a run does");
 	} finally {
 		cleanup();
@@ -155,7 +155,7 @@ test("wrong calls are answered with a sentence and the verb's signature", async 
 	}
 });
 
-test("an agent's shell, as a runtime sets it up, reaches its own stage with the decks command", async () => {
+test("an agent's shell, as a runtime sets it up, reaches its own canvas with the decks command", async () => {
 	const { decksEnv } = await import("../runtimes/decks-env.ts");
 	const { execFile } = await import("node:child_process");
 	const { promisify } = await import("node:util");
@@ -237,13 +237,13 @@ test("the event stream carries what a verb changed, and only the types asked for
 		for (let i = 0; i < 40 && !heard.some((event) => event.type === "card.changed" && event.path === path); i++) await new Promise((resolve) => setTimeout(resolve, 25));
 		stream.close();
 		assert.ok(heard.some((event) => event.type === "card.changed" && event.path === path && event.card?.path === path), `heard ${JSON.stringify(heard.map((event) => event.type))}`);
-		assert.ok(heard.every((event) => event.type === "card.changed"), "nothing else came through the filter, and no old board.changed beside it");
+		assert.ok(heard.every((event) => event.type === "card.changed"), "nothing else came through the filter");
 	} finally {
 		cleanup();
 	}
 });
 
-test("the person's verbs act on the stage on screen, and draw no agent cursor", async () => {
+test("the person's verbs act on the canvas on screen, and draw no agent cursor", async () => {
 	const { app, base, agent, cleanup } = await open();
 	try {
 		app.agents.focus(agent.id);
@@ -274,7 +274,7 @@ test("an app is shown by an item: apps.item names it, canvas.insert places it, a
 		put(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
 		const item = await call("apps.item", ["notes"]);
 		assert.deepEqual(item.body.value, { type: "app", app: "notes" }, "the item to insert, and no file written");
-		assert.equal(existsSync(join(app.deck.path, "boards", "apps", "notes.html")), false);
+		assert.equal(existsSync(join(app.deck.path, "cards", "apps", "notes.html")), false);
 		const placed = await call("canvas.insert", [item.body.value, { at: { x1: 0, y1: 0 } }]);
 		assert.ok(placed.body.ok, placed.body.error);
 		const value = placed.body.value as { id: string; type: string; name: string; metadata: unknown; width: number; height: number };
@@ -291,7 +291,7 @@ test("an app is shown by an item: apps.item names it, canvas.insert places it, a
 	}
 });
 
-test("each principal calls as itself: an app as the app, a site as the person, whatever board it names", async () => {
+test("each principal calls as itself: an app as the app, a site as the person, whatever card it names", async () => {
 	const { callerOf } = await import("./caller.ts");
 	const { app, call, bearer, cleanup } = await open();
 	try {
@@ -315,8 +315,8 @@ test("each principal calls as itself: an app as the app, a site as the person, w
 
 		const site = bearer(app.tokens.issue({ kind: "site", label: "Studio" }).token);
 		assert.equal((await call("card.list", [], site)).status, 200);
-		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("canvases/t/cards/tall/index.html") }, principal: { kind: "site", label: "Studio" } });
-		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a board is still the person");
+		const named = await callerOf(app, { headers: { "x-decks-canvas": "t" }, principal: { kind: "site", label: "Studio" } });
+		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a canvas is still the person");
 
 		const none = await callerOf(app, { headers: { "x-decks-person": "1" } });
 		assert.ok("error" in none && none.status === 401, "a header is nobody");

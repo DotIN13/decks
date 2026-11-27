@@ -1,5 +1,5 @@
 /**
- * Resizing by the handles: an item's eight, a board's eight, and an item's corner radius. Each
+ * Resizing by the handles: an item's eight, a card's eight, and an item's corner radius. Each
  * move of the pointer is one call here (`resizeStep`, `pageResizeStep`, `radiusAt`), with the
  * box the drag started from and how far the pointer has gone; letting go is an op builder
  * (`resizeOp`, `hugAgainOp`, `radiusOp`). The pointer loop itself is the page's.
@@ -17,10 +17,10 @@ type Edges = { x1: number; y1: number; x2: number; y2: number };
 /** What the keys held say about a resize: Shift keeps the shape, ⌘ or Ctrl (`free`) turns snapping off. */
 type ResizeMods = { shift?: boolean; free?: boolean };
 
-/** What a resize snaps to: the boxes around it, and how near is near, in stage units. */
+/** What a resize snaps to: the boxes around it, and how near is near, in canvas units. */
 type SnapOptions = { targets: readonly Rect[]; threshold: number };
 
-/** Never smaller than a board can be. */
+/** Never smaller than a card can be. */
 export const PAGE_MIN = { w: 320, h: 200 };
 
 /** The edges a handle drags. */
@@ -116,11 +116,11 @@ export function resizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeM
 }
 
 /**
- * One move of a board's handle. As an item's, but the edge being dragged stops at `PAGE_MIN`
+ * One move of a card's handle. As an item's, but the edge being dragged stops at `PAGE_MIN`
  * (the other stays put) rather than flipping.
  */
 export function pageResizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeMods, options: SnapOptions): { box: Rect; guides: Guide[] } {
-	// Shift on a corner keeps the shape, and snaps after it (`snappedShape`); never for a board with no size to keep.
+	// Shift on a corner keeps the shape, and snaps after it (`snappedShape`); never for a card with no size to keep.
 	const shaping = mods.shift && handle.length === 2 && start.w > 0 && start.h > 0;
 	const moved = shaping ? snappedShape(dragged(start, handle, delta), start, handle, mods, options) : snapped(dragged(start, handle, delta), handleEdges(handle), mods, options);
 	let { x1, y1, x2, y2 } = moved.box;
@@ -136,8 +136,8 @@ export function pageResizeStep(start: Rect, handle: Handle, delta: Pt, mods: Res
 }
 
 /**
- * A board that reads top to bottom, as its resize shows it: the height the drag gives it is the floor
- * written to the file, and the board is drawn no shorter than its content (`least`), as it will be
+ * A card that reads top to bottom, as its resize shows it: the height the drag gives it is the floor
+ * written to the file, and the card is drawn no shorter than its content (`least`), as it will be
  * once that floor is written. Its top is where the drag has it, by whichever handle: a document
  * dragged shorter by its top moves down and still holds all of its words.
  */
@@ -145,7 +145,7 @@ export function shownPageResize(box: Rect, least: number | undefined): Rect {
 	return least && box.h < least ? { ...box, h: least } : box;
 }
 
-/** What a board's resize changed, on the lift: where it moved to, if a left or top edge was dragged, and its new size. */
+/** What a card's resize changed, on the lift: where it moved to, if a left or top edge was dragged, and its new size. */
 export function pageResizeEnd(start: Rect, next: Rect): { move?: Pt; size?: { w: number; h: number } } {
 	return {
 		...(next.x !== start.x || next.y !== start.y ? { move: { x: next.x, y: next.y } } : {}),

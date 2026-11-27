@@ -29,7 +29,7 @@ export interface AgentHooks {
 	setTags(tags: unknown): string[];
 	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
 	setWorkspace(workspace: unknown): string | null;
-	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; stage?: string; avatar?: string; outside?: { client: string; seen: number; waiting: number } }>;
+	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; canvas?: string; avatar?: string; outside?: { client: string; seen: number; waiting: number } }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Queue work for an agent that already exists, and return without waiting. */
@@ -84,7 +84,7 @@ export interface AgentHooks {
 	 */
 	here?(): string | undefined;
 	/** Deliver a message now: steer the running turn, start one, or queue it (`agent.send`). */
-	deliver?(target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
+	deliver?(target: string, spec: { task: string; cards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
 	/** Wait until another agent's work is done (`agent.wait`): its turn over, nothing queued. */
 	wait?(target: string, timeoutMs: number): Promise<{ name: string; state: AgentState; reply: string; waited: number; timedOut: boolean }>;
 	/** Make another canvas this agent's home (`agent.update({ canvas })`). */

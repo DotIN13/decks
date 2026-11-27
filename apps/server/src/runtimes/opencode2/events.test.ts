@@ -44,19 +44,19 @@ test("a turn with a tool call becomes the reply, the call and its result, and th
 	const t = transcript();
 	t.feed("session.step.started", { model: { id: "deepseek-v4.1-flash", providerID: "opencode-go", variant: "high" }, assistantMessageID: "msg_1" });
 	t.feed("session.reasoning.delta", { ...M1, delta: "Let me call it." });
-	t.feed("session.tool.input.started", { assistantMessageID: "msg_1", id: "call_1", name: "stage_eval" });
+	t.feed("session.tool.input.started", { assistantMessageID: "msg_1", id: "call_1", name: "canvas_eval" });
 	t.feed("session.reasoning.ended", { ...M1, text: "Let me call it." });
 	t.feed("session.tool.called", { assistantMessageID: "msg_1", id: "call_1", input: { code: "return 1+1" } });
 	t.feed("session.tool.success", { assistantMessageID: "msg_1", id: "call_1", content: [{ type: "text", text: "2" }] });
 	t.feed("session.step.ended", { tokens: { input: 3825, output: 43, reasoning: 74, cache: { read: 2688, write: 0 } }, cost: 0.00065 });
-	t.feed("session.text.delta", { ...M2, delta: "The stage tool returned 2." });
-	t.feed("session.text.ended", { ...M2, text: "The stage tool returned 2." });
+	t.feed("session.text.delta", { ...M2, delta: "The canvas tool returned 2." });
+	t.feed("session.text.ended", { ...M2, text: "The canvas tool returned 2." });
 	t.feed("session.execution.succeeded", {});
 	t.feed("session.usage.updated", { cost: 0.0012, tokens: { input: 9000, output: 90, reasoning: 74, cache: { read: 5000, write: 0 } } });
 
-	assert.equal(said(t.translator), "The stage tool returned 2.", "the closing event does not say the reply twice");
+	assert.equal(said(t.translator), "The canvas tool returned 2.", "the closing event does not say the reply twice");
 	const [call] = tools(t.translator);
-	assert.equal(call?.name, "stage_eval", "the name comes from the one event that carries it");
+	assert.equal(call?.name, "canvas_eval", "the name comes from the one event that carries it");
 	assert.deepEqual(call?.args, { code: "return 1+1" });
 	assert.equal(call?.result, "2");
 	assert.equal(call?.state, "done");
@@ -67,7 +67,7 @@ test("a turn with a tool call becomes the reply, the call and its result, and th
 
 test("a tool row counts the pictures its result carried, not how long it ran", async () => {
 	const t = transcript();
-	t.feed("session.tool.input.started", { assistantMessageID: "msg_1", id: "call_1", name: "stage_eval" });
+	t.feed("session.tool.input.started", { assistantMessageID: "msg_1", id: "call_1", name: "canvas_eval" });
 	t.feed("session.tool.called", { assistantMessageID: "msg_1", id: "call_1", input: {} });
 	await new Promise((ok) => setTimeout(ok, 30));
 	t.feed("session.tool.success", { assistantMessageID: "msg_1", id: "call_1", content: [{ type: "text", text: "ok" }] });

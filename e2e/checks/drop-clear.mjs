@@ -38,7 +38,7 @@ const canvas = await canvasFrame(page);
 }
 // The middle of the stage, and the canvas point there (the engine's camera is the canvas point at the middle).
 const point = await canvas.evaluate(() => {
-	const r = document.querySelector(".stage").getBoundingClientRect();
+	const r = document.querySelector(".canvas").getBoundingClientRect();
 	const cam = globalThis.__decksProbes.rust.camera;
 	const x = r.left + r.width / 2;
 	const y = r.top + r.height / 2;

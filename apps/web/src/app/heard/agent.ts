@@ -14,7 +14,7 @@ import type { FrameHooks, Of } from "../socket-messages.ts";
  *
  * Serialised rather than compared field by field, because the four things this is asked
  * about are small and shaped differently — an identity with two lists in it, a list of
- * board paths, a model, a reading of three numbers. Reading a store proxy through
+ * card paths, a model, a reading of three numbers. Reading a store proxy through
  * `JSON.stringify` walks it, which is the point: it is the *contents* that decide whether
  * anything downstream needs to run again.
  */
@@ -61,7 +61,7 @@ function heardAgentList(message: Extract<Of<"agent">, { type: "agent.list" }>, h
 	 * And the rest of each row, into the places the app reads them from.
 	 *
 	 * These arrived as seven messages per chat until the row carried them: the
-	 * identity, the boards, the model, the account, the reading. The unpacking
+	 * identity, the cards, the model, the account, the reading. The unpacking
 	 * is here rather than at each reader because everything above this line
 	 * already keys by agent id, and a row is a fact about one agent however it
 	 * travelled. The state handler is the same one a live `agent.state` uses, so
@@ -70,14 +70,14 @@ function heardAgentList(message: Extract<Of<"agent">, { type: "agent.list" }>, h
 	 * **Only what changed is written.** The list is published for a dozen
 	 * reasons that have nothing to do with these fields — a prompt sent, a turn
 	 * finished, a chat focused — and a write of an equal value is still a write:
-	 * it would invalidate every agent's boards on every prompt, and everything
+	 * it would invalidate every agent's cards on every prompt, and everything
 	 * derived from them. A separate message only ever
 	 * arrived when something had actually moved, and this has to mean the same.
 	 */
 	for (const chat of message.chats) {
 		ensureAgent(chat.id);
 		if (chat.identity && changed(state.identities[chat.id], chat.identity)) setState("identities", chat.id, chat.identity);
-		if (changed(state.contexts[chat.id], chat.boards)) setState("contexts", chat.id, chat.boards ?? []);
+		if (changed(state.contexts[chat.id], chat.cards)) setState("contexts", chat.id, chat.cards ?? []);
 		const held = state.agents[chat.id];
 		if (changed(held?.inPlay, chat.inPlay)) setState("agents", chat.id, "inPlay", chat.inPlay ?? []);
 		if (changed(held?.model, chat.model)) setState("agents", chat.id, "model", chat.model);
@@ -159,7 +159,7 @@ export function heardAgent(message: Of<"agent">, hooks: FrameHooks): void {
 			setState("identities", message.id, reconcile(message.identity));
 			return;
 
-		// An agent acting on a board or a drawing: the canvas no longer draws agents' cursors or marks.
+		// An agent acting on a card or a drawing: the canvas no longer draws agents' cursors or marks.
 		case "agent.act":
 			return;
 
@@ -203,7 +203,7 @@ export function heardAgent(message: Of<"agent">, hooks: FrameHooks): void {
 		}
 
 		case "agent.context":
-			setState("contexts", message.agentId, message.boards);
+			setState("contexts", message.agentId, message.cards);
 			ensureAgent(message.agentId);
 			setState("agents", message.agentId, "inPlay", message.inPlay);
 			return;

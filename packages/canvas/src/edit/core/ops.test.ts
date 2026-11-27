@@ -11,7 +11,7 @@ const counter = (prefix = "n") => {
 };
 
 /**
- * `a` and `b` on the stage, a column frame `col` holding `c1 c2 c3`, a card `card` holding the
+ * `a` and `b` on the canvas, a column frame `col` holding `c1 c2 c3`, a card `card` holding the
  * markdown text `md`, and an arrow `ar` from a point to `a`.
  */
 const items: FakeItem[] = [
@@ -25,8 +25,8 @@ const items: FakeItem[] = [
 	{ id: "md", type: "text", parent: "card", box: { x: 420, y: 220, w: 280, h: 24 }, extra: { metadata: { type: MARKDOWN } } },
 	{ id: "ar", type: "path", box: { x: 0, y: 0, w: 10, h: 20 }, extra: { metadata: { type: ARROW, from: [0, 0], to: "a" } } },
 ];
-const boards = [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }];
-const scene = fakeScene(items, boards);
+const cards = [{ path: "cards/one/index.html", x: 1000, y: 0, w: 400, h: 300 }];
+const scene = fakeScene(items, cards);
 
 test("a nudge shifts each item's own x and y: 1 px, and 10 with Shift", () => {
 	assert.deepEqual(moveOps(scene, ["a"], 1, 0), [{ op: "update", id: "a", set: { x: 11, y: 20 } }]);
@@ -45,9 +45,9 @@ test("an arrow moved with what it joins carries its point ends, and its joined e
 	assert.deepEqual(movedBy({ id: "r", type: "rectangle", x: 1.2 } as PenNode, 0.4, 0), { x: 2, y: 0 });
 });
 
-test("a drag into a frame is a move with the stage box it ends at, and the slot it goes in", () => {
+test("a drag into a frame is a move with the canvas box it ends at, and the slot it goes in", () => {
 	assert.deepEqual(moveOps(scene, ["a"], 5.4, 200, "col", 1), [{ op: "move", id: "a", parent: "col", index: 1, box: { x1: 15, y1: 220, x2: 115, y2: 270 } }]);
-	// Out onto the stage: parent null, no index.
+	// Out onto the canvas: parent null, no index.
 	assert.deepEqual(moveOps(scene, ["c1"], 0, -300, null), [{ op: "move", id: "c1", parent: null, box: { x1: 18, y1: -82, x2: 282, y2: -42 } }]);
 	// Into the frame it is in already, with no slot: the plain shift.
 	assert.deepEqual(moveOps(scene, ["c1"], 1, 0, "col"), [{ op: "update", id: "c1", set: { x: 1, y: 0 } }]);
@@ -58,7 +58,7 @@ test("a reorder in a column counts down for an item above its new slot, and a se
 	assert.deepEqual(moveOps(scene, ["c1"], 0, 104, "col", 3), [{ op: "move", id: "c1", parent: "col", index: 2, box: { x1: 18, y1: 322, x2: 282, y2: 362 } }]);
 	// c3 (index 2) to slot 0: no correction.
 	assert.deepEqual(moveOps(scene, ["c3"], 0, -104, "col", 0), [{ op: "move", id: "c3", parent: "col", index: 0, box: { x1: 18, y1: 218, x2: 282, y2: 258 } }]);
-	// Two at once into slot 1: a from the stage at 1, b after it at 2.
+	// Two at once into slot 1: a from the canvas at 1, b after it at 2.
 	assert.deepEqual(
 		moveOps(scene, ["a", "b"], 0, 0, "col", 1).map((op) => ("index" in op ? op.index : undefined)),
 		[1, 2],
@@ -71,7 +71,7 @@ test("markdown words dropped in a card are as wide as it", () => {
 		{ op: "move", id: "w", parent: "card", index: 1, box: { x1: 400, y1: 240, x2: 520, y2: 264 } },
 		{ op: "update", id: "w", set: { width: "fill_container", textGrowth: "fixed-width" } },
 	]);
-	// Out of a card onto the stage they keep the width they had.
+	// Out of a card onto the canvas they keep the width they had.
 	assert.deepEqual(moveOps(scene, ["md"], 0, 200, null), [{ op: "move", id: "md", parent: null, box: { x1: 420, y1: 420, x2: 700, y2: 444 } }]);
 });
 
@@ -107,8 +107,8 @@ test("delete is one op per item", () => {
 	assert.deepEqual(deleteOps([]), []);
 });
 
-test("boards move to their own rounded corners; a board not on the stage is left out", () => {
-	assert.deepEqual(pageMoves(boards, ["boards/one.html", "boards/gone.html"], 10.6, -1), [{ path: "boards/one.html", x: 1011, y: -1 }]);
+test("cards move to their own rounded corners; a card not on the canvas is left out", () => {
+	assert.deepEqual(pageMoves(cards, ["cards/one/index.html", "cards/gone/index.html"], 10.6, -1), [{ path: "cards/one/index.html", x: 1011, y: -1 }]);
 });
 
 test("new ids are none of the taken ones and none of each other", () => {
@@ -216,7 +216,7 @@ test("an arrow joined at both ends, carried on its own, gets no op: it cannot mo
 		...items,
 		{ id: "j", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, metadata: { type: ARROW, from: "a", to: { item: "b", side: "left" } } } },
 	];
-	const s = fakeScene(joined, boards);
+	const s = fakeScene(joined, cards);
 	assert.deepEqual(moveOps(s, ["j"], 30, 60), []);
 	assert.deepEqual(moveOps(s, ["j"], 30, 60, null), []);
 	// Carried with one item it joins while the other stays: no op of its own; it is drawn from its ends after the move.
@@ -234,7 +234,7 @@ test("an arrow whose joined items were deleted moves as a free one, from where i
 		...items,
 		{ id: "o", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, width: 90, height: 10, viewBox: [0, 0, 90, 10], geometry: "M2 5 L88 5 M80 9 L88 5 L80 1", metadata: { type: ARROW, from: "gone1", to: { item: "gone2", side: "left" } } } },
 	];
-	const s = fakeScene(orphan, boards);
+	const s = fakeScene(orphan, cards);
 	assert.deepEqual(moveOps(s, ["o"], 30, 60), [{ op: "update", id: "o", set: { x: 140, y: 100, metadata: { type: ARROW, from: [142, 105], to: [228, 105] } } }]);
 });
 
@@ -243,7 +243,7 @@ test("deleting what an arrow joins lets that end go where it is drawn, so the ar
 		...items,
 		{ id: "j", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, width: 90, height: 10, viewBox: [0, 0, 90, 10], geometry: "M2 5 L88 5 M80 9 L88 5 L80 1", metadata: { type: ARROW, from: "a", to: "b" } } },
 	];
-	const s = fakeScene(joined, boards);
+	const s = fakeScene(joined, cards);
 	assert.deepEqual(deleteOps(["a"], s), [
 		// `ar` has no line drawn yet, so it has no point to be let go at: it is left as it is.
 		{ op: "update", id: "j", set: { metadata: { type: ARROW, from: [112, 45], to: "b" } } },

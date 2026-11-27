@@ -9,17 +9,17 @@ const agents = [
 	{ id: "u1", name: "under_score9" },
 ];
 
-const stage: BarContext = { agents, focused: { id: "s1", name: "Sable" } };
+const canvas: BarContext = { agents, focused: { id: "s1", name: "Sable" } };
 const nobody: BarContext = { agents };
 
 test("a note target wins over everything, even a mention", () => {
-	const context: BarContext = { ...stage, note: { board: "boards/risk-model.html", component: "c3" } };
-	assert.deepEqual(destination("@Ada look", context), { kind: "note", board: "boards/risk-model.html", component: "c3" });
+	const context: BarContext = { ...canvas, note: { card: "cards/risk-model/index.html", component: "c3" } };
+	assert.deepEqual(destination("@Ada look", context), { kind: "note", card: "cards/risk-model/index.html", component: "c3" });
 });
 
 test("a mention picks the agent by name, case-insensitively, and marks it named", () => {
 	assert.deepEqual(destination("@sable fix the test", nobody), { kind: "prompt", id: "s1", name: "Sable", named: true });
-	assert.deepEqual(destination("please @ADA", stage), { kind: "prompt", id: "a1", name: "Ada", named: true });
+	assert.deepEqual(destination("please @ADA", canvas), { kind: "prompt", id: "a1", name: "Ada", named: true });
 	assert.deepEqual(destination("ask @under_score9.", nobody), {
 		kind: "prompt",
 		id: "u1",
@@ -48,8 +48,8 @@ test("an @ inside a word, as in an email address, is not a mention", () => {
 });
 
 test("without a mention, the line goes to the focused agent, unnamed", () => {
-	assert.deepEqual(destination("build the board", stage), { kind: "prompt", id: "s1", name: "Sable", named: false });
-	assert.deepEqual(destination("@unknown hi", stage), { kind: "prompt", id: "s1", name: "Sable", named: false });
+	assert.deepEqual(destination("build the card", canvas), { kind: "prompt", id: "s1", name: "Sable", named: false });
+	assert.deepEqual(destination("@unknown hi", canvas), { kind: "prompt", id: "s1", name: "Sable", named: false });
 });
 
 test("with no focused agent there is nowhere to go, unless the line names one", () => {
@@ -58,8 +58,8 @@ test("with no focused agent there is nowhere to go, unless the line names one", 
 });
 
 test("labels", () => {
-	assert.equal(destinationLabel({ kind: "note", board: "boards/risk-model.html", component: "c1" }), "note on risk-model");
-	assert.equal(destinationLabel({ kind: "note", board: "risk-model", component: "c1" }), "note on risk-model");
+	assert.equal(destinationLabel({ kind: "note", card: "canvases/plan/cards/risk-model/index.html", component: "c1" }), "note on risk-model");
+	assert.equal(destinationLabel({ kind: "note", card: "risk-model", component: "c1" }), "note on risk-model");
 	assert.equal(destinationLabel({ kind: "prompt", id: "s1", name: "Sable", named: true }), "to Sable");
 	assert.equal(destinationLabel({ kind: "nowhere" }), "no agent");
 });

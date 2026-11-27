@@ -35,7 +35,7 @@ import { createPlacement } from "./properties/placement.ts";
 import type { PropertiesProps } from "./properties/props.ts";
 
 /**
- * The properties panel: everything about what is selected in the drawing, in the board inspector's
+ * The properties panel: everything about what is selected in the drawing, in the card inspector's
  * corner (top right).
  *
  * It shows only what the selection has: a shape its kind, fill, line and words; an arrow its route,

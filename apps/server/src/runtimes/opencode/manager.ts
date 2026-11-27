@@ -107,7 +107,7 @@ export class OpencodeManager extends SharedServer<OpencodeServerSpec> {
 			OPENCODE_CONFIG_DIR: opencodeConfigDir(),
 			// …and what the Google Docs tools call back with. One token for the whole server,
 			// and the session id does the rest of the naming.
-			DECKS_STAGE_URL: spec.decksUrl,
+			DECKS_CANVAS_URL: spec.decksUrl,
 			DECKS_OPENCODE_SECRET: token,
 			// The `decks` command and where Decks is, for every session's shell; the plugin in
 			// `runtime/opencode/plugin/` trades the session for its agent's token (`runtimes/decks-env.ts`).

@@ -139,7 +139,7 @@ export function preload(ids: Iterable<string>): void {
  * Every failure is swallowed on purpose — including the autoplay rejection, which is what
  * happens when a turn finishes before the user has touched the page at all. A notification
  * sound is the least important thing here, and there is no version of "the speakers are busy"
- * that somebody working on a board needs in a toast.
+ * that somebody working on a card needs in a toast.
  */
 export function play(id: string | undefined, volume = 0.65): void {
 	if (!id || id === SILENT || volume <= 0) return;

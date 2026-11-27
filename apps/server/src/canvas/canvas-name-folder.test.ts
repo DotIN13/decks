@@ -15,7 +15,7 @@ import { renameCanvas } from "../calls/person-canvas.ts";
 test("a new agent's canvas is not named after it, and the first name chosen names the folder", () => {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-canvas-name-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	try {
 		const one = app.agents.create({ name: "Wren", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });

@@ -31,7 +31,7 @@ import { AppsTab } from "./AppsTab.tsx";
  * The left panel: one surface, **one list**, and a button that makes it go away.
  *
  * It replaces three things. The floating context rail, the floating agents panel and the
- * full-screen `AllBoards` modal all answered "what is on this canvas, and what else is
+ * full-screen `AllCards` modal all answered "what is on this canvas, and what else is
  * there" — and the first two could not be open at once because the panel module closed one
  * when the other opened. That is a tab strip with the strip left out: the relationship was
  * enforced in code and invisible on screen, which is why the third surface had nowhere to
@@ -39,7 +39,7 @@ import { AppsTab } from "./AppsTab.tsx";
  *
  * For a while the answer was a real tab strip: **Context** and **Deck**. That was one
  * surface too few and one list too many — everything in Context was also in Deck, so the two
- * tabs were the same list with a line drawn through it, and finding a board began with
+ * tabs were the same list with a line drawn through it, and finding a card began with
  * guessing which side of the line the app had put it on *this second*.
  *
  * The panel has four tabs now, each a component of its own: Recent (`RecentTab.tsx`), Objects, an
@@ -48,7 +48,7 @@ import { AppsTab } from "./AppsTab.tsx";
  * and its row budget, the width and `⌘\`.
  *
  * The first two sections are the **focused agent's**, all of them and nothing else — no
- * other agent's holdings appear anywhere, and a board somebody else is holding is simply in
+ * other agent's holdings appear anywhere, and a card somebody else is holding is simply in
  * the deck like any other. So nothing on this screen has to ask whose a row is.
  *
  * ### Folded means gone
@@ -72,7 +72,7 @@ import { AppsTab } from "./AppsTab.tsx";
  *
  * ### Presentational
  *
- * No socket, no app state: boards in, `onPickItem` out. The panel is a picture of what it is
+ * No socket, no app state: cards in, `onPickItem` out. The panel is a picture of what it is
  * given, and a rule worth testing without a DOM lives in a module beside it (`agent-sections.ts`).
  */
 
@@ -84,21 +84,21 @@ import { AppsTab } from "./AppsTab.tsx";
  */
 export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 
-/** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
+/** The strip's order: who is working, what is on the canvas, and the deck's apps. It opens on Agents. */
 const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, () => string> = { recent: () => m.panel_tab_recent(), canvas: () => m.panel_tab_canvas(), agents: () => m.panel_tab_agents(), apps: () => m.panel_tab_apps() };
 const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
-/** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
+/** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and card. */
 export type { PanelApp } from "./AppRow.tsx";
 import type { AppAction, PanelApp } from "./AppRow.tsx";
 
 export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
 	ask?: { tab: PanelTab; at: number };
-	/** Every board there is. The list is all of them, in three sections. */
-	boards: Page[];
-	/** The `.pen` files in `boards/` and `frames/`, listed after the boards; a press places one on the stage. */
+	/** Every card there is. The list is all of them, in three sections. */
+	cards: Page[];
+	/** The `.pen` files in `cards/` and `frames/`, listed after the cards; a press places one on the canvas. */
 	pens?: DeckPen[];
 	onPlacePen?: (pen: DeckPen) => void;
 	/**
@@ -107,11 +107,11 @@ export function LeftPanel(props: {
 	 * time. Left out, the whole list is drawn.
 	 */
 	listMayGrow?: boolean;
-	/** The board the canvas is centred on. */
+	/** The card the canvas is centred on. */
 	current?: string;
 	/** The focused agent's in-play set: what is actually on the canvas. */
 	inPlay?: string[];
-	/** Boards the focused agent holds and has taken off its stage: the Boards tab's "Held, not shown". */
+	/** Cards the focused agent holds and has taken off its canvas: the Cards tab's "Held, not shown". */
 	kept?: string[];
 	/** The agent you are talking to, for the Agents tab. */
 	focused?: string;
@@ -119,7 +119,7 @@ export function LeftPanel(props: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	/**
-	 * A stamp that means "find a board now": take the cursor into the search field.
+	 * A stamp that means "find a card now": take the cursor into the search field.
 	 *
 	 * `⌘K` is the caller. A stamp rather than a boolean because pressing it twice in a row
 	 * is two requests, and a flag would make the second one look like a state the panel was
@@ -133,9 +133,9 @@ export function LeftPanel(props: {
 	 *
 	 * A tab strip is back, and it is not the one that was removed. **Context** and **Deck**
 	 * were one collection with a line drawn through it — everything in Context was also in
-	 * Deck, so finding a board began by guessing which side the app had put it on this
-	 * second. Boards and agents overlap in *nothing*: no agent is in the boards list and no
-	 * board is in the agents list, so the invariant that mattered — every item appears
+	 * Deck, so finding a card began by guessing which side the app had put it on this
+	 * second. Cards and agents overlap in *nothing*: no agent is in the cards list and no
+	 * card is in the agents list, so the invariant that mattered — every item appears
 	 * exactly once — stays true trivially rather than by argument.
 	 */
 	chats?: AgentChat[];
@@ -313,7 +313,7 @@ export function LeftPanel(props: {
 	});
 
 	/* `⌘K` used to open a tab as well as take the cursor. There is one list now, so finding
-	   a board is typing at it — and the query it lands on is whatever was already there. */
+	   a card is typing at it — and the query it lands on is whatever was already there. */
 	createEffect(() => {
 		if (!props.findAt) return;
 		// Next frame, or there is nothing to focus yet on a panel that was closed.
@@ -368,7 +368,7 @@ export function LeftPanel(props: {
 	 * How many rows are drawn, across the sections in order.
 	 *
 	 * A row is about a millisecond — a title, a picture from the cache, an icon — and a deck has
-	 * hundreds of things in it, boards and now conversations alike. Drawing every row the moment
+	 * hundreds of things in it, cards and now conversations alike. Drawing every row the moment
 	 * the deck arrived was 425 ms of the app's first second, all of it before the chat it opened
 	 * on could be drawn. So the first screenful is drawn at once and the rest as the reader
 	 * reaches for it — a chunk per approach to the bottom of the list.
@@ -392,7 +392,7 @@ export function LeftPanel(props: {
 	 * Whether the list has rows at all: while the panel is open, and for its slide out after.
 	 *
 	 * A closed panel is still in the document, slid off the edge and transparent (`panel.css`), and
-	 * every row in it held the server's picture of its board: 720 by 540 pixels decoded, 1.5MB, for a
+	 * every row in it held the server's picture of its card: 720 by 540 pixels decoded, 1.5MB, for a
 	 * box of 20 by 14. Measured on an iPhone, the closed panel was painting 214 of them while the canvas
 	 * was panned — about 330MB of pictures nobody could see, the largest thing in a tab that iOS kept
 	 * killing. So a closed panel lets its rows go, and their pictures with them; they come back the
@@ -407,7 +407,7 @@ export function LeftPanel(props: {
 		const timer = setTimeout(() => setListed(false), 260);
 		onCleanup(() => clearTimeout(timer));
 	});
-	/** The sections of the list that is showing — boards, or agents. */
+	/** The sections of the list that is showing — cards, or agents. */
 	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentLists.sections : tab() === "recent" ? [{ rows: agentLists.recent }] : []);
 	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
@@ -637,7 +637,7 @@ export function LeftPanel(props: {
 					 *
 					 * The two lists share every class they can (`panel-list`, `panel-section`, `panel-meta`)
 					 * because they are one surface with two contents. They do not share what their rows repeat
-					 * down the right edge: a dot in the boards list, a timestamp in the agents one — and the
+					 * down the right edge: a dot in the cards list, a timestamp in the agents one — and the
 					 * count in the heading has to end on *that* line, so the two inset it differently. Same
 					 * argument as `data-kind` on a section: name the thing rather than infer it from content.
 					 */

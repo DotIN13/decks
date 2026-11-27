@@ -17,7 +17,7 @@ type FloatRow =
 	| { kind: "notice"; id: string; turnId: string; text: string; level: "info" | "warn" | "error" };
 
 /**
- * The transcript, condensed for floating over the boards.
+ * The transcript, condensed for floating over the cards.
  *
  * User and assistant items become bubbles; a run of consecutive tool items
  * collapses into one slim row, because a turn that edits files is mostly tool

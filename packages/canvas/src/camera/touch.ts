@@ -1,7 +1,7 @@
 /**
  * What a set of fingers on the canvas means, and nothing about where they are.
  *
- * The camera's touch gestures have two sources — the stage's own finger pool (`stage/input.ts`)
+ * The camera's touch gestures have two sources — the canvas's own finger pool (`view/input.ts`)
  * and the controller's (`camera/controller.ts`) — and the mistake to avoid is writing
  * them twice. What both places need is the same reduction: fingers arrive and leave,
  * one of them moves, and the answer is either "pan by this much" or "here is one step
@@ -11,7 +11,7 @@
  *
  * **Positions are screen pixels, whoever is asking.** A source with pixels of its own
  * converts before it reports — and it must,
- * because a finger that does not move is over a *different* part of the board once the
+ * because a finger that does not move is over a *different* part of the card once the
  * camera pans under it. Screen space is the one frame of reference in which a still
  * finger is still, which is what stops a two-finger gesture feeding itself.
  *
@@ -24,18 +24,18 @@
  * ### A finger that never lifted
  *
  * The pool is fed from several documents at once, and none of them can promise to
- * report the end of a gesture. A board's iframe is navigated the instant anybody writes
- * that board — its document dies mid-drag and the `pointerup` is delivered to nothing.
+ * report the end of a gesture. A card's iframe is navigated the instant anybody writes
+ * that card — its document dies mid-drag and the `pointerup` is delivered to nothing.
  * A tab that goes to the background loses its touches. A sandboxed embed reports its
  * fingers by `postMessage` and can be reloaded between two of them.
  *
  * Every one of those leaves a finger in the pool that is not on the glass, and one is
  * enough to break the canvas until the page is reloaded: the next single finger makes a
- * pair, so **every touch is read as a pinch**, the stage thinks a gesture is in progress
- * and keeps the grabbing cursor, and a board can no longer be dragged because the drag
+ * pair, so **every touch is read as a pinch**, the canvas thinks a gesture is in progress
+ * and keeps the grabbing cursor, and a card can no longer be dragged because the drag
  * gives way to what it takes for a second finger.
  *
- * So the sources release what they hold (`stage/input.ts` on teardown, `CanvasView` when
+ * So the sources release what they hold (`view/input.ts` on teardown, `CanvasView` when
  * the window loses focus), and this file is the net under them, because a source that
  * has died cannot release anything:
  *

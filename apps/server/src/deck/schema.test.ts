@@ -6,7 +6,7 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	const source = `{
   "version": 1,
   "name": "Example",
-  "sizes": { "boards/a.html": { "w": 640, "h": 480 } },
+  "sizes": { "pages/a.html": { "w": 640, "h": 480 } },
   "roots": ["../shared"],
   "somethingNewer": { "keep": true }
 }`;
@@ -30,19 +30,19 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	assert.equal(written.includes('"sizes"'), false);
 });
 
-test("a legacy boards map gives up its places as a seed, and none of its sizes", () => {
-	const { file, arrangement, warnings } = parseDeckFile('{"boards":{"a.html":{"x":10,"y":20,"w":500}}}');
+test("a legacy places map gives up its places as a seed, and none of its sizes", () => {
+	const { file, arrangement, warnings } = parseDeckFile('{"places":{"a.html":{"x":10,"y":20,"w":500}}}');
 	// The place belongs to a canvas now, so it is not written back — but it is kept as the arrangement a
 	// canvas starts from. The size is not kept anywhere: it belonged to the card, and the card's file
 	// is where one lives.
 	assert.deepEqual(arrangement, { "a.html": { x: 10, y: 20 } });
-	assert.equal("boards" in file, false, "the old key is consumed, so a write does not carry it on");
+	assert.equal("places" in file, false, "the old key is consumed, so a write does not carry it on");
 	assert.equal("sizes" in file, false);
 	assert.deepEqual(warnings, []);
 });
 
 test("a position that is not a pair of numbers is dropped, not fatal", () => {
-	const { arrangement, warnings } = parseDeckFile('{"boards":{"a.html":{"x":"left","y":0},"b.html":{"x":1,"y":2}}}');
+	const { arrangement, warnings } = parseDeckFile('{"places":{"a.html":{"x":"left","y":0},"b.html":{"x":1,"y":2}}}');
 	assert.deepEqual(arrangement, { "b.html": { x: 1, y: 2 } });
 	assert.equal(warnings.length, 1);
 	assert.match(warnings[0]!, /a\.html/);
@@ -55,10 +55,10 @@ test("a broken deck file opens the deck anyway, with a warning", () => {
 	assert.match(warnings[0]!, /not valid JSON/);
 });
 
-test("a deck file with no board state writes neither key", () => {
+test("a deck file with no card state writes neither key", () => {
 	const written = serializeDeckFile({ version: 1, name: "T" });
 	assert.equal(written.includes("sizes"), false);
-	assert.equal(written.includes("boards"), false);
+	assert.equal(written.includes("pages"), false);
 });
 
 test("a newer version is a warning, not a refusal", () => {
@@ -74,7 +74,7 @@ test("roots take both spellings", () => {
 	]);
 });
 
-test("one board has one key", () => {
-	assert.equal(normalizeCardPath("./boards\\a.html"), "boards/a.html");
-	assert.equal(normalizeCardPath("boards/a.html"), "boards/a.html");
+test("one card has one key", () => {
+	assert.equal(normalizeCardPath("./pages\\a.html"), "pages/a.html");
+	assert.equal(normalizeCardPath("pages/a.html"), "pages/a.html");
 });

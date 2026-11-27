@@ -6,7 +6,7 @@ import { blockAt, childrenOf, marqueePick, marqueeRect, parentOf, pickAt, pictur
 const mark = (type: string) => ({ metadata: { type } });
 
 /** A group of a frame holding a rectangle, a shape, a file chip, a card of markdown and a picture, and a loose line. */
-const stage = (): FakeItem[] => [
+const canvas = (): FakeItem[] => [
 	{ id: "g", type: "group", box: { x: 0, y: 0, w: 400, h: 400 } },
 	{ id: "f", type: "frame", parent: "g", box: { x: 0, y: 0, w: 200, h: 200 } },
 	{ id: "r", parent: "f", box: { x: 10, y: 10, w: 50, h: 50 } },
@@ -24,11 +24,11 @@ const stage = (): FakeItem[] => [
 	{ id: "line", type: "path", box: { x: 400, y: 800, w: 200, h: 2 }, line: false },
 	{ id: "line2", type: "path", box: { x: 400, y: 900, w: 200, h: 2 }, line: true },
 	{ id: "ref/inside", box: { x: 1100, y: 0, w: 50, h: 50 } },
-	{ id: "board", type: "browser", box: { x: 1200, y: 0, w: 50, h: 50 }, extra: mark("decks.card") },
+	{ id: "card-item", type: "browser", box: { x: 1200, y: 0, w: 50, h: 50 }, extra: mark("decks.card") },
 ];
 
 test("a press picks exactly what is under it: the item in a frame in a group, the frame's padding, the group's gap", () => {
-	const scene = fakeScene(stage());
+	const scene = fakeScene(canvas());
 	assert.equal(pickAt(scene, { x: 20, y: 20 })?.id, "r");
 	assert.equal(pickAt(scene, { x: 20, y: 20 }, { policy: "exact" })?.id, "r");
 	assert.equal(pickAt(scene, { x: 20, y: 20 }, { deep: true })?.id, "r");
@@ -42,7 +42,7 @@ test("a press picks exactly what is under it: the item in a frame in a group, th
 });
 
 test("\"outermost\" climbs to the outermost group, and a group's gap is nothing", () => {
-	const scene = fakeScene(stage());
+	const scene = fakeScene(canvas());
 	assert.equal(pickAt(scene, { x: 20, y: 20 }, { policy: "outermost" })?.id, "g");
 	assert.equal(pickAt(scene, { x: 150, y: 150 }, { policy: "outermost" })?.id, "g");
 	assert.equal(pickAt(scene, { x: 20, y: 20 }, { policy: "outermost", deep: true })?.id, "r");
@@ -71,7 +71,7 @@ test("a group's gap is the group only where it is drawn over what is under it", 
 });
 
 test("a shape, a file and a live file are picked whole", () => {
-	const scene = fakeScene(stage());
+	const scene = fakeScene(canvas());
 	assert.equal(pickAt(scene, { x: 550, y: 50 })?.id, "sh");
 	assert.equal(pickAt(scene, { x: 550, y: 50 }, { deep: true })?.id, "sh-words");
 	assert.equal(pickAt(scene, { x: 750, y: 16 })?.id, "file");
@@ -80,7 +80,7 @@ test("a shape, a file and a live file are picked whole", () => {
 });
 
 test("a card is climbed to from its markdown, not from a picture in it", () => {
-	const scene = fakeScene(stage());
+	const scene = fakeScene(canvas());
 	assert.equal(pickAt(scene, { x: 50, y: 570 })?.id, "card");
 	assert.equal(pickAt(scene, { x: 50, y: 570 }, { deep: true })?.id, "p1");
 	assert.equal(pickAt(scene, { x: 50, y: 650 })?.id, "pic");
@@ -88,7 +88,7 @@ test("a card is climbed to from its markdown, not from a picture in it", () => {
 });
 
 test("a line is hit on its stroke only; anything else only inside its box, not in the reach", () => {
-	const scene = fakeScene(stage());
+	const scene = fakeScene(canvas());
 	assert.equal(pickAt(scene, { x: 500, y: 801 }), undefined);
 	assert.equal(pickAt(scene, { x: 500, y: 903 })?.id, "line2");
 	// 2 px off the rectangle: in the engine's reach, outside what it draws, so the frame under it.
@@ -96,8 +96,8 @@ test("a line is hit on its stroke only; anything else only inside its box, not i
 	assert.equal(pickAt(scene, { x: 1300, y: 1300 }), undefined);
 });
 
-test("never an instance's inside or a board; skip looks through an item; the box is a copy", () => {
-	const scene = fakeScene(stage());
+test("never an instance's inside or a card; skip looks through an item; the box is a copy", () => {
+	const scene = fakeScene(canvas());
 	assert.equal(pickAt(scene, { x: 1120, y: 20 }), undefined);
 	assert.equal(pickAt(scene, { x: 1220, y: 20 }), undefined);
 	assert.equal(pickAt(scene, { x: 20, y: 20 }, { deep: true, skip: (node) => node.id === "r" })?.id, "f");
@@ -112,7 +112,7 @@ test("the item as drawn is what is hit, not where it is placed", () => {
 });
 
 test("a card's block: the one under the point, or the one level with it in the margin", () => {
-	const scene = fakeScene(stage());
+	const scene = fakeScene(canvas());
 	assert.equal(blockAt(scene, { x: 50, y: 570 }), "p1");
 	// The card's margin, level with the heading, and 4 px above it.
 	assert.equal(blockAt(scene, { x: 4, y: 530 }), "h1");
@@ -125,36 +125,36 @@ test("a card's block: the one under the point, or the one level with it in the m
 	assert.equal(blockAt(scene, { x: 50, y: 570 }, "card"), undefined);
 });
 
-test("a board's picture: the last in file order, never one drawn as a page", () => {
-	const boards = [
+test("a card's picture: the last in file order, never one drawn as a page", () => {
+	const cards = [
 		{ path: "a", x: 0, y: 0, w: 100, h: 100 },
 		{ path: "b", x: 50, y: 50, w: 100, h: 100 },
 	];
-	assert.equal(pictureAt(boards, { x: 75, y: 75 }, new Set()), "b");
-	assert.equal(pictureAt(boards, { x: 75, y: 75 }, new Set(["b"])), "a");
-	assert.equal(pictureAt(boards, { x: 100, y: 100 }, new Set(["a", "b"])), undefined);
-	assert.equal(pictureAt(boards, { x: 150, y: 150 }, new Set()), "b");
-	assert.equal(pictureAt(boards, { x: 151, y: 150 }, new Set()), undefined);
+	assert.equal(pictureAt(cards, { x: 75, y: 75 }, new Set()), "b");
+	assert.equal(pictureAt(cards, { x: 75, y: 75 }, new Set(["b"])), "a");
+	assert.equal(pictureAt(cards, { x: 100, y: 100 }, new Set(["a", "b"])), undefined);
+	assert.equal(pictureAt(cards, { x: 150, y: 150 }, new Set()), "b");
+	assert.equal(pictureAt(cards, { x: 151, y: 150 }, new Set()), undefined);
 });
 
 test("a marquee picks what is wholly inside it, leaving children of a picked parent to it", () => {
-	const scene = fakeScene(stage(), [{ path: "canvases/t/cards/x/index.html", x: 0, y: 1000, w: 100, h: 100 }]);
+	const scene = fakeScene(canvas(), [{ path: "canvases/t/cards/x/index.html", x: 0, y: 1000, w: 100, h: 100 }]);
 	assert.deepEqual(marqueeRect({ x1: 100, y1: 50, x2: 10, y2: 80 }), { x: 10, y: 50, w: 90, h: 30 });
 	// Just the rectangle: its frame and group are not wholly inside.
-	assert.deepEqual(marqueePick(scene, { x: 5, y: 5, w: 60, h: 60 }), { items: ["r"], boards: [] });
+	assert.deepEqual(marqueePick(scene, { x: 5, y: 5, w: 60, h: 60 }), { items: ["r"], cards: [] });
 	// Edges count as inside.
 	assert.deepEqual(marqueePick(scene, { x: 10, y: 10, w: 50, h: 50 }).items, ["r"]);
 	// The whole group: only the group, its frame and rectangle go with it.
 	assert.deepEqual(marqueePick(scene, { x: -1, y: -1, w: 402, h: 402 }).items, ["g"]);
 	// A shape's parts are never picked by themselves, even with the shape outside.
 	assert.deepEqual(marqueePick(scene, { x: 510, y: 30, w: 80, h: 40 }).items, []);
-	// A card takes its blocks; an instance's inside and a board's node are left out; boards wholly inside are picked.
-	assert.deepEqual(marqueePick(scene, { x: -10, y: 490, w: 2000, h: 700 }), { items: ["card", "line", "line2"], boards: ["canvases/t/cards/x/index.html"] });
+	// A card takes its blocks; an instance's inside and a card's node are left out; cards wholly inside are picked.
+	assert.deepEqual(marqueePick(scene, { x: -10, y: 490, w: 2000, h: 700 }), { items: ["card", "line", "line2"], cards: ["canvases/t/cards/x/index.html"] });
 	assert.deepEqual(marqueePick(scene, { x: 1090, y: -10, w: 200, h: 100 }).items, []);
 });
 
 test("what an item sits in and what it holds, as the keys climb them", () => {
-	const scene = fakeScene(stage());
+	const scene = fakeScene(canvas());
 	assert.equal(parentOf(scene, "r"), "f");
 	assert.equal(parentOf(scene, "f"), "g");
 	assert.equal(parentOf(scene, "g"), undefined);

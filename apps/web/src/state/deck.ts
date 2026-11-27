@@ -12,13 +12,13 @@ import { emptyAgent, type AgentRecord } from "./agent.ts";
  *
  * **One store, not three.** Splitting it by reader was considered and measured against:
  * the fields do not cluster. `focused` is read by eight of the file's ten regions and
- * `boards` by seven, and almost every other field is read by the socket switch *and* the
+ * `cards` by seven, and almost every other field is read by the socket switch *and* the
  * render body and nowhere else. Three stores would be three imports in the same two places.
  *
  * ### What is here and what is not
  *
  * The four derived below are plain functions, so they need no owner and live here beside
- * what they read. The memos — `focusedChat`, `transcript`, `busy`, `stagePages` — stay in
+ * what they read. The memos — `focusedChat`, `transcript`, `busy`, `canvasPages` — stay in
  * `App.tsx`: a memo is a computation and
  * needs a reactive owner, which module scope does not have. They read this store by import
  * instead of by closure, which is the only thing that changed for them.
@@ -68,10 +68,10 @@ function createDeck() {
 		 * cleared seven of the eleven maps by hand and missed the rest.
 		 */
 		agents: Record<string, AgentRecord | undefined>;
-		/** The user's shared Chrome, from `web.status`; the status board draws it (`live-web.js`). */
+		/** The user's shared Chrome, from `web.status`; the status card draws it (`live-web.js`). */
 		web?: { status: WebStatus; code?: string };
 		/**
-		 * Boards each agent is holding, from `context.changed`.
+		 * Cards each agent is holding, from `context.changed`.
 		 *
 		 * Still a map, unlike the nine that moved, keyed by agent.
 		 */

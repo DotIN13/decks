@@ -8,14 +8,14 @@ export interface Box {
 	h: number;
 }
 
-/** A top-level item of a drawing as placed: its box, and, for a card, document, app or board, what it names. */
+/** A top-level item of a drawing as placed: its box, and, for a card, document, app or card, what it names. */
 interface PlacedItem {
 	id: string;
 	box: Box;
 	name?: string;
 	/** Its tag (`decks.card`, `decks.document`, `decks.app`), when it has one. */
 	type?: string;
-	/** The file a card or board names. */
+	/** The file a card names. */
 	path?: string;
 }
 
@@ -78,7 +78,7 @@ export const topBoxes = (doc: PenDocument, look: "light" | "dark" = "light"): Bo
 const isPageNode = (node: { metadata?: { path?: unknown; type?: unknown } }) => typeof node.metadata?.path === "string" && node.metadata.type === "decks.card";
 
 /**
- * The cards and boards a drawing places, by the file each names. Only they are read, so the notes
+ * The cards a drawing places, by the file each names. Only they are read, so the notes
  * and frames sized by their content are not laid out for a question about where the cards are.
  */
 export const pageItems = (doc: PenDocument, look: "light" | "dark" = "light"): PlacedItem[] =>

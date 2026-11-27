@@ -5,14 +5,14 @@ import { scheme } from "../lib/theme.ts";
 import { FpsMeter, showFps } from "../perf/fps.tsx";
 import { TopBar } from "../shell/TopBar.tsx";
 import { TopRight } from "../shell/TopRight.tsx";
-import { stageOf, stages } from "../state/canvases.ts";
+import { canvasOf, canvases } from "../state/canvases.ts";
 import { state } from "../state/deck.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { openUsage, panelOpen, unread } from "../state/ui.ts";
 import { canvasMenu, type CanvasMenuTrigger } from "./canvas-menu.tsx";
 import { moreItems } from "./more-menu.ts";
 import type { Parts } from "./parts.ts";
-import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, openAgentsPanel, openCanvas, setStagesOpen, showPanel, stagesOpen, viewOnlyStage } from "./person.ts";
+import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, openAgentsPanel, openCanvas, setCanvasesOpen, showPanel, canvasesOpen, viewOnlyCanvas } from "./person.ts";
 import { openPlus, openTabsList, TabStrip } from "../tabs/TabStrip.tsx";
 import { TabActs } from "../tabs/TabActs.tsx";
 import { showOnCanvas } from "../tabs/show-on-canvas.ts";
@@ -41,9 +41,9 @@ export function Top(props: { parts: Parts }) {
 	const more = () => [...(touch() ? [{ label: m.app_open_tab(), icon: Plus, onPick: openPlus }] : []), ...moreItems()];
 	/** The agents whose canvas is the one on screen: the faces in the top-right bar. */
 	const hereAgents = createMemo(() => {
-		const stage = canvasOnScreen()?.name;
-		if (!stage) return state.chats.filter((chat) => chat.id === state.focused);
-		return state.chats.filter((chat) => stageOf(chat.id)?.name === stage);
+		const canvas = canvasOnScreen()?.name;
+		if (!canvas) return state.chats.filter((chat) => chat.id === state.focused);
+		return state.chats.filter((chat) => canvasOf(chat.id)?.name === canvas);
 	});
 	return (
 		<>
@@ -75,30 +75,30 @@ export function Top(props: { parts: Parts }) {
 				phone={phone()}
 				/* A desktop's bar is a row of tabs, the canvas among them. A touch bar has one chip, which names the tab in front and, while that is no canvas, opens the tabs. */
 				row={!touch()}
-				{...(shownTitle() ? { stage: shownTitle()! } : {})}
+				{...(shownTitle() ? { canvasChip: shownTitle()! } : {})}
 				{...(touch() && !onCanvas() && kindOf(front().kind) ? { mark: () => <Dynamic component={kindOf(front().kind)!.icon} size={16} /> } : {})}
 				canvas={{ front: onCanvas(), show: openTabsList }}
 				/* A tab is about 150 px: with more tabs than the bar, beside the side panel, has room for, the row shows the first of them and a count lists them all; a touch bar always shows the count. */
 				tabs={<TabStrip touch={touch()} room={Math.max(0, Math.floor((layout.viewWidth() - (panelOpen() ? 360 : 0) - 600) / 150))} />}
-				{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
-				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
-				{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}
+				{...(canvases().length > 0 ? { onCanvases: () => void setCanvasesOpen((was) => !was), canvasesOpen: canvasesOpen() } : {})}
+				{...(!phone() && canvases().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
+				{...(viewOnlyCanvas() ? { viewOnly: viewOnlyCanvas()!.shared!.owner, onCopy: () => copyShared(viewOnlyCanvas()!.name) } : {})}
 			/>
 
 			{/*
-				The stage manager: every stage in the deck, over the canvas.
+				The canvas manager: every canvas in the deck, over the canvas.
 
 				Here rather than inside the pill, because it covers the canvas and the pill is a
 				cluster of controls 40px tall. The pill owns the button; this owns the surface.
 			*/}
 			<CanvasManager
-				stages={stages()}
+				canvases={canvases()}
 				onRename={(name, to) => void call("canvas.rename", [to, { canvas: name }]).then(warnIfFailed)}
 				onDelete={(name) => void call("canvas.remove", [name]).then(warnIfFailed)}
 				onCopy={copyShared}
 				here={canvasOnScreen()?.name}
-				open={stagesOpen()}
-				onClose={() => void setStagesOpen(false)}
+				open={canvasesOpen()}
+				onClose={() => void setCanvasesOpen(false)}
 				onPick={openCanvas}
 				onNew={createCanvas}
 				scheme={scheme()}

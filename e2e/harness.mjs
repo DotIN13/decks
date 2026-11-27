@@ -154,7 +154,7 @@ export async function deckState(api) {
 		const node = drawings.get(canvas).find((one) => one.metadata?.path === inFolder);
 		return node && Number.isFinite(node.x) ? { ...board, x: node.x, y: node.y, w: node.width ?? board.w, h: node.height ?? board.h } : board;
 	};
-	return { ...deck, library: deck.boards, boards: deck.boards.filter((board) => !board.path.startsWith("shared/")).map(placed) };
+	return { ...deck, library: deck.cards, cards: deck.cards.filter((board) => !board.path.startsWith("shared/")).map(placed) };
 }
 
 /**
@@ -306,9 +306,9 @@ export async function canvasFrame(page, { timeout = 30000 } = {}) {
 			if (frame.isDetached() || !frame.url().includes("canvas-frame.html")) continue;
 			const owner = await frame.frameElement().catch(() => undefined);
 			if (!owner || !(await owner.evaluate((element) => element.classList.contains("canvas-frame")).catch(() => false))) continue;
-			if (await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false)) return frame;
+			if (await frame.evaluate(() => !!document.querySelector(".canvas")).catch(() => false)) return frame;
 		}
-		if (Date.now() > deadline) throw new Error("the canvas frame never showed its stage");
+		if (Date.now() > deadline) throw new Error("the canvas frame never showed its canvas");
 		await page.waitForTimeout(100);
 	}
 }
@@ -318,7 +318,7 @@ export async function focusCanvas(page) {
 	const canvas = await canvasFrame(page);
 	await canvas.evaluate(() => {
 		if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
-		document.querySelector(".stage")?.focus({ preventScroll: true });
+		document.querySelector(".canvas")?.focus({ preventScroll: true });
 	});
 	return canvas;
 }
@@ -351,8 +351,8 @@ export async function editMode(page, on = true) {
 	const canvas = await canvasFrame(page);
 	/* Select stands alone and is browsing: pressing it puts the pen and the hand down and turns highlights off. */
 	const browse = page.locator('.v3-tool[data-tool="select"]:visible').first();
-	if ((await browse.count()) && ((await browse.getAttribute("aria-pressed")) !== "true" || (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.mode)) !== "browse")) await browse.click();
-	await canvas.waitForFunction(() => (document.querySelector(".stage")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
+	if ((await browse.count()) && ((await browse.getAttribute("aria-pressed")) !== "true" || (await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.mode)) !== "browse")) await browse.click();
+	await canvas.waitForFunction(() => (document.querySelector(".canvas")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
 }
 
@@ -362,10 +362,10 @@ export async function editMode(page, on = true) {
  */
 export async function highlightMode(page) {
 	const canvas = await canvasFrame(page);
-	if ((await canvas.evaluate(() => document.querySelector(".stage")?.dataset.mode)) === "edit") return;
+	if ((await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.mode)) === "edit") return;
 	await focusCanvas(page);
 	await page.keyboard.press("e");
-	await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.mode === "edit", null, { timeout: 4000 });
+	await canvas.waitForFunction(() => document.querySelector(".canvas")?.dataset.mode === "edit", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
 }
 
@@ -386,14 +386,14 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 		// Up to the old pause, but no longer than it takes the camera to rest live: most opens are live at once.
 		await canvas
 			.waitForFunction(() => {
-				const stage = document.querySelector(".stage")?.dataset;
+				const stage = document.querySelector(".canvas")?.dataset;
 				return stage?.live === "true" && stage.gliding !== "true" && stage.moving !== "true";
 			}, null, { timeout: i === 0 ? 400 : 350, polling: 50 })
 			.catch(() => {});
-		if (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) return true;
+		if (await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.live === "true")) return true;
 		if ((await boards()) === 0) return false;
 		await canvas.evaluate(() => {
-			const stage = document.querySelector(".stage");
+			const stage = document.querySelector(".canvas");
 			const rect = stage.getBoundingClientRect();
 			/*
 			 * Toward the biggest board on screen, not the stage's centre: where the stage fills the
@@ -424,7 +424,7 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 export async function ready(page, { timeout = 30000 } = {}) {
 	const canvas = await canvasFrame(page, { timeout });
 	await canvas.waitForFunction(
-		() => document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksProbes?.sheet?.shown ?? 0) > 0,
+		() => document.querySelector(".canvas-sheet")?.hidden === false || (globalThis.__decksProbes?.sheet?.shown ?? 0) > 0,
 		null,
 		{ timeout, polling: 100 },
 	);
@@ -440,7 +440,7 @@ export async function ready(page, { timeout = 30000 } = {}) {
  */
 export async function still(page, { timeout = 5000 } = {}) {
 	const canvas = await canvasFrame(page);
-	await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.gliding !== "true", null, { timeout });
+	await canvas.waitForFunction(() => document.querySelector(".canvas")?.dataset.gliding !== "true", null, { timeout });
 }
 
 /**
@@ -454,7 +454,7 @@ export async function still(page, { timeout = 5000 } = {}) {
 export async function rest(page, { start = 300, timeout = 6000 } = {}) {
 	const canvas = await canvasFrame(page);
 	const moving = (want) => {
-		const stage = document.querySelector(".stage")?.dataset;
+		const stage = document.querySelector(".canvas")?.dataset;
 		return (stage?.gliding === "true" || stage?.moving === "true") === want;
 	};
 	// (Playwright reads a timeout of 0 as "forever", so `start: 0` skips the first step instead.)
@@ -629,7 +629,7 @@ export async function socket(api) {
 			if (fresh) screen = fresh.id;
 			else if (!focusing && !adding) screen = message.focused ?? screen;
 		} else if (message.type === "canvas.list") {
-			for (const row of message.stages ?? []) {
+			for (const row of message.canvases ?? []) {
 				if (asked.has(row.name)) continue;
 				asked.add(row.name);
 				say({ type: "canvas.watch", canvas: row.name, whole: true });
@@ -673,14 +673,14 @@ export async function socket(api) {
 				resolve(answer);
 			});
 			const agent = "agent" in on ? on.agent : screen;
-			const stage = "stage" in on ? on.stage : canvasOf(screen);
-			say({ type: "line.call", id, verb, args, ...(agent ? { agent } : {}), ...(stage ? { stage } : {}) });
+			const canvas = "canvas" in on ? on.canvas : canvasOf(screen);
+			say({ type: "line.call", id, verb, args, ...(agent ? { agent } : {}), ...(canvas ? { canvas } : {}) });
 		});
 	return {
 		received,
 		last,
 		call,
-		edit: (agent, ops) => call("canvas.edit", [ops, { agent }], { agent, stage: canvasOf(agent) }),
+		edit: (agent, ops) => call("canvas.edit", [ops, { agent }], { agent, canvas: canvasOf(agent) }),
 		canvasOf,
 		drawing: (of) => held.get(canvasOf(of) ?? of),
 		drawings: (of) => drawn.filter((one) => one.canvas === (canvasOf(of) ?? of)),
@@ -740,7 +740,7 @@ export async function resetStage(at) {
 		agent = link.last("agent.list")?.focused ?? agent;
 		if (agent) {
 			void link.call("agent.set", [agent, { canvas: CANVAS }]);
-			for (const one of FIXTURE_PLACES) void link.call("card.move", [one.path, { x: one.x, y: one.y }, { canvas: CANVAS }], { stage: CANVAS });
+			for (const one of FIXTURE_PLACES) void link.call("card.move", [one.path, { x: one.x, y: one.y }, { canvas: CANVAS }], { canvas: CANVAS });
 		}
 		// Watched rather than slept on: the answer is usually back in a few milliseconds, and is resent after 1.5s.
 		const resend = Date.now() + (agent ? 1500 : 100);
@@ -987,7 +987,7 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 		const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
 		const r = node?.getBoundingClientRect() ?? window.__decksProbes?.cards?.().find((one) => one.path === wanted)?.rect;
 		if (!r) return [];
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const out = [];
 		for (const fy of [0.08, 0.2, 0.35, 0.5, 0.65, 0.8]) {
 			for (const fx of [0.5, 0.25, 0.75, 0.1, 0.9]) {
@@ -1067,7 +1067,7 @@ export async function pressCardAction(page, label) {
 	 */
 	const pillAt = () =>
 		canvas.evaluate(() => {
-			const pill = document.querySelector(".stage-fixed > .card-callout");
+			const pill = document.querySelector(".canvas-fixed > .card-callout");
 			if (!pill || pill.hasAttribute("data-hidden")) return null;
 			const r = pill.getBoundingClientRect();
 			const x = r.x + r.width / 2;
@@ -1077,7 +1077,7 @@ export async function pressCardAction(page, label) {
 			return hit && pill.contains(hit) ? { x, y } : null;
 		});
 	// The pill hides while the camera moves and comes back a moment after it rests.
-	const shownPill = () => canvas.waitForFunction(() => { const pill = document.querySelector(".stage-fixed > .card-callout"); return !!pill && !pill.hasAttribute("data-hidden"); }, null, { timeout: 3000 }).catch(() => {});
+	const shownPill = () => canvas.waitForFunction(() => { const pill = document.querySelector(".canvas-fixed > .card-callout"); return !!pill && !pill.hasAttribute("data-hidden"); }, null, { timeout: 3000 }).catch(() => {});
 	const at = await pillAt();
 	if (!at || !(await onCanvasAt(page, at.x, at.y))) {
 		await focusCanvas(page);

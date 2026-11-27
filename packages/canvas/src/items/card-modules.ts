@@ -49,11 +49,6 @@ export async function loadCardModule(path: string, address: string, version: str
 	}
 }
 
-/** Let a card's scripts go: its card is gone from the page for good (deleted, not asleep). */
-export function forgetCardModules(path: string): void {
-	cards.delete(path);
-}
-
 /** A module of this card's version, by its address without a pass (a renewed pass is the same file, `host.ts`), run once. */
 function moduleOf(card: Loaded, key: string, address: string): Promise<Exports> {
 	let got = card.modules.get(key);

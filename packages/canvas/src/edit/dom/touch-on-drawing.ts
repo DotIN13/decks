@@ -31,7 +31,7 @@ export function createTouchOnDrawing(d: TouchOnDrawingNeeds) {
 		const since = performance.now();
 		const selected = d.editor.items();
 		/*
-		 * One finger pans, whatever it lands on, selected or not: the finger is the stage's to scroll with,
+		 * One finger pans, whatever it lands on, selected or not: the finger is the canvas's to scroll with,
 		 * and a tap selects. Held still first, it selects what it is on (`hold`), and moving from there
 		 * carries it: the finger is the editor's from the hold.
 		 */
@@ -59,7 +59,7 @@ export function createTouchOnDrawing(d: TouchOnDrawingNeeds) {
 			d.editor.pickPages([]);
 			// What it is on joins nothing: it is selected alone, unless it was part of the selection already.
 			if (!selected.includes(hit.id)) d.editor.select([hit.id]);
-			d.host.holdMenu?.({ ids: d.editor.items().slice(), at: from, stage: at });
+			d.host.holdMenu?.({ ids: d.editor.items().slice(), at: from, canvas: at });
 		}, HOLD_MS);
 		const done = () => {
 			clearTimeout(hold);

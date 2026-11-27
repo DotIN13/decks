@@ -9,7 +9,7 @@
  * change as the same value, which is what lets a memo see that nothing changed.
  *
  * The selection is this editor's. `state/pen-tools.ts` reads and writes it through
- * `feedSelection`, so the drawing bar and the properties panel see the one selection the stage has.
+ * `feedSelection`, so the drawing bar and the properties panel see the one selection the canvas has.
  */
 import { arrowEndItem, ids as penIds, isArrow, type MediaItem, type Op, type PenDocument } from "@decks/pen";
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
@@ -22,7 +22,7 @@ import type { TextSession } from "../core/text.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { createEffects, type EffectHost } from "./effects.ts";
 
-/** A board as the editor needs it from the app: where it is and its revision. */
+/** A card as the editor needs it from the app: where it is and its revision. */
 type HostPage = { path: string; x: number; y: number; w: number; h: number; rev: number; title?: string | undefined };
 
 export type EditorHost = {
@@ -31,18 +31,18 @@ export type EditorHost = {
 	mode: () => EditorState["mode"];
 	tool: () => PenTool;
 	zoom: () => number;
-	/** The window, in stage pixels. */
+	/** The window, in canvas pixels. */
 	view: () => Rect;
 	nextIds: () => NextId;
-	boards: () => readonly HostPage[];
-	/** The board selected by a plain press, which the page keeps apart from the picks: Shift and a press on another starts the picks with it. */
+	cards: () => readonly HostPage[];
+	/** The card selected by a plain press, which the page keeps apart from the picks: Shift and a press on another starts the picks with it. */
 	selectedPage?: () => string | undefined;
 	onPenEdit: (ops: Op[]) => void;
 	/** The page's side of the effects, but for the three the controller does itself. */
-	effects: Omit<EffectHost, "settle" | "wake" | "awaitFrame" | "boards"> & { toggleMedia: (id: string, media: MediaItem) => void };
+	effects: Omit<EffectHost, "settle" | "wake" | "awaitFrame" | "cards"> & { toggleMedia: (id: string, media: MediaItem) => void };
 };
 
-/** A pointer event as the editor takes it: at a stage point, with its keys, its kind and its time. */
+/** A pointer event as the editor takes it: at a canvas point, with its keys, its kind and its time. */
 export function pointerInput(event: { clientX: number; clientY: number; shiftKey: boolean; altKey: boolean; metaKey: boolean; ctrlKey: boolean; pointerType?: string }, at: Pt): PointerInput {
 	const kind = event.pointerType;
 	return {
@@ -56,7 +56,7 @@ export function pointerInput(event: { clientX: number; clientY: number; shiftKey
 
 export function createEditor(host: EditorHost) {
 	/*
-	 * The selection the last stage left (`state/pen-tools.ts`, `keptSelection`): a stage mounted
+	 * The selection the last canvas left (`state/pen-tools.ts`, `keptSelection`): a canvas mounted
 	 * again starts with what was selected, as it did when the selection was the page's own signal.
 	 */
 	const [state, setState] = createSignal<EditorState>(withSelection(initialState(untrack(host.mode), untrack(host.tool)), { items: keptSelection() }));
@@ -79,7 +79,7 @@ export function createEditor(host: EditorHost) {
 
 	const effects = createEffects({
 		...host.effects,
-		boards: host.boards,
+		cards: host.cards,
 		settle: (landing) => host.engine.settle(landing),
 		wake: (at) => {
 			const timer = setTimeout(() => {
@@ -96,7 +96,7 @@ export function createEditor(host: EditorHost) {
 		view: host.view(),
 		generation,
 		nextIds: host.nextIds,
-		pageRev: (path) => untrack(host.boards).find((board) => board.path === path)?.rev ?? 0,
+		pageRev: (path) => untrack(host.cards).find((card) => card.path === path)?.rev ?? 0,
 		linkAt: (point) => host.engine.linkAt(point),
 		overComposer: effects.overComposer,
 		selectedPage: host.selectedPage?.(),
@@ -132,46 +132,46 @@ export function createEditor(host: EditorHost) {
 		const tool = host.tool();
 		update((now) => (now.mode === mode && now.tool === tool ? now : { ...now, mode, tool }));
 	});
-	// Boards picked up that are no longer on the canvas are let go.
+	// Cards picked up that are no longer on the canvas are let go.
 	createEffect(() => {
-		const present = new Set(host.boards().map((board) => board.path));
+		const present = new Set(host.cards().map((card) => card.path));
 		update((now) => prunePages(now, present));
 	});
 
 	const part = <T>(pick: (now: EditorState) => T): Accessor<T> => createMemo(() => pick(state()));
 	const items = part((now) => now.selection.items);
-	const pagePicks = part((now) => now.selection.boards);
+	const pagePicks = part((now) => now.selection.cards);
 	const pageResize = part((now) => now.pageResize);
 	const pageDrag = part((now) => now.pageDrag);
 	const ownDrag = part((now) => now.ownDrag);
 
 	/*
-	 * A board size let go of is held until the board is at it (`landPageResize`): asked again
-	 * whenever the boards change, and once as it is let go.
+	 * A card size let go of is held until the card is at it (`landPageResize`): asked again
+	 * whenever the cards change, and once as it is let go.
 	 */
 	createEffect(() => {
 		const held = pageResize();
 		if (!held?.released) return;
-		const board = host.boards().find((candidate) => candidate.path === held.path);
-		update((now) => landPageResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev} : undefined));
+		const card = host.cards().find((candidate) => candidate.path === held.path);
+		update((now) => landPageResize(now, card ? { path: card.path, x: card.x, y: card.y, w: card.w, h: card.h, rev: card.rev} : undefined));
 	});
-	/* Boards a drag let go of are held where they were dropped until the boards are there (`landPageDrag`): asked again whenever the boards change. */
+	/* Cards a drag let go of are held where they were dropped until the cards are there (`landPageDrag`): asked again whenever the cards change. */
 	createEffect(() => {
 		if (!pageDrag()?.released) return;
-		const boards = host.boards();
-		update((now) => landPageDrag(now, boards));
+		const cards = host.cards();
+		update((now) => landPageDrag(now, cards));
 	});
-	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
+	/** The cards a drag carries and how far, for the carried layer; only cards that are pages, drawn as pictures there. */
 	createEffect(() => {
 		const drag = pageDrag();
 		const held = ownDrag();
-		const board = held ? host.boards().find((one) => one.path === held.path) : undefined;
-		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
-		// The boards' pictures are the engine's, and go with the drag there.
+		const card = held ? host.cards().find((one) => one.path === held.path) : undefined;
+		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && card ? { paths: [held.path], dx: held.x - card.x, dy: held.y - card.y } : undefined;
+		// The cards' pictures are the engine's, and go with the drag there.
 		host.engine.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });
 	});
 
-	/** Whether an arrow on the drawing ends on this board. */
+	/** Whether an arrow on the drawing ends on this card. */
 	const arrowEndsOn = (path: string) => {
 		for (const { node } of host.scene.items()) {
 			if (!isArrow(node)) continue;
@@ -183,7 +183,7 @@ export function createEditor(host: EditorHost) {
 	const ZERO: Offset = { dx: 0, dy: 0 };
 	const shown = part(shownDrag);
 	const shownResize = part((now) => now.shownResize);
-	/** A drop's glide in hand, each frame of it as the engine draws it (`stage/engine.ts`, `onGlide`). */
+	/** A drop's glide in hand, each frame of it as the engine draws it (`view/engine.ts`, `onGlide`). */
 	const [glide, setGlide] = createSignal<ReadonlyMap<string, Offset> | undefined>(undefined, { equals: false });
 
 	const select = (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { items: typeof next === "function" ? next(now.selection.items) : next }));
@@ -194,11 +194,11 @@ export function createEditor(host: EditorHost) {
 		items,
 		pagePicks,
 		hoverItem: part((now) => now.hover.item),
-		hoverPage: part((now) => now.hover.board),
+		hoverPage: part((now) => now.hover.card),
 		hoverPicture: part((now) => now.hover.picture),
 		hoverBlock: part((now) => now.hover.block),
 		overLink: part((now) => now.hover.link),
-		/** Alt is held over the stage: the distances from the selection to what is hovered. */
+		/** Alt is held over the canvas: the distances from the selection to what is hovered. */
 		altHeld: part((now) => !!now.hover.alt),
 		gesture: part((now) => now.gesture),
 		drag: part((now) => now.drag),
@@ -223,19 +223,19 @@ export function createEditor(host: EditorHost) {
 		text: part((now) => now.text),
 		typing: part((now) => now.text?.id),
 
-		/** A board is being moved or sized: title bars and news glows step aside until it lands. */
+		/** A card is being moved or sized: title bars and news glows step aside until it lands. */
 		carrying: createMemo(() => !!pageDrag() || !!pageResize() || !!ownDrag()),
-		/** The boards a gesture holds, which keep their nodes wherever the camera goes. */
+		/** The cards a gesture holds, which keep their nodes wherever the camera goes. */
 		heldPages: (): readonly string[] => {
 			const sized = pageResize()?.path;
 			return [...(pageDrag()?.paths ?? []), ...(sized === undefined ? [] : [sized])];
 		},
-		/** The board whose size is being dragged, if one is. */
+		/** The card whose size is being dragged, if one is. */
 		resizingPage: () => pageResize()?.path,
 		/**
-		 * The board size the sheet should draw, while one is dragged: a board shown as a picture
+		 * The card size the sheet should draw, while one is dragged: a card shown as a picture
 		 * (not `live`) is drawn by the sheet, and one an arrow ends on is followed by the arrow. A
-		 * live board's page is drawn over the sheet at the new box, so the sheet keeps it where it was.
+		 * live card's page is drawn over the sheet at the new box, so the sheet keeps it where it was.
 		 */
 		sheetResize: (live: (path: string) => boolean) => {
 			const held = pageResize();
@@ -263,7 +263,7 @@ export function createEditor(host: EditorHost) {
 			return !!read().gesture;
 		},
 		select,
-		pickPages: (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { boards: typeof next === "function" ? next(now.selection.boards) : next })),
+		pickPages: (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { cards: typeof next === "function" ? next(now.selection.cards) : next })),
 		/** Select what was just asked for, which the drawing does not have until the server answers. */
 		selectMade: (made: readonly string[]) => update((now) => selectMade(now, made)),
 		hover: (next: Partial<EditorState["hover"]>) =>

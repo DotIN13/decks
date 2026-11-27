@@ -123,7 +123,7 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				if (replaced(path)) rearm();
 				// On a Mac the watcher also names the folders whose contents changed (and the deck's
 				// own folder); they are not files anyone edited, and reporting one as an asset sent a
-				// change for `boards` with every card save.
+				// change for `cards` with every card save.
 				if (isFolder(path) || isRootItself(path)) return;
 				if (path === "deck.json") onChange({ kind: "deck" });
 				// Anything in a card's folder is the card's: its `chart.js` changing is the card changing.

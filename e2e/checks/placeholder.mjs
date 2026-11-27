@@ -36,7 +36,7 @@ const canvas = await canvasFrame(page);
 await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
 
 const deck = await deckState();
-const placed = deck.boards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
+const placed = deck.cards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
 const X = Math.round(Math.max(0, ...placed.map((b) => b.x + (b.w ?? 0))) + 400);
 const Y = Math.round((placed.length ? Math.min(...placed.map((b) => b.y)) : 0) + 120);
 
@@ -44,7 +44,7 @@ const link = await socket();
 const agentId = await until(() => link.last("agent.list")?.focused);
 link.edit(agentId, [{ op: "insert", node: { type: "frame", id: ID, width: W, height: H, layout: "none", placeholder: true, fill: "#ffffff" }, box: { x1: X, y1: Y, x2: X + W, y2: Y + H } }]);
 const landed = await until(() => link.drawn.some((m) => m.doc?.children?.some((n) => n.id === ID)));
-say("the placeholder frame is on the stage", !!landed);
+say("the placeholder frame is on the canvas", !!landed);
 
 /** The accent as `[r, g, b]`, as the page resolves `--color-accent` in this scheme. */
 const accent = await canvas.evaluate(() => {
@@ -57,7 +57,7 @@ const accent = await canvas.evaluate(() => {
 const camera = () =>
 	canvas.evaluate(() => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform?.() ?? "");
-		const rect = document.querySelector(".stage").getBoundingClientRect();
+		const rect = document.querySelector(".canvas").getBoundingClientRect();
 		return m ? { left: rect.left + Number(m[1]), top: rect.top + Number(m[2]), zoom: Number(m[3]), cx: Number(m[4]), cy: Number(m[5]), dpr: devicePixelRatio, rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } } : null;
 	});
 const toScreen = (cam, x, y) => ({ x: cam.left + cam.zoom * (x + cam.cx), y: cam.top + cam.zoom * (y + cam.cy) });
@@ -69,7 +69,7 @@ async function zoomToOne() {
 		if (!cam || Math.abs(cam.zoom - 1) < 0.08) break;
 		const at = toScreen(cam, X + W / 2, Y + H / 2);
 		await canvas.evaluate(([at, dy]) => {
-			document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaY: dy, ctrlKey: true, clientX: at.x, clientY: at.y, bubbles: true, cancelable: true }));
+			document.querySelector(".canvas").dispatchEvent(new WheelEvent("wheel", { deltaY: dy, ctrlKey: true, clientX: at.x, clientY: at.y, bubbles: true, cancelable: true }));
 		}, [at, cam.zoom < 1 ? -6 : 6]);
 		await settle(page, 60);
 	}
@@ -81,7 +81,7 @@ async function zoomToOne() {
 		const dy = at.y - mid.y;
 		if (Math.abs(dx) < 4 && Math.abs(dy) < 4) break;
 		await canvas.evaluate(([dx, dy, mid]) => {
-			document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: mid.x, clientY: mid.y, bubbles: true, cancelable: true }));
+			document.querySelector(".canvas").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: mid.x, clientY: mid.y, bubbles: true, cancelable: true }));
 		}, [dx, dy, mid]);
 		await settle(page, 120);
 	}
@@ -174,7 +174,7 @@ say("with a writer its name is on a tag of its colour in the corner", named.gree
 /** The server's picture of the frame, as `canvas.screenshot` takes it: natively, or in the browser with `live`. */
 async function shot(extra) {
 	const params = new URLSearchParams({ agent: agentId, scale: "1", scheme: "light", of: ID, ...extra });
-	const response = await fetch(`${API}/api/stage-shot?${params}`, { headers: await asPerson() });
+	const response = await fetch(`${API}/api/canvas-shot?${params}`, { headers: await asPerson() });
 	if (!response.ok) return { error: `${response.status} ${await response.text()}` };
 	const box = JSON.parse(response.headers.get("x-shot-box") ?? "null");
 	return { png: Buffer.from(await response.arrayBuffer()), box, how: decodeURIComponent(response.headers.get("x-shot-how") ?? "") };

@@ -26,7 +26,7 @@ export class EngineQuestions {
 
 	private nodeIndex = new BoxIndex([]);
 
-	/** The boards `cardIndex` answers for, in its order: `boards` when it is up to date with them. */
+	/** The cards `cardIndex` answers for, in its order: `cards` when it is up to date with them. */
 	indexed: readonly SceneCard[] = [];
 
 	/** Each page's item on the drawing by the page's path, made when first asked for after a change: what a glide's offset is kept under. */
@@ -52,13 +52,13 @@ export class EngineQuestions {
 
 	private penHit?: CanvasRenderingContext2D;
 
-	/** The SVG of invisible shapes that take a press on a drawn item from the board page under it. */
+	/** The SVG of invisible shapes that take a press on a drawn item from the card page under it. */
 	attachHits(svg: SVGSVGElement): void {
 		this.hits = svg;
 		this.writeHits();
 	}
 
-	/** The id of the item that is this page (a card, a board, a document, an app), by its path as the item names it or by its end. */
+	/** The id of the item that is this page (a card, a document, an app), by its path as the item names it or by its end. */
 	pageIdOf(path: string): string | undefined {
 		if (!this.pageIds) {
 			this.pageIds = new Map();
@@ -78,13 +78,13 @@ export class EngineQuestions {
 	}
 
 	/**
-	 * One invisible shape per drawn item over a board, near the window: a press on it is the drawing's,
-	 * and one beside it reaches the board. On bare canvas the stage has the press and the editor's pick (`editor/core/pick.ts`) answers.
+	 * One invisible shape per drawn item over a card, near the window: a press on it is the drawing's,
+	 * and one beside it reaches the card. On bare canvas the canvas has the press and the editor's pick (`editor/core/pick.ts`) answers.
 	 */
 	/**
-	 * Which cards have a node in the DOM, from the stage (`items-layer.tsx`, `renderedPaths`): an item
+	 * Which cards have a node in the DOM, from the canvas (`items-layer.tsx`, `renderedPaths`): an item
 	 * drawn over one of these needs a click shape to take the press from the card's page; over a
-	 * sleeping card, which is the engine's picture, a press reaches the stage itself and `pickAll` finds
+	 * sleeping card, which is the engine's picture, a press reaches the canvas itself and `pickAll` finds
 	 * the item. The shapes are written again when the set changes.
 	 */
 	setNodes(paths: ReadonlySet<string>): void {
@@ -156,7 +156,7 @@ export class EngineQuestions {
 		svg.replaceChildren(...shapes);
 	}
 
-	/** Whether a stage point is on what a path draws: its line with the press's reach, or inside its fill. */
+	/** Whether a canvas point is on what a path draws: its line with the press's reach, or inside its fill. */
 	private onPath(placed: Placed, point: { x: number; y: number }): boolean | undefined {
 		const { node } = placed;
 		if (typeof node.geometry !== "string" || !node.geometry) return undefined;
@@ -181,16 +181,16 @@ export class EngineQuestions {
 	}
 
 	/**
-	 * Every item under a stage point, topmost first, with a press's reach round each so a thin line
+	 * Every item under a canvas point, topmost first, with a press's reach round each so a thin line
 	 * can be hit: raw geometry, unfiltered. Which of them a press means is the editor's
-	 * (`canvas/editor/core/pick.ts`). Boards' own items are among them; nothing before a page.
+	 * (`canvas/editor/core/pick.ts`). Cards' own items are among them; nothing before a page.
 	 */
 	pickAll(point: { x: number; y: number }): string[] {
 		if (!this.of.page) return [];
 		return JSON.parse(this.of.page.pickAll(point.x, point.y, (2 * BAND_PX) / this.of.camera.zoom)) as string[];
 	}
 
-	/** Whether a stage point is on what a path item draws (`onPath`); `undefined` for an item not placed or with no geometry. */
+	/** Whether a canvas point is on what a path item draws (`onPath`); `undefined` for an item not placed or with no geometry. */
 	onLine(id: string, point: { x: number; y: number }): boolean | undefined {
 		const placed = this.of.placed.get(id);
 		return placed ? this.onPath(placed, point) : undefined;
@@ -208,7 +208,7 @@ export class EngineQuestions {
 	}
 
 	/**
-	 * A link chip under a stage point: the address of the topmost item there when it is one, or is in
+	 * A link chip under a canvas point: the address of the topmost item there when it is one, or is in
 	 * one (`@decks/pen`, `chipLink`). A chip under something else is not under the point.
 	 */
 	private chipAt(point: { x: number; y: number }): string | undefined {
@@ -220,7 +220,7 @@ export class EngineQuestions {
 		return undefined;
 	}
 
-	/** The link under a stage point: one in a markdown card's words, or a link chip. */
+	/** The link under a canvas point: one in a markdown card's words, or a link chip. */
 	linkAt(point: { x: number; y: number }): string | undefined {
 		const found = this.cardAt(point);
 		if (!found) return this.chipAt(point);
@@ -237,7 +237,7 @@ export class EngineQuestions {
 		return inWords ?? this.chipAt(point);
 	}
 
-	/** Scroll the wide table under a stage point sideways; true when there was one to scroll. */
+	/** Scroll the wide table under a canvas point sideways; true when there was one to scroll. */
 	scrollBy(point: { x: number; y: number }, dx: number): boolean {
 		const found = this.cardAt(point);
 		if (!found) return false;

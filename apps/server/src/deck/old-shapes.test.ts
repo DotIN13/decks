@@ -16,22 +16,22 @@ const deckWith = (files: Record<string, string>) => {
 	}
 	return deck;
 };
-const OLD_DECK_JSON = JSON.stringify({ version: 1, boards: { "boards/plan.html": { x: 40, y: 60 } } });
+const OLD_DECK_JSON = JSON.stringify({ version: 1, places: { "pages/plan.html": { x: 40, y: 60 } } });
 
 test("a deck at the latest version does not read shapes from before 0.1.0", () => {
-	const deck = deckWith({ "deck.json": OLD_DECK_JSON, "boards/plan.html": "<title>Plan</title>", ".decks/migrations.json": JSON.stringify({ version: LATEST }) });
+	const deck = deckWith({ "deck.json": OLD_DECK_JSON, "pages/plan.html": "<title>Plan</title>", ".decks/migrations.json": JSON.stringify({ version: LATEST }) });
 	runAtOpen(deck);
 	assert.equal(readsOldShapes(deck), false, "no mark: the deck is up to date");
 	const opened = Deck.open(deck);
 	assert.equal(opened.readsOldShapes, false);
 	// The places an old deck.json held are not read: nothing here is old enough to mean them.
 	assert.deepEqual(parseDeckFile(OLD_DECK_JSON, { oldPlaces: opened.readsOldShapes }).arrangement, {});
-	assert.deepEqual(parseDeckFile(OLD_DECK_JSON, { oldPlaces: true }).arrangement, { "boards/plan.html": { x: 40, y: 60 } });
+	assert.deepEqual(parseDeckFile(OLD_DECK_JSON, { oldPlaces: true }).arrangement, { "pages/plan.html": { x: 40, y: 60 } });
 	rmSync(deck, { recursive: true, force: true });
 });
 
 test("a deck opened from below 0.1.0 is marked, reads them, and stops once that run has ended cleanly", () => {
-	const deck = deckWith({ "deck.json": OLD_DECK_JSON, "boards/plan.html": "<title>Plan</title>", "stages/wren/stage.pen": JSON.stringify({ version: "2.14", children: [] }) });
+	const deck = deckWith({ "deck.json": OLD_DECK_JSON, "pages/plan.html": "<title>Plan</title>", "stages/wren/stage.pen": JSON.stringify({ version: "2.14", children: [] }) });
 	assert.equal(readsOldShapes(deck), true, "a folder no Decks with versions has opened counts as old");
 	runAtOpen(deck);
 	const record = JSON.parse(readFileSync(join(deck, ".decks/migrations.json"), "utf8"));

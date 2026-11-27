@@ -30,7 +30,7 @@ export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & {
 		case "person":
 		case "site": {
 			// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
-			const canvas = header("x-decks-stage");
+			const canvas = header("x-decks-canvas");
 			const to = header("x-decks-agent");
 			const edit = header("x-decks-edit")?.slice(0, 80);
 			const agent = personAgent({ agents: app.agents, pens: app.canvas.pens }, { ...(canvas ? { canvas } : {}), ...(to ? { agent: to } : {}) });
@@ -83,8 +83,8 @@ async function appCaller(app: CallsHost, name: string): Promise<Caller> {
 	const key = `apps/${name}`;
 	if (!app.appTrust.allows(key) && !app.appsAllowedOnce.has(key)) {
 		const answer = await conversationForApp(app, name).conversation.bridge.choose({
-			title: "Let this app use the stage?",
-			message: `The app ${name} wants to call stage verbs: write cards, move the canvas, message agents.`,
+			title: "Let this app use the canvas?",
+			message: `The app ${name} wants to call canvas verbs: write cards, move the canvas, message agents.`,
 			options: [
 				{ label: "Allow until Decks restarts" },
 				{ label: "Always allow this app", description: `Remember ${name}, and stop asking` },
@@ -93,7 +93,7 @@ async function appCaller(app: CallsHost, name: string): Promise<Caller> {
 		});
 		if (answer === "Always allow this app") app.appTrust.allow(key);
 		else if (answer === "Allow until Decks restarts") app.appsAllowedOnce.add(key);
-		else return { status: 403, error: `The person did not let ${name} use the stage.` };
+		else return { status: 403, error: `The person did not let ${name} use the canvas.` };
 	}
 	const { tool, conversation } = appTool(app, name);
 	return {

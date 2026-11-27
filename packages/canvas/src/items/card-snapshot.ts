@@ -1,8 +1,7 @@
 /**
- * A card as it stands, written out as a page the server's Chrome draws the same way (`boards/snapshot.ts`
+ * A card as it stands, written out as a page the server's Chrome draws the same way (`cards/snapshot.ts`
  * on the server): what an agent's `decks canvas screenshot` of a card shows, so it has what the person
- * did in it. Boards had this as `snapshotOf` while the canvas ran their pages; a card is the same rules
- * over its shadow root.
+ * did in it, by the same rules over its shadow root.
  *
  * The card's markup after every script has run is most of it; what a fresh load would lose is written
  * in: what was typed into fields, which boxes were scrolled and how far (`data-decks-scroll`, put back by
@@ -10,8 +9,8 @@
  * drawn by one is not drawn a second time. Styles a script made without markup (a sheet built in script
  * and adopted, rules inserted into an empty `<style>`) are written out as `<style>`.
  *
- * The page is shaped as the server's own page of a card (`cardPage`, `boards/cards.ts`): card.css from
- * the canvas's `lib/`, `body.board` at the card's width, the card in `#decks-card`. It is loaded at the
+ * The page is shaped as the server's own page of a card (`cardPage`, `cards/cards.ts`): card.css from
+ * the canvas's `lib/`, `body.card-page` at the card's width, the card in `#decks-card`. It is loaded at the
  * card's own address, so the card's relative addresses resolve as they do there.
  *
  * Sizes are read from layout (`offsetWidth`), never from `getBoundingClientRect`: the card sits under the
@@ -70,11 +69,11 @@ export function snapshotOfCard(root: ShadowRoot, options: CardShotOptions): Card
 <html lang="en" data-theme="${options.scheme}">
 <head>
 <meta charset="utf-8" />
-<meta name="board" content='${JSON.stringify({ w })}' />
+<meta name="card" content='${JSON.stringify({ w })}' />
 <link rel="stylesheet" href="../../lib/card.css" />
 ${head.join("\n")}
 </head>
-<body class="board" style="width:${w}px">
+<body class="card-page" style="width:${w}px">
 ${copy.outerHTML}
 </body>
 </html>`,

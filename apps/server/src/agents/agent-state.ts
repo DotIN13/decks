@@ -3,7 +3,7 @@ import type { CanvasSnapshot } from "./work.ts";
 /**
  * What each agent was holding, showing and calling itself, over time (DESIGN §6.2).
  *
- * Pi used to carry this in the transcript: every `stage_eval` recorded its outcome in the
+ * Pi used to carry this in the transcript: every `canvas_eval` recorded its outcome in the
  * tool result's `details`, and `session_start` rebuilt from the newest one on the branch.
  * That is genuinely elegant — rewinding the conversation rewound the canvas, because the
  * transcript was the record of both — and it has no Claude counterpart. MCP tool results

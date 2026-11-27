@@ -9,7 +9,7 @@ import { join, relative } from "node:path";
  * beside it rather than a route this server serves. But a copy made once at
  * `Deck.create` and never touched again is a deck frozen at the version of Decks
  * that happened to create it, and that had a real cost: the editor's vocabulary
- * could only ever be the vocabulary of the *oldest* `board.css` in the wild, since
+ * could only ever be the vocabulary of the *oldest* `card.css` in the wild, since
  * a class this build invented would render as an unstyled box in a deck made last
  * month. So the copy is refreshed every time a deck is opened, and `lib/` is this
  * application's directory rather than the user's.

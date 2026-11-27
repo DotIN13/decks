@@ -6,7 +6,7 @@ import { outlineOf } from "./outline.ts";
 import { bool, isVariable, variable, withTheme, type ThemeState } from "./values.ts";
 
 /**
- * A document as an agent reads it: the file's own items, each with its box on the stage.
+ * A document as an agent reads it: the file's own items, each with its box on the canvas.
  *
  * The items are exactly what is in the file — the same fields, the same nesting — plus one field
  * that is never saved, `box: { x1, y1, x2, y2 }`, so a reader knows where everything is without
@@ -155,7 +155,7 @@ const SLACK = 0.5;
 /** Whether an item's box is cut by the clipping frames round it, or its words by its own fixed box. */
 function clipper(doc: PenDocument, placed: Map<string, Placed>, options: ReadOptions): (at: Placed) => "partly" | "fully" | undefined {
 	const measure = options.measure ?? estimateText;
-	/** The part of the stage an item's children are seen in: its clipping ancestors' boxes overlapped; undefined is everywhere. */
+	/** The part of the canvas an item's children are seen in: its clipping ancestors' boxes overlapped; undefined is everywhere. */
 	const seen = new Map<string, Frame | null>();
 	const regionInside = (id: string | undefined): Frame | null => {
 		if (id === undefined) return null;

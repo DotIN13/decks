@@ -72,11 +72,11 @@ async function flyToItem(canvas: string, id: string, fresh: boolean): Promise<vo
 		openTab("canvas", canvas);
 		await until(() => onCanvas() && canvasOnScreen()?.name === canvas);
 	}
-	const stage = await until(() => !!document.querySelector("iframe.canvas-frame, .stage"));
-	if (!stage) return;
+	const shown = await until(() => !!document.querySelector("iframe.canvas-frame, .canvas"));
+	if (!shown) return;
 	const { x1, y1, x2, y2 } = found.box;
 	const fly = (animate: boolean) => {
-		const frame = document.querySelector("iframe.canvas-frame, .stage");
+		const frame = document.querySelector("iframe.canvas-frame, .canvas");
 		if (!frame) return;
 		const view = { width: frame.clientWidth, height: frame.clientHeight };
 		// Held, not filled: a small item is seen at life size at most, with what is round it.

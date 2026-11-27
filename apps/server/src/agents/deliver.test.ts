@@ -17,21 +17,21 @@ function fake(kind: AgentKind, state: AgentState) {
 		name: () => "Rune",
 		state: () => state,
 		prompt: async (text) => void prompted.push(text),
-		run: async () => ({ report: "", boards: [] }),
+		run: async () => ({ report: "", cards: [] }),
 		notice: () => {},
 		brief: (task, cards) => `${task}${cards.length ? ` [${cards.join(", ")}]` : ""}`,
 		report: () => {},
 		outside: () => undefined,
 		mailChanged: () => {},
 	});
-	return { prompted, turns, send: (task: string) => turns.deliver({ from: "a1", fromName: "Ada", task, boards: ["boards/a.html"], at: 1 }) };
+	return { prompted, turns, send: (task: string) => turns.deliver({ from: "a1", fromName: "Ada", task, cards: ["pages/a.html"], at: 1 }) };
 }
 
 test("an idle agent of any runtime starts a turn on the message", () => {
 	for (const kind of ["pi", "claude", "opencode", "opencode2", "antigravity"] as const) {
 		const one = fake(kind, "idle");
 		assert.deepEqual(one.send("look"), { delivered: true, turn: "new" }, kind);
-		assert.match(one.prompted[0]!, /Ada sent you this, to act on now:\n\nlook \[boards\/a\.html\]/);
+		assert.match(one.prompted[0]!, /Ada sent you this, to act on now:\n\nlook \[pages\/a\.html\]/);
 	}
 });
 

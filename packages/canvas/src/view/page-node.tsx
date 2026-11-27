@@ -45,34 +45,34 @@ export function createPageNode(d: PageNodeNeeds) {
 	const isActive = createSelector(activeItem);
 
 	/** One placed item's slot: the host's, told where it is and what it may do. */
-	const pageNode = (board: Page) => (
+	const pageNode = (card: Page) => (
 		<d.Frame
-			board={board}
+			card={card}
 			zoom={d.ctl.zoom()}
-			mounted={d.isLive(board.path) || d.isKept(board.path) || d.isLeaving(board.path)}
-			asleep={d.isKept(board.path) || d.isLeaving(board.path)}
-			kept={d.isKept(board.path)}
-			covered={d.isPictured(board.path)}
-			visible={d.isNear(board.path)}
-			onLive={(on: boolean) => d.markLive(board.path, on)}
-			carried={d.carriedPages().has(board.path) || d.draggedAsPicture().has(board.path)}
-			selected={isSelected(board.path)}
-			active={isActive(board.path)}
-			onActivate={() => setActiveItem(board.path)}
+			mounted={d.isLive(card.path) || d.isKept(card.path) || d.isLeaving(card.path)}
+			asleep={d.isKept(card.path) || d.isLeaving(card.path)}
+			kept={d.isKept(card.path)}
+			covered={d.isPictured(card.path)}
+			visible={d.isNear(card.path)}
+			onLive={(on: boolean) => d.markLive(card.path, on)}
+			carried={d.carriedPages().has(card.path) || d.draggedAsPicture().has(card.path)}
+			selected={isSelected(card.path)}
+			active={isActive(card.path)}
+			onActivate={() => setActiveItem(card.path)}
 			gestures={d.gestures}
 			{...(d.props.onOpenPage ? { onOpenPage: d.props.onOpenPage } : {})}
-			view={d.editor.pageView(board.path)}
-			{...(d.props.onExtent ? { onExtent: (extent) => d.props.onExtent?.(board.path, extent) } : {})}
-			onMove={(x, y) => d.props.onMove(board.path, x, y)}
-			onOpen={() => d.pushCamera(d.frame([boxOf(board)]))}
-			{...(d.props.onHide ? { onClose: () => d.props.onHide?.(board.path) } : {})}
-			{...(d.props.onCollapse ? { onCollapse: () => d.props.onCollapse?.(board.path) } : {})}
+			view={d.editor.pageView(card.path)}
+			{...(d.props.onExtent ? { onExtent: (extent) => d.props.onExtent?.(card.path, extent) } : {})}
+			onMove={(x, y) => d.props.onMove(card.path, x, y)}
+			onOpen={() => d.pushCamera(d.frame([boxOf(card)]))}
+			{...(d.props.onHide ? { onClose: () => d.props.onHide?.(card.path) } : {})}
+			{...(d.props.onCollapse ? { onCollapse: () => d.props.onCollapse?.(card.path) } : {})}
 			{...(d.props.onComment
 				? {
-						// Words selected in a card while browsing: a comment on them, as on a board's page before.
+						// Words selected in a card while browsing: a comment on them.
 						onWords: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => {
 							if (d.props.mode !== "browse" || drawing()) return;
-							d.props.onComment?.({ path: board.path, title: board.title, quote: words.quote, ...(words.component ? { component: words.component } : {}), anchor: words.anchor });
+							d.props.onComment?.({ path: card.path, title: card.title, quote: words.quote, ...(words.component ? { component: words.component } : {}), anchor: words.anchor });
 						},
 					}
 				: {})}
