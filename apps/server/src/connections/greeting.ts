@@ -39,9 +39,9 @@ export function greet(app: RouteDeps["app"], reply: (message: ServerMessage) => 
 	 * second or two after the rest and the browser fills the section in when it lands.
 	 */
 	void app.accountList.publish(reply);
-	// And the shared browser, with the code the extension pairs with: the status board
+	// And the shared browser, with the code the extension pairs with: the status card
 	// shows it when nothing is connected yet, and the browser is where the user reads it.
-	// Which stages exist: the manager's list, and the name the pill shows beside the agent.
+	// Which canvases exist: the manager's list, and the name the pill shows beside the agent.
 	reply(app.stagesMessage());
 	reply({ type: "web.changed", status: app.web.status(), code: app.web.code() });
 	reply(app.settings.message());

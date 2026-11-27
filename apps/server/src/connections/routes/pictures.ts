@@ -17,13 +17,13 @@ import { asyncRoute, wildcard, sendFile, harnessId, type RouteDeps } from "./sha
 import express, { type Router } from "express";
 
 /**
- * Pictures: of every card (`pictures/service.ts`), of a stage, a canvas as a bundle, a stage's .pen for `shot.html`, and a page drawn from a snapshot.
+ * Pictures: of every card (`pictures/service.ts`), of a canvas, a canvas as a bundle, a canvas's .pen for `shot.html`, and a page drawn from a snapshot.
  */
 /** A picture's own type, from its bytes: one card's picture may come back as WebP though PNG was asked for. */
 const imageType = (bytes: Buffer) => imageKind(bytes)?.mime ?? "png";
 
 export function register(api: Router, { app }: RouteDeps): void {
-	/** How far the server has got keeping a picture of every board (`PictureService.index`), for the ⋯ menu. */
+	/** How far the server has got keeping a picture of every card (`PictureService.index`), for the ⋯ menu. */
 	api.get("/pictures", (_req, res) => {
 		res.setHeader("Cache-Control", "no-store");
 		res.json(app.thumbs.progress());
@@ -72,8 +72,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 		"/thumb/*path",
 		asyncRoute(async (req, res) => {
 			const asked = normalizeCardPath(wildcard(req));
-			const board = app.deck.card(asked) ?? appPage(asked, req) ?? docPage(asked);
-			if (!board) {
+			const card = app.deck.card(asked) ?? appPage(asked, req) ?? docPage(asked);
+			if (!card) {
 				res.status(404).end();
 				return;
 			}
@@ -101,17 +101,17 @@ export function register(api: Router, { app }: RouteDeps): void {
 				 */
 				const size = small ?? "whole";
 				app.thumbs.asked(scheme);
-				const near = app.thumbs.nearest(board, scheme, size);
+				const near = app.thumbs.nearest(card, scheme, size);
 				if (near && !near.exact) {
-					app.thumbs.picture(board, scheme, size).catch(() => {});
+					app.thumbs.picture(card, scheme, size).catch(() => {});
 					res.setHeader("Cache-Control", "no-store");
 					res.setHeader("X-Decks-Stand-In", "1");
 					await send(near.file);
 					return;
 				}
-				const file = near?.file ?? (await app.thumbs.picture(board, scheme, size, () => gone));
+				const file = near?.file ?? (await app.thumbs.picture(card, scheme, size, () => gone));
 				if (gone) return;
-				const kept = req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache";
+				const kept = req.query.v === String(card.rev) ? "private, max-age=31536000, immutable" : "no-cache";
 				// Compressed for the GPU, when the canvas takes it (`astc=1`) and this machine can make it; else the WebP.
 				// The brotli copy as it is on disk, for a browser that undoes brotli: the daily clean keeps only that one.
 				const encoding = wireEncoding(req.headers["accept-encoding"]);
@@ -147,13 +147,13 @@ export function register(api: Router, { app }: RouteDeps): void {
 	);
 
 	/**
-	 * A picture of a whole stage, for the manager's cards (`canvas/shots.ts`).
+	 * A picture of a whole canvas, for the manager's cards (`canvas/shots.ts`).
 	 *
-	 * The board thumbnails' bargain, one level up: the request waits for the picture because an
+	 * The card thumbnails' bargain, one level up: the request waits for the picture because an
 	 * `<img>` cannot be told "later", `v` is the drawing as a short hash (`pens.summary`, `shot`) and
-	 * is what makes the URL new when the stage changes, and a year of caching is safe because of it:
+	 * is what makes the URL new when the canvas changes, and a year of caching is safe because of it:
 	 * the hash is the same drawing whichever run of the harness answers. 503 when this machine
-	 * has no Chromium, 404 for no such stage; the card draws its plain tile for either.
+	 * has no Chromium, 404 for no such canvas; the card draws its plain tile for either.
 	 */
 	api.get(
 		"/stage-thumb/:name",
@@ -182,7 +182,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * A canvas as one `.decks` file, to download and open in any Decks (`share/bundle.ts`).
 	 *
 	 * Pictures already taken go in as they are; one not taken yet gets the time left of a shared
-	 * minute, and a board without one is drawn from its page when the reader opens it.
+	 * minute, and a card without one is drawn from its page when the reader opens it.
 	 */
 	api.get(
 		"/bundle/:name",
@@ -198,14 +198,14 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const { bytes } = await buildBundle({
 				deckPath: app.deck.path,
 				deckName: app.deck.name,
-				board: (path) => app.deck.card(path),
-				stage: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.cards.cards(name) },
-				picture: async (board, scheme) => {
-					const near = app.thumbs.nearest(board, scheme, "whole");
+				card: (path) => app.deck.card(path),
+				canvas: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, cards: pens.cards.cards(name) },
+				picture: async (card, scheme) => {
+					const near = app.thumbs.nearest(card, scheme, "whole");
 					if (near) return near.file;
 					const left = until - Date.now();
 					if (left <= 0) return undefined;
-					return Promise.race([app.thumbs.get(board, scheme, () => false), new Promise<undefined>((done) => setTimeout(() => done(undefined), left))]).catch(() => undefined);
+					return Promise.race([app.thumbs.get(card, scheme, () => false), new Promise<undefined>((done) => setTimeout(() => done(undefined), left))]).catch(() => undefined);
 				},
 			});
 			const file = bundleFileName(pens.titleOf(name));
@@ -216,8 +216,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 	);
 
 	/**
-	 * One stage, for `shot.html` to draw (`canvas/shots.ts`): its `.pen` document, the folder its
-	 * image fills are read against, and where each board on it is.
+	 * One canvas, for `shot.html` to draw (`canvas/shots.ts`): its `.pen` document, the folder its
+	 * image fills are read against, and where each card on it is.
 	 */
 	api.get("/stage-pen/:name", (req, res) => {
 		const pens = app.canvas.pens;
@@ -229,19 +229,19 @@ export function register(api: Router, { app }: RouteDeps): void {
 		const frame = pens.log.frame(name);
 		res.setHeader("Cache-Control", "no-store");
 		/*
-		 * Each card and board on it with its record (title, revision, card or not, who wrote it and when,
+		 * Each card on it with its record (title, revision, card or not, who wrote it and when,
 		 * when it was read), at its place on this drawing: what the canvas frame shows them from.
 		 */
 		const cards = pens.cards.cards(name).flatMap(({ path, x, y, w, h }) => {
-			const board = app.deck.card(path);
-			return board ? [{ ...board, x, y, w, h }] : [];
+			const card = app.deck.card(path);
+			return card ? [{ ...card, x, y, w, h }] : [];
 		});
 // Squeezed: a frame reads this whole each time it starts, and a large canvas's is most of a megabyte as it stands.
 		sendSqueezedJson(req, res, { doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.cards.cards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
 	});
 
 	/**
-	 * Any .pen file as `shot.html` draws it: a saved frame, or a stage by its file. `path` is relative
+	 * Any .pen file as `shot.html` draws it: a saved frame, or a canvas by its file. `path` is relative
 	 * to the deck or absolute (`CanvasPens.penFile`).
 	 */
 	api.get("/pen-file", (req, res) => {
@@ -252,9 +252,9 @@ export function register(api: Router, { app }: RouteDeps): void {
 		}
 		try {
 			const frame = pens.files.fileFrame(req.query.path);
-			const boards = frame.stage ? pens.cards.cards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			const cards = frame.stage ? pens.cards.cards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
 			res.setHeader("Cache-Control", "no-store");
-			res.json({ doc: frame.doc, base: frame.base, boards });
+			res.json({ doc: frame.doc, base: frame.base, boards: cards });
 		} catch (error) {
 			res.status(404).type("text").send((error as Error).message);
 		}
@@ -274,8 +274,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 		"/stage-shot",
 		asyncRoute(async (req, res) => {
 			const agent = app.agents.get(String(req.query.agent ?? ""));
-			const stage = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : agent?.seat.canvasFolder(false);
-			if (!stage) {
+			const canvas = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : agent?.seat.canvasFolder(false);
+			if (!canvas) {
 				res.status(404).type("text").send("Say which canvas to picture.");
 				return;
 			}
@@ -285,8 +285,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const format = req.query.format === "jpeg" || req.query.format === "pdf" ? req.query.format : "png";
 			const scale = typeof req.query.scale === "string" && Number.isFinite(Number(req.query.scale)) ? Number(req.query.scale) : 2;
 			const live = req.query.live === "1" || req.query.live === "true";
-			const options = { canvas: stage, ...(of !== undefined ? { of } : {}), format, scale, scheme: req.query.scheme === "dark" ? "dark" : "light", ...(live ? { live } : {}) };
-			const { status, answer } = await runVerb(app, req.principal, { ...req.headers, "x-decks-stage": stage }, "canvas.screenshot", [options], req.socket.remoteAddress);
+			const options = { canvas, ...(of !== undefined ? { of } : {}), format, scale, scheme: req.query.scheme === "dark" ? "dark" : "light", ...(live ? { live } : {}) };
+			const { status, answer } = await runVerb(app, req.principal, { ...req.headers, "x-decks-stage": canvas }, "canvas.screenshot", [options], req.socket.remoteAddress);
 			if (!answer.ok) {
 				res.status(status === 422 ? 503 : status).type("text").send(answer.error ?? "The picture could not be taken.");
 				return;
@@ -297,7 +297,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			// Taken for this download only: not kept among the agents' screenshots.
 			if (shot.file.startsWith(".decks/shots/")) rmSync(file, { force: true });
 			const ext = format === "jpeg" ? "jpg" : format;
-			const name = typeof req.query.name === "string" && /^[\w.-]{1,80}$/.test(req.query.name) ? req.query.name : stage;
+			const name = typeof req.query.name === "string" && /^[\w.-]{1,80}$/.test(req.query.name) ? req.query.name : canvas;
 			res.setHeader("X-Shot-Box", JSON.stringify(shot.box));
 			res.setHeader("X-Shot-How", encodeURIComponent(shot.how ?? ""));
 			res.setHeader("Content-Disposition", `attachment; filename="${name}.${ext}"`);
@@ -308,7 +308,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	);
 
 	/**
-	 * A board or card drawn from a snapshot of the reader's page (`pictures/snapshot.ts`): the page's markup
+	 * A card drawn from a snapshot of the reader's page (`pictures/snapshot.ts`): the page's markup
 	 * as it stood, drawn by the server's Chrome at its own address. The answer is the picture. A card's
 	 * comes from the canvas frame showing it (`packages/canvas/src/items/card-snapshot.ts`).
 	 */

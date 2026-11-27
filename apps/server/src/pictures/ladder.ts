@@ -13,7 +13,7 @@ export type ThumbScheme = "light" | "dark";
  * `small` is one rung of the canvas's ladder (`SMALL_WIDTHS`), taken straight from the page.
  */
 export type ThumbKind = "whole" | "small";
-/** The tallest a whole picture is taken, in CSS px of the board: past it the rest is cut. */
+/** The tallest a whole picture is taken, in CSS px of the card: past it the rest is cut. */
 const WHOLE_MAX_H = 12_000;
 
 /**
@@ -22,18 +22,18 @@ const WHOLE_MAX_H = 12_000;
  */
 export const THUMB_WIDTH = 720;
 /**
- * A whole picture is taken at up to twice the board's own size, so a board the canvas draws as its
+ * A whole picture is taken at up to twice the card's own size, so a card the canvas draws as its
  * picture stays sharp on a 2x screen up to life size (`canvas/pen/scene.ts` decodes it at the size
  * it is drawn). Capped at 2048 px wide and 16M pixels in all, and never below the card's width.
  */
-export function wholeScale(board: Pick<DeckPage, "w" | "h">): number {
-	const w = Math.max(200, Math.round(board.w));
-	const h = Math.max(150, Math.min(Math.round(board.h), WHOLE_MAX_H));
+export function wholeScale(card: Pick<DeckPage, "w" | "h">): number {
+	const w = Math.max(200, Math.round(card.w));
+	const h = Math.max(150, Math.min(Math.round(card.h), WHOLE_MAX_H));
 	return Math.max(THUMB_WIDTH / w, Math.min(2, 2048 / w, Math.sqrt(16_000_000 / (w * h))));
 }
 /**
- * A whole picture, as WebP at quality 88: at twice a board's size it looks the same as a JPEG at
- * that quality and is half the bytes (three boards at 2000 px wide: 141, 163 and 302 KB against
+ * A whole picture, as WebP at quality 88: at twice a card's size it looks the same as a JPEG at
+ * that quality and is half the bytes (three cards at 2000 px wide: 141, 163 and 302 KB against
  * 263, 306 and 569). Lossless WebP was measured too, and came out a tenth larger than the JPEG.
  * Playwright writes only PNG and JPEG, so Chrome is asked directly, at `scale` image pixels per
  * CSS pixel (it does not apply the device scale to a clip itself); a page that cannot be asked (a
@@ -75,10 +75,10 @@ export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: 
 }
 
 /**
- * How boards are drawn, as far as their pictures go: raised when a change to the shipped `lib/`
- * changes every board's look, so every picture is a miss once and is taken again. 2: the board
+ * How cards are drawn, as far as their pictures go: raised when a change to the shipped `lib/`
+ * changes every card's look, so every picture is a miss once and is taken again. 2: the card
  * fonts are shipped (`lib/type/`), where the server's Chrome had drawn Liberation Sans. 3: a whole
- * picture is taken at up to twice the board's size (`wholeScale`), where it was 720 px wide, and as
+ * picture is taken at up to twice the card's size (`wholeScale`), where it was 720 px wide, and as
  * WebP (`wholeShot`). The app
  * puts the same number in each picture's address (`thumbUrl`), which the browser keeps a year.
  */
@@ -152,10 +152,10 @@ export function pageClip(card: Pick<DeckPage, "w" | "h">): { width: number; heig
 }
 
 /**
- * In the page: how tall the board's page is, the way `apps/web/src/pages/measure-page.ts` measures it (`documentHeight`).
+ * In the page: how tall the card's page is, the way `apps/web/src/pages/measure-page.ts` measures it (`documentHeight`).
  *
  * The body's own height, with the height and floor `board.js` gave it released for the read, so the
- * reading is the content's. The two measurements have to agree or the picture and the board are
+ * reading is the content's. The two measurements have to agree or the picture and the card are
  * different heights; the stated height is applied as a floor by the caller.
  */
 export const MEASURE = `(() => {

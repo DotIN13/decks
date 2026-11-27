@@ -64,15 +64,15 @@ export class App {
 	deck: Deck;
 	readonly agents: Registry;
 	readonly canvas: CanvasService;
-	/** Every agent's stage drawing, as `.pen` files under `canvases/` (`canvas/pens.ts`). */
+	/** Every agent's canvas drawing, as `.pen` files under `canvases/` (`canvas/pens.ts`). */
 	readonly pens: CanvasPens;
 	/** The ports agents have forwarded through this server (`ports.ts`). */
 	readonly forwards: Forwards;
 	/** The apps agents build in the deck's `apps/` (`apps/service.ts`). */
 	readonly apps: Apps;
-	/** What each agent is doing to which board, said to the browsers as it happens (`agents/acts.ts`). */
+	/** What each agent is doing to which card, said to the browsers as it happens (`agents/acts.ts`). */
 	readonly acts: Acts;
-	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
+	/** The card files: writing, revisioning, editing, deleting (`boards/service.ts`). */
 	readonly cards: CardService;
 	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
@@ -117,9 +117,9 @@ export class App {
 	readonly deviceLogins = new DeviceLogins();
 	/** Canvas passes, signed and checked on every use (`auth/passes.ts`). */
 	readonly passes: Passes;
-	/** Which boards may run their own code, and the list the first question writes (`auth/app-trust.ts`). */
+	/** Which cards may run their own code, and the list the first question writes (`auth/app-trust.ts`). */
 	readonly appTrust: AppTrust;
-	/** Whether a card or board is placed on a canvas: a canvas pass reads it as one of that canvas's (`auth/guard.ts`). */
+	/** Whether a card is placed on a canvas: a canvas pass reads it as one of that canvas's (`auth/guard.ts`). */
 	/**
 	 * The deck's import map, as the canvas frame is handed it (`/api/passes`): names to another site's addresses,
 	 * or to paths under `assets/`, which the frame reads from beside its canvas's cards, where the deck's `assets/`
@@ -150,10 +150,10 @@ export class App {
 	/** The user's own Chrome, shared through the Decks extension (`browser/bridge.ts`). */
 	readonly web: WebBridge;
 	readonly thumbs: PictureService;
-	/** Stage pictures drawn without a browser (`canvas/native-shots.ts`). */
+	/** Canvas pictures drawn without a browser (`canvas/native-shots.ts`). */
 	readonly nativeShots: NativeShots;
 	private unwatch: (() => void) | undefined;
-	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
+	/** Where each agent's canvas is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
 	/** What an agent asked the pages to do to a canvas, waiting on their answers (`canvas/page-calls.ts`). */
 	/** What is said to the pages, and who is listening (`connections/broadcast.ts`). */
@@ -217,9 +217,9 @@ export class App {
 				this.send(message);
 			},
 			/*
-			 * The arrangement, not the deck — `CardService` broadcasts a board on every write, and the
+			 * The arrangement, not the deck — `CardService` broadcasts a card on every write, and the
 			 * loader's copy of one has no place of its own any more. It asks rather than is handed the
-			 * positions so that the seeding `stageState` does happens on this path too.
+			 * positions so that the seeding `canvasState` does happens on this path too.
 			 */
 			state: () => this.canvasState(),
 			removed: (path) => this.agents.cardRemoved(path),
@@ -227,11 +227,11 @@ export class App {
 		this.canvas = new CanvasService(deck, {
 			/*
 
-			 * Move a board on the stage being served, and answer with the board as that stage sees it.
+			 * Move a card on the canvas being served, and answer with the card as that canvas sees it.
 
 			 * The deck has no arrangement to write to: a place belongs to an agent, so this writes on the
 
-			 * focused one, which is the stage the sandbox is running as.
+			 * focused one, which is the canvas the sandbox is running as.
 
 			 */
 
@@ -241,14 +241,14 @@ export class App {
 
 				agent.seat.setPosition(path, x, y);
 
-				return this.canvasState(agent).boards.find((board) => board.path === path);
+				return this.canvasState(agent).boards.find((card) => card.path === path);
 
 			},
 
 			/*
-			 * `decks.canvas.read()` reads the arrangement **of the agent that asked** — the same stage
+			 * `decks.canvas.read()` reads the arrangement **of the agent that asked** — the same canvas
 			 * `decks.canvas.move` writes to. Served from the conversation on screen instead, an agent
-			 * working while the person read another chat moved a board and read back the place it
+			 * working while the person read another chat moved a card and read back the place it
 			 * had before, with the move itself correct on disk.
 			 *
 			 * No id is an app running its own code, which acts for a conversation on a canvas
@@ -268,12 +268,12 @@ export class App {
 			awaitExtent: (path, rev, ms, at) => this.cards.awaitExtent(path, rev, ms, at),
 			reading: (path, rev) => this.cards.reading(path, rev),
 			views: async (path) => {
-				const board = this.deck.card(path);
-				return board ? this.thumbs.views(board) : undefined;
+				const card = this.deck.card(path);
+				return card ? this.thumbs.views(card) : undefined;
 			},
 			measureAway: async (path, w) => {
-				const board = this.deck.card(path);
-				return board && this.canvas.shots ? this.canvas.shots.measure(w === undefined ? board : { ...board, w }) : undefined;
+				const card = this.deck.card(path);
+				return card && this.canvas.shots ? this.canvas.shots.measure(w === undefined ? card : { ...card, w }) : undefined;
 			},
 			call: (call, timeoutMs) => this.pageCalls.ask(call, timeoutMs),
 			callAll: (call, timeoutMs) => this.pageCalls.askAll(call, timeoutMs),
@@ -287,11 +287,11 @@ export class App {
 			agents: () => this.agents.summaries(),
 		});
 		/*
-		 * The stage drawings. A change — through the tool or by hand — goes to every browser, keyed by
-		 * the agents whose stage it is, since two chats never share a folder but the browser draws per chat.
+		 * The canvas drawings. A change — through the tool or by hand — goes to every browser, keyed by
+		 * the agents whose canvas it is, since two chats never share a folder but the browser draws per chat.
 		 */
 		this.pens = new CanvasPens(deck.path, (name, entry) => this.publishPen(name, entry));
-		// A canvas's copy of a board from elsewhere is a board of the deck the moment it is made.
+		// A canvas's copy of a card from elsewhere is a card of the deck the moment it is made.
 		this.pens.cards.copied = (path) => this.cards?.appeared(path);
 		this.canvas.pens = this.pens;
 		this.forwards = new Forwards(deck.path, config.port);
@@ -367,13 +367,13 @@ export class App {
 		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.changed", status }));
 		this.canvas.web = this.web;
 		/*
-		 * Board pictures, taken by this server of itself. `127.0.0.1` whatever
+		 * Card pictures, taken by this server of itself. `127.0.0.1` whatever
 		 * the host is: `0.0.0.0` is somewhere to listen, not somewhere to go.
 		 */
 		this.thumbs = new PictureService({
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
-			boards: () => this.deck.cards,
+			cards: () => this.deck.cards,
 			apps: () => this.apps.list().map((one) => one.name),
 			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.cards.cards(name).map((one) => one.path))),
 			// Its own reads of the harness, on a pass it makes for no canvas (`auth/guard.ts`, `harnessReads`).
@@ -385,26 +385,26 @@ export class App {
 		this.thumbs.indexLater();
 		this.thumbs.cleanDaily();
 		/*
-		 * Pictures of a stage (`canvas/shots.ts`), in the same Chromium as the card pictures. The page
+		 * Pictures of a canvas (`canvas/shots.ts`), in the same Chromium as the card pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by
 		 * Vite in development, whose port the dev scripts put in `DECKS_WEB_PORT`.
 		 */
 		const apiOrigin = () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`;
 		/*
-		 * Stage pictures are drawn natively over each card's picture of its current revision: the
+		 * Canvas pictures are drawn natively over each card's picture of its current revision: the
 		 * ladder's rung (`SMALL_WIDTHS`) when the card is drawn no wider, the whole picture otherwise. A
 		 * card with none sends the shot to the browser, and is pictured in the background for the next one.
 		 */
 		this.nativeShots = new NativeShots({
 			cardPicture: (path, scheme, px) => {
-				const board = deck.card(path);
-				if (!board) return { why: `there is no card ${path}` };
+				const card = deck.card(path);
+				if (!card) return { why: `there is no card ${path}` };
 				const size = SMALL_WIDTHS.find((width) => px <= width) ?? "whole";
 				for (const want of size === "whole" ? (["whole"] as const) : [size, "whole" as const]) {
-					const found = this.thumbs.nearest(board, scheme, want);
+					const found = this.thumbs.nearest(card, scheme, want);
 					if (found?.exact) return { file: found.file };
 				}
-				void this.thumbs.picture(board, scheme, size, () => false, true).catch(() => {});
+				void this.thumbs.picture(card, scheme, size, () => false, true).catch(() => {});
 				return { why: `the card ${path} has no picture of its current revision yet (one is being taken)` };
 			},
 		});
@@ -415,16 +415,16 @@ export class App {
 			pass: (canvas) => this.passes.canvas(canvas, "view", HARNESS_ID).pass,
 			borrow: (use) => this.thumbs.borrow(use),
 			...(process.env.DECKS_NATIVE_SHOTS === "0" ? {} : { native: this.nativeShots }),
-			writer: (stage) => {
-				const id = this.pens.log.writerOf(stage);
+			writer: (canvas) => {
+				const id = this.pens.log.writerOf(canvas);
 				return id ? this.agents.get(id)?.who() : undefined;
 			},
 		});
 		this.canvas.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
 		this.canvas.cardPicture = async (path, scheme) => {
-			const board = deck.card(path);
-			if (!board) throw new Error(`There is no board ${path}.`);
-			return readFileSync(await this.thumbs.get(board, scheme, () => false));
+			const card = deck.card(path);
+			if (!card) throw new Error(`There is no board ${path}.`);
+			return readFileSync(await this.thumbs.get(card, scheme, () => false));
 		};
 		this.canvas.pairCode = () => {
 			const made = this.codes.newCode();
@@ -476,9 +476,9 @@ export class App {
 				defaultKind: config.backend,
 				camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.canvasFolder()),
 				/*
-				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
-				 * board where the deck state says it is, so the state goes out here — before the
-				 * `context.changed` that says the board is on the canvas, which is the order the two
+				 * A card joining a canvas was given a place (`agents/session.ts`). The browsers draw a
+				 * card where the deck state says it is, so the state goes out here — before the
+				 * `context.changed` that says the card is on the canvas, which is the order the two
 				 * arrive in.
 				 */
 				arranged: () => this.send({ type: "deck.changed", deck: this.canvasState() }),
@@ -515,7 +515,7 @@ export class App {
 		// A deck this build did not create has whichever `lib/` created it, so every
 		// start brings the primitives forward. `Deck.create` has just done it for a new
 		// one. Before `attach()`, deliberately: the watcher is not running yet, so the one
-		// restart that does rewrite files cannot also reload every board twice.
+		// restart that does rewrite files cannot also reload every card twice.
 		if (existing) App.refreshLib(deck);
 		return new App(config, deck);
 	}
@@ -525,7 +525,7 @@ export class App {
 	 *
 	 * Logged rather than sent as a notice: on a normal restart it changes nothing and
 	 * says nothing, and when it does change something the person who needs to know is
-	 * whoever is reading the server's output wondering why a board looks different.
+	 * whoever is reading the server's output wondering why a card looks different.
 	 */
 	private static refreshLib(deck: Deck): void {
 		const sync = syncRuntimeLib(App.runtimeLib, join(deck.path, "lib"));
@@ -650,7 +650,7 @@ export class App {
 		return (asked ?? this.agents.looking())?.seat.deckState() ?? this.deck.state();
 	}
 
-	/** What a board frame acts on: the stage of the conversation this browser is in. */
+	/** What a card frame acts on: the canvas of the conversation this browser is in. */
 	target(): DeckAgent {
 		return this.agents.focused();
 	}
@@ -665,12 +665,12 @@ export class App {
 	}
 
 	/**
-	 * One board as the focused stage sees it — the same resolution `stageState` does, for the one caller
-	 * that has the board already. A broadcast that carried the loader's copy instead would put the board
-	 * at the origin for everybody, because the loader's boards have no place of their own any more.
+	 * One card as the focused canvas sees it — the same resolution `canvasState` does, for the one caller
+	 * that has the card already. A broadcast that carried the loader's copy instead would put the card
+	 * at the origin for everybody, because the loader's cards have no place of their own any more.
 	 */
-	private placed(board: Page): Page {
-		return this.canvasState().boards.find((one) => one.path === board.path) ?? board;
+	private placed(card: Page): Page {
+		return this.canvasState().boards.find((one) => one.path === card.path) ?? card;
 	}
 
 	/** Apps the person let call verbs with "Allow once": remembered until the server restarts (`calls/caller.ts`). */
@@ -698,7 +698,7 @@ export class App {
 		for (const agent of on) agent.seat.penChanged();
 		// What changed, not the whole drawing: a client that missed a revision asks for it whole.
 		this.send(this.pens.log.changes(name));
-		// The manager lists what each stage holds, and this is the moment that changed.
+		// The manager lists what each canvas holds, and this is the moment that changed.
 		this.publishStages();
 	}
 

@@ -56,7 +56,7 @@ export function compressedName(picture: string): string {
 
 /**
  * The compressed sizes squeezed for the wire, beside them: ASTC is a byte a pixel and blocks of plain
- * paper repeat, so brotli takes a board's file to a third or a half (480 px ones of 154 to 174 KB
+ * paper repeat, so brotli takes a card's file to a third or a half (480 px ones of 154 to 174 KB
  * went to 52 to 84 KB) and gzip nearly as far, and the browser undoes it as it reads. Still three to
  * five times its WebP (14 to 19 KB): ASTC saves the GPU's memory and the page's decoding, not network
  * bytes. Brotli (`.astc.br`) is made with the compressed file; gzip (`.astc.gz`), for a browser that

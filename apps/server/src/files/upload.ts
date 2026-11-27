@@ -71,7 +71,7 @@ export function assetName(requested: string): string {
 	 * The stem is trimmed *after* the extension has been taken off, which is the
 	 * order that keeps `документ.png` a `.png`. Trimming the whole name first turned
 	 * it into `-.png` and then into `png` — a file whose type had moved into its
-	 * name, so the board sniffed it as having no extension at all.
+	 * name, so the card sniffed it as having no extension at all.
 	 *
 	 * Leading dots and dashes both go: the first would make a dotfile, the second
 	 * only looks like one of this function's own repairs. The length cap leaves room
@@ -95,7 +95,7 @@ const digestOf = (bytes: Buffer) => createHash("sha256").update(bytes).digest("h
  *
  * The returned path is deck-relative with forward slashes, the same currency the
  * rest of the app deals in, because the caller's next move is to put it in a
- * board's `data-embed`.
+ * card's `data-embed`.
  */
 export function storeAsset(deckRoot: string, requested: string, bytes: Buffer): UploadedAsset {
 	if (bytes.length === 0) throw new UploadRefused("that file is empty");
@@ -116,7 +116,7 @@ export function storeAsset(deckRoot: string, requested: string, bytes: Buffer): 
 
 		if (existsSync(target)) {
 			// Byte-identical: hand back what is already there. Dropping the same
-			// screenshot onto two boards should not leave two copies of it.
+			// screenshot onto two cards should not leave two copies of it.
 			if (digestOf(readFileSync(target)) === digest) {
 				return { path: relative, name: candidate, bytes: bytes.length, reused: true };
 			}

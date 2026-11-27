@@ -6,11 +6,11 @@ import { test } from "node:test";
 import { AppTrust } from "./app-trust.ts";
 
 /**
- * The trust list: what a board can be allowed to do, and what a broken file means.
+ * The trust list: what a card can be allowed to do, and what a broken file means.
  *
  * The one that matters is the last: a file that cannot be read is not a list that trusts
  * everything. Any parse failure falls back to trusting nothing, because the failure mode of
- * the other answer — a corrupt file silently running every board's code — is the whole
+ * the other answer — a corrupt file silently running every card's code — is the whole
  * thing this store exists to prevent.
  */
 

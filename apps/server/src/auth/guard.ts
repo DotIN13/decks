@@ -87,7 +87,7 @@ function inner(path: string): string {
 	return relayed ? relayed[1]! : path;
 }
 
-/** The Decks page and its files, the board runtime and the SDK file: the same for every caller. */
+/** The Decks page and its files, the card runtime and the SDK file: the same for every caller. */
 export function isPublic(method: string, path: string): boolean {
 	if (method !== "GET" && method !== "HEAD") return false;
 	const at = inner(path);
@@ -96,7 +96,7 @@ export function isPublic(method: string, path: string): boolean {
 }
 
 /**
- * The pages and pictures the harness's own Chromium reads, drawing a board, a card or a canvas for a
+ * The pages and pictures the harness's own Chromium reads, drawing a card, a card or a canvas for a
  * picture (`pictures/service.ts`, `canvas/shots.ts`): what its own pass reaches (`passes.ts`, made for no
  * canvas by the harness), GETs alone. No one else reads any of these without a pass or a token.
  */
@@ -161,7 +161,7 @@ const CANVAS_ONLY = "A canvas pass reads and changes its one canvas, and nothing
 export interface Gate {
 	tokens: Pick<TokenStore, "verify">;
 	passes: Pick<Passes, "openCanvas" | "openApp">;
-	/** Whether a card or board at this deck path is placed on a canvas (`calls/canvas-frame.ts`, `boardOnCanvas`): a canvas pass reads it too. */
+	/** Whether a card at this deck path is placed on a canvas (`calls/canvas-frame.ts`, `cardOnCanvas`): a canvas pass reads it too. */
 	placedOn?(path: string, canvas: string): boolean;
 }
 
@@ -278,7 +278,7 @@ export function guard(gate: Gate) {
 				/*
 				 * Readable by a sandboxed page: the canvas frame fetches its cards and imports their modules
 				 * with `Origin: null`. The pass in the address is the credential, and what it admits is the
-				 * canvas's own files, which that frame shows anyway. A board picture's stand-in mark too, or the
+				 * canvas's own files, which that frame shows anyway. A card picture's stand-in mark too, or the
 				 * frame keeps the stand-in and never asks again for the picture (`render/engine.ts`).
 				 */
 				res.setHeader("Access-Control-Allow-Origin", "*");

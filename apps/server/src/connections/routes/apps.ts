@@ -9,8 +9,8 @@ import { runVerb } from "../../calls/run.ts";
  */
 export function register(api: Router, { app }: RouteDeps): void {
 	/*
-	 * The deck's apps (`apps/service.ts`), for the bar on an app's board (`lib/live-app.js`): what
-	 * each is doing, its log, that its board is still in view, and the bar's Restart.
+	 * The deck's apps (`apps/service.ts`), for the bar on an app's card (`lib/live-app.js`): what
+	 * each is doing, its log, that its card is still in view, and the bar's Restart.
 	 */
 	const appOf = (req: Request, res: Response): string | undefined => {
 		const name = String(req.params.name ?? "");
@@ -30,8 +30,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 		if (name) res.set("cache-control", "no-store").json({ lines: app.apps.log(name, Number(req.query.tail) || 200) });
 	});
 	/*
-	 * An app's board saying it is on screen, which keeps a server app awake. A read as well as a post:
-	 * a board's page has no token (`auth/guard.ts` lets this read in), and a heartbeat is no more than the
+	 * An app's card saying it is on screen, which keeps a server app awake. A read as well as a post:
+	 * a card's page has no token (`auth/guard.ts` lets this read in), and a heartbeat is no more than the
 	 * request from its frame that would wake the app anyway.
 	 */
 	// Aliases of apps.seen and apps.restart, which an app's frame calls (`card-host/lib/live-app.js`): it has no token to call a verb with.

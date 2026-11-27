@@ -245,7 +245,7 @@ export function canvasFolder(canvas: string): string {
 
 /**
  * Whether a canvas pass reaches a GET of this path (decoded, as the route sees it): a file in the
- * canvas's folder (`/api/card/<folder>…`), its picture (`/api/thumb/<folder>…`), or a card or board
+ * canvas's folder (`/api/card/<folder>…`), its picture (`/api/thumb/<folder>…`), or a card
  * placed on the canvas from elsewhere (`placed`), by its own path. Every part plain: never `..`, `.`, or a
  * hidden folder.
  */

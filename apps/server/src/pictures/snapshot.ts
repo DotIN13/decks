@@ -3,14 +3,14 @@ import { wholeScale, wholeShot } from "./ladder.ts";
 import type { PictureService } from "./service.ts";
 
 /**
- * A picture of a board as a reader left it, drawn by the server's Chrome from a snapshot of the
+ * A picture of a card as a reader left it, drawn by the server's Chrome from a snapshot of the
  * page the reader's browser had (the `snapshot` adaptor).
  *
  * The browser sends the document as it stood: its markup after every script had run, with the
  * values typed into fields, each scrolled box's position and each canvas's pixels written into it,
  * and the scripts taken out so nothing runs twice. Copying that costs the page a few milliseconds,
  * where copying every element's computed style costs it most of a second. The server loads it at
- * the board's own address, so its stylesheets, fonts and pictures resolve exactly as the board's
+ * the card's own address, so its stylesheets, fonts and pictures resolve exactly as the card's
  * do, puts the scroll positions back, and takes the picture.
  */
 interface SnapshotAsk {
@@ -31,7 +31,7 @@ const RESTORE = `(async () => {
 	}
 })()`;
 
-/** The tallest a snapshot is drawn, in board pixels, as a whole picture is. */
+/** The tallest a snapshot is drawn, in card pixels, as a whole picture is. */
 const MAX_H = 12_000;
 
 export async function renderSnapshot(thumbs: PictureService, origin: string, ask: SnapshotAsk): Promise<Buffer> {
@@ -41,7 +41,7 @@ export async function renderSnapshot(thumbs: PictureService, origin: string, ask
 	return thumbs.borrow(async (browser) => {
 		const context = await browser.newContext({ viewport: { width: w, height: Math.min(h, 2000) }, deviceScaleFactor: wholeScale({ w, h }), colorScheme: ask.scheme, reducedMotion: "reduce", javaScriptEnabled: true });
 		try {
-			// The snapshot is served at the board's own address: same origin, same relative URLs.
+			// The snapshot is served at the card's own address: same origin, same relative URLs.
 			await context.route(address, (route) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: ask.html }));
 			const page = await context.newPage();
 			await page.goto(address, { waitUntil: "load", timeout: 15_000 });

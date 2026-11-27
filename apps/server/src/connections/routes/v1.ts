@@ -108,7 +108,7 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 	/**
 	 * What the canvas frame says about a card on its canvas, which a tab says on the socket: that you
 	 * read it (`card-seen`) and how it measured (`card-extent`, kept for `decks canvas fit` to report).
-	 * Each for a card or board on the caller's own canvas; the person and a paired site may say them for any.
+	 * Each for a card on the caller's own canvas; the person and a paired site may say them for any.
 	 */
 	const onItsCanvas = (req: Request, res: Response): string | undefined => {
 		const path = String((req.body as { path?: unknown } | undefined)?.path ?? "");

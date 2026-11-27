@@ -63,13 +63,13 @@ export interface AppState {
 	port?: number;
 	/** What went wrong, in a line, when it is broken. */
 	error?: string;
-	/** When its board was last seen or it last answered a request. */
+	/** When its card was last seen or it last answered a request. */
 	seenAt?: number;
 	/** When the last install, build or start finished. */
 	at?: number;
 	/**
-	 * What the board would show if it loaded the app now, as a number that changes when that does:
-	 * a static app's newest file, a built app's last build, a server app's last start. The board
+	 * What the card would show if it loaded the app now, as a number that changes when that does:
+	 * a static app's newest file, a built app's last build, a server app's last start. The card
 	 * loads the app again when it changes, so an agent's edit shows without anyone pressing Reload.
 	 */
 	version?: number;
@@ -120,7 +120,7 @@ export class Apps {
 	 * Build and install commands are given none.
 	 */
 	passes: { appServer(name: string, run: string): string } | undefined;
-	/** Decks' own port, set by `app.ts`, so a server app is told where to call back for stage code. */
+	/** Decks' own port, set by `app.ts`, so a server app is told where to call back for canvas code. */
 	decksPort: number | undefined;
 
 	constructor(private deckPath: string) {
@@ -339,7 +339,7 @@ export class Apps {
 		return undefined;
 	}
 
-	/** The board was seen, or the app answered a request: it is not to be put to sleep. */
+	/** The card was seen, or the app answered a request: it is not to be put to sleep. */
 	seen(name: string): void {
 		if (!this.states.has(name) && !this.exists(name)) return;
 		this.set(name, { seenAt: Date.now() });
@@ -347,7 +347,7 @@ export class Apps {
 
 	/**
 	 * Install and build, as the manifest says, and answer with how it went. Waits up to `waitMs` and
-	 * then answers `pending`: an install can take minutes, and a stage run is abandoned after twenty
+	 * then answers `pending`: an install can take minutes, and a canvas run is abandoned after twenty
 	 * seconds, so the agent asks again with `status`.
 	 */
 	async build(name: string, waitMs = 15_000): Promise<AppOutcome> {

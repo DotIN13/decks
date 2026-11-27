@@ -8,7 +8,7 @@ import { containedIn, resolveFileRequest, type ResolvedRoots } from "../deck/roo
  *
  * The same rule an embed reads by (`deck/roots.ts`): anything in the deck or in a root the deck
  * declares. A file in the deck is named by its deck-relative path, which is also its name in the
- * board version store, so a markdown board opened as a document shares its history; a file in
+ * card version store, so a markdown card opened as a document shares its history; a file in
  * another root by its absolute path, and it is written only when that root says `writable`.
  * The app's own records under `.decks/` are never a document.
  */

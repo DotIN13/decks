@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Which apps this install has allowed to call the stage verbs: keys like `apps/<name>`.
+ * Which apps this install has allowed to call the canvas verbs: keys like `apps/<name>`.
  *
  * An app's code calls the verbs an agent has (`calls/app-caller.ts`), deliberately, because the
  * agent that wrote the app already has `bash`. What is new here is the *trigger*: the code runs
@@ -15,7 +15,7 @@ import { join } from "node:path";
  * is not a thing a server process can be given a little of.
  *
  * **The list is written by the question, not by the panel.** The person's verbs (`calls/person-table.ts`) raise the
- * question the first time a board asks to run; the answer "Always allow this board" is what
+ * question the first time a card asks to run; the answer "Always allow this board" is what
  * calls `allow`. Nothing here decides anything.
  */
 export class AppTrust {

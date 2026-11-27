@@ -9,7 +9,7 @@ export type Page = import("playwright").Page;
 export type BrowserContext = import("playwright").BrowserContext;
 
 /**
- * WebGPU, which headless Chromium has only when asked: the stage's engine draws with it in a stage
+ * WebGPU, which headless Chromium has only when asked: the canvas's engine draws with it in a canvas
  * picture (`canvas/shots.ts`). On a Mac through Metal; elsewhere SwiftShader stands in for a card.
  */
 const WEBGPU = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];

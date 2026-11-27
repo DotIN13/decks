@@ -9,7 +9,7 @@ const run = promisify(execFile);
 /**
  * What a film or a sound says about itself, and the still that stands for it.
  *
- * A media item on a stage has to be placed before anything has been decoded: it needs a shape to
+ * A media item on a canvas has to be placed before anything has been decoded: it needs a shape to
  * take, a running time to print, and something to draw while it is not playing. None of that can
  * be read from the bytes without a decoder, so the server asks ffmpeg, once, when the file lands.
  *
@@ -132,7 +132,7 @@ const PEAK_BARS = 56;
  * megabytes of samples that way, read in about a second, and a bar is far wider than what that
  * rate loses. Each bar is its stretch's average loudness (the root of the mean square: a peak alone saturates
  * on speech), scaled so the loudest bar is 1, and
- * rounded to two places because the numbers live in the stage file.
+ * rounded to two places because the numbers live in the canvas file.
  */
 export async function soundPeaks(file: string, bars = PEAK_BARS): Promise<number[] | undefined> {
 	if (!(await ffmpegReady())) return undefined;

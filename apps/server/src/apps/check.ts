@@ -3,9 +3,9 @@ import { join } from "node:path";
 import type { Browser } from "playwright";
 
 /**
- * `decks.apps.check`: the app opened in the server's own Chromium, the way `decks.canvas.fit` measures a board.
+ * `decks.apps.check`: the app opened in the server's own Chromium, the way `decks.canvas.fit` measures a card.
  * What a person would hit first — a page that throws, a request that fails, a blank screen — comes
- * back to the agent as sentences before anyone opens the board, with a picture to look at.
+ * back to the agent as sentences before anyone opens the card, with a picture to look at.
  */
 export interface AppCheck {
 	url: string;
@@ -45,7 +45,7 @@ export async function checkApp(options: {
 			page.on("response", (response) => {
 				if (response.status() >= 400) failed.push(`${response.request().method()} ${short(response.url(), options.origin)}: ${response.status()}`);
 			});
-			// Inside a stage run's twenty seconds: the caller has started a server app already.
+			// Inside a canvas run's twenty seconds: the caller has started a server app already.
 			await page.goto(url, { waitUntil: "load", timeout: 10_000 });
 			await page.waitForLoadState("networkidle", { timeout: 2500 }).catch(() => {});
 			const title = await page.title();

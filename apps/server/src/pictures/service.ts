@@ -47,21 +47,21 @@ export type { PageViews };
 
 /**
  * Pictures of cards, taken on the server: what the canvas draws for a card that is not live (zoomed
- * out, or far from the screen), what a native stage screenshot lays out, and what an export carries.
+ * out, or far from the screen), what a native canvas screenshot lays out, and what an export carries.
  * A card is a page of its own, and the server is the one place that can reach every card without
  * anybody having opened it.
  *
  * **Chromium, through the Playwright this app already depends on.** Obscura
  * (github.com/h4ckf0r0day/obscura) was tried first, because it was asked for and because a
  * 30MB Rust browser that needs no Chromium is an attractive thing. Measured on the example
- * deck, on this arm64 host, v0.2.2: the same 120–620ms a board as Chromium, because the time
- * is the board's own scripts and not the browser; and pictures that are wrong in ways a
+ * deck, on this arm64 host, v0.2.2: the same 120–620ms a card as Chromium, because the time
+ * is the card's own scripts and not the browser; and pictures that are wrong in ways a
  * thumbnail cannot hide. `color-mix()` and translucent colours paint black, so the grid and
  * every card border are solid black; KaTeX's exponents land beside the line; words overprint
- * ("deessp", "1,0002 m"); and one board in five never reached `__cardReady` and held the
+ * ("deessp", "1,0002 m"); and one card in five never reached `__cardReady` and held the
  * page for thirty seconds (`import.meta` in a worker). Its download is also two binaries of
  * 100MB, which is what Chromium's headless shell costs. It is its own layout and paint
- * engine, and a picture of a board has to be the board.
+ * engine, and a picture of a card has to be the card.
  *
  * ### Asynchronous, and what that means here
  *
@@ -95,9 +95,9 @@ const IDLE_MS = 60_000;
 const READY_MS = 8_000;
 /** How long a card on `measure.html` may take to hold its height and say so: its own wait is 10 s (`measure.ts`). */
 const CARD_READY_MS = 12_000;
-/** How long a background picture waits for a board to say it is ready (`take`). */
+/** How long a background picture waits for a card to say it is ready (`take`). */
 const AHEAD_READY_MS = 3_000;
-/** How long a board has to stop changing before its picture is retaken. */
+/** How long a card has to stop changing before its picture is retaken. */
 const SETTLE_MS = 1_500;
 
 interface ThumbHost {
@@ -105,10 +105,10 @@ interface ThumbHost {
 	origin: () => string;
 	/** `<deck>/.decks/thumbs`. */
 	dir: string;
-	/** How long a changed board is left to settle. For tests; `SETTLE_MS` otherwise. */
+	/** How long a changed card is left to settle. For tests; `SETTLE_MS` otherwise. */
 	settleMs?: number;
-	/** Every board in the deck, for the indexer (`index`) to keep pictures of. */
-	boards?: () => DeckPage[];
+	/** Every card in the deck, for the indexer (`index`) to keep pictures of. */
+	cards?: () => DeckPage[];
 	/** The deck's apps, by name: their pictures (`apps/<name>`) are kept by the daily clean. */
 	apps?: () => string[];
 	/** The cards on any canvas: the only ones the indexer keeps pictures of, since nothing else draws them. */
@@ -136,21 +136,21 @@ export interface PictureProgress {
 	ready: number;
 	/** The indexer is sweeping, or pictures are being taken or copied. */
 	working: boolean;
-	/** Pictures this sweep could not take: a board that would not draw. */
+	/** Pictures this sweep could not take: a card that would not draw. */
 	failed: number;
 }
 
-/** Boards the indexer works on at once; the browser takes two pictures at a time in all (`CONCURRENCY`). */
+/** Cards the indexer works on at once; the browser takes two pictures at a time in all (`CONCURRENCY`). */
 const INDEXERS = 2;
 
 interface Job {
-	board: DeckPage;
+	card: DeckPage;
 	scheme: ThumbScheme;
 	file: string;
 	kind: ThumbKind;
 	/** A small picture's width (`TAKEN_WIDTHS`). */
 	width?: number;
-	/** Taken ahead of time, because the board changed, rather than because a browser asked. */
+	/** Taken ahead of time, because the card changed, rather than because a browser asked. */
 	ahead?: boolean;
 	/** Everybody waiting on this one picture. */
 	waiting: Array<{ resolve: (file: string) => void; reject: (error: Error) => void; gone: () => boolean }>;
@@ -177,7 +177,7 @@ export class PictureService {
 	private queue: Job[] = [];
 	private byFile = new Map<string, Job>();
 	private broken: string | undefined;
-	/** Boards that changed and are being left to settle, by path. */
+	/** Cards that changed and are being left to settle, by path. */
 	private settling = new Map<string, ReturnType<typeof setTimeout>>();
 	/** The schemes and kinds anybody has asked for, as `light` or `light/whole`. Read off the disk the first time, so it survives a restart. */
 	private schemes: Set<string> | undefined;
@@ -268,9 +268,9 @@ export class PictureService {
 	 * now if missing: the first request for a compressed picture finds it on disk instead of waiting
 	 * for the encoder (about 80 ms a 480 px card, 40 to 100 a 192, with the server's Chrome up).
 	 */
-	private async ahead(board: DeckPage, scheme: ThumbScheme): Promise<void> {
+	private async ahead(card: DeckPage, scheme: ThumbScheme): Promise<void> {
 		const files: string[] = [];
-		for (const width of [...AHEAD_WIDTHS].reverse()) files.push(await this.picture(board, scheme, width, () => false, true));
+		for (const width of [...AHEAD_WIDTHS].reverse()) files.push(await this.picture(card, scheme, width, () => false, true));
 		if (!this.compressedWanted()) return;
 		for (const file of files) if (!this.hasCompressed(file) && !(await this.compressed(file))) throw new Error(`${file} could not be compressed`);
 	}
@@ -360,7 +360,7 @@ export class PictureService {
 	private failures = new Set<string>();
 
 	async index(): Promise<void> {
-		if (!this.host.boards) return;
+		if (!this.host.cards) return;
 		if (this.sweeping) {
 			this.sweepAgain = true;
 			return;
@@ -374,12 +374,12 @@ export class PictureService {
 				const todo = this.missing(new Set(this.listDir()));
 				const work = async () => {
 					for (let next = todo.shift(); next && !this.broken; next = todo.shift()) {
-						const { board, scheme } = next;
+						const { card, scheme } = next;
 						try {
-							// The sizes a canvas draws when zoomed out; the whole picture is taken when a board is asked for at it.
-							await this.ahead(board, scheme);
+							// The sizes a canvas draws when zoomed out; the whole picture is taken when a card is asked for at it.
+							await this.ahead(card, scheme);
 						} catch {
-							this.failures.add(`${board.path}:${scheme}`);
+							this.failures.add(`${card.path}:${scheme}`);
 						}
 					}
 				};
@@ -416,7 +416,7 @@ export class PictureService {
 		};
 		const run = () => {
 			if (this.sweeping || this.running > 0 || this.queue.length > 0 || this.compressing.size > 0) return next(30 * 60_000);
-			const pages = [...(this.host.boards?.() ?? []).map((board) => board.path), ...(this.host.apps?.() ?? []).map((name) => `apps/${name}`)];
+			const pages = [...(this.host.cards?.() ?? []).map((card) => card.path), ...(this.host.apps?.() ?? []).map((name) => `apps/${name}`)];
 			// No pages read means the deck is not loaded: never take that as every page gone.
 			if (pages.length > 0) {
 				const done = cleanPictures(this.host.dir, pages);
@@ -434,9 +434,9 @@ export class PictureService {
 
 	/** The cards the indexer keeps pictures of: those on a canvas (`placed`), or every one when the host does not say. */
 	private indexed(): DeckPage[] {
-		const all = this.host.boards?.() ?? [];
+		const all = this.host.cards?.() ?? [];
 		const placed = this.host.placed?.();
-		return placed ? all.filter((board) => placed.has(board.path)) : all;
+		return placed ? all.filter((card) => placed.has(card.path)) : all;
 	}
 
 	/** How many cards have every picture they should, and whether more are being made. */
@@ -463,17 +463,17 @@ export class PictureService {
 	private lastScheme: ThumbScheme | undefined;
 
 	/** The cards and schemes without one of their far rungs (`AHEAD_WIDTHS`) of the current revision. */
-	private missing(have: Set<string>): Array<{ board: DeckPage; scheme: ThumbScheme }> {
-		const out: Array<{ board: DeckPage; scheme: ThumbScheme }> = [];
-		const boards = this.indexed();
+	private missing(have: Set<string>): Array<{ card: DeckPage; scheme: ThumbScheme }> {
+		const out: Array<{ card: DeckPage; scheme: ThumbScheme }> = [];
+		const cards = this.indexed();
 		for (const scheme of this.indexSchemes()) {
-			for (const board of boards) {
-				const whole = thumbName(board.path, board.rev, scheme, "whole");
+			for (const card of cards) {
+				const whole = thumbName(card.path, card.rev, scheme, "whole");
 				const packed = this.compressedWanted();
 				if (AHEAD_WIDTHS.every((width) => have.has(smallName(whole, width)) && (!packed || have.has(compressedName(smallName(whole, width))) || have.has(`${compressedName(smallName(whole, width))}.br`)))) continue;
-				// A picture this sweep could not take is not missing again until the board changes.
-				if (this.failures.has(`${board.path}:${scheme}`) && !this.sweeping) continue;
-				out.push({ board, scheme });
+				// A picture this sweep could not take is not missing again until the card changes.
+				if (this.failures.has(`${card.path}:${scheme}`) && !this.sweeping) continue;
+				out.push({ card, scheme });
 			}
 		}
 		return out;
@@ -496,12 +496,12 @@ export class PictureService {
 	 * The picture's file, taken now if nobody has taken it.
 	 *
 	 * `gone` is asked when the job's turn comes: a request whose browser has left is not worth
-	 * a page. Rejects when there is no Chromium, or the board would not draw.
+	 * a page. Rejects when there is no Chromium, or the card would not draw.
 	 */
 	/** A card's whole picture, taken now if nobody has taken it. */
-	get(board: DeckPage, scheme: ThumbScheme, gone: () => boolean = () => false): Promise<string> {
+	get(card: DeckPage, scheme: ThumbScheme, gone: () => boolean = () => false): Promise<string> {
 		this.asked(scheme);
-		return this.ask(board, scheme, gone, false, "whole");
+		return this.ask(card, scheme, gone, false, "whole");
 	}
 
 	/** A browser asked for a picture in this scheme: the indexer keeps that scheme from now on, starting now if it is new. */
@@ -520,35 +520,35 @@ export class PictureService {
 	 * otherwise taken straight from the page, and any other is cut from the next taken one up.
 	 * `ahead` is the background's: a browser's request is taken before it.
 	 */
-	async picture(board: DeckPage, scheme: ThumbScheme, size: "whole" | number, gone: () => boolean = () => false, ahead = false): Promise<string> {
-		const whole = join(this.host.dir, thumbName(board.path, board.rev, scheme, "whole"));
-		if (size === "whole") return this.ask(board, scheme, gone, ahead, "whole");
+	async picture(card: DeckPage, scheme: ThumbScheme, size: "whole" | number, gone: () => boolean = () => false, ahead = false): Promise<string> {
+		const whole = join(this.host.dir, thumbName(card.path, card.rev, scheme, "whole"));
+		if (size === "whole") return this.ask(card, scheme, gone, ahead, "whole");
 		const target = smallName(whole, size);
 		if (existsSync(target)) return target;
 		let source: string;
 		if (existsSync(whole)) source = whole;
-		else if (TAKEN_WIDTHS.includes(size)) return this.ask(board, scheme, gone, ahead, "small", size);
-		else source = await this.picture(board, scheme, TAKEN_WIDTHS.find((one) => one >= size) ?? SMALL_TAKEN, gone, ahead);
+		else if (TAKEN_WIDTHS.includes(size)) return this.ask(card, scheme, gone, ahead, "small", size);
+		else source = await this.picture(card, scheme, TAKEN_WIDTHS.find((one) => one >= size) ?? SMALL_TAKEN, gone, ahead);
 		const made = await this.smaller(source, size, true, target);
 		return typeof made === "string" ? made : target;
 	}
 
 	/**
-	 * What to show for a board at a size right now: the picture itself when it is on disk (`exact`),
+	 * What to show for a card at a size right now: the picture itself when it is on disk (`exact`),
 	 * otherwise the nearest one there is of this revision (the smallest at least that size, or else
-	 * the largest), otherwise the same from the newest earlier revision, and undefined when the board
+	 * the largest), otherwise the same from the newest earlier revision, and undefined when the card
 	 * has no picture at all in this scheme. The caller asks for the real one behind it (`picture`).
 	 *
-	 * Without it a board with no current picture was blank on the canvas until the server's Chrome,
-	 * two pages at a time, reached it: zooming out over dozens of boards after a look change was a
+	 * Without it a card with no current picture was blank on the canvas until the server's Chrome,
+	 * two pages at a time, reached it: zooming out over dozens of cards after a look change was a
 	 * screen of empty rectangles filling in over a minute.
 	 */
-	nearest(board: DeckPage, scheme: ThumbScheme, size: "whole" | number): { file: string; exact: boolean } | undefined {
+	nearest(card: DeckPage, scheme: ThumbScheme, size: "whole" | number): { file: string; exact: boolean } | undefined {
 		const want = size === "whole" ? Number.POSITIVE_INFINITY : size;
-		const whole = thumbName(board.path, board.rev, scheme, "whole");
+		const whole = thumbName(card.path, card.rev, scheme, "whole");
 		const exact = size === "whole" ? whole : smallName(whole, size);
-		const wholes = pictureOf(board.path, scheme, "whole");
-		const copies = smallOf(board.path, scheme);
+		const wholes = pictureOf(card.path, scheme, "whole");
+		const copies = smallOf(card.path, scheme);
 		const found: Array<{ name: string; rev: string; width: number }> = [];
 		for (const name of this.listDir()) {
 			if (name === exact) return { file: join(this.host.dir, name), exact: true };
@@ -560,7 +560,7 @@ export class PictureService {
 		if (found.length === 0) return undefined;
 		const current = whole.slice(0, whole.indexOf("-whole")).replace(/-\d+$/, "");
 		// This revision in this look, or in an older look, or else the revision whose picture was written last.
-		let pool = found.filter((one) => one.name.startsWith(current) && one.name.includes(`-l${lookOf(board.path)}.`));
+		let pool = found.filter((one) => one.name.startsWith(current) && one.name.includes(`-l${lookOf(card.path)}.`));
 		// This revision drawn the way it was before (a card's look raised): the same card, until its new picture comes.
 		if (pool.length === 0) pool = found.filter((one) => one.name.startsWith(current));
 		if (pool.length === 0) {
@@ -580,22 +580,22 @@ export class PictureService {
 	}
 
 	/**
-	 * A board changed: retake its picture once it has stopped changing.
+	 * A card changed: retake its picture once it has stopped changing.
 	 *
 	 * Called for every `card.changed`, which includes changes that are not to the file (who
 	 * wrote it, when it was last seen). Those cost one `existsSync`, because the revision is the
 	 * same and so is the picture's name.
 	 */
-	changed(board: DeckPage): void {
+	changed(card: DeckPage): void {
 		if (this.broken) return;
-		clearTimeout(this.settling.get(board.path));
+		clearTimeout(this.settling.get(card.path));
 		const timer = setTimeout(() => {
-			this.settling.delete(board.path);
+			this.settling.delete(card.path);
 			// Retaken as its far rungs; the whole one, and 800, when somebody asks for them.
-			for (const want of this.wanted()) void this.ahead(board, want.split("/")[0] as ThumbScheme).catch(() => {});
+			for (const want of this.wanted()) void this.ahead(card, want.split("/")[0] as ThumbScheme).catch(() => {});
 		}, this.host.settleMs ?? SETTLE_MS);
 		timer.unref?.();
-		this.settling.set(board.path, timer);
+		this.settling.set(card.path, timer);
 	}
 
 	/** A card is gone: so are its pictures, and any wait to retake one. */
@@ -624,8 +624,8 @@ export class PictureService {
 		return this.schemes;
 	}
 
-	private ask(board: DeckPage, scheme: ThumbScheme, gone: () => boolean, ahead: boolean, kind: ThumbKind, width = SMALL_TAKEN): Promise<string> {
-		const file = join(this.host.dir, thumbName(board.path, board.rev, scheme, kind, width));
+	private ask(card: DeckPage, scheme: ThumbScheme, gone: () => boolean, ahead: boolean, kind: ThumbKind, width = SMALL_TAKEN): Promise<string> {
+		const file = join(this.host.dir, thumbName(card.path, card.rev, scheme, kind, width));
 		if (existsSync(file)) return Promise.resolve(file);
 		if (this.broken) return Promise.reject(new Error(this.broken));
 		return new Promise((resolve, reject) => {
@@ -640,18 +640,18 @@ export class PictureService {
 				}
 				return;
 			}
-			const job: Job = { board, scheme, kind, file, waiting: [{ resolve, reject, gone }], ...(kind === "small" ? { width } : {}) };
+			const job: Job = { card, scheme, kind, file, waiting: [{ resolve, reject, gone }], ...(kind === "small" ? { width } : {}) };
 			this.byFile.set(file, job);
 			/*
 			 * A picture taken ahead of time goes to the back, which is the front of the array:
 			 * the next job is popped off the end. And it replaces one still waiting for an
-			 * older revision of the same board, which nobody will ever ask for.
+			 * older revision of the same card, which nobody will ever ask for.
 			 */
 			if (ahead) {
-				const any = pictureOf(board.path, scheme, kind);
+				const any = pictureOf(card.path, scheme, kind);
 				this.queue = this.queue.filter((one) => {
 					const name = one.file.slice(this.host.dir.length + 1);
-					const stale = any.test(name) && one.board.rev !== board.rev && one.ahead === true;
+					const stale = any.test(name) && one.card.rev !== card.rev && one.ahead === true;
 					if (stale) {
 						this.byFile.delete(one.file);
 						for (const w of one.waiting) w.reject(new Error("a newer revision replaced it"));
@@ -705,7 +705,7 @@ export class PictureService {
 			throw new Error(this.broken);
 		}
 		// Laid out at the card's own height, as the canvas lays it out, in a window no shorter than three quarters of its width.
-		const clip = pageClip(job.board);
+		const clip = pageClip(job.card);
 		const tall = Math.max(clip.height, Math.round(clip.width * WINDOW_ASPECT));
 		/*
 		 * The background's small pictures reuse a tab (`lease`): a fresh one per picture was an eighth
@@ -716,7 +716,7 @@ export class PictureService {
 			lease?.context ??
 			(await browser.newContext({
 				viewport: { width: clip.width, height: tall },
-				deviceScaleFactor: job.kind === "whole" ? wholeScale({ w: job.board.w, h: tall }) : 1,
+				deviceScaleFactor: job.kind === "whole" ? wholeScale({ w: job.card.w, h: tall }) : 1,
 				colorScheme: job.scheme,
 				reducedMotion: "reduce",
 			}));
@@ -724,47 +724,47 @@ export class PictureService {
 		// A page that never finishes (a script that never stops, a screenshot that never comes) is closed, which ends every call on it.
 		const watchdog = setTimeout(() => {
 			given = true;
-			console.log(`[decks] card pictures: ${job.board.path} took longer than ${TAKE_MS / 1000} s and was given up`);
+			console.log(`[decks] card pictures: ${job.card.path} took longer than ${TAKE_MS / 1000} s and was given up`);
 			void context.close().catch(() => {});
 		}, TAKE_MS);
 		try {
 			const page = lease?.page ?? (await context.newPage());
 			if (lease) await page.setViewportSize({ width: clip.width, height: tall });
 			let shotClip = clip;
-			if (CARD_PATH.test(job.board.path)) {
+			if (CARD_PATH.test(job.card.path)) {
 				/*
 				 * A card is drawn by the web app's `measure.html` (`apps/web/src/pages/measure.ts`, `picture=1`), as
 				 * the canvas frame draws it: `mountCard` in a closed shadow root at its width, card.css before its
 				 * own styles, its modules handed the card, in the scheme asked for. It says it is ready once its
 				 * height has held and its fonts have come, and how tall it came to: never below its box.
 				 */
-				const query = new URLSearchParams({ path: job.board.path, w: String(clip.width), h: String(clip.height), scheme: job.scheme, picture: "1" });
+				const query = new URLSearchParams({ path: job.card.path, w: String(clip.width), h: String(clip.height), scheme: job.scheme, picture: "1" });
 				await page.goto(`${(this.host.webOrigin ?? this.host.origin)()}/measure.html?${query}`, { waitUntil: "load", timeout: 20_000 });
 				await page.waitForFunction("window.__cardReady === true || typeof window.__measureFailed === 'string'", undefined, { timeout: CARD_READY_MS }).catch(() => {});
 				const tallAs = await page.evaluate<number>("Number(window.__cardHeight) || 0").catch(() => 0);
-				if (tallAs > 0) shotClip = pageClip({ w: job.board.w, h: Math.max(tallAs, job.board.h) });
-			} else if (job.board.item === "document") {
+				if (tallAs > 0) shotClip = pageClip({ w: job.card.w, h: Math.max(tallAs, job.card.h) });
+			} else if (job.card.item === "document") {
 				/*
 				 * A document (`docs/<file>.md`): its file rendered as a card by `measure.html` (`document=1`), markdown
 				 * set in a card's root with card.css, in the scheme asked for, as tall as it comes to.
 				 */
-				const query = new URLSearchParams({ path: job.board.path, w: String(clip.width), h: String(clip.height), scheme: job.scheme, picture: "1", document: "1" });
+				const query = new URLSearchParams({ path: job.card.path, w: String(clip.width), h: String(clip.height), scheme: job.scheme, picture: "1", document: "1" });
 				await page.goto(`${(this.host.webOrigin ?? this.host.origin)()}/measure.html?${query}`, { waitUntil: "load", timeout: 20_000 });
 				await page.waitForFunction("window.__cardReady === true || typeof window.__measureFailed === 'string'", undefined, { timeout: CARD_READY_MS }).catch(() => {});
 				const tallAs = await page.evaluate<number>("Number(window.__cardHeight) || 0").catch(() => 0);
-				if (tallAs > 0) shotClip = pageClip({ w: job.board.w, h: Math.max(tallAs, job.board.h) });
-			} else if (opens(job.board)) {
+				if (tallAs > 0) shotClip = pageClip({ w: job.card.w, h: Math.max(tallAs, job.card.h) });
+			} else if (opens(job.card)) {
 				/*
 				 * An app on a canvas (`apps/<name>`), pictured as it runs in the canvas frame: at its address
 				 * there, with the pass made for that canvas (`connections/routes/pictures.ts`), so its pages, data and storage
 				 * stand-in are the ones the frame shows. Given a moment to fetch and draw what it shows first.
 				 */
-				await page.goto(`${this.host.origin()}${opens(job.board)}`, { waitUntil: "load", timeout: 20_000 });
+				await page.goto(`${this.host.origin()}${opens(job.card)}`, { waitUntil: "load", timeout: 20_000 });
 				await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
 				await page.waitForTimeout(400);
 			} else {
 				// Anything else pictured (the page a picture card links to) is a page of its own.
-				const url = `${this.host.origin()}/api/card/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
+				const url = `${this.host.origin()}/api/card/${job.card.path.split("/").map(encodeURIComponent).join("/")}`;
 				await page.goto(url, { waitUntil: "load", timeout: 20_000 });
 				/*
 				 * `card.js` sets this after fonts, markdown, maths and diagrams. A page that never says
@@ -774,15 +774,15 @@ export class PictureService {
 				await page.waitForFunction("window.__cardReady === true", undefined, { timeout: job.ahead ? AHEAD_READY_MS : READY_MS }).catch(() => {});
 				const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
 				// Never below what the page says it is: a picture cropped under its box would be a different page from the one on the canvas.
-				const h = Math.max(measured, job.board.h);
-				if (measured > 0 && h !== job.board.h) shotClip = pageClip({ w: job.board.w, h });
+				const h = Math.max(measured, job.card.h);
+				if (measured > 0 && h !== job.card.h) shotClip = pageClip({ w: job.card.w, h });
 			}
-			const shot = await wholeShot(page, shotClip, job.kind === "whole" ? wholeScale({ w: job.board.w, h: tall }) : Math.min(2, job.width! / shotClip.width));
+			const shot = await wholeShot(page, shotClip, job.kind === "whole" ? wholeScale({ w: job.card.w, h: tall }) : Math.min(2, job.width! / shotClip.width));
 			mkdirSync(this.host.dir, { recursive: true });
 			writeFileSync(job.file, shot);
 			this.forgetOlder(job);
 			// The rungs cut from it now, while the browser is up, so a canvas zoomed out never waits for one.
-			const whole = join(this.host.dir, thumbName(job.board.path, job.board.rev, job.scheme, "whole"));
+			const whole = join(this.host.dir, thumbName(job.card.path, job.card.rev, job.scheme, "whole"));
 			void this.copiesOf(job, whole).catch(() => {});
 		} finally {
 			clearTimeout(watchdog);
@@ -815,16 +815,16 @@ export class PictureService {
 
 	/** A card's earlier revisions, in this scheme: nobody will ask for them again. */
 	private forgetOlder(job: Job): void {
-		const mine = thumbName(job.board.path, job.board.rev, job.scheme, job.kind, job.width);
-		const thisRev = `${mine.split("-")[0]}-${job.board.rev}-`;
-		const wholes = pictureOf(job.board.path, job.scheme, "whole");
+		const mine = thumbName(job.card.path, job.card.rev, job.scheme, job.kind, job.width);
+		const thisRev = `${mine.split("-")[0]}-${job.card.rev}-`;
+		const wholes = pictureOf(job.card.path, job.scheme, "whole");
 		// A picture replaces the rungs of earlier revisions; its own revision's stay.
-		const small = smallOf(job.board.path, job.scheme);
+		const small = smallOf(job.card.path, job.scheme);
 		// And their compressed sizes (`compressedName`), which no stand-in ever is.
 		const packed = new RegExp(small.source.replace("\\.webp$", "\\.astc(\\.br|\\.gz)?$"));
 		try {
 			// And every picture of it in an older look (`lookOf`), of any revision: it is drawn another way now.
-			const look = `-l${lookOf(job.board.path)}.`;
+			const look = `-l${lookOf(job.card.path)}.`;
 			for (const name of readdirSync(this.host.dir)) {
 				if ((wholes.test(name) || small.test(name) || packed.test(name)) && !name.includes(look)) rmSync(join(this.host.dir, name), { force: true });
 				else if (job.kind === "whole" && name !== mine && wholes.test(name)) rmSync(join(this.host.dir, name), { force: true });
@@ -836,17 +836,17 @@ export class PictureService {
 	}
 
 	/**
-	 * Press every control on a board and say which views break it.
+	 * Press every control on a card and say which views break it.
 	 *
-	 * A board that keeps its depth behind tabs and rows has views its writer never looked at:
-	 * `decks.canvas.fit` measures the board as it rests, and a screenshot is of the resting view too. The
-	 * first board checked this way had a tab whose text was squeezed into a 24px column and ran
-	 * to 3,460px, and nothing had said so. This loads the board in the same headless browser
+	 * A card that keeps its depth behind tabs and rows has views its writer never looked at:
+	 * `decks.canvas.fit` measures the card as it rests, and a screenshot is of the resting view too. The
+	 * first card checked this way had a tab whose text was squeezed into a 24px column and ran
+	 * to 3,460px, and nothing had said so. This loads the card in the same headless browser
 	 * the pictures use, presses each control in turn, and measures after each press: the height,
-	 * anything wider than the board, and any script error. Nothing is returned for a view that
+	 * anything wider than the card, and any script error. Nothing is returned for a view that
 	 * is fine, and nothing at all when there is no Chromium, because this is advice.
 	 */
-	async views(board: DeckPage): Promise<PageViews | undefined> {
+	async views(card: DeckPage): Promise<PageViews | undefined> {
 		if (this.broken) return undefined;
 		clearTimeout(this.idle);
 		let browser: Browser;
@@ -858,9 +858,9 @@ export class PictureService {
 			return undefined;
 		}
 		this.running += 1;
-		const context = await browser.newContext({ viewport: { width: Math.max(320, Math.round(board.w)), height: 800 }, reducedMotion: "reduce" });
+		const context = await browser.newContext({ viewport: { width: Math.max(320, Math.round(card.w)), height: 800 }, reducedMotion: "reduce" });
 		try {
-			return await pressEveryControl(context, board, this.host.origin(), READY_MS);
+			return await pressEveryControl(context, card, this.host.origin(), READY_MS);
 		} finally {
 			await context.close().catch(() => {});
 			this.running -= 1;
@@ -870,7 +870,7 @@ export class PictureService {
 	}
 
 	/**
-	 * The same browser, lent for something other than a board picture: a stage screenshot
+	 * The same browser, lent for something other than a card picture: a canvas screenshot
 	 * (`canvas/shots.ts`). Counted as running, so it is not closed under the borrower, and rested
 	 * afterwards like any other use. Throws the sentence the pictures use when there is no Chromium.
 	 */
@@ -892,7 +892,7 @@ export class PictureService {
 		} finally {
 			this.running -= 1;
 			// What waited for this slot goes now: a picture's copies or its compressed sizes held both
-			// slots as the last job ended, and nothing started the queue again, so every board after
+			// slots as the last job ended, and nothing started the queue again, so every card after
 			// it waited for ever.
 			this.pump();
 			if (this.running === 0 && this.queue.length === 0) this.rest();

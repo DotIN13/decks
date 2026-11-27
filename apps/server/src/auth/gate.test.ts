@@ -27,7 +27,7 @@ function getPage(url: string, headers: Record<string, string>): Promise<{ status
 	});
 }
 
-/** A harness with one board on a free port. */
+/** A harness with one card on a free port. */
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-gate-")));
 	const deck = join(dataDir, "decks");

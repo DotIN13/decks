@@ -7,14 +7,14 @@ import { fileUrl, NotFound, resolveFileRequest, resolveInDeck, resolveServed } f
 import { canvasFolder, canvasNameOk, libName } from "@decks/hub/layout";
 import { browse } from "../../files/browse.ts";
 import { filePreview, previewKind } from "../../files/preview.ts";
-import { boardHeaders, quarantine } from "../../files/serve.ts";
+import { cardHeaders, quarantine } from "../../files/serve.ts";
 import { storeAssetStream, UploadRefused, withMedia } from "../../files/upload.ts";
 import { actsAsPerson } from "../../auth/principal.ts";
 import { asyncRoute, wildcard, sendFile, type RouteDeps } from "./shared.ts";
 import express, { type Router } from "express";
 
 /**
- * Files: the board primitives, files from outside the deck, avatars, where a picked file sits, browsing, speech to text and uploads.
+ * Files: the card primitives, files from outside the deck, avatars, where a picked file sits, browsing, speech to text and uploads.
  */
 export function register(api: Router, { app }: RouteDeps): void {
 	/**
@@ -28,7 +28,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			// A page written before cards asks for board.css and board.js: they are card.css and card.js.
 			const target = resolveServed(app.deck.path, join("lib", libName(versioned?.file ?? wildcard(req))));
 			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(wildcard(req));
-			boardHeaders(res);
+			cardHeaders(res);
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 			await sendFile(res, target);
 		}),
@@ -44,8 +44,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * absolute path it resolved to. From then on the URL is path-shaped, which is
 	 * what makes a foreign page's own relative references land back on this guard.
 	 *
-	 * `from` is the board that asked, so a relative path means what it would mean
-	 * in an `<img src>` on that board.
+	 * `from` is the card that asked, so a relative path means what it would mean
+	 * in an `<img src>` on that card.
 	 */
 	api.get("/file", (req, res) => {
 		const path = typeof req.query.path === "string" ? req.query.path : "";
@@ -151,7 +151,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 
 
 	/**
-	 * A file the user dropped onto a board, copied into the deck's `assets/` (§3), or with
+	 * A file the user dropped onto a card, copied into the deck's `assets/` (§3), or with
 	 * `canvas`, into that canvas's own `files/`.
 	 *
 	 * One file per request, its bytes as the body and its name in the query. Not

@@ -61,7 +61,7 @@ export class Broadcast<Agent extends { id: string }> {
 	 * A broadcast as one browser should see it.
 	 *
 	 * Three frames depend on which conversation is on screen: `agents` names it, and `deck.state` and
-	 * `card.changed` carry that stage's arrangement. They are built for the registry's focus, which is
+	 * `card.changed` carry that canvas's arrangement. They are built for the registry's focus, which is
 	 * whichever browser acted last, so a browser on another conversation gets them rebuilt for its own.
 	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
 	 */

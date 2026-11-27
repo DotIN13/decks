@@ -14,7 +14,7 @@ import { cliTokenFile, readCliToken, writeCliToken } from "./cli-token.ts";
  * writes for its own user at start, traded at `POST /api/login` for a terminal's own.
  */
 
-/** A harness with one board on a free port. */
+/** A harness with one card on a free port. */
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-gate-")));
 	const deck = join(dataDir, "decks");

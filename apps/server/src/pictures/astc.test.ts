@@ -45,7 +45,7 @@ test("pictures are kept at the ladder's widths only, and no other width is answe
 test("a compressed picture is squeezed for the wire once, beside it, and comes back the same", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "astc-wire-"));
 	const packed = join(dir, "ab-3-light-2-whole-w480-l3.astc");
-	// Blocks of plain paper repeat: what a board's picture mostly is.
+	// Blocks of plain paper repeat: what a card's picture mostly is.
 	writeFileSync(packed, Buffer.alloc(64 * 1024, 7));
 	const br = await squeezed(packed, "br");
 	assert.equal(br, wireName(packed, "br"));

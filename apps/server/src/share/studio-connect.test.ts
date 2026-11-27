@@ -88,8 +88,8 @@ test("a page that hands the harness a Studio key is refused and nothing is kept:
 		const allowed = await post("/v1/now", { args: [] }, { ...STUDIO, "x-decks-person": "studio", authorization: `Bearer ${done.body.token}` });
 		assert.equal(allowed.status, 200);
 		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
-		const board = await fetch(`${base}/card/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
-		assert.equal(board.status, 401, "a token in an address is no longer taken: a frame gets a ticket");
+		const card = await fetch(`${base}/card/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
+		assert.equal(card.status, 401, "a token in an address is no longer taken: a frame gets a ticket");
 	} finally {
 		cleanup();
 	}
