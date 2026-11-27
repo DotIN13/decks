@@ -17,7 +17,7 @@
 		"packages/docs/src/page/gview.ts": 2091,
 		"packages/docs/src/page/live.ts": 2054,
 		"packages/docs/src/page/page.ts": 1752,
-		"packages/sync-client/src/sync.ts": 1350,
+		"packages/sync-client/src/sync.ts": 1200,
 		"apps/server/src/apps/starters.ts: files": 169,
 		"apps/server/src/auth/issue.ts: doorRoutes": 171,
 		"apps/server/src/calls/apps.ts: appsVerbs": 196,
@@ -69,7 +69,7 @@
 		"apps/server/src/runtimes/opencode2/backend.ts: Opencode2Backend": 38,
 		"packages/docs/src/page/gview.ts: GoogleView": 73,
 		"packages/docs/src/page/live.ts: LiveEditor": 47,
-		"packages/sync-client/src/sync.ts: HarnessSync": 46
+		"packages/sync-client/src/sync.ts: HarnessSync": 40
 	},
 	"upward": [
 		"apps/server/src/agents/backend.ts -> apps/server/src/calls/tool.ts",
