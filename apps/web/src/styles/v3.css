@@ -4271,7 +4271,8 @@ body {
 	.v3-topbar .v3-agent-chip,
 	.v3-phone-more .v3-icon,
 	.v3-panel-head .v3-icon,
-	.agent-row .agent-more {
+	.agent-row .agent-more,
+	.v3-tools .v3-tool {
 		min-width: 40px;
 		min-height: 40px;
 	}
@@ -4279,7 +4280,8 @@ body {
 	.dock .dock-row .chip-button,
 	.v3-topbar .v3-canvas-chip,
 	.v3-nav .v3-nav-tab,
-	.v3-zoom .v3-zoom-value {
+	.v3-zoom .v3-zoom-value,
+	.panel-mark .switcher {
 		min-height: 40px;
 	}
 
