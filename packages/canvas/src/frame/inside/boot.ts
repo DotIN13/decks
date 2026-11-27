@@ -96,7 +96,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		const doc = made?.handle.drawn();
 		return doc ? pagesOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
 	};
-	/** Every place the stage draws a page in: the cards and boards, and the document and app items. */
+	/** Every place the canvas draws a page in: the cards and boards, and the document and app items. */
 	const places = () => [...pages(), ...items()];
 	const changed = () => {
 		setRevision((n) => n + 1);
@@ -160,7 +160,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	/*
 	 * What a host answers for the canvas (`host.ts`), from the ticket: a deck file in the drawing is read in
 	 * the canvas's own folder, where the deck's `assets/` and `docs/` are served beside it too
-	 * (`deck/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
+	 * (`deck/layout.ts`); a link from a card to another is its deck path, when it is one on this canvas.
 	 */
 	const folder = `canvases/${start.canvas.name}/`;
 	// The deck's import map, once for every card here (the harness's), before any card's script runs: its paths under assets/ read beside this canvas's cards, where the deck's assets/ is served.

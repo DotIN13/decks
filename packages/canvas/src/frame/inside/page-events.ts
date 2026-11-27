@@ -34,7 +34,7 @@ export function listenToPage(d: ListenToPageNeeds) {
 		if (!carries(event)) return;
 		event.preventDefault();
 		const at = { x: event.clientX, y: event.clientY };
-		// Over a card they go into it, between its blocks where they land: only the stage here knows what is under the point.
+		// Over a card they go into it, between its blocks where they land: only the canvas here knows what is under the point.
 		const card = probes.cardAt?.(at.x, at.y) as CardSlot | undefined;
 		const files = Array.from(event.dataTransfer?.files ?? []);
 		void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>

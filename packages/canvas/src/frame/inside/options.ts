@@ -49,7 +49,7 @@ const focusOn = (ctx: FrameContext, targets: string[]) => {
  * cards' `card.decks` calls.
  */
 /**
- * A page by its path, from a map made once per list: the stage asks this for every card each time it
+ * A page by its path, from a map made once per list: the canvas asks this for every card each time it
  * lists them, and a search of the whole list per card made that O(n²).
  */
 let pagesIndexed: { list: readonly Page[]; byPath: Map<string, Page> } | undefined;

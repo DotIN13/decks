@@ -18,7 +18,7 @@ import { useShippedFonts } from "../../look/font-files.ts";
  * stream and sends your edits itself. With the page it trades only what is the page's: its chrome, the
  * composer, your storage (`protocol.ts`).
  *
- * What a host answered with a function (a board's address, its picture, its storage) is worked out
+ * What a host answered with a function (a card's address, its picture, its storage) is worked out
  * here from `start`: the files' ticketed address, the pages' trust, the page's kept values.
  *
  * In parts: what the frame holds once started (`boot.ts`), what the host and the editor are told

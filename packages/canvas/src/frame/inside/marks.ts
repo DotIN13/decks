@@ -74,7 +74,7 @@ export function touchedBy(edits: readonly PenEdit[], before: (id: string) => Ite
 /**
  * Marks over what agents draw: each change by an agent puts a mark on every item it touched, in the
  * agent's colour, for `MARK_MS`; a second change to the same item starts its mark again. Drawn in the
- * stage's world (`frame.tsx`), in canvas units.
+ * canvas's world (`frame.tsx`), in canvas units.
  */
 export function installMarks() {
 	const [list, setList] = createSignal<Mark[]>([]);
