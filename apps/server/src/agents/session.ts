@@ -12,6 +12,7 @@ import type { Act } from "./acts.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
 import { identityReminder } from "./identity-reminder.ts";
+import { progressReminder } from "./progress-reminder.ts";
 import { lookingLineIn, type LookingAt } from "./looking-at.ts";
 import { canvasNameReminder } from "../canvas/canvas-name.ts";
 import { Conversation } from "./conversation.ts";
@@ -596,7 +597,7 @@ export class DeckAgent {
 	 * In order: anything the person did to a card since the last turn, which rides along with the
 	 * message rather than arriving as its own interruption; what others changed on its canvases since
 	 * its last message (every way in comes through here: a message typed, queued, sent into a running
-	 * turn or handed over); who it has not said it is, until it has (`agents/identity-reminder.ts`);
+	 * turn or handed over); who it has not said it is, until it has (`agents/identity-reminder.ts`); on a message that starts a turn, to start its progress card first (`agents/progress-reminder.ts`);
 	 * its canvas's name, while it has none of its own or has outgrown it (`canvas/canvas-name.ts`); and
 	 * last, nearest the words, what the person was looking at when they wrote them (`looking-at.ts`).
 	 */
@@ -606,6 +607,8 @@ export class DeckAgent {
 		notes.push(...this.seat.canvasNotes());
 		const unsaid = identityReminder(this.identity);
 		if (unsaid) notes.push(unsaid);
+		const progress = progressReminder(this.conversation.state === "idle");
+		if (progress) notes.push(progress);
 		const unnamed = canvasNameReminder(this.stage.pens, this.seat.stageName());
 		if (unnamed) notes.push(unnamed);
 		if (at) notes.push(lookingLineIn(at, this.deck, this.stage.pens, this.seat.stageName()));

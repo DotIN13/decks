@@ -11,8 +11,9 @@ report in three places, each kept current at its own pace:
 
 ## When to make a progress card
 
-Work of three steps or more, or anything that runs in the background, gets one, made when the work
-starts. A small job (one turn, a step or two) goes straight to its result.
+Work of three steps or more, or anything that runs in the background, gets one, made **before you
+run anything**: the card first, with the first step's hypothesis, then the first command. A card
+written after the work is a report, not progress, and the person watched nothing move meanwhile. A small job (one turn, a step or two) goes straight to its result.
 
 It is an ordinary card: `decks card create --title "<the task>: starting" --canvas <name>`, placed in
 your row of the Working area (`--beside` your row's last item; the canvas-authoring skill,
@@ -32,7 +33,9 @@ Write each step like a small experiment, so a reader sees why you are doing it a
 - **Result**: what came of it, and whether the hypothesis **held**, **did not hold**, or is
   **blocked**. Numbers where there are some: "12 of 12 pass", "8% faster, below the 30% hoped".
 
-Steps are fine-grained: a bug fix is reproduce, narrow it down, find the cause, fix, check nothing else
+Steps are fine-grained: one hypothesis, checked by one run or a few. "Write the sieve and test it"
+is two steps (write it; test it against known counts), and a benchmark is at least two more (time
+both; find where the time goes). Update the card as each run ends, not only when a step does. A bug fix is reproduce, narrow it down, find the cause, fix, check nothing else
 broke, each its own step. You do not plan them all first: write the steps you can see, and add one
 whenever a result calls for it. A step that does not hold opens the next.
 
