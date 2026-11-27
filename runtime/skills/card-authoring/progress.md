@@ -11,10 +11,11 @@ waits on them. You report in three places, each kept current at its own pace:
 
 ## When to make a progress card
 
-Work of three steps or more, or anything long or in the background, gets one, made **before you run
+**Every question or piece of work that takes more than one step gets one**, whatever it is: a bug, a
+feature, a refactor, a web search, a question about the code, research. It is made **before you run
 anything**: the card first, with the first step, then the first command. A card written after the
-work is a report, not progress, and the person watched nothing move meanwhile. A small job (one
-turn, a step or two) goes straight to its result.
+work is a report, not progress, and the person watched nothing move meanwhile. Only an answer you can
+give in one step (a fact you know, one look at a file) goes straight to its result.
 
 It is an ordinary card, copied from the template, placed in your row of the Working area (`--beside`
 your row's last item; the canvas-authoring skill, "Organize a canvas"). If a to-do asked for the

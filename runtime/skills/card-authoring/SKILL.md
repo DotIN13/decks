@@ -91,7 +91,7 @@ Everything that used to be a board is a card. A board file left in a deck from b
 
 **A progress card: your work while it runs**
 
-- Work of three steps or more, or anything long or in the background, gets a progress card in your
+- Every question or piece of work that takes more than one step gets a progress card in your
   row of Working, made before you run anything. It is an ordinary 16:10 card copied from the template
   [progress-example/](progress-example/): steps on the left (a plain title, a goal or hypothesis with
   why, a method, what you expect, whether it held), a log on the right of every command with what it
