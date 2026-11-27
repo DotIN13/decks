@@ -35,7 +35,10 @@ Write each step like a small experiment, so a reader sees why you are doing it a
 
 Steps are fine-grained: one hypothesis, checked by one run or a few. "Write the sieve and test it"
 is two steps (write it; test it against known counts), and a benchmark is at least two more (time
-both; find where the time goes). Update the card as each run ends, not only when a step does. A bug fix is reproduce, narrow it down, find the cause, fix, check nothing else
+both; find where the time goes). Update the card as each run ends, not only when a step does,
+and **before any run that may take more than a minute**: put it on the card as running first, so the
+person sees what you are waiting on, and give it a time limit (`timeout 300 python3 bench.py`). A run
+that hits the limit is a result too: say so on the card, and change the method. A bug fix is reproduce, narrow it down, find the cause, fix, check nothing else
 broke, each its own step. You do not plan them all first: write the steps you can see, and add one
 whenever a result calls for it. A step that does not hold opens the next.
 
