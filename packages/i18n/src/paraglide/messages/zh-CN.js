@@ -6,6 +6,9 @@
 /** @typedef {{}} Agents_Browse_LabelInputs */
 /** @typedef {{}} Agents_Browse_TitleInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_CloseInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_BodyInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_TitleInputs */
+/** @typedef {{}} Agents_Close_Ask_YesInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_TitleInputs */
 /** @typedef {{}} Agents_Dialog_AllowInputs */
 /** @typedef {{}} Agents_Dialog_CancelInputs */
@@ -95,6 +98,9 @@
 /** @typedef {{}} Agents_Ws_NamedInputs */
 /** @typedef {{}} App_CancelInputs */
 /** @typedef {{}} App_Clear_CanvasInputs */
+/** @typedef {{}} App_Clear_Canvas_Ask_BodyInputs */
+/** @typedef {{ count: NonNullable<unknown> }} App_Clear_Canvas_Ask_TitleInputs */
+/** @typedef {{}} App_Clear_Canvas_Ask_YesInputs */
 /** @typedef {{}} App_Dark_ModeInputs */
 /** @typedef {{}} App_DeleteInputs */
 /** @typedef {{ folder: NonNullable<unknown> }} App_Delete_App_BodyInputs */
@@ -1580,6 +1586,18 @@ export const agents_close = /** @type {(inputs: Agents_CloseInputs) => Localized
 	return /** @type {LocalizedString} */ (`关闭 ${i?.name}`)
 };
 
+export const agents_close_ask_body = /** @type {(inputs: Agents_Close_Ask_BodyInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.name} 将从代理列表中移除，对话记录仍保存在磁盘上。`)
+};
+
+export const agents_close_ask_title = /** @type {(inputs: Agents_Close_Ask_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`关闭 ${i?.name}？`)
+};
+
+export const agents_close_ask_yes = /** @type {(inputs: Agents_Close_Ask_YesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`关闭`)
+};
+
 export const agents_close_title = /** @type {(inputs: Agents_Close_TitleInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`关闭 ${i?.name}，对话记录仍留在磁盘上。删除的效果相同。`)
 };
@@ -1933,7 +1951,19 @@ export const app_cancel = /** @type {(inputs: App_CancelInputs) => LocalizedStri
 };
 
 export const app_clear_canvas = /** @type {(inputs: App_Clear_CanvasInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`清空画布`)
+	return /** @type {LocalizedString} */ (`移除所有卡片…`)
+};
+
+export const app_clear_canvas_ask_body = /** @type {(inputs: App_Clear_Canvas_Ask_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`卡片会从画布上移除，它们的文件夹仍保留在牌组中，绘图也保留。`)
+};
+
+export const app_clear_canvas_ask_title = /** @type {(inputs: App_Clear_Canvas_Ask_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`从此画布移除全部 ${i?.count} 张卡片？`)
+};
+
+export const app_clear_canvas_ask_yes = /** @type {(inputs: App_Clear_Canvas_Ask_YesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`移除卡片`)
 };
 
 export const app_dark_mode = /** @type {(inputs: App_Dark_ModeInputs) => LocalizedString} */ () => {

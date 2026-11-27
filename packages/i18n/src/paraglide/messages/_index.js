@@ -8,6 +8,9 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Agents_Browse_LabelInputs */
 /** @typedef {{}} Agents_Browse_TitleInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_CloseInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_BodyInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_TitleInputs */
+/** @typedef {{}} Agents_Close_Ask_YesInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_TitleInputs */
 /** @typedef {{}} Agents_Dialog_AllowInputs */
 /** @typedef {{}} Agents_Dialog_CancelInputs */
@@ -97,6 +100,9 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Agents_Ws_NamedInputs */
 /** @typedef {{}} App_CancelInputs */
 /** @typedef {{}} App_Clear_CanvasInputs */
+/** @typedef {{}} App_Clear_Canvas_Ask_BodyInputs */
+/** @typedef {{ count: NonNullable<unknown> }} App_Clear_Canvas_Ask_TitleInputs */
+/** @typedef {{}} App_Clear_Canvas_Ask_YesInputs */
 /** @typedef {{}} App_Dark_ModeInputs */
 /** @typedef {{}} App_DeleteInputs */
 /** @typedef {{ folder: NonNullable<unknown> }} App_Delete_App_BodyInputs */
@@ -1645,6 +1651,48 @@ export const agents_close = /** @type {((inputs: Agents_CloseInputs, options?: {
 /**
 * | output |
 * | --- |
+* | "{name} leaves the agent list. Its transcript stays on disk." |
+*
+* @param {Agents_Close_Ask_BodyInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const agents_close_ask_body = /** @type {((inputs: Agents_Close_Ask_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Close_Ask_BodyInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.agents_close_ask_body(inputs)
+	return __en.agents_close_ask_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Close {name}?" |
+*
+* @param {Agents_Close_Ask_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const agents_close_ask_title = /** @type {((inputs: Agents_Close_Ask_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Close_Ask_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.agents_close_ask_title(inputs)
+	return __en.agents_close_ask_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Close" |
+*
+* @param {Agents_Close_Ask_YesInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const agents_close_ask_yes = /** @type {((inputs?: Agents_Close_Ask_YesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Agents_Close_Ask_YesInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.agents_close_ask_yes(inputs)
+	return __en.agents_close_ask_yes(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Close {name} — the transcript stays on disk. Delete does the same." |
 *
 * @param {Agents_Close_TitleInputs} inputs
@@ -2882,7 +2930,7 @@ export const app_cancel = /** @type {((inputs?: App_CancelInputs, options?: { lo
 /**
 * | output |
 * | --- |
-* | "Clear the canvas" |
+* | "Remove all cards…" |
 *
 * @param {App_Clear_CanvasInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options
@@ -2892,6 +2940,48 @@ export const app_clear_canvas = /** @type {((inputs?: App_Clear_CanvasInputs, op
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.app_clear_canvas(inputs)
 	return __en.app_clear_canvas(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The cards come off the canvas. Their folders stay in the deck, and the drawing stays." |
+*
+* @param {App_Clear_Canvas_Ask_BodyInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const app_clear_canvas_ask_body = /** @type {((inputs?: App_Clear_Canvas_Ask_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<App_Clear_Canvas_Ask_BodyInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.app_clear_canvas_ask_body(inputs)
+	return __en.app_clear_canvas_ask_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Remove all {count} cards from this canvas?" |
+*
+* @param {App_Clear_Canvas_Ask_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const app_clear_canvas_ask_title = /** @type {((inputs: App_Clear_Canvas_Ask_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<App_Clear_Canvas_Ask_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.app_clear_canvas_ask_title(inputs)
+	return __en.app_clear_canvas_ask_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Remove cards" |
+*
+* @param {App_Clear_Canvas_Ask_YesInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const app_clear_canvas_ask_yes = /** @type {((inputs?: App_Clear_Canvas_Ask_YesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<App_Clear_Canvas_Ask_YesInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.app_clear_canvas_ask_yes(inputs)
+	return __en.app_clear_canvas_ask_yes(inputs)
 });
 /**
 * | output |

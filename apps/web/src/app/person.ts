@@ -3,6 +3,7 @@ import { createSignal } from "solid-js";
 import type { PanelTab } from "../panel/LeftPanel.tsx";
 import { moveTo, stageOf, viewOnly } from "../state/canvases.ts";
 import { setState, state } from "../state/deck.ts";
+import { ask } from "../state/confirm.ts";
 import { act } from "../state/decks.ts";
 import { ensureHistory } from "../state/history.ts";
 import { notice } from "../state/notices.ts";
@@ -69,7 +70,7 @@ export const newAgent = async (spec: { kind?: string; workspace?: string }) => {
 };
 
 /*
- * Close a chat — the × on a row in the agent list.
+ * Close a chat — the × on a row in the agent list, after the person says yes.
  *
  * Nothing is cleaned up here on purpose. The server answers with `agent.removed`, which
  * is where the transcript, identity and context kept for that id are dropped, and then
@@ -79,7 +80,12 @@ export const newAgent = async (spec: { kind?: string; workspace?: string }) => {
  * row's × is disabled to avoid: `closing()` in `agent-order.ts` draws it from the same
  * rule `Registry.remove` enforces.
  */
-export const closeAgent = (id: string) => void call("agent.remove", [id]).then(warnIfFailed);
+export const closeAgent = async (id: string) => {
+	// Asked first: the × sits beside the row that switches to the agent, and on a phone on every row.
+	const name = state.identities[id]?.name ?? state.chats.find((chat) => chat.id === id)?.name ?? id;
+	const yes = await ask({ title: m.agents_close_ask_title({ name }), body: m.agents_close_ask_body({ name }), yes: m.agents_close_ask_yes(), no: m.app_cancel(), danger: true });
+	if (yes) await call("agent.remove", [id]).then(warnIfFailed);
+};
 
 // ---- canvases ----------------------------------------------------------------------------------
 

@@ -6,6 +6,9 @@
 /** @typedef {{}} Agents_Browse_LabelInputs */
 /** @typedef {{}} Agents_Browse_TitleInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_CloseInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_BodyInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Agents_Close_Ask_TitleInputs */
+/** @typedef {{}} Agents_Close_Ask_YesInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Agents_Close_TitleInputs */
 /** @typedef {{}} Agents_Dialog_AllowInputs */
 /** @typedef {{}} Agents_Dialog_CancelInputs */
@@ -95,6 +98,9 @@
 /** @typedef {{}} Agents_Ws_NamedInputs */
 /** @typedef {{}} App_CancelInputs */
 /** @typedef {{}} App_Clear_CanvasInputs */
+/** @typedef {{}} App_Clear_Canvas_Ask_BodyInputs */
+/** @typedef {{ count: NonNullable<unknown> }} App_Clear_Canvas_Ask_TitleInputs */
+/** @typedef {{}} App_Clear_Canvas_Ask_YesInputs */
 /** @typedef {{}} App_Dark_ModeInputs */
 /** @typedef {{}} App_DeleteInputs */
 /** @typedef {{ folder: NonNullable<unknown> }} App_Delete_App_BodyInputs */
@@ -1581,6 +1587,18 @@ export const agents_close = /** @type {(inputs: Agents_CloseInputs) => Localized
 	return /** @type {LocalizedString} */ (`Close ${i?.name}`)
 };
 
+export const agents_close_ask_body = /** @type {(inputs: Agents_Close_Ask_BodyInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.name} leaves the agent list. Its transcript stays on disk.`)
+};
+
+export const agents_close_ask_title = /** @type {(inputs: Agents_Close_Ask_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Close ${i?.name}?`)
+};
+
+export const agents_close_ask_yes = /** @type {(inputs: Agents_Close_Ask_YesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Close`)
+};
+
 export const agents_close_title = /** @type {(inputs: Agents_Close_TitleInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Close ${i?.name} — the transcript stays on disk. Delete does the same.`)
 };
@@ -1949,7 +1967,19 @@ export const app_cancel = /** @type {(inputs: App_CancelInputs) => LocalizedStri
 };
 
 export const app_clear_canvas = /** @type {(inputs: App_Clear_CanvasInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Clear the canvas`)
+	return /** @type {LocalizedString} */ (`Remove all cards…`)
+};
+
+export const app_clear_canvas_ask_body = /** @type {(inputs: App_Clear_Canvas_Ask_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The cards come off the canvas. Their folders stay in the deck, and the drawing stays.`)
+};
+
+export const app_clear_canvas_ask_title = /** @type {(inputs: App_Clear_Canvas_Ask_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Remove all ${i?.count} cards from this canvas?`)
+};
+
+export const app_clear_canvas_ask_yes = /** @type {(inputs: App_Clear_Canvas_Ask_YesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Remove cards`)
 };
 
 export const app_dark_mode = /** @type {(inputs: App_Dark_ModeInputs) => LocalizedString} */ () => {

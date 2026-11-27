@@ -161,5 +161,8 @@
 	"agents_browse_title": "浏览：阅读卡片，移动和改写绘图",
 	"agents_browse_label": "浏览卡片",
 	"agents_draw": "在画布上绘图",
-	"agents_ws_named": "名为"
+	"agents_ws_named": "名为",
+	"agents_close_ask_title": "关闭 {name}？",
+	"agents_close_ask_body": "{name} 将从代理列表中移除，对话记录仍保存在磁盘上。",
+	"agents_close_ask_yes": "关闭"
 }

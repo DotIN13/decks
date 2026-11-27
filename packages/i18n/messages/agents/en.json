@@ -166,5 +166,8 @@
 	"agents_browse_title": "Browse: read the cards, move and retype what is drawn",
 	"agents_browse_label": "Browse the cards",
 	"agents_draw": "Draw on the canvas",
-	"agents_ws_named": "Named"
+	"agents_ws_named": "Named",
+	"agents_close_ask_title": "Close {name}?",
+	"agents_close_ask_body": "{name} leaves the agent list. Its transcript stays on disk.",
+	"agents_close_ask_yes": "Close"
 }

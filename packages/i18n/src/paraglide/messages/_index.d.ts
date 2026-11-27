@@ -44,6 +44,27 @@ export const agents_close: ((inputs: Agents_CloseInputs, options?: { locale?: "e
 /**
 * | output |
 * | --- |
+* | "{name} leaves the agent list. Its transcript stays on disk." |
+*
+*/
+export const agents_close_ask_body: ((inputs: Agents_Close_Ask_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Close_Ask_BodyInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Close {name}?" |
+*
+*/
+export const agents_close_ask_title: ((inputs: Agents_Close_Ask_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Close_Ask_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Close" |
+*
+*/
+export const agents_close_ask_yes: ((inputs?: Agents_Close_Ask_YesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Close_Ask_YesInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Close {name} — the transcript stays on disk. Delete does the same." |
 *
 */
@@ -665,10 +686,31 @@ export const app_cancel: ((inputs?: App_CancelInputs, options?: { locale?: "en" 
 /**
 * | output |
 * | --- |
-* | "Clear the canvas" |
+* | "Remove all cards…" |
 *
 */
 export const app_clear_canvas: ((inputs?: App_Clear_CanvasInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<App_Clear_CanvasInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "The cards come off the canvas. Their folders stay in the deck, and the drawing stays." |
+*
+*/
+export const app_clear_canvas_ask_body: ((inputs?: App_Clear_Canvas_Ask_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<App_Clear_Canvas_Ask_BodyInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Remove all {count} cards from this canvas?" |
+*
+*/
+export const app_clear_canvas_ask_title: ((inputs: App_Clear_Canvas_Ask_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<App_Clear_Canvas_Ask_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Remove cards" |
+*
+*/
+export const app_clear_canvas_ask_yes: ((inputs?: App_Clear_Canvas_Ask_YesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<App_Clear_Canvas_Ask_YesInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
 * | --- |
@@ -10917,6 +10959,9 @@ export type Agents_AgentsInputs = {};
 export type Agents_Browse_LabelInputs = {};
 export type Agents_Browse_TitleInputs = {};
 export type Agents_CloseInputs = { name: NonNullable<unknown> };
+export type Agents_Close_Ask_BodyInputs = { name: NonNullable<unknown> };
+export type Agents_Close_Ask_TitleInputs = { name: NonNullable<unknown> };
+export type Agents_Close_Ask_YesInputs = {};
 export type Agents_Close_TitleInputs = { name: NonNullable<unknown> };
 export type Agents_Dialog_AllowInputs = {};
 export type Agents_Dialog_CancelInputs = {};
@@ -11006,6 +11051,9 @@ export type Agents_Ws_Name_PlaceholderInputs = {};
 export type Agents_Ws_NamedInputs = {};
 export type App_CancelInputs = {};
 export type App_Clear_CanvasInputs = {};
+export type App_Clear_Canvas_Ask_BodyInputs = {};
+export type App_Clear_Canvas_Ask_TitleInputs = { count: NonNullable<unknown> };
+export type App_Clear_Canvas_Ask_YesInputs = {};
 export type App_Dark_ModeInputs = {};
 export type App_DeleteInputs = {};
 export type App_Delete_App_BodyInputs = { folder: NonNullable<unknown> };
