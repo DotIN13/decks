@@ -4232,3 +4232,26 @@ body {
 		box-shadow: var(--v3-shadow);
 	}
 }
+
+/* An empty canvas's words, centred on the canvas; they never take a press (`canvas-host.tsx`). */
+.canvas-empty {
+	position: fixed;
+	left: calc(var(--inset-left, 0px) + (100vw - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
+	top: 45%;
+	transform: translate(-50%, -50%);
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-width: 360px;
+	color: var(--muted);
+	font-size: 14px;
+	line-height: 1.45;
+	text-align: center;
+	pointer-events: none;
+}
+
+.canvas-empty strong {
+	color: var(--fg);
+	font-size: 16px;
+	font-weight: 600;
+}

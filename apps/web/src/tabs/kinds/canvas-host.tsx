@@ -143,9 +143,24 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		editor.dispose();
 	});
 	const canvasLeft = () => document.querySelector("iframe.canvas-frame")?.getBoundingClientRect().left ?? 0;
+	/*
+	 * An empty canvas says what it is for. It was a blank grey field, and nothing said what a canvas, a card
+	 * or an agent was, or what to do first (UI review). Empty is no cards and no words; it never takes a press.
+	 */
+	const empty = () => {
+		const row = stages().find((one) => one.name === canvasOnScreen()?.name);
+		return !!row && row.boards === 0 && !row.words.trim();
+	};
+	const agentName = () => state.identities[state.focused ?? ""]?.name ?? m.canvas_empty_agent();
 	return (
 		<>
 			{editor.surface()}
+			<Show when={empty()}>
+				<div class="canvas-empty" aria-live="polite">
+					<strong>{m.canvas_empty_title()}</strong>
+					<span>{m.canvas_empty_body({ agent: agentName() })}</span>
+				</div>
+			</Show>
 			<Show when={commenting()} keyed>
 				{(target) => (
 					<CommentPopup

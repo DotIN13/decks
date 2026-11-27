@@ -226,6 +226,9 @@
 /** @typedef {{}} Canvas_Copy_No_AnswerInputs */
 /** @typedef {{}} Canvas_Cursor_AgentInputs */
 /** @typedef {{}} Canvas_Document_Needs_FrameInputs */
+/** @typedef {{}} Canvas_Empty_AgentInputs */
+/** @typedef {{ agent: NonNullable<unknown> }} Canvas_Empty_BodyInputs */
+/** @typedef {{}} Canvas_Empty_TitleInputs */
 /** @typedef {{}} Canvas_Frame_TitleInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_BendInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_JoinInputs */
@@ -2488,6 +2491,18 @@ export const canvas_cursor_agent = /** @type {(inputs: Canvas_Cursor_AgentInputs
 
 export const canvas_document_needs_frame = /** @type {(inputs: Canvas_Document_Needs_FrameInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Documents open in the canvas frame.`)
+};
+
+export const canvas_empty_agent = /** @type {(inputs: Canvas_Empty_AgentInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`an agent`)
+};
+
+export const canvas_empty_body = /** @type {(inputs: Canvas_Empty_BodyInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Ask ${i?.agent} in the box below to draw something, write a card or build an app. Or draw on it yourself with the tools on the left.`)
+};
+
+export const canvas_empty_title = /** @type {(inputs: Canvas_Empty_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This canvas is empty`)
 };
 
 export const canvas_frame_title = /** @type {(inputs: Canvas_Frame_TitleInputs) => LocalizedString} */ () => {

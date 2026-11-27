@@ -1589,6 +1589,27 @@ export const canvas_document_needs_frame: ((inputs?: Canvas_Document_Needs_Frame
 /**
 * | output |
 * | --- |
+* | "an agent" |
+*
+*/
+export const canvas_empty_agent: ((inputs?: Canvas_Empty_AgentInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Empty_AgentInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Ask {agent} in the box below to draw something, write a card or build an app. Or draw on it yourself with the tools on the left." |
+*
+*/
+export const canvas_empty_body: ((inputs: Canvas_Empty_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Empty_BodyInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "This canvas is empty" |
+*
+*/
+export const canvas_empty_title: ((inputs?: Canvas_Empty_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Empty_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Canvas" |
 *
 */
@@ -11235,6 +11256,9 @@ export type Canvas_Copy_FailedInputs = { why: NonNullable<unknown> };
 export type Canvas_Copy_No_AnswerInputs = {};
 export type Canvas_Cursor_AgentInputs = {};
 export type Canvas_Document_Needs_FrameInputs = {};
+export type Canvas_Empty_AgentInputs = {};
+export type Canvas_Empty_BodyInputs = { agent: NonNullable<unknown> };
+export type Canvas_Empty_TitleInputs = {};
 export type Canvas_Frame_TitleInputs = {};
 export type Canvas_Handle_Arrow_BendInputs = {};
 export type Canvas_Handle_Arrow_JoinInputs = {};

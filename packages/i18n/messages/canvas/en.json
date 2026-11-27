@@ -416,5 +416,8 @@
 	"canvas_pill_refresh": "Reload",
 	"canvas_pill_refresh_title": "Load it again from its files, in this window",
 	"canvas_hidden_offer": "“{title}” is off the canvas. Its folder stays in the deck.",
-	"canvas_hidden_undo": "Undo"
+	"canvas_hidden_undo": "Undo",
+	"canvas_empty_title": "This canvas is empty",
+	"canvas_empty_body": "Ask {agent} in the box below to draw something, write a card or build an app. Or draw on it yourself with the tools on the left.",
+	"canvas_empty_agent": "an agent"
 }

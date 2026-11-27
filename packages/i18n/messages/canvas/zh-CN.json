@@ -374,5 +374,8 @@
 	"canvas_pill_refresh": "重新加载",
 	"canvas_pill_refresh_title": "在这个窗口里从文件重新加载",
 	"canvas_hidden_offer": "“{title}”已从画布上移除，它的文件夹仍在牌组中。",
-	"canvas_hidden_undo": "撤销"
+	"canvas_hidden_undo": "撤销",
+	"canvas_empty_title": "此画布是空的",
+	"canvas_empty_body": "在下方的输入框中让 {agent} 画点什么、写一张卡片或做一个应用；也可以用左侧的工具自己画。",
+	"canvas_empty_agent": "代理"
 }

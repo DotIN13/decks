@@ -228,6 +228,9 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Canvas_Copy_No_AnswerInputs */
 /** @typedef {{}} Canvas_Cursor_AgentInputs */
 /** @typedef {{}} Canvas_Document_Needs_FrameInputs */
+/** @typedef {{}} Canvas_Empty_AgentInputs */
+/** @typedef {{ agent: NonNullable<unknown> }} Canvas_Empty_BodyInputs */
+/** @typedef {{}} Canvas_Empty_TitleInputs */
 /** @typedef {{}} Canvas_Frame_TitleInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_BendInputs */
 /** @typedef {{}} Canvas_Handle_Arrow_JoinInputs */
@@ -4740,6 +4743,48 @@ export const canvas_document_needs_frame = /** @type {((inputs?: Canvas_Document
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.canvas_document_needs_frame(inputs)
 	return __en.canvas_document_needs_frame(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "an agent" |
+*
+* @param {Canvas_Empty_AgentInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_empty_agent = /** @type {((inputs?: Canvas_Empty_AgentInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Empty_AgentInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_empty_agent(inputs)
+	return __en.canvas_empty_agent(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Ask {agent} in the box below to draw something, write a card or build an app. Or draw on it yourself with the tools on the left." |
+*
+* @param {Canvas_Empty_BodyInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_empty_body = /** @type {((inputs: Canvas_Empty_BodyInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Empty_BodyInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_empty_body(inputs)
+	return __en.canvas_empty_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This canvas is empty" |
+*
+* @param {Canvas_Empty_TitleInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_empty_title = /** @type {((inputs?: Canvas_Empty_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Empty_TitleInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_empty_title(inputs)
+	return __en.canvas_empty_title(inputs)
 });
 /**
 * | output |
