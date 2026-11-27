@@ -1,6 +1,6 @@
 import type { Page } from "@decks/protocol";
 import { flyToPages } from "../app/links.ts";
-import { stages } from "../state/canvases.ts";
+import { canvases } from "../state/canvases.ts";
 import { act } from "../state/decks.ts";
 import { m } from "@decks/i18n";
 import { notice } from "../state/notices.ts";
@@ -37,7 +37,7 @@ export async function showOnCanvas(tab: Tab, d: { frameWhenPlaced: (path: string
 		const at = await act<{ x1: number; y1: number }>("canvas.space", [{ w: 1100, h: 760 }, { canvas }]);
 		item = await act<Placed>("canvas.insert", [{ type: "app", app: target }, { canvas, ...(at ? { at } : {}) }]);
 	}
-	if (!item?.id || !item.box) return void notice("info", m.tabs_not_on_canvas({ canvas: stages().find((one) => one.name === canvas)?.title ?? canvas }));
+	if (!item?.id || !item.box) return void notice("info", m.tabs_not_on_canvas({ canvas: canvases().find((one) => one.name === canvas)?.title ?? canvas }));
 	forward();
 	if (!(await inFront(canvas))) return;
 	const { x1, y1, x2, y2 } = item.box;

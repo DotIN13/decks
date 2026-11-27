@@ -91,7 +91,7 @@ export const closeAgent = async (id: string) => {
 
 /** Whether the canvas manager is up. One state, because there is one of it (`CanvasManager`). */
 const [canvasesOpen, setCanvasesOpen] = createSignal(false);
-export { setCanvasesOpen as setStagesOpen, canvasesOpen as stagesOpen };
+export { setCanvasesOpen, canvasesOpen };
 
 /**
  * Move a conversation's camera to a canvas, as the person: the canvas manager's pick, the panel's Open and a canvas tab move the one on screen,

@@ -11,7 +11,7 @@ import type { ServerMessage, StageRow } from "@decks/protocol";
  */
 const [canvases, setCanvases] = createSignal<StageRow[]>([]);
 
-export { canvases as stages };
+export { canvases };
 
 export function receiveCanvases(message: Extract<ServerMessage, { type: "canvas.list" }>): void {
 	setCanvases(message.stages);

@@ -5,7 +5,7 @@ import { state } from "../state/deck.ts";
 import { offer } from "../state/notices.ts";
 import type { Tab } from "./kind.ts";
 import { kindAt, kindOf } from "./kinds.ts";
-import { canvasOf, stages } from "../state/canvases.ts";
+import { canvasOf, canvases } from "../state/canvases.ts";
 import { aimCanvas, front, openTab, restoreTabs, rowNow } from "./tabs.ts";
 
 /** The canvas each conversation's camera was last seen on, or was put on by this page: what a canvases frame is news against. */
@@ -142,7 +142,7 @@ export function rememberTabs(): void {
 		offer(m.tabs_moved_elsewhere({ canvas }), { label: m.tabs_follow(), run: () => aimCanvas(agent) }, `moved:${agent}`);
 	};
 	createEffect(() => {
-		for (const canvas of stages()) {
+		for (const canvas of canvases()) {
 			for (const agent of canvas.agents) {
 				/*
 				 * Where the page takes the agent to be (`canvasOf`), which during a move this page made is
@@ -152,7 +152,7 @@ export function rememberTabs(): void {
 				const now = canvasOf(agent.id)?.name ?? canvas.name;
 				const was = seen.get(agent.id);
 				seen.set(agent.id, now);
-				if (was !== undefined && was !== now) moved(agent.id, stages().find((one) => one.name === now)?.title ?? now);
+				if (was !== undefined && was !== now) moved(agent.id, canvases().find((one) => one.name === now)?.title ?? now);
 			}
 		}
 	});

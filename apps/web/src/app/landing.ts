@@ -7,7 +7,7 @@ import { scheme } from "../lib/theme.ts";
 import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
-import { stages } from "../state/canvases.ts";
+import { canvases } from "../state/canvases.ts";
 import { canvasOnScreen } from "../tabs/tabs.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
@@ -88,7 +88,7 @@ export function createCameraLanding({ views, canvasPen, canvasPages, deckSeen }:
 		const on = canvasOnScreen();
 		const canvas = on?.name;
 		// Not before the canvases are known: an agent's canvas read as none would land once for no canvas, then again.
-		if (!agent || !scope || (!canvas && stages().length === 0)) return;
+		if (!agent || !scope || (!canvas && canvases().length === 0)) return;
 		const to: CameraOwner = { scope, ...(canvas ? { canvas } : {}) };
 		untrack(() => landing.arrive(to, on?.formerly));
 	});

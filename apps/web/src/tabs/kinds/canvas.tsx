@@ -2,7 +2,7 @@ import type { TabKind } from "../kind.ts";
 import Layers from "lucide-solid/icons/layers";
 import { Icon } from "@decks/ui";
 import { Show } from "solid-js";
-import { stages } from "../../state/canvases.ts";
+import { canvases } from "../../state/canvases.ts";
 import { CanvasHost } from "./canvas-host.tsx";
 import { CanvasTools } from "./canvas-tools.tsx";
 
@@ -17,8 +17,8 @@ import { CanvasTools } from "./canvas-tools.tsx";
 export const canvasKind: TabKind = {
 	name: "canvas",
 	address: "canvas",
-	title: (tab) => stages().find((one) => one.name === tab.target)?.title,
-	has: (target) => stages().some((one) => one.name === target),
+	title: (tab) => canvases().find((one) => one.name === tab.target)?.title,
+	has: (target) => canvases().some((one) => one.name === target),
 	icon: (props) => <Icon of={Layers} size={props.size ?? 16} />,
 	// Kept while a tab of another kind is in front, out of sight: its frame, its canvas and where it was looking are as they were when it comes back. Hidden, not taken out of the layout: a frame with no size moves its view to keep its middle, and draws again when it has one.
 	view: (tab, parts) => (

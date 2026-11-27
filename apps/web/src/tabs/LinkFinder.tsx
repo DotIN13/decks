@@ -2,7 +2,7 @@ import type { JSX } from "solid-js";
 import { CanvasSwitcher } from "../canvases/CanvasSwitcher.tsx";
 import { m } from "@decks/i18n";
 import { scheme } from "../lib/theme.ts";
-import { stages } from "../state/canvases.ts";
+import { canvases } from "../state/canvases.ts";
 import { placeLink } from "./link.ts";
 import { OpenMore } from "./OpenMore.tsx";
 import { canvasOnScreen } from "./tabs.ts";
@@ -23,7 +23,7 @@ export const openLinkFinder = (beside: HTMLElement): void => void setTimeout(() 
 export function LinkFinder(): JSX.Element {
 	return (
 		<CanvasSwitcher
-			canvases={stages()}
+			canvases={canvases()}
 			here={canvasOnScreen()?.name}
 			scheme={scheme()}
 			placement="right-start"

@@ -6,7 +6,7 @@ import { canvasPass, cardAgentCall } from "../../canvases/pass.ts";
 import { scheme } from "../../lib/theme.ts";
 import { camera, glide } from "../../state/camera.ts";
 import { state } from "../../state/deck.ts";
-import { stages } from "../../state/canvases.ts";
+import { canvases } from "../../state/canvases.ts";
 import { setDrawingEditor } from "../../state/decks.ts";
 import { offer } from "../../state/notices.ts";
 import { m } from "@decks/i18n";
@@ -106,7 +106,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			pass: canvasPass,
 			// Between canvases that are yours alone the frame moves in place; a friend's, or one someone else may edit, gets a frame of its own.
 			inPlace: (from, to) => [from, to].every((name) => {
-				const row = stages().find((one) => one.name === name);
+				const row = canvases().find((one) => one.name === name);
 				return !!row && !row.shared && !row.othersEdit;
 			}),
 			// The canvas tabs last in front keep their frames behind this one, within the device's budget (`tabs/budget.ts`): coming back to one is showing it.
@@ -148,7 +148,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 	 * or an agent was, or what to do first (UI review). Empty is no cards and no words; it never takes a press.
 	 */
 	const empty = () => {
-		const row = stages().find((one) => one.name === canvasOnScreen()?.name);
+		const row = canvases().find((one) => one.name === canvasOnScreen()?.name);
 		return !!row && row.boards === 0 && !row.words.trim();
 	};
 	const agentName = () => state.identities[state.focused ?? ""]?.name ?? m.canvas_empty_agent();

@@ -5,14 +5,14 @@ import { scheme } from "../lib/theme.ts";
 import { FpsMeter, showFps } from "../perf/fps.tsx";
 import { TopBar } from "../shell/TopBar.tsx";
 import { TopRight } from "../shell/TopRight.tsx";
-import { canvasOf, stages } from "../state/canvases.ts";
+import { canvasOf, canvases } from "../state/canvases.ts";
 import { state } from "../state/deck.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { openUsage, panelOpen, unread } from "../state/ui.ts";
 import { canvasMenu, type CanvasMenuTrigger } from "./canvas-menu.tsx";
 import { moreItems } from "./more-menu.ts";
 import type { Parts } from "./parts.ts";
-import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, openAgentsPanel, openCanvas, setStagesOpen, showPanel, stagesOpen, viewOnlyCanvas } from "./person.ts";
+import { closeAgent, copyShared, createCanvas, focusAgent, newAgent, openAgentsPanel, openCanvas, setCanvasesOpen, showPanel, canvasesOpen, viewOnlyCanvas } from "./person.ts";
 import { openPlus, openTabsList, TabStrip } from "../tabs/TabStrip.tsx";
 import { TabActs } from "../tabs/TabActs.tsx";
 import { showOnCanvas } from "../tabs/show-on-canvas.ts";
@@ -80,8 +80,8 @@ export function Top(props: { parts: Parts }) {
 				canvas={{ front: onCanvas(), show: openTabsList }}
 				/* A tab is about 150 px: with more tabs than the bar, beside the side panel, has room for, the row shows the first of them and a count lists them all; a touch bar always shows the count. */
 				tabs={<TabStrip touch={touch()} room={Math.max(0, Math.floor((layout.viewWidth() - (panelOpen() ? 360 : 0) - 600) / 150))} />}
-				{...(stages().length > 0 ? { onCanvases: () => void setStagesOpen((was) => !was), canvasesOpen: stagesOpen() } : {})}
-				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
+				{...(canvases().length > 0 ? { onCanvases: () => void setCanvasesOpen((was) => !was), canvasesOpen: canvasesOpen() } : {})}
+				{...(!phone() && canvases().length > 0 ? { canvasMenu: (trigger: CanvasMenuTrigger) => canvasMenu(trigger) } : {})}
 				{...(viewOnlyCanvas() ? { viewOnly: viewOnlyCanvas()!.shared!.owner, onCopy: () => copyShared(viewOnlyCanvas()!.name) } : {})}
 			/>
 
@@ -92,13 +92,13 @@ export function Top(props: { parts: Parts }) {
 				cluster of controls 40px tall. The pill owns the button; this owns the surface.
 			*/}
 			<CanvasManager
-				canvases={stages()}
+				canvases={canvases()}
 				onRename={(name, to) => void call("canvas.rename", [to, { canvas: name }]).then(warnIfFailed)}
 				onDelete={(name) => void call("canvas.remove", [name]).then(warnIfFailed)}
 				onCopy={copyShared}
 				here={canvasOnScreen()?.name}
-				open={stagesOpen()}
-				onClose={() => void setStagesOpen(false)}
+				open={canvasesOpen()}
+				onClose={() => void setCanvasesOpen(false)}
 				onPick={openCanvas}
 				onNew={createCanvas}
 				scheme={scheme()}
