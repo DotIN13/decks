@@ -61,8 +61,9 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
 
   Each template says in a comment how to fill it. When none fits, write your own piece: a diff, a
   table, a map, a screenshot with an `<img src="files/…">`. Pick the picture that makes the result
-  obvious, keep text 14 px or larger, and give every number its unit (on axis ticks too) or say in
-  the caption what it counts.
+  obvious, keep text 14 px or larger, give every number its unit (on axis ticks too) or say in
+  the caption what it counts, and show nothing the entry's own line already says: no caption that
+  repeats it, no picture of a plain pass ("23 of 23 pass" needs no row of green blocks).
 
 ```jsonc
 {

@@ -83,8 +83,7 @@
 			"step": 2,
 			"at": "18:09",
 			"kind": "result",
-			"text": "23 of 23 pass",
-			"file": "log/step2-rerun.html"
+			"text": "23 of 23 pass"
 		},
 		{
 			"step": 3,
