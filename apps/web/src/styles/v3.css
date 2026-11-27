@@ -4255,3 +4255,38 @@ body {
 	font-size: 16px;
 	font-weight: 600;
 }
+
+/*
+ * Touch: every control a finger presses is at least 40px, the size the touch rules elsewhere aim for.
+ * Measured on a phone with touch, these were 28 to 36px (UI review): the composer's buttons, an agent
+ * row's ⋯, the panel's tabs, the zoom and the top bar. Last in the sheet, so it holds over the rules
+ * that size them for a pointer.
+ */
+@media (pointer: coarse) {
+	.dock .dock-row .icon-button,
+	.dock .dock-row .send-button,
+	.dock .dock-to-chip,
+	.v3-zoom .v3-zoom-btn,
+	.v3-topbar .v3-icon,
+	.v3-topbar .v3-agent-chip,
+	.v3-phone-more .v3-icon,
+	.v3-panel-head .v3-icon,
+	.agent-row .agent-more {
+		min-width: 40px;
+		min-height: 40px;
+	}
+
+	.dock .dock-row .chip-button,
+	.v3-topbar .v3-canvas-chip,
+	.v3-nav .v3-nav-tab,
+	.v3-zoom .v3-zoom-value {
+		min-height: 40px;
+	}
+
+	/* The grip that opens the chat: the bar stays small, its hit area is a finger's. */
+	.dock-grip::after {
+		content: "";
+		position: absolute;
+		inset: -18px -24px;
+	}
+}
