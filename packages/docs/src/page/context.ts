@@ -73,7 +73,7 @@ export interface PageHooks {
 	draw(keepCaret?: boolean): void;
 	/** `source.ts`: draw the file's text again after others' splices, the caret moved past them. */
 	drawShifted(applied: readonly Splice[]): void;
-	/** `page.ts`: draw the Changes panel, or only when the list in it changed. */
+	/** `changes.ts`: draw the Changes panel, or only when the list in it changed. */
 	drawChanges(onlyIfChanged?: boolean): void;
 	/** `comments.ts`: draw a Doc's comments panel. */
 	drawComments(): void;
