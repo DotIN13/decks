@@ -8869,7 +8869,7 @@ export const panel_tab_apps: ((inputs?: Panel_Tab_AppsInputs, options?: { locale
 /**
 * | output |
 * | --- |
-* | "Canvas" |
+* | "Objects" |
 *
 */
 export const panel_tab_canvas: ((inputs?: Panel_Tab_CanvasInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Panel_Tab_CanvasInputs, { locale?: "en" | "zh-CN" }, {}>;

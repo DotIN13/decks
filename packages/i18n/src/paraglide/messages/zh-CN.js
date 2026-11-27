@@ -6615,7 +6615,7 @@ export const panel_tab_apps = /** @type {(inputs: Panel_Tab_AppsInputs) => Local
 };
 
 export const panel_tab_canvas = /** @type {(inputs: Panel_Tab_CanvasInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`画布`)
+	return /** @type {LocalizedString} */ (`对象`)
 };
 
 export const panel_tab_recent = /** @type {(inputs: Panel_Tab_RecentInputs) => LocalizedString} */ () => {

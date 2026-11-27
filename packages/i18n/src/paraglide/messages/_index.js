@@ -19275,7 +19275,7 @@ export const panel_tab_apps = /** @type {((inputs?: Panel_Tab_AppsInputs, option
 /**
 * | output |
 * | --- |
-* | "Canvas" |
+* | "Objects" |
 *
 * @param {Panel_Tab_CanvasInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options
