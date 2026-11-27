@@ -427,8 +427,8 @@ canvas that already has things on it, ask before rearranging them.
   done, fade the note (`opacity: 0.5`) and put a link chip by it to the card or drawing that answers
   it. Leave the notes where they are: the person clears them.
 - **Working** is shared by every agent, one row each, your row starting with your name. Put work in
-  progress there and nowhere else: a progress card (card-authoring, progress.md: each step as
-  hypothesis, method and result), a draft, a half-done diagram, each with a link chip to the topic it
+  progress there and nowhere else: a progress card (card-authoring, progress.md: steps as goal or
+  hypothesis, method and expect, and a log of what ran), a draft, a half-done diagram, each with a link chip to the topic it
   is for. When the work is finished, move it into its topic and take your
   row down to what is still going.
 - **A topic** is everything about one subject: its title, then its cards, drawings and apps in

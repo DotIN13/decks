@@ -91,11 +91,12 @@ Everything that used to be a board is a card. A board file left in a deck from b
 
 **A progress card: your work while it runs**
 
-- Work of three steps or more, or a background run, gets a progress card in your row of Working,
-  made when the work starts. It is an ordinary card, copied from the template
-  [progress-example/](progress-example/): steps on the left (a goal or hypothesis, a method, what you
-  expect, a verdict), a log on the right of every command, failure, finding and result, each with
-  its own HTML picture if it helps (templates included), all read from a progress.json you keep current. [progress.md](progress.md) says how.
+- Work of three steps or more, or anything long or in the background, gets a progress card in your
+  row of Working, made before you run anything. It is an ordinary 16:10 card copied from the template
+  [progress-example/](progress-example/): steps on the left (a plain title, a goal or hypothesis with
+  why, a method, what you expect, whether it held), a log on the right of every command with what it
+  is for and how far it has got, and each failure, finding and result, with a small picture where it
+  makes the result obvious. [progress.md](progress.md) says how.
 
 **Scripts: modules handed the card**
 

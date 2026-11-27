@@ -13,7 +13,7 @@
  * long runs and their time limits.
  */
 export const PROGRESS_REMINDER =
-	"[Decks] If this is work of three steps or more, or a background run: make your progress card in your row of Working before you run anything, write each step's hypothesis before you run it, and update the card as each run ends and before any run that may take more than a minute (give that one a time limit) (card-authoring skill, progress.md). A small job goes straight to its answer.";
+	"[Decks] If this is work of three steps or more, or anything long or in the background: make your progress card in your row of Working before you run anything (card-authoring skill, progress.md). Write each step (goal or hypothesis, method, expect) as you reach it, put each command on the card before it runs (with a time limit on anything long), and its result, failure or finding as it ends. A small job goes straight to its answer.";
 
 /** The line, for a message that starts a turn; nothing for one that lands in a turn under way. */
 export function progressReminder(startsTurn: boolean): string | undefined {
