@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
-import { deckContext, briefingFor } from "../../agents/context.ts";
+import { agentBriefing } from "../../agents/context.ts";
 import { helpText, parseSlash } from "../../agents/slash.ts";
 import { agyExecutable, agyModels, antigravityHomeDir, antigravityAvailability, prepareAntigravityHome } from "./install.ts";
 import { AntigravityStream, type AntigravityResult, type AntigravityStep } from "./events.ts";
@@ -145,6 +145,10 @@ export class AntigravityBackend implements AgentBackend {
 			},
 			idle: (usage, _status) => {
 				this.streamingNow = false;
+				// The briefing rides in the conversation itself here, so a compaction can summarise it
+				// away; the context shrinking by half or more between turns is that, and the next
+				// prompt carries the briefing again.
+				if (compacted(this.lastUsage, usage)) this.briefed = false;
 				this.lastUsage = usage;
 				this.context.turnEnded?.();
 			},
@@ -233,8 +237,7 @@ export class AntigravityBackend implements AgentBackend {
 	 * miss, and a conversation that resumes already has it in its history.
 	 */
 	private briefing(): string {
-		const { deck, tool } = this.context;
-		return [deckContext(deck, briefingFor(this.context)), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		return agentBriefing(this.context.deck, this.context);
 	}
 
 	async abort(): Promise<void> {
@@ -392,4 +395,13 @@ export class AntigravityBackend implements AgentBackend {
 		setTimeout(() => child.kill(), 500).unref?.();
 		this.spawn(this.conversationId);
 	}
+}
+
+/**
+ * Whether a turn's context is much smaller than the last one's: a compaction, which the CLI does not
+ * announce. Only a real drop counts: from 20,000 tokens or more to half or less.
+ */
+export function compacted(before: AgentUsage | null, after: AgentUsage): boolean {
+	const was = before?.contextTokens ?? 0, now = after.contextTokens ?? 0;
+	return was >= 20000 && now > 0 && now <= was / 2;
 }

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
-import { deckContext } from "../../agents/context.ts";
+import { agentBriefing } from "../../agents/context.ts";
 import { sentAs } from "../../agents/sent-as.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { DEFAULT_THINKING } from "@decks/protocol";
@@ -216,10 +216,10 @@ export class OpencodeBackend implements AgentBackend {
 	 * temp file is a thing the agent is holding that the user cannot look at.
 	 */
 	private briefingFile(): string {
-		const { deck, tool } = this.context;
+		const { deck } = this.context;
 		const path = resolve(deck.path, ".decks-agent.md");
 		// Shared by every opencode agent in the deck.
-		const text = [deckContext(deck, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		const text = agentBriefing(deck, this.context);
 		try {
 			/*
 			 * Only when it has changed, which is not an optimisation.

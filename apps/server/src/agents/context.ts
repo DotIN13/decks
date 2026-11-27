@@ -1,8 +1,7 @@
 import { processZone } from "../lib/clock.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { agentsTemplate, decksCommands } from "@decks/runtime";
+import { agentsTemplate } from "@decks/runtime";
 import type { Deck } from "../deck/loader.ts";
-import { isCardPath } from "@decks/hub/layout";
 
 /**
  * What the agent is told about the deck, once, as a context file.
@@ -37,26 +36,13 @@ function timeLine(): string {
 }
 
 /**
- * The shared browser's verbs, taken out of the API unless there is a tab to drive.
+ * The line about the person's shared Chrome tab, only while one is shared.
  *
- * Thirteen verbs one agent has ever used, carried in every other agent's prompt: about 240
- * tokens of type text plus the paragraph that explains it, every turn, for a thing most
- * agents cannot do because nothing is paired. So the block is included when a browser is
- * shared and replaced by one line when it is not — the line names the verb that says how to
- * pair, which is the only thing an agent can usefully do about it.
+ * The browser's verbs used to be described in full to every agent, shared tab or not; the index
+ * now names them only when there is a tab to drive, and `decks help web …` has the rest.
  */
-export function apiFor(api: string, options: { web: boolean }): string {
-	// The file calls are for a caller with no disk; an agent Decks runs has a shell in the deck folder.
-	api = api.replace(/<!-- file -->[\s\S]*?<!-- \/file -->\n*/, "");
-	const start = api.indexOf("<!-- web -->");
-	const end = api.indexOf("<!-- /web -->");
-	if (start < 0 || end < 0) return api;
-	const kept = options.web
-		? api.slice(0, start) + api.slice(start + "<!-- web -->".length, end) + api.slice(end + "<!-- /web -->".length)
-		: api.slice(0, start) +
-			"**The person's Chrome**: nothing is shared now. `decks web status` says so, and `decks web pairing` says how to pair.\n" +
-			api.slice(end + "<!-- /web -->".length);
-	return kept.replace(/\n{3,}/g, "\n\n");
+function webLine(web: boolean): string {
+	return web ? "\nThe person is sharing a Chrome tab with you: the `decks web …` commands read and drive it (`decks help web read`).\n" : "";
 }
 
 export function deckContext(deck: Deck, options: { web?: boolean } = {}): string {
@@ -66,30 +52,24 @@ export function deckContext(deck: Deck, options: { web?: boolean } = {}): string
 		// agent still has the skills and the deck.
 		return `You are working in a deck at ${deck.path}. Each canvas keeps its cards in canvases/<name>/cards/<card>/index.html. The decks command in your shell reaches the canvas: decks --help.`;
 	}
-
-	// No list of the deck's cards: at 860 cards it was three quarters of this briefing, and grew with every card. `decks card list` and `decks canvas read` answer when asked.
-	const roots = deck.roots.roots;
-	const rootList =
-		roots.length === 0
-			? "No roots are declared, so embeds can only reach files inside the deck."
-			: [
-					"Roots declared in `deck.json`, which embeds may reach:",
-					"",
-					...roots.map((root) => `- \`${root.path}\`${root.exists ? "" : " — **missing**"}`),
-				].join("\n");
-
-	const reference = decksCommands();
-	const api = existsSync(reference) ? readFileSync(reference, "utf8").replace(/^<!--[^\n]*-->\n+/, "") : "";
-
+	// An index, not a manual: no list of the deck's cards (`decks card list` answers) and no command
+	// reference (`decks help <command>` does); the details live in the skills it points to.
 	return readFileSync(template, "utf8")
-		.replaceAll("{{DECKS_COMMANDS}}", api ? apiFor(api, { web: options.web === true }).trim() : "_The command reference is not in this install: `decks --help` lists the commands._")
 		.replaceAll("{{DECK_NAME}}", deck.name)
 		.replaceAll("{{DECK_PATH}}", deck.path)
-		.replaceAll("{{ROOTS}}", rootList)
-		.replaceAll("{{TIME}}", timeLine());
+		.replaceAll("{{WEB}}", webLine(options.web === true))
+		.replaceAll("{{TIME}}", timeLine())
+		.trimEnd();
 }
 
-/** The briefing options a backend passes, from its context. */
-export function briefingFor(context: { tool: { webShared(): boolean } }): { web: boolean } {
-	return { web: context.tool.webShared() };
+/**
+ * Everything Decks tells an agent once, as the start of its conversation: the deck's index and any
+ * extra guidelines (`runtime/guidelines.txt`). One function, so every runtime gets the same words;
+ * where each puts them is its own (a system prompt, a context file, a session instruction, or the
+ * first prompt where a runtime has no other way in).
+ */
+export function agentBriefing(deck: Deck, context: { tool: { webShared(): boolean; guidelines: readonly string[] } }): string {
+	const extra = context.tool.guidelines.map((line) => `- ${line}`);
+	return [deckContext(deck, { web: context.tool.webShared() }), ...(extra.length ? ["", ...extra] : [])].join("\n");
 }
+

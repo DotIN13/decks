@@ -88,6 +88,9 @@ Everything that used to be a board is a card. A board file left in a deck from b
   `--below`, `--at.x1 --at.y1`) puts it on the canvas you name, and `decks canvas fit <path>` sizes it. `fit` reports the
   height, the word count, the smallest type and any content wider than the card. Fix what it says is
   over; when it says "One screen", stop.
+- `fit` also presses each control and measures every view, so it is how you check a card. A screenshot
+  (the card-debug skill has the script) is for what `fit` cannot judge: an SVG diagram or a chart.
+- Never edit the deck's `lib/`: it is Decks's own.
 
 **A progress card: your work while it runs**
 

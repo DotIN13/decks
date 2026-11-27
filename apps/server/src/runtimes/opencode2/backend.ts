@@ -2,7 +2,7 @@ import { skillsDir, opencode2PluginDir } from "@decks/runtime";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import { DEFAULT_THINKING } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
-import { deckContext } from "../../agents/context.ts";
+import { agentBriefing } from "../../agents/context.ts";
 import { sentAs } from "../../agents/sent-as.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 // The level vocabulary is Decks' own and the same for both opencodes, so it is read from there
@@ -188,8 +188,7 @@ export class Opencode2Backend implements AgentBackend {
 
 	/** The deck's description and the guidelines, as every runtime gets them. */
 	private briefing(): string {
-		const { deck, tool } = this.context;
-		return [deckContext(deck, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		return agentBriefing(this.context.deck, this.context);
 	}
 
 	private async putInstruction(key: string, value: string): Promise<void> {

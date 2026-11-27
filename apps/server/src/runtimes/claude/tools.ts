@@ -32,8 +32,8 @@ export function decksMcpServer(gdocs: GdocsCall): McpSdkServerConfigWithInstance
 		version: "0.2.0",
 		alwaysLoad: true,
 		instructions:
-			"Decks is the canvas this session is running inside. Boards are how you answer: put the substance " +
-			"on a board and let the chat name it. The decks command in your shell reaches the canvas.",
+			"Decks is the canvas this session runs inside: answer there (a drawing, a card or an app) and let the chat " +
+			"name it. The decks command in your shell reaches the canvas; these tools edit Google Docs placed on it.",
 		tools: GDOCS_TOOLS.map((t) =>
 			tool(
 				t.name,

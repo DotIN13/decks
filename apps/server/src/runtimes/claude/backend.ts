@@ -22,7 +22,7 @@ import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../..
 import { helpText, mergeCommands, parseSlash, sameCommands } from "../../agents/slash.ts";
 import { answerQuestions } from "./ask-user-question.ts";
 import { runtimeDir } from "@decks/runtime";
-import { deckContext, briefingFor } from "../../agents/context.ts";
+import { agentBriefing } from "../../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
@@ -230,9 +230,7 @@ export class ClaudeBackend implements AgentBackend {
 			systemPrompt: {
 				type: "preset",
 				preset: "claude_code",
-				append: [deckContext(deck, briefingFor(this.context)), "", ...this.context.tool.guidelines.map((line) => `- ${line}`)].join(
-					"\n",
-				),
+				append: agentBriefing(deck, this.context),
 			},
 			/*
 			 * Decks' own skills, as a local plugin.
