@@ -444,15 +444,15 @@ export const VERBS: readonly Verb[] = [
 		params: [o("options", obj({ workspace: opt(str()) }))],
 		result: arr(Agent),
 	},
-	{ name: "agent.get", card: "page", group: "agent", ...agentsRead, summary: "Another agent, by name or id: kind, workspace, tags, state, home canvas.", params: [p("name", str())], result: Agent },
+	{ name: "agent.get", card: "page", group: "agent", ...agentsRead, summary: "Another agent, by its id (or its name, which can change): kind, workspace, tags, state, home canvas.", params: [p("agent", str())], result: Agent },
 	{
 		name: "agent.send",
 		card: "page",
 		group: "agent",
 		...agentsChange,
 		summary:
-			"Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.",
-		params: [p("name", str()), p("message", obj({ task: str(), cards: opt(arr(str())) }))],
+			"Deliver now, to an agent by its id (a name works but can change): the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.",
+		params: [p("agent", str()), p("message", obj({ task: str(), cards: opt(arr(str())) }))],
 		result: obj({ delivered: bool(), turn: lit("running", "new", "queued"), position: opt(num()), note: opt(str()) }),
 	},
 	{
@@ -461,8 +461,8 @@ export const VERBS: readonly Verb[] = [
 		group: "agent",
 		...agentsRead,
 		summary:
-			"Wait until an agent's work is done: the turn that took the work handed to it has ended, nothing is queued for it, and it stays idle a moment. Answers at once when that is already so; with `timedOut: true` after `timeout` seconds (600 unless said, at most 3600). `reply` is its last message. For a test or a hand-off whose answer you need before going on; the turn's own end wakes it, so there is no polling.",
-		params: [p("name", str()), o("options", obj({ timeout: opt(num()) }))],
+			"Wait until an agent's work is done (by its id; a name works but can change): the turn that took the work handed to it has ended, nothing is queued for it, and it stays idle a moment. Answers at once when that is already so; with `timedOut: true` after `timeout` seconds (600 unless said, at most 3600). `reply` is its last message. For a test or a hand-off whose answer you need before going on; the turn's own end wakes it, so there is no polling.",
+		params: [p("agent", str()), o("options", obj({ timeout: opt(num()) }))],
 		result: obj({ name: str(), state: str(), reply: str(), waited: num(), timedOut: bool() }),
 	},
 	{
@@ -470,8 +470,8 @@ export const VERBS: readonly Verb[] = [
 		card: "page",
 		group: "agent",
 		...agentsChange,
-		summary: "Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
-		params: [p("name", str()), p("work", obj({ task: str(), cards: opt(arr(str())), reply: opt(bool()) }))],
+		summary: "Put work in an agent's queue (by its id; a name works but can change), taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
+		params: [p("agent", str()), p("work", obj({ task: str(), cards: opt(arr(str())), reply: opt(bool()) }))],
 		result: obj({ queued: lit(true), position: num() }),
 	},
 	{

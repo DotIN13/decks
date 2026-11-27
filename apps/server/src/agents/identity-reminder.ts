@@ -3,7 +3,7 @@ import type { Identity } from "@decks/protocol";
 /**
  * What an agent has not yet said about itself, and the sentence that asks for it.
  *
- * An agent is addressed by its name (`@name`, `decks agent send <name>`), found by its workspace
+ * An agent is called by its name (`@name`), addressed in calls by its id (names change), found by its workspace
  * (`decks agent list --workspace …`) and read at a glance by its tags, and the
  * instructions ask for all three once. Agents skip it: the deck filled with `Agent 3`s working
  * on nothing in particular. An instruction read at the start of a session is easy to pass over,

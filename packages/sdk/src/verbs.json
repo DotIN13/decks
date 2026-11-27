@@ -2814,12 +2814,12 @@
   "group": "agent",
   "touches": "agents",
   "effect": "read",
-  "summary": "Another agent, by name or id: kind, workspace, tags, state, home canvas.",
-  "signature": "agent.get(name: string)",
+  "summary": "Another agent, by its id (or its name, which can change): kind, workspace, tags, state, home canvas.",
+  "signature": "agent.get(agent: string)",
   "returns": "Agent",
   "params": [
    {
-    "name": "name",
+    "name": "agent",
     "type": "string",
     "schema": {
      "type": "string"
@@ -2836,12 +2836,12 @@
   "group": "agent",
   "touches": "agents",
   "effect": "change",
-  "summary": "Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.",
-  "signature": "agent.send(name: string, message: { task: string; cards?: string[] })",
+  "summary": "Deliver now, to an agent by its id (a name works but can change): the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.",
+  "signature": "agent.send(agent: string, message: { task: string; cards?: string[] })",
   "returns": "{ delivered: boolean; turn: \"running\" | \"new\" | \"queued\"; position?: number; note?: string }",
   "params": [
    {
-    "name": "name",
+    "name": "agent",
     "type": "string",
     "schema": {
      "type": "string"
@@ -2880,12 +2880,12 @@
   "group": "agent",
   "touches": "agents",
   "effect": "read",
-  "summary": "Wait until an agent's work is done: the turn that took the work handed to it has ended, nothing is queued for it, and it stays idle a moment. Answers at once when that is already so; with `timedOut: true` after `timeout` seconds (600 unless said, at most 3600). `reply` is its last message. For a test or a hand-off whose answer you need before going on; the turn's own end wakes it, so there is no polling.",
-  "signature": "agent.wait(name: string, options?: { timeout?: number })",
+  "summary": "Wait until an agent's work is done (by its id; a name works but can change): the turn that took the work handed to it has ended, nothing is queued for it, and it stays idle a moment. Answers at once when that is already so; with `timedOut: true` after `timeout` seconds (600 unless said, at most 3600). `reply` is its last message. For a test or a hand-off whose answer you need before going on; the turn's own end wakes it, so there is no polling.",
+  "signature": "agent.wait(agent: string, options?: { timeout?: number })",
   "returns": "{ name: string; state: string; reply: string; waited: number; timedOut: boolean }",
   "params": [
    {
-    "name": "name",
+    "name": "agent",
     "type": "string",
     "schema": {
      "type": "string"
@@ -2916,12 +2916,12 @@
   "group": "agent",
   "touches": "agents",
   "effect": "change",
-  "summary": "Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
-  "signature": "agent.queue(name: string, work: { task: string; cards?: string[]; reply?: boolean })",
+  "summary": "Put work in an agent's queue (by its id; a name works but can change), taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
+  "signature": "agent.queue(agent: string, work: { task: string; cards?: string[]; reply?: boolean })",
   "returns": "{ queued: true; position: number }",
   "params": [
    {
-    "name": "name",
+    "name": "agent",
     "type": "string",
     "schema": {
      "type": "string"

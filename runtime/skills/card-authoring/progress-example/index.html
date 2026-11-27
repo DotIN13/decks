@@ -150,11 +150,12 @@
 		const $ = (id) => card.root.getElementById(id);
 		let text = "", data = null, pieces = {}, chosen = null, follow = true, face = { name: "", src: "" };
 
-		async function faceOf(name) {
-			if (!name || face.name === name) return;
-			face = { name, src: "" };
+		// The agent by its id (`agentId`): a name can change. An old card with only a name still finds it.
+		async function faceOf(who) {
+			if (!who || face.name === who) return;
+			face = { name: who, src: "" };
 			try {
-				const agent = await card.decks.agent.get(name);
+				const agent = await card.decks.agent.get(who);
 				face.src = agent?.avatar ?? "";
 			} catch {}
 			drawHead();
@@ -180,7 +181,7 @@
 			for (const b of $("asks").querySelectorAll("button")) b.addEventListener("click", async () => {
 				const q = asks[Number(b.dataset.q)];
 				for (const o of b.parentElement.querySelectorAll("button")) o.disabled = true;
-				await card.decks.agent.send(q.agent ?? data.agent, { task: `${q.ask} ${b.textContent}`, cards: [card.path] });
+				await card.decks.agent.send(q.agentId ?? data.agentId ?? data.agent, { task: `${q.ask} ${b.textContent}`, cards: [card.path] });
 			}, { signal: card.signal });
 		}
 
@@ -250,7 +251,7 @@
 				const settle = () => { showChosen(); if (follow) $("log").scrollTop = $("log").scrollHeight; };
 				settle(); requestAnimationFrame(settle); setTimeout(settle, 300);
 			}
-			faceOf(data.agent);
+			faceOf(data.agentId ?? data.agent);
 		}
 
 		$("steps").addEventListener("click", (event) => {

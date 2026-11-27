@@ -27,7 +27,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 	const asMessage = (item: ReturnType<typeof agent.queue>[number]) => ({ from: item.fromName, task: item.task, cards: item.boards, at: item.at, ...(item.reply ? { reply: true } : {}) });
 	const find = (name: unknown) => {
 		const asked = typeof name === "string" ? name.trim() : "";
-		if (!asked) throw new Error("Name an agent, by name or id: decks agent list lists them.");
+		if (!asked) throw new Error("Name an agent by its id (a name works too, but names change): decks agent list lists them.");
 		const all = agent.agents();
 		const byId = all.find((one) => one.id === asked);
 		if (byId) return byId;

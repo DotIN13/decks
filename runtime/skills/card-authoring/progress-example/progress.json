@@ -1,6 +1,7 @@
 {
 	"task": "Word counter",
 	"agent": "Abacus",
+	"agentId": "2d1412bf-a9fd-4b53-9c63-06992b5f8185",
 	"status": "working",
 	"updated": "2026-11-26T18:18:40-08:00",
 	"steps": [

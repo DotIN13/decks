@@ -365,27 +365,31 @@ export interface Verbs {
 		 * for it.
 		 */
 		list(options?: { workspace?: string }): Promise<Agent[]>;
-		/** Another agent, by name or id: kind, workspace, tags, state, home canvas. */
-		get(name: string): Promise<Agent>;
 		/**
-		 * Deliver now: the message reaches the agent in the turn it is running and steers it, where its
-		 * runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be
-		 * steered mid-turn gets it queued, and the answer says delivered: false.
+		 * Another agent, by its id (or its name, which can change): kind, workspace, tags, state, home
+		 * canvas.
 		 */
-		send(name: string, message: { task: string; cards?: string[] }): Promise<{ delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }>;
+		get(agent: string): Promise<Agent>;
 		/**
-		 * Wait until an agent's work is done: the turn that took the work handed to it has ended, nothing
-		 * is queued for it, and it stays idle a moment. Answers at once when that is already so; with
-		 * `timedOut: true` after `timeout` seconds (600 unless said, at most 3600). `reply` is its last
-		 * message. For a test or a hand-off whose answer you need before going on; the turn's own end wakes
-		 * it, so there is no polling.
+		 * Deliver now, to an agent by its id (a name works but can change): the message reaches the agent
+		 * in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle
+		 * agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the
+		 * answer says delivered: false.
 		 */
-		wait(name: string, options?: { timeout?: number }): Promise<{ name: string; state: string; reply: string; waited: number; timedOut: boolean }>;
+		send(agent: string, message: { task: string; cards?: string[] }): Promise<{ delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }>;
 		/**
-		 * Put work in the agent's queue, taken up after the turn it is running. Returns at once; with
-		 * `reply: true` its report comes back to you.
+		 * Wait until an agent's work is done (by its id; a name works but can change): the turn that took
+		 * the work handed to it has ended, nothing is queued for it, and it stays idle a moment. Answers at
+		 * once when that is already so; with `timedOut: true` after `timeout` seconds (600 unless said, at
+		 * most 3600). `reply` is its last message. For a test or a hand-off whose answer you need before
+		 * going on; the turn's own end wakes it, so there is no polling.
 		 */
-		queue(name: string, work: { task: string; cards?: string[]; reply?: boolean }): Promise<{ queued: true; position: number }>;
+		wait(agent: string, options?: { timeout?: number }): Promise<{ name: string; state: string; reply: string; waited: number; timedOut: boolean }>;
+		/**
+		 * Put work in an agent's queue (by its id; a name works but can change), taken up after the turn it
+		 * is running. Returns at once; with `reply: true` its report comes back to you.
+		 */
+		queue(agent: string, work: { task: string; cards?: string[]; reply?: boolean }): Promise<{ queued: true; position: number }>;
 		/**
 		 * Start a new agent, then send or queue it work. `kind` is the runtime ("claude", "pi", "opencode",
 		 * "opencode2", "antigravity"; yours when left out), `model` any model that kind runs, `thinking`

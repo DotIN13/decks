@@ -36,8 +36,8 @@ edit the JSON and the pieces in `log/` (or let a script you run rewrite them).
 A 16:10 card, edge to edge: a head across the top, the steps on the left, a log on the right. Both
 sides scroll inside the card.
 
-- **The head**: the task and where it is ("Word counter: on step 5"), your own avatar (read from
-  Decks by `agent`, your name) with a green dot while you work, when it was last updated (it turns
+- **The head**: the task and where it is ("Word counter: on step 5"), your name and your own avatar
+  (read from Decks by `agentId`, your id: a name can change) with a green dot while you work, when it was last updated (it turns
   to "no update for 12 min" when `updated` grows old), and a bar with one segment per step.
 - **Left, the steps.** Each step is a plain title saying what is done, then:
   - **Goal** (making something) or **Hypothesis** (testing a belief), with why it matters:
@@ -108,7 +108,7 @@ table, a map, an SVG diagram drawn for this run. The rules for every piece:
 
 ```jsonc
 {
-  "task": "Word counter", "agent": "<your name>",
+  "task": "Word counter", "agent": "<your name, shown>", "agentId": "<your id, from decks agent me>",
   "status": "working",                 // working | waiting (on the person) | done
   "updated": "2026-11-26T18:18:40-08:00",
   "steps": [{ "id": 5, "title": "Race Counter against a loop", "status": "active",  // todo | active | done | blocked
@@ -146,7 +146,7 @@ write there wins.
 ## Questions, waiting, stopping
 
 - A choice the person must make is a question on the card (`questions`), shown as buttons that
-  message you. Mark the step blocked, set `status` to "waiting" and your tags to say so, say it in
+  message you (by `agentId`). Mark the step blocked, set `status` to "waiting" and your tags to say so, say it in
   chat in a sentence, and end your turn.
 - Before you end any turn, bring the card up to date: a step left active says where it stopped and
   why. A card that says "running" after you have stopped misleads the person.

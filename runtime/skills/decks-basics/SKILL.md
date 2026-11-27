@@ -59,14 +59,17 @@ A Google Doc opens the same way, from its link (Add menu, Document…). Edit it 
 
 ## Handing work to another agent
 
-Both return at once:
+Name the agent by its **id** (`decks agent list` shows each one's): names change, and agents rename
+themselves. A name is fine for a person to read, never for a call kept in a script or a card. Both
+return at once:
 
-- `decks agent queue <name> --task …` puts it in their queue, taken up when their current turn ends;
+- `decks agent queue <id> --task …` puts it in their queue, taken up when their current turn ends;
   `--reply true` brings their report back into your transcript.
-- `decks agent send <name> --task …` delivers it now, into the turn they are running (or a new one if
+- `decks agent send <id> --task …` delivers it now, into the turn they are running (or a new one if
   they are idle); the answer says whether it landed.
 
-`decks agent create --name … --kind …` makes an agent first; `decks agent list --workspace …` lists
+`decks agent create --name … --kind …` makes an agent first and answers with its id;
+`decks agent wait <id>` answers when its work is done, with its last reply; `decks agent list --workspace …` lists
 who is on your project; `decks agent inbox` lists what was handed to you. A long brief goes on a
 card, not in the task string. Changes others make on a canvas reach you with your next message, so
 there is nothing to watch.
