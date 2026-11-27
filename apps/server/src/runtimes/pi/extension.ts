@@ -1,6 +1,6 @@
 import { createBashTool, type ExtensionAPI, type InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { AgentHooks } from "../../calls/tool.ts";
+import type { AgentHooks } from "../../agents/hooks.ts";
 import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
 
 /**

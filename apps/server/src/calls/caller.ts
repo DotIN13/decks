@@ -4,6 +4,7 @@ import type { Principal } from "../auth/principal.ts";
 import { appTool, conversationForApp } from "./app-caller.ts";
 import type { CallsHost } from "./host.ts";
 import { personAgent } from "./person.ts";
+import { personToolOf, stageToolOf } from "./agent-tools.ts";
 import type { CallResult, DecksTool } from "./tool.ts";
 
 /**
@@ -33,14 +34,14 @@ export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & {
 			const to = header("x-decks-agent");
 			const edit = header("x-decks-edit")?.slice(0, 80);
 			const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(stage ? { stage } : {}), ...(to ? { agent: to } : {}) });
-			return { tool: agent.personTool(), on: { ...(stage ? { stage } : {}) }, ...(edit ? { edit } : {}) };
+			return { tool: personToolOf(agent), on: { ...(stage ? { stage } : {}) }, ...(edit ? { edit } : {}) };
 		}
 		case "agent": {
 			const agent = app.agents.get(principal.id);
 			if (!agent) return { status: 401, error: "The agent this token was made for is gone." };
 			// An agent that works outside Decks is here while it calls, and what it changes is said in its conversation.
 			agent.inbox.touch();
-			return { tool: agent.stageTool(), ...(agent.inbox.outsideKey ? { announce: (name: string, answer: CallResult) => {
+			return { tool: stageToolOf(agent), ...(agent.inbox.outsideKey ? { announce: (name: string, answer: CallResult) => {
 						if (answer.ok && VERB_BY_NAME.get(name)?.effect === "change" && name !== "agent.news") agent.inbox.noteAct(actLine(name, answer));
 					},
 				}
@@ -69,7 +70,7 @@ function actLine(name: string, answer: CallResult): string {
  */
 function canvasCaller(app: CallsHost, principal: Extract<Principal, { kind: "canvas" }>, edit: string | undefined): Caller {
 	const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { stage: principal.canvas });
-	return { tool: agent.personTool(), on: { stage: principal.canvas }, ...(edit ? { edit } : {}) };
+	return { tool: personToolOf(agent), on: { stage: principal.canvas }, ...(edit ? { edit } : {}) };
 }
 
 /**

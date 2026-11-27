@@ -1,6 +1,6 @@
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import type { AgentHooks, DecksTool } from "../calls/tool.ts";
+import type { AgentHooks, ToolBriefing } from "./hooks.ts";
 import type { ExtensionUiBridge } from "./extension-ui.ts";
 import type { Translator } from "./translator.ts";
 
@@ -30,11 +30,11 @@ export interface AgentBackendContext {
 	 */
 	turnEnded?(): void;
 	/**
-	 * The agent's Decks tool. Every runtime reaches the canvas through the `decks` command in its
-	 * shell; what a backend reads here is the briefing's part (`agentBriefing`: the guidelines, and
-	 * whether a Chrome tab is shared).
+	 * What the agent's briefing says of its Decks tool (`agentBriefing`: the guidelines, and whether
+	 * a Chrome tab is shared). Every runtime reaches the canvas itself through the `decks` command
+	 * in its shell.
 	 */
-	tool: DecksTool;
+	tool: ToolBriefing;
 	/**
 	 * The agent behind the tool, for the parts of a backend that are not the tool itself: its id
 	 * (every runtime puts it in the shell's environment, `decksEnv`), and for Pi the revision a turn wrote.

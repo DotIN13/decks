@@ -15,6 +15,7 @@ import { deleteCanvas, titleCanvas } from "../canvas/admin.ts";
 import { unpairStudio, studioLink } from "../studio/index.ts";
 import { isLoopbackOrigin, studioAddress } from "../studio/login.ts";
 import { personAgent } from "./person.ts";
+import { personToolOf } from "./agent-tools.ts";
 
 /**
  * What one connected page is looking at.
@@ -74,7 +75,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		return { name, ...(agent ? { agent } : {}) };
 	};
 	const gesture = async (call: PersonCall, asked: { stage?: string; agent?: string }, name: "move" | "resize" | "hide" | "edit" | "open" | "newStage", args: unknown[]) => {
-		const answer = await personAgent({ agents: agents(), pens: pens() }, asked).personTool().gesture(name, args as never);
+		const answer = await personToolOf(personAgent({ agents: agents(), pens: pens() }, asked)).gesture(name, args as never);
 		if (!answer.ok) throw new Error(answer.error ?? `${name} failed`);
 		return answer.value;
 	};
@@ -332,8 +333,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 				const inside = relative(real(app.deck.path), real(file));
 				const path = !inside.startsWith("..") && !isAbsolute(inside) ? inside.split("\\").join("/") : file;
 				const corner = asked.at && Number.isFinite(asked.at.x) && Number.isFinite(asked.at.y) ? { x1: Math.round(asked.at.x), y1: Math.round(asked.at.y) } : joined();
-				const answer = await personAgent({ agents: agents(), pens: pens() }, { stage: name })
-					.personTool()
+				const answer = await personToolOf(personAgent({ agents: agents(), pens: pens() }, { stage: name }))
 					.call("canvas.insert", [{ type: "document", path, ...(title ? { title } : {}) }, { canvas: name, ...(corner ? { at: corner } : {}) }]);
 				if (!answer.ok) throw new Error(answer.error ?? "The document could not be put on the canvas.");
 				const id = (answer.value as { id?: unknown } | undefined)?.id;
