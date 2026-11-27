@@ -4,11 +4,15 @@ import { spliceDiff } from "../merge.ts";
 import type { DocSync as Sync } from "../client.ts";
 import { docxBlocks, readParagraph } from "./blocks.ts";
 import { findMarks, marksOf, segments, shiftMarks, spliceBetween, type Mark } from "./marks.ts";
-import { LiveEditor, type BlockStyle, type FormatState, type InlineStyle } from "./live.ts";
+import { LiveEditor } from "./live.ts";
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
 import type { DocsRequest } from "../gdoc/types.ts";
 import { formatList, formatNumber, getLocale, m } from "@decks/i18n";
+import { pageDom, type Mode, type PageContext, type PageHooks, type View } from "./context.ts";
+import { addStyle } from "./style.ts";
+import { mountTools } from "./tools.ts";
+import { base, clip, dir, el, iconButton, initial, svg, when, whoOf } from "./ui.ts";
 
 /**
  * `@decks/docs/page`: a document drawn as a page you type into, in plain DOM.
@@ -50,59 +54,6 @@ interface DocPage {
 	destroy(): void;
 }
 
-const ICON: Record<string, string> = {
-	bold: '<path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/>',
-	italic: '<line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/>',
-	strike: '<path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" x2="20" y1="12" y2="12"/>',
-	underline: '<path d="M6 4v6a6 6 0 0 0 12 0V4"/><line x1="4" x2="20" y1="20" y2="20"/>',
-	code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
-	mark: '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>',
-	link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
-	math: '<path d="M18 7V4H6l6 8-6 8h12v-3"/>',
-	ul: '<line x1="9" x2="21" y1="6" y2="6"/><line x1="9" x2="21" y1="12" y2="12"/><line x1="9" x2="21" y1="18" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
-	ol: '<line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>',
-	task: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
-	quote: '<path d="M17 6H3"/><path d="M21 12H8"/><path d="M21 18H8"/><path d="M3 12v6"/>',
-	codeblock: '<path d="m10 9-3 3 3 3"/><path d="m14 15 3-3-3-3"/><rect x="3" y="3" width="18" height="18" rx="2"/>',
-	hr: '<path d="M5 12h14"/>',
-	table: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/>',
-	undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
-	redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
-	display: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 8.9V7H8l4 5-4 5h8v-1.9"/>',
-	clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-	source: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/>',
-	changes: '<path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
-	check: '<path d="M20 6 9 17l-5-5"/>',
-	x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-	restore: '<path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5"/>',
-	chevron: '<path d="m6 9 6 6 6-6"/>',
-	pdf: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M14 3v18"/>',
-	refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.5 2.8L21 8"/><path d="M21 3v5h-5"/>',
-	external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
-	alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
-	branch: '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
-	pull: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
-	push: '<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',
-	comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-	rowabove: '<rect x="3" y="12" width="18" height="9" rx="1"/><path d="M12 3v6"/><path d="M9 6h6"/>',
-	rowbelow: '<rect x="3" y="3" width="18" height="9" rx="1"/><path d="M12 15v6"/><path d="M9 18h6"/>',
-	colleft: '<rect x="12" y="3" width="9" height="18" rx="1"/><path d="M3 12h6"/><path d="M6 9v6"/>',
-	colright: '<rect x="3" y="3" width="9" height="18" rx="1"/><path d="M15 12h6"/><path d="M18 9v6"/>',
-	rowdelete: '<rect x="3" y="8" width="18" height="8" rx="1"/><path d="m9 10 6 4"/><path d="m15 10-6 4"/>',
-	coldelete: '<rect x="8" y="3" width="8" height="18" rx="1"/><path d="m10 9 4 6"/><path d="m14 9-4 6"/>',
-	alignleft: '<path d="M21 6H3"/><path d="M15 12H3"/><path d="M17 18H3"/>',
-	aligncenter: '<path d="M21 6H3"/><path d="M17 12H7"/><path d="M19 18H5"/>',
-	alignright: '<path d="M21 6H3"/><path d="M21 12H9"/><path d="M21 18H7"/>',
-	justify: '<path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>',
-	textcolour: '<path d="M4 20h16" stroke-width="3"/><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/>',
-	clear: '<path d="M4 7V4h16v3"/><path d="M5 20h6"/><path d="M13 4 8 20"/><path d="m15 15 5 5"/><path d="m20 15-5 5"/>',
-	minus: '<path d="M5 12h14"/>',
-	indent: '<path d="M21 6H11"/><path d="M21 12H11"/><path d="M21 18H11"/><path d="m3 8 4 4-4 4"/>',
-	outdent: '<path d="M21 6H11"/><path d="M21 12H11"/><path d="M21 18H11"/><path d="m7 8-4 4 4 4"/>',
-	plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
-	cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
-	cloudoff: '<path d="m2 2 20 20"/><path d="M5.78 5.78A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.31-.2"/><path d="M21.53 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7 7 0 0 0 10.2 5.15"/>',
-};
 /** A comment on a Google Doc, as Drive answers it. */
 interface GComment {
 	id: string;
@@ -113,430 +64,24 @@ interface GComment {
 	replies?: Array<{ id: string; content?: string; author?: { displayName?: string }; createdTime?: string }>;
 }
 
-const svg = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name] ?? ""}</svg>`;
-
-const STYLE = `
-.dp { --dp-r: 6px; --dp-h: 30px; /* The panel header and the old-version strip sit side by side, so they share one height. */ --dp-strip: 48px; --dp-ink: var(--b-fg, #111); --dp-line: var(--b-border-strong, #d4d4d4); --dp-hair: var(--b-border, #e6e6e6); --dp-hover: color-mix(in srgb, var(--b-fg, #111) 7%, transparent); --dp-shadow: 0 2px 4px rgba(0,0,0,.08), 0 10px 28px rgba(0,0,0,.16);
-	position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--b-bg, #fff); color: var(--dp-ink); font-family: var(--b-font, system-ui, sans-serif); -webkit-font-smoothing: antialiased; }
-.dp button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
-.dp svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-
-/* One button system, drawn in ink: a square icon button, a labelled button, a solid primary. */
-.dp-ib, .dp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--dp-h); border: 1px solid var(--dp-line); border-radius: var(--dp-r); background: var(--b-bg, #fff); color: var(--dp-ink); cursor: pointer; white-space: nowrap; transition: background .1s, color .1s, border-color .1s; }
-.dp-ib { width: var(--dp-h); padding: 0; }
-.dp-btn { padding: 0 11px; font-size: 13px; font-weight: 600; letter-spacing: -.005em; }
-.dp-ib:hover, .dp-btn:hover { background: var(--dp-hover); }
-.dp-ib:active, .dp-btn:active { background: color-mix(in srgb, var(--dp-ink) 12%, transparent); }
-.dp-ib:hover, .dp-btn:hover { border-color: color-mix(in srgb, var(--dp-ink) 32%, transparent); }
-.dp-ib[aria-pressed="true"], .dp-btn[aria-pressed="true"] { background: var(--b-accent, #2563eb); border-color: var(--b-accent, #2563eb); color: #fff; }
-/* In the styling row the tools are bare: no border, solid accent when on. */
-.dp-tools .dp-ib, .dp-tools .dp-btn { border-color: transparent; background: transparent; }
-.dp-tools .dp-ib:hover { background: var(--dp-hover); }
-.dp-tools .dp-ib[aria-pressed="true"] { background: var(--b-accent, #2563eb); color: #fff; }
-.dp-ib:focus-visible, .dp-btn:focus-visible { outline: 2px solid var(--b-accent, #2563eb); outline-offset: 1px; }
-.dp-ib[hidden], .dp-btn[hidden] { display: none; }
-.dp-btn.dp-primary { background: var(--b-accent, #2563eb); border-color: var(--b-accent, #2563eb); color: #fff; }
-.dp-btn.dp-primary:hover { background: color-mix(in srgb, var(--b-accent, #2563eb) 86%, #000); }
-.dp-btn.dp-outline { color: var(--b-accent, #2563eb); border-color: color-mix(in srgb, var(--b-accent, #2563eb) 45%, transparent); }
-.dp-btn.dp-outline:hover { background: color-mix(in srgb, var(--b-accent, #2563eb) 10%, var(--b-bg, #fff)); border-color: var(--b-accent, #2563eb); }
-.dp-btn.dp-sm { height: 26px; padding: 0 9px; font-size: 12.5px; }
-.dp-ib.dp-sm { width: 26px; height: 26px; }
-.dp-ib.dp-sm svg { width: 14px; height: 14px; }
-.dp-ib.dp-yes { color: var(--b-ok, #15803d); }
-.dp-ib.dp-no { color: var(--b-danger, #b91c1c); }
-.dp-ib.dp-yes:hover { background: color-mix(in srgb, var(--b-ok, #15803d) 12%, var(--b-bg, #fff)); border-color: var(--b-ok, #15803d); }
-.dp-ib.dp-no:hover { background: color-mix(in srgb, var(--b-danger, #b91c1c) 11%, var(--b-bg, #fff)); border-color: var(--b-danger, #b91c1c); }
-.dp-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 4px; background: var(--b-bg, #fff); color: var(--dp-ink); font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
-
-/* The bar: the file's name and state, and the three views. */
-.dp-bar { display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 10px 0 16px; flex: none; min-width: 0; border-bottom: 1px solid var(--dp-hair); }
-.dp-name { font-weight: 700; font-size: 14px; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
-.dp-status { margin-left: 8px; color: var(--b-muted, #666); white-space: nowrap; font-size: 12.5px; font-weight: 500; }
-.dp-status[data-state="saving"] { color: var(--b-warn, #b45309); }
-.dp-status[data-state="error"] { color: var(--b-danger, #b91c1c); }
-.dp-bar:has(+ .dp-tools[hidden]) { border-bottom-color: var(--dp-line); }
-/* In the app's focus view the bar is the view's header, with room at each end for the app's controls (\`lib/card.js\`, \`watchFocus\`). */
-html[data-decks-focus] .dp-bar { height: 52px; padding-left: calc(var(--decks-focus-left, 0px) + 4px); padding-right: calc(var(--decks-focus-right, 0px) + 8px); border-bottom-color: var(--dp-hair); }
-html[data-decks-focus] .dp-bar:has(+ .dp-tools[hidden]) { border-bottom-color: var(--dp-hair); }
-html[data-decks-focus] .dp-tools { background: transparent; border-bottom-color: var(--dp-hair); }
-.dp-spacer { flex: 1; }
-.dp-btn .dp-count { background: var(--b-accent, #2563eb); color: #fff; }
-/* The bar's buttons are quiet: no border, ink icons, an accent tint when open; Changes is tinted while edits wait. */
-.dp-bar .dp-btn { border-color: transparent; background: transparent; }
-.dp-bar .dp-btn:hover { background: var(--dp-hover); border-color: transparent; }
-.dp-bar .dp-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--b-accent, #2563eb) 12%, transparent); border-color: transparent; color: var(--b-accent, #2563eb); }
-.dp-bar .dp-btn.dp-changes { color: var(--b-accent, #2563eb); background: color-mix(in srgb, var(--b-accent, #2563eb) 10%, transparent); }
-.dp-bar .dp-btn.dp-changes:hover { background: color-mix(in srgb, var(--b-accent, #2563eb) 16%, transparent); }
-.dp-bar .dp-btn.dp-changes[aria-pressed="true"] { background: color-mix(in srgb, var(--b-accent, #2563eb) 20%, transparent); }
-
-/* The styles: a band of bordered groups. */
-.dp-tools { display: flex; align-items: center; gap: 8px; padding: 6px 12px; flex: none; flex-wrap: wrap; background: var(--b-bg-deep, #f6f6f6); border-bottom: 1px solid var(--dp-line); }
-.dp-tools[hidden] { display: none; }
-.dp-group { display: inline-flex; gap: 2px; padding-right: 9px; margin-right: 1px; border-right: 1px solid var(--dp-line); }
-.dp-group:last-child { border-right: 0; padding-right: 0; }
-.dp-style { position: relative; }
-.dp-git { position: relative; display: flex; }
-.dp-git[hidden] { display: none; }
-.dp-git .dp-ahead { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.dp-gitmenu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 10; background: var(--b-bg, #fff); border: 1px solid var(--dp-line); border-radius: 8px; box-shadow: var(--dp-shadow); width: 300px; padding: 14px; display: grid; gap: 10px; cursor: default; }
-.dp-gitmenu .g-where { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
-.dp-gitmenu .g-where svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.dp-gitmenu .g-remote { font-family: var(--b-mono, monospace); font-size: 11.5px; color: var(--b-muted, #666); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dp-gitmenu .g-state { font-size: 13px; color: var(--b-muted, #666); line-height: 1.4; }
-.dp-gitmenu .g-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.dp-gitmenu .g-acts .dp-btn { justify-content: center; height: 32px; }
-.dp-bar .dp-gitmenu .dp-btn.dp-primary { background: var(--b-accent, #2563eb); border-color: var(--b-accent, #2563eb); color: #fff; }
-.dp-bar .dp-gitmenu .dp-btn.dp-primary:hover { background: color-mix(in srgb, var(--b-accent, #2563eb) 86%, #000); }
-.dp-bar .dp-gitmenu .dp-btn.dp-outline { color: var(--b-accent, #2563eb); border-color: color-mix(in srgb, var(--b-accent, #2563eb) 45%, transparent); background: transparent; }
-.dp-bar .dp-gitmenu .dp-btn.dp-outline:hover { background: color-mix(in srgb, var(--b-accent, #2563eb) 10%, var(--b-bg, #fff)); border-color: var(--b-accent, #2563eb); }
-.dp-gitmenu .g-acts .dp-btn:disabled { opacity: .55; cursor: progress; }
-.dp-gitmenu .g-said { font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 6px; background: color-mix(in srgb, var(--b-ok, #16a34a) 10%, transparent); }
-.dp-gitmenu .g-said[data-ok="false"] { background: color-mix(in srgb, var(--b-danger, #dc2626) 10%, transparent); color: var(--b-danger, #dc2626); }
-.dp-gitmenu .g-said[hidden], .dp-gitmenu[hidden] { display: none; }
-.dp-gitmenu .g-note { font-size: 12px; color: var(--b-faint, #999); line-height: 1.4; }
-.dp-gitmenu a.g-open { color: var(--b-accent, #2563eb); font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
-.dp-gitmenu a.g-open:hover { text-decoration: underline; }
-.dp-gitmenu a.g-open svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.dp-gitmenu .g-paste { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
-.dp-gitmenu .g-paste input { min-width: 0; font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--dp-line); border-radius: 6px; background: var(--b-bg, #fff); color: inherit; }
-.gd { background: #f0f2f5; min-height: 100%; padding: 22px 16px 60px; display: flex; justify-content: center; box-sizing: border-box; }
-.gd[data-pageless] { background: #fff; padding: 0; }
-/* Pages are the paper drawn every page-height with a gap (gview's paginate); the shadow follows each page's edge. */
-.gd-page { box-sizing: border-box; flex: none; max-width: 100%; background: #fff; filter: drop-shadow(0 1px 1.5px rgba(60, 64, 67, .28)); color: #000; font-family: Arial, sans-serif; font-size: 14.67px; line-height: 1.15; white-space: pre-wrap; overflow-wrap: break-word; outline: none; caret-color: #000; }
-.gd[data-pageless] .gd-page { min-height: 0; filter: none; width: auto; flex: 1; }
-.gd-page .gd-p { margin: 0; font-weight: inherit; font-size: inherit; letter-spacing: normal; }
-.gd-page h1.gd-p, .gd-page h2.gd-p, .gd-page h3.gd-p, .gd-page h4.gd-p, .gd-page h5.gd-p, .gd-page h6.gd-p { font-weight: 400; }
-.gd-page a { color: rgb(17, 85, 204); }
-.gd-page .gd-marker { display: inline-block; text-indent: 0; white-space: nowrap; user-select: none; }
-.gd-page .gd-table { border-collapse: collapse; margin: 0; table-layout: fixed; width: 100%; }
-.gd-page .gd-cell { border: 1px solid #000; vertical-align: top; }
-.gd-page img[data-obj] { vertical-align: bottom; max-width: 100%; }
-.gd-page .gd-hr { display: inline-block; width: 100%; border-top: 1px solid #a0a0a0; vertical-align: middle; }
-.gd-page .gd-break { display: block; border-top: 1px dashed #c0c0c0; margin: 10px 0; }
-.gd-page .gd-chip { background: #f1f3f4; border-radius: 12px; padding: 0 6px; }
-.gd-page .lv-hl { background: color-mix(in srgb, var(--b-accent, #2563eb) 18%, transparent); box-shadow: 0 1.5px 0 color-mix(in srgb, var(--b-accent, #2563eb) 55%, transparent); border-radius: 2px; }
-.gd-page .lv-hl[data-hot] { background: color-mix(in srgb, var(--b-accent, #2563eb) 30%, transparent); }
-.gd-page .gd-sug-ins { color: rgb(20, 120, 60); text-decoration: underline; text-decoration-color: rgb(20, 120, 60); }
-.gd-page .gd-sug-del { color: rgb(180, 40, 40); text-decoration: line-through; }
-.gd-page .gd-commented { background: rgba(255, 212, 0, .32); border-bottom: 2px solid rgba(230, 180, 0, .9); cursor: pointer; }
-.gd-page .gd-commented[data-hot] { background: rgba(255, 196, 0, .55); }
-.dp-count-soft { background: color-mix(in srgb, var(--b-fg, #000) 10%, transparent) !important; color: inherit !important; }
-.dp-comment { padding: 12px 14px; border-bottom: 1px solid var(--dp-hair); display: grid; gap: 6px; cursor: default; }
-.dp-comment:hover { background: color-mix(in srgb, var(--b-accent, #2563eb) 4%, transparent); }
-.dp-comment .dp-quote { font-size: 12.5px; color: var(--b-muted, #666); border-left: 3px solid rgba(230, 180, 0, .9); padding-left: 8px; white-space: pre-wrap; }
-.dp-comment .dp-comment-body { font-size: 14px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
-.dp-comment .dp-reply-row { display: flex; }
-.dp-comment .dp-reply, .dp-comment-new .dp-reply { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--dp-line); border-radius: 6px; background: var(--b-bg, #fff); color: inherit; resize: vertical; }
-.dp-comment-acts { display: flex; gap: 6px; justify-content: flex-end; }
-.dp-panel .g-paste { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin: 8px 14px; }
-.dp-panel .g-paste input { min-width: 0; font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--dp-line); border-radius: 6px; background: var(--b-bg, #fff); color: inherit; }
-.dp-panel > .dp-btn.dp-primary { margin: 4px 14px; }
-.dp-panel .g-note { margin: 4px 14px; font-size: 12px; color: var(--b-muted, #666); }
-.gd-page .gd-gap { display: block; user-select: none; }
-.gd-page .gd-sup { vertical-align: super; font-size: .66em; background: none; padding: 0; }
-.dp-tools .dp-select { height: 30px; max-width: 130px; padding: 0 6px; font: inherit; font-size: 13px; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
-.dp-tools .dp-select:hover { background: var(--dp-hover); }
-.dp-tools .dp-size { width: 34px; height: 26px; text-align: center; font: inherit; font-size: 13px; color: inherit; background: transparent; border: 1px solid var(--dp-line); border-radius: 4px; }
-.dp-tools .dp-ib { position: relative; }
-.dp-tools .dp-colour { position: absolute; inset: auto 0 0 0; width: 100%; height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
-.dp-git .dp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--b-ok, #16a34a); flex: none; }
-.dp-git .dp-dot[data-state="syncing"] { background: var(--b-accent, #2563eb); }
-.dp-git .dp-dot[data-state="error"], .dp-git .dp-dot[data-state="signin"] { background: var(--b-warn, #d97706); }
-.dp-style > .dp-btn { width: 136px; height: 30px; justify-content: space-between; padding: 0 8px 0 10px; }
-.dp-style { padding-right: 9px; border-right: 1px solid var(--dp-line); }
-.dp-style > .dp-btn svg { width: 14px; height: 14px; }
-.dp-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 10; min-width: 210px; padding: 4px; background: var(--b-bg, #fff); border: 1px solid var(--dp-line); border-radius: 8px; box-shadow: var(--dp-shadow); }
-.dp-menu[hidden] { display: none; }
-.dp-menu button { display: flex; align-items: center; width: 100%; min-height: 32px; padding: 4px 10px; border: 0; border-radius: 4px; background: transparent; cursor: pointer; text-align: left; line-height: 1.2; }
-.dp-menu button[aria-checked="true"] { color: var(--b-accent, #2563eb); }
-.dp-menu button:hover { background: var(--b-accent, #2563eb); color: #fff; }
-.dp-menu button[aria-checked="true"]::after { content: ""; margin-left: auto; width: 14px; height: 14px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat; }
-.dp-menu .m-p { font-size: 14px; }
-.dp-menu .m-h1 { font-size: 20px; font-weight: 700; }
-.dp-menu .m-h2 { font-size: 17px; font-weight: 700; }
-.dp-menu .m-h3 { font-size: 15px; font-weight: 700; }
-.dp-menu .m-h4, .dp-menu .m-h5, .dp-menu .m-h6 { font-size: 13.5px; font-weight: 700; }
-
-.dp-main { position: relative; flex: 1; min-height: 0; display: flex; }
-.dp-scroll { flex: 1; min-width: 0; overflow: auto; }
-.dp-text { box-sizing: border-box; max-width: 820px; margin: 0 auto; padding: 28px 40px 80px; min-height: 100%; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--b-mono, ui-monospace, monospace); font-size: 14px; line-height: 1.6; tab-size: 4; }
-.dp-text[hidden] { display: none; }
-.dp-ins { background: color-mix(in srgb, var(--b-accent, #2563eb) 16%, transparent); border-radius: 2px; }
-
-/* The PDF beside a LaTeX page: a divider to drag, a bar saying how the last typesetting went, and the pages. */
-.dp-divider { flex: none; width: 7px; margin: 0 -3px; z-index: 2; cursor: col-resize; position: relative; }
-.dp-divider::after { content: ""; position: absolute; inset: 0 3px; background: var(--dp-line); transition: background .1s; }
-.dp-divider:hover::after, .dp-divider[data-drag]::after { background: var(--b-accent, #2563eb); inset: 0 2px; }
-.dp-divider[hidden], .dp-pdf[hidden] { display: none; }
-.dp-pdf { flex: none; width: var(--pdf-w, 46%); min-width: 260px; display: flex; flex-direction: column; background: var(--b-bg-deep, #f4f4f4); }
-.dp-pdfbar { flex: none; display: flex; align-items: center; gap: 6px; height: var(--dp-strip); box-sizing: border-box; padding: 0 8px 0 14px; border-bottom: 1px solid var(--dp-line); background: var(--b-bg, #fff); font-size: 13px; white-space: nowrap; }
-.dp-pdfstate { color: var(--b-muted, #666); overflow: hidden; text-overflow: ellipsis; flex: 1; font-variant-numeric: tabular-nums; }
-.dp-pdfstate b { color: var(--dp-ink); font-weight: 700; margin-right: 6px; }
-.dp-pdfstate[data-state="busy"]::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--b-accent, #2563eb) 30%, transparent); border-top-color: var(--b-accent, #2563eb); vertical-align: -1px; animation: dp-spin .8s linear infinite; }
-@keyframes dp-spin { to { transform: rotate(360deg); } }
-.dp-pdfbar .dp-btn.dp-errs { color: var(--b-danger, #b91c1c); border-color: color-mix(in srgb, var(--b-danger, #b91c1c) 45%, transparent); }
-.dp-pdfbar .dp-btn.dp-errs[aria-pressed="true"] { background: var(--b-danger, #b91c1c); border-color: var(--b-danger, #b91c1c); color: #fff; }
-.dp-errlist { flex: none; max-height: 40%; overflow: auto; background: var(--b-bg, #fff); border-bottom: 1px solid var(--dp-line); }
-.dp-errlist[hidden] { display: none; }
-.dp-err { display: flex; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--dp-hair); cursor: pointer; font-size: 13px; line-height: 1.45; }
-.dp-err:hover { background: var(--b-bg-deep, #f6f6f6); box-shadow: inset 3px 0 0 var(--b-danger, #b91c1c); }
-.dp-err .e-line { flex: none; color: var(--b-danger, #b91c1c); font-weight: 700; font-variant-numeric: tabular-nums; min-width: 52px; }
-.dp-err .e-msg { font-family: var(--b-mono, ui-monospace, monospace); font-size: 12.5px; overflow-wrap: anywhere; }
-.dp-pdfbody { flex: 1; min-height: 0; overflow: auto; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.dp-pdfbody .page { width: 100%; height: auto; display: block; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 4px 14px rgba(0,0,0,.08); }
-.dp-pdfempty { margin: auto; text-align: center; color: var(--b-muted, #666); font-size: 14px; max-width: 280px; line-height: 1.5; }
-.dp-pdfbody[data-stale] .page { opacity: .55; transition: opacity .2s; }
-
-/* The side panel: changes to review, or kept versions. */
-.dp-panel { flex: none; width: 310px; border-left: 1px solid var(--dp-line); overflow: auto; background: var(--b-bg, #fff); display: flex; flex-direction: column; }
-.dp-panel[hidden] { display: none; }
-.dp-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px; height: var(--dp-strip); box-sizing: border-box; padding: 0 10px 0 16px; background: var(--b-bg, #fff); border-bottom: 1px solid var(--dp-line); flex: none; }
-.dp-head h3 { margin: 0; flex: 1; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
-.dp-empty { color: var(--b-muted, #666); font-size: 13px; line-height: 1.5; padding: 14px 16px; margin: 0; }
-.dp-change { position: relative; flex: none; padding: 12px 12px 12px 16px; border-bottom: 1px solid var(--dp-hair); cursor: pointer; }
-.dp-change:hover, .dp-change[data-hot] { background: var(--b-bg-deep, #f6f6f6); box-shadow: inset 3px 0 0 var(--b-accent, #2563eb); }
-.dp-who { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--b-muted, #666); font-variant-numeric: tabular-nums; }
-.dp-who b { color: var(--dp-ink); font-weight: 700; font-size: 13px; }
-.dp-av { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 700; color: #fff; background: var(--b-accent, #2563eb); flex: none; }
-.dp-who .dp-acts { margin-left: auto; display: flex; gap: 4px; }
-.dp-snip { margin: 8px 0 0 28px; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; color: var(--dp-ink); }
-.dp-snip ins { text-decoration: none; background: color-mix(in srgb, var(--b-accent, #2563eb) 16%, transparent); border-bottom: 1.5px solid var(--b-accent, #2563eb); padding: 0 1px; }
-.dp-snip del { color: var(--b-danger, #b91c1c); }
-.dp-time { position: relative; flex: none; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 10px 0 16px; border-bottom: 1px solid var(--dp-hair); cursor: pointer; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.dp-time::before { content: ""; width: 7px; height: 7px; border-radius: 1px; border: 1.5px solid var(--b-muted, #888); flex: none; }
-.dp-time.t-latest::before { background: var(--b-accent, #2563eb); border-color: var(--b-accent, #2563eb); }
-.dp-time:hover { background: var(--b-bg-deep, #f6f6f6); }
-.dp-time[aria-current="true"] { background: color-mix(in srgb, var(--b-accent, #2563eb) 9%, transparent); box-shadow: inset 3px 0 0 var(--b-accent, #2563eb); font-weight: 700; }
-.dp-time .t-when { flex: 1; }
-.dp-time .t-when small { color: var(--b-muted, #777); margin-left: 6px; font-size: 12px; font-weight: 500; }
-.dp-time .dp-ib { visibility: hidden; }
-.dp-time:hover .dp-ib, .dp-time[aria-current="true"] .dp-ib { visibility: visible; }
-
-/* Accept or reject, over the highlight: a small card in the page's own colours. */
-.dp-pill { position: absolute; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 3px 3px 3px 8px; background: var(--b-bg, #fff); color: var(--dp-ink); border: 1px solid var(--dp-line); border-radius: 8px; box-shadow: var(--dp-shadow); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dp-pill[hidden] { display: none; }
-.dp-pill .p-who { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; color: var(--b-muted, #666); }
-.dp-pill .p-who b { color: var(--dp-ink); font-weight: 700; }
-.dp-pill .dp-av { width: 18px; height: 18px; font-size: 10px; }
-
-/* Looking at a kept version: a tinted strip in the page's colours, so it cannot pass for the page as it is. */
-.dp-banner { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 8px; height: var(--dp-strip); box-sizing: border-box; padding: 0 10px 0 16px; background: color-mix(in srgb, var(--b-accent, #2563eb) 12%, var(--b-bg, #fff)); color: var(--dp-ink); border-bottom: 1px solid color-mix(in srgb, var(--b-accent, #2563eb) 35%, transparent); font-size: 13px; white-space: nowrap; }
-.dp-banner[hidden] { display: none; }
-.dp-banner > svg { color: var(--b-accent, #2563eb); }
-.dp-banner b { font-weight: 700; font-variant-numeric: tabular-nums; }
-.dp-old { box-sizing: border-box; max-width: 780px; margin: 0 auto; padding: 28px 48px 80px; white-space: pre-wrap; font-size: 16px; line-height: 1.65; }
-.dp-old[hidden] { display: none; }
-.lv[data-preview] .lv-hl { background: color-mix(in srgb, var(--b-warn, #d97706) 20%, transparent); box-shadow: 0 1.5px 0 color-mix(in srgb, var(--b-warn, #d97706) 60%, transparent); animation: none; }
-.lv[data-preview] .lv-hl-line { background: color-mix(in srgb, var(--b-warn, #d97706) 9%, transparent); box-shadow: inset 3px 0 0 var(--b-warn, #d97706); animation: none; }
-.lv .lv-hl[data-hot], .lv .lv-hl-line[data-hot] { background: color-mix(in srgb, var(--b-accent, #2563eb) 30%, transparent); }
-
-/* The live page: the file's own text, drawn as it reads. */
-.lv { box-sizing: border-box; max-width: 780px; margin: 0 auto; padding: 36px 48px 120px; min-height: 100%; outline: none; white-space: pre-wrap; overflow-wrap: break-word; font-size: 16.5px; line-height: 1.7; tab-size: 4; caret-color: var(--b-accent, #2563eb); font-family: var(--b-font, system-ui, sans-serif); }
-.lv[hidden] { display: none; }
-.lv[data-tex] { font-family: "Latin Modern Roman", "CMU Serif", Georgia, "Times New Roman", serif; font-size: 17.5px; }
-.lv .lv-mk { display: none; color: var(--b-faint, #9a9a9a); font-weight: 400; font-style: normal; font-family: var(--b-mono, ui-monospace, monospace); font-size: .86em; text-decoration: none; }
-.lv .open > .lv-mk { display: inline; }
-.lv .lv-src { display: none; }
-.lv .lv-chunk.open div.lv-src { display: block; }
-.lv .lv-i.open > .lv-src { display: inline; color: var(--b-muted, #666); font-family: var(--b-mono, ui-monospace, monospace); font-size: .88em; }
-.lv .lv-w { user-select: none; }
-.lv .lv-line { min-height: 1.7em; }
-.lv .lv-blank { min-height: 0; height: .9em; line-height: .9em; overflow: hidden; }
-.lv .lv-blank.open { height: auto; min-height: 1.7em; line-height: 1.7; }
-.lv .lv-end { min-height: 1.7em; }
-.lv .lv-placeholder::before { content: attr(data-placeholder); color: var(--b-faint, #aaa); pointer-events: none; position: absolute; }
-.lv .lv-h1, .lv .lv-h2, .lv .lv-h3, .lv .lv-h4, .lv .lv-h5, .lv .lv-h6 { font-weight: 700; line-height: 1.3; letter-spacing: -.01em; }
-.lv .lv-h1 { font-size: 2em; margin: .3em 0 .15em; }
-.lv .lv-h2 { font-size: 1.5em; margin: .5em 0 .1em; padding-bottom: .15em; border-bottom: 1px solid var(--b-border, #e8e8e8); }
-.lv .lv-h3 { font-size: 1.25em; margin: .4em 0 .05em; }
-.lv .lv-h4 { font-size: 1.08em; }
-.lv .lv-h5, .lv .lv-h6 { font-size: 1em; color: var(--b-muted, #555); }
-.lv .lv-h1 > .lv-mk, .lv .lv-h2 > .lv-mk, .lv .lv-h3 > .lv-mk { font-size: .6em; vertical-align: middle; }
-.lv .lv-hr { height: 1.7em; background: linear-gradient(var(--b-border-strong, #ccc), var(--b-border-strong, #ccc)) center / 100% 1px no-repeat; }
-.lv .lv-hr.open { background: none; }
-.lv .lv-quote { padding-left: calc(var(--depth, 1) * 16px); box-shadow: inset 3px 0 0 var(--b-border-strong, #d4d4d4); color: var(--b-muted, #555); }
-.lv .lv-quote.open { padding-left: 8px; }
-.lv .lv-li { position: relative; padding-left: calc(var(--indent, 0) * 24px + 26px); }
-.lv .lv-ul:not(.open)::before { content: "•"; position: absolute; left: calc(var(--indent, 0) * 24px + 8px); color: var(--b-muted, #555); }
-.lv .lv-ul.open { padding-left: calc(var(--indent, 0) * 24px); }
-.lv .lv-ol { padding-left: calc(var(--indent, 0) * 24px + 6px); }
-.lv .lv-num { color: var(--b-muted, #555); font-variant-numeric: tabular-nums; }
-.lv .lv-ol:not(.open) .lv-num { display: inline-block; min-width: 20px; margin-right: 6px; }
-.lv .lv-ol.open { padding-left: calc(var(--indent, 0) * 24px); }
-.lv .lv-task { padding-left: calc(var(--indent, 0) * 24px + 28px); }
-.lv .lv-task.open { padding-left: calc(var(--indent, 0) * 24px); }
-.lv .lv-check { position: absolute; left: calc(var(--indent, 0) * 24px + 3px); top: .38em; width: 15px; height: 15px; box-sizing: border-box; border: 1.5px solid var(--b-border-strong, #bbb); border-radius: 4px; cursor: pointer; background: var(--b-bg, #fff); }
-.lv .lv-check[data-checked="true"] { background: var(--b-accent, #2563eb) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 11px no-repeat; border-color: var(--b-accent, #2563eb); }
-.lv .lv-task.open .lv-check { display: none; }
-.lv .lv-done:not(.open) { color: var(--b-muted, #777); text-decoration: line-through; text-decoration-color: var(--b-faint, #aaa); }
-.lv .lv-cont { padding-left: calc(var(--indent, 0) * 24px + 26px); }
-.lv strong.lv-b { font-weight: 700; }
-.lv code.lv-code { font-family: var(--b-mono, ui-monospace, monospace); font-size: .86em; background: var(--b-bg-layer, #f2f2f2); padding: .1em .35em; border-radius: 4px; }
-.lv .lv-mark { background: #fde68a; color: inherit; border-radius: 2px; padding: 0 1px; }
-/* A dark page (the host sets data-theme, as the canvas's document item does): the highlighter a dark board's sticky amber. */
-.dp[data-theme="dark"] .lv .lv-mark { background: #4a3d1c; }
-.lv a.lv-a { color: var(--b-accent, #2563eb); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--b-accent, #2563eb) 40%, transparent); text-underline-offset: 2px; cursor: text; }
-.lv .lv-tag, .lv .lv-cmd, .lv .lv-brace { color: var(--b-faint, #999); font-family: var(--b-mono, ui-monospace, monospace); font-size: .85em; }
-.lv .lv-fn { color: var(--b-accent, #2563eb); font-size: .9em; }
-.lv .lv-refw { color: var(--b-accent, #2563eb); cursor: text; }
-.lv .lv-refw.lv-unresolved { color: var(--b-danger, #b91c1c); font-weight: 600; }
-.lv .lv-ref.open > .lv-refw { display: none; }
-.lv .lv-line:not(.open) .lv-tilde, .lv .lv-w .lv-tilde { display: inline-block; width: .27em; overflow: hidden; color: transparent; vertical-align: bottom; }
-.lv .lv-line.open .lv-tilde { color: var(--b-faint, #999); }
-/* LaTeX lines that only open or close something: gone until the caret comes to them. */
-.lv .lv-tagline:not(.open):not(.lv-envhead):not(.lv-maketitle) { min-height: 0; height: 0; overflow: hidden; }
-.lv .lv-tagline.open { color: var(--b-faint, #999); font-family: var(--b-mono, ui-monospace, monospace); font-size: 13px; }
-.lv .lv-envhead:not(.open) > .lv-mk { display: none; }
-.lv .lv-envlabel { font-weight: 700; color: var(--b-fg, #111); }
-.lv .lv-tagline.open .lv-envlabel { font-family: var(--b-font, system-ui, sans-serif); }
-.lv .lv-tagline.open .lv-envlabel { margin-left: 10px; font-size: 13px; }
-.lv .lv-head-abstract { text-align: center; margin-top: .4em; }
-.lv .lv-head-abstract .lv-envlabel { font-size: 15px; letter-spacing: .02em; }
-.lv .lv-head-proof .lv-envlabel { font-style: italic; font-weight: 500; }
-.lv .lv-qed { float: right; color: var(--b-fg, #111); }
-.lv .lv-in-abstract { font-size: .94em; margin: 0 2.5em; }
-.lv .lv-in-quote, .lv .lv-in-quotation, .lv .lv-in-verse { padding-left: 2em; padding-right: 2em; }
-.lv .lv-in-center { text-align: center; }
-.lv .lv-in-flushright { text-align: right; }
-.lv .lv-in-theorem { font-style: italic; }
-.lv .lv-titleblock { display: block; text-align: center; margin: .6em 0 1.2em; font-family: inherit; }
-.lv .lv-titleblock.lv-notitle { color: var(--b-faint, #999); font-size: 14px; }
-.lv .lv-t-title { font-size: 1.9em; font-weight: 700; line-height: 1.2; margin-bottom: .45em; }
-.lv .lv-t-author { font-size: 1.12em; }
-.lv .lv-t-date { color: var(--b-muted, #666); margin-top: .2em; }
-.lv .lv-floatbox { margin: .4em 0; }
-.lv .lv-floatbox > .lv-src { font-family: var(--b-mono, ui-monospace, monospace); font-size: 14px; line-height: 1.55; background: var(--b-bg-layer, #f6f6f6); border-radius: 8px; padding: 10px 14px; white-space: pre-wrap; margin-bottom: .5em; }
-.lv .lv-floatbox > .lv-src .lv-line { min-height: 1.55em; }
-.lv .lv-floatw { display: flex; flex-direction: column; align-items: center; gap: .6em; cursor: text; white-space: normal; }
-.lv .lv-tabular { border-collapse: collapse; font-size: .95em; line-height: 1.45; }
-.lv .lv-tabular td { padding: 4px 14px; }
-.lv .lv-tabular tr.lv-rule-above td { border-top: 1px solid var(--b-fg, #111); }
-.lv .lv-tabular tr.lv-rule-below td { border-bottom: 1px solid var(--b-fg, #111); }
-.lv .lv-caption { font-size: .92em; max-width: 85%; text-align: center; }
-.lv .lv-figimg { max-width: 100%; display: flex; justify-content: center; }
-.lv .lv-figimg img { max-width: 100%; border-radius: 4px; }
-.lv .lv-figimg.lv-missing img { display: none; }
-.lv .lv-figimg.lv-missing::before { content: attr(data-name); display: grid; place-items: center; width: 320px; max-width: 100%; height: 140px; border: 1px dashed var(--b-border-strong, #ccc); border-radius: 6px; color: var(--b-muted, #666); font-size: 13px; font-family: var(--b-mono, ui-monospace, monospace); }
-.lv .lv-label { color: var(--b-faint, #999); font-size: .8em; }
-.lv .lv-comment { color: var(--b-faint, #9a9a9a); font-style: italic; }
-.lv .lv-fnote { font-size: .85em; color: var(--b-muted, #555); }
-.lv .lv-sc { font-variant: small-caps; }
-.lv .lv-math.open .lv-mathw { display: none; }
-.lv .lv-matherr { font-family: var(--b-mono, ui-monospace, monospace); font-size: .85em; color: var(--b-muted, #666); background: var(--b-bg-layer, #f3f3f3); border-radius: 4px; padding: 1px 5px; text-decoration: underline dotted color-mix(in srgb, var(--b-warn, #d97706) 70%, transparent); text-underline-offset: 3px; white-space: pre-wrap; cursor: help; }
-.lv .lv-display .lv-matherr { display: inline-block; text-align: left; padding: 6px 10px; }
-.lv .lv-img .lv-imgw { display: block; margin: .4em 0; }
-.lv .lv-img .lv-imgw img { max-width: 100%; border-radius: 6px; display: block; }
-.lv .lv-img .lv-imgw img:not([src]) { min-height: 40px; min-width: 120px; background: var(--b-bg-layer, #f2f2f2); }
-.lv .lv-codebox { position: relative; background: var(--b-bg-layer, #f6f6f6); border: 1px solid var(--b-border, #e8e8e8); border-radius: 8px; padding: 12px 16px; margin: .2em 0; font-family: var(--b-mono, ui-monospace, monospace); font-size: 14px; line-height: 1.55; overflow-x: auto; white-space: pre; }
-.lv .lv-codebox .lv-line { min-height: 1.55em; }
-.lv .lv-chunk:not(.open) .lv-fence { display: none; }
-.lv .lv-chunk.open .lv-fence > .lv-mk { display: inline; }
-.lv .lv-lang { position: absolute; top: 6px; right: 10px; font-size: 12px; color: var(--b-faint, #999); font-family: var(--b-font, system-ui, sans-serif); }
-.lv .lv-mathbox, .lv .lv-tablebox { margin: .2em 0; }
-.lv .lv-mathbox > .lv-src, .lv .lv-tablebox > .lv-src, .lv .lv-frontbox, .lv .lv-htmlbox, .lv .lv-envbox { font-family: var(--b-mono, ui-monospace, monospace); font-size: 14px; line-height: 1.55; background: var(--b-bg-layer, #f6f6f6); border-radius: 8px; padding: 10px 14px; white-space: pre-wrap; }
-.lv .lv-htmlbox, .lv .lv-envbox { color: var(--b-muted, #555); }
-.lv .lv-htmlbox .lv-line, .lv .lv-envbox .lv-line, .lv .lv-src .lv-line { min-height: 1.55em; }
-.lv .lv-display { display: block; text-align: center; padding: .4em 0; overflow-x: auto; cursor: text; }
-.lv .lv-chunk.open .lv-display { border: 1px dashed var(--b-border, #e5e5e5); border-top: 0; border-radius: 0 0 8px 8px; }
-.lv .lv-tablew { overflow-x: auto; }
-.lv .lv-chunk.open .lv-tablew { display: none; }
-.lv .lv-tablew table { border-collapse: collapse; width: 100%; font-size: .95em; line-height: 1.5; white-space: normal; cursor: text; }
-.lv .lv-tablew th, .lv .lv-tablew td { border: 1px solid var(--b-border, #e2e2e2); padding: 6px 10px; }
-.lv .lv-tablew th { background: var(--b-bg-layer, #f6f6f6); font-weight: 600; }
-.lv .lv-tablew .lv-mk { display: none !important; }
-.lv .lv-chip { display: inline-block; font-size: 13px; color: var(--b-muted, #666); border: 1px dashed var(--b-border-strong, #ccc); border-radius: 6px; padding: 2px 8px; cursor: text; }
-.lv .lv-chunk[data-kind="front"].open > .lv-chip { display: none; }
-.lv .lv-env { color: var(--b-faint, #999); font-family: var(--b-mono, ui-monospace, monospace); font-size: 13px; }
-.lv .lv-hl { background: color-mix(in srgb, var(--b-accent, #2563eb) 18%, transparent); box-shadow: 0 1.5px 0 color-mix(in srgb, var(--b-accent, #2563eb) 55%, transparent); border-radius: 2px; animation: lv-in .8s ease-out; }
-.lv .lv-hl-line { background: color-mix(in srgb, var(--b-accent, #2563eb) 9%, transparent); box-shadow: inset 3px 0 0 var(--b-accent, #2563eb); border-radius: 3px; animation: lv-in .8s ease-out; }
-@keyframes lv-in { from { background: color-mix(in srgb, var(--b-accent, #2563eb) 42%, transparent); } }
-
-/* A Word page, drawn by docx-preview. */
-.dp-page { box-sizing: border-box; max-width: 820px; margin: 0 auto; padding: 28px 40px 80px; font-size: 17px; line-height: 1.6; }
-.dp-page[hidden] { display: none; }
-.dp-block { position: relative; border-radius: 6px; padding: 2px 10px; margin: 0 -10px 8px; cursor: text; }
-.dp-block:hover { background: color-mix(in srgb, var(--b-fg, #111) 4%, transparent); }
-.dp-changed { box-shadow: inset 3px 0 0 var(--b-accent, #2563eb); background: color-mix(in srgb, var(--b-accent, #2563eb) 9%, transparent); }
-.dp-editing { white-space: pre-wrap; overflow-wrap: anywhere; outline: none; background: var(--b-bg-deep, #fafafa); box-shadow: inset 0 0 0 1px var(--b-border-strong, #ccc); padding: 8px 10px; margin: 0 -10px 14px; font-size: 15px; line-height: 1.55; }
-.dp-chip { display: inline-block; font-size: 13px; color: var(--b-muted, #666); border: 1px dashed var(--b-border-strong, #ccc); border-radius: 6px; padding: 2px 8px; margin: 0 0 14px; }
-.dp-word section.docx { padding: 0 !important; margin: 0 !important; width: auto !important; min-height: 0 !important; background: transparent !important; box-shadow: none !important; }
-.dp-word .dp-para { margin-left: 0; margin-right: 0; cursor: text; border-radius: 4px; }
-.dp-word .dp-para:hover { background: color-mix(in srgb, var(--b-fg, #111) 4%, transparent); }
-`;
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, text?: string): HTMLElementTagNameMap[K] {
-	const node = document.createElement(tag);
-	for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-	if (text !== undefined) node.textContent = text;
-	return node;
-}
-
-const base = (path: string) => path.split(/[\\/]/).pop() ?? path;
-const dir = (path: string) => path.replace(/[\\/][^\\/]*$/, "");
-const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-const keyName = (k: string) => (mac ? k.replace("Mod+", "⌘").replace("Shift+", "⇧") : k.replace("Mod+", "Ctrl+"));
-
-const when = (at: number) => new Date(at).toLocaleString(getLocale(), { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
-const clip = (text: string, n = 70) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
-
 export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPage {
-	if (!document.getElementById("dp-style")) document.head.append(el("style", { id: "dp-style" }, STYLE));
-	host.classList.add("dp");
-	host.replaceChildren();
-	const bar = el("div", { class: "dp-bar" });
-	const name = el("span", { class: "dp-name" }, base(options.path));
-	const status = el("span", { class: "dp-status" }, m.docs_opening());
-	const spacer = el("span", { class: "dp-spacer" });
-	const iconButton = (icon: string, label: string, cls = "dp-ib") => {
-		const b = el("button", { type: "button", class: cls, title: label, "aria-label": label, "aria-pressed": "false" });
-		b.innerHTML = svg(icon);
-		return b;
-	};
-	const labelled = (icon: string, label: string, title: string) => {
-		const b = el("button", { type: "button", class: "dp-btn", title, "aria-pressed": "false" });
-		b.innerHTML = `${svg(icon)}<span>${label}</span>`;
-		return b;
-	};
-	const sourceButton = labelled("source", m.docs_source(), m.docs_source_title());
-	const historyButton = labelled("clock", m.docs_history(), m.docs_history_title());
-	const pdfButton = labelled("pdf", "PDF", m.docs_pdf_title());
-	pdfButton.hidden = true;
-	const changesButton = el("button", { type: "button", class: "dp-btn dp-changes", "aria-pressed": "false", title: m.docs_changes_title(), hidden: "" });
-	const commentsButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", title: m.docs_comments_title(), hidden: "" });
-	// Git: shown once the server says the file is in a repository, with Pull and Push in a popover.
-	const gitBox = el("div", { class: "dp-git", hidden: "" });
+	addStyle();
+	const dom = pageDom(host, options.path);
+	const { name, status, changesButton, commentsButton, gitBox, googleBox, pdfButton, sourceButton, historyButton, tools, main, scroll, text, panel, banner, old, pill, divider, pdfPane } = dom;
 	const gitButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_git_title() });
 	const gitMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
 	gitBox.append(gitButton, gitMenu);
-	// A Google Doc: where it lives, how the link stands, and signing in; in place of Git, which a Doc has none of.
-	const googleBox = el("div", { class: "dp-git", hidden: "" });
 	const googleButton = el("button", { type: "button", class: "dp-btn", "aria-pressed": "false", "aria-haspopup": "dialog", title: m.docs_google_title() });
 	const googleMenu = el("div", { class: "dp-gitmenu", role: "dialog", hidden: "" });
 	googleBox.append(googleButton, googleMenu);
-	bar.append(name, status, spacer, changesButton, commentsButton, gitBox, googleBox, pdfButton, sourceButton, historyButton);
-	const tools = el("div", { class: "dp-tools", hidden: "" });
-	const main = el("div", { class: "dp-main" });
-	const scroll = el("div", { class: "dp-scroll" });
-	const text = el("div", { class: "dp-text", spellcheck: "false", hidden: "" });
-	const panel = el("div", { class: "dp-panel", hidden: "" });
-	const banner = el("div", { class: "dp-banner", hidden: "" });
-	const old = el("div", { class: "dp-old", hidden: "" });
-	const pill = el("div", { class: "dp-pill", hidden: "" });
-	scroll.append(banner, text);
-	const divider = el("div", { class: "dp-divider", hidden: "", role: "separator", "aria-orientation": "vertical", title: m.docs_drag_resize() });
-	const pdfPane = el("div", { class: "dp-pdf", hidden: "" });
 	const pdfBar = el("div", { class: "dp-pdfbar" });
 	const pdfState = el("span", { class: "dp-pdfstate" }, m.docs_pdf_not_yet());
 	const errButton = el("button", { type: "button", class: "dp-btn dp-sm dp-errs", hidden: "", "aria-pressed": "false" });
 	const errList = el("div", { class: "dp-errlist", hidden: "" });
 	const pdfBody = el("div", { class: "dp-pdfbody" });
 	pdfPane.append(pdfBar, errList, pdfBody);
-	main.append(scroll, divider, pdfPane, panel, pill);
-	host.append(bar, tools, main);
 
-	let marks: Mark[] = [];
 	let composing = false;
-	let view: "none" | "changes" | "history" | "comments" = "none";
 	/** A Google Doc's open comments, from Drive, or why they cannot be shown. */
 	let comments: GComment[] = [];
 	let commentsError = "";
@@ -545,7 +90,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	let viewing: { sha: string; at?: number; text: string; editor?: LiveEditor } | undefined;
 	/** The History row last pressed: one text kept twice has one id, so the row says which time is meant. */
 	let picked: { sha: string; at: number } | undefined;
-	let mode: "page" | "source" = "page";
 	const urls = new Map<string, Promise<string | undefined>>();
 	const pictures = new Map<string, Promise<string | undefined>>();
 	const near = (src: string) => (src.startsWith("/") ? src : `${dir(sync.path)}/${decodeURI(src)}`);
@@ -553,7 +97,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	const sync = new DocSync({
 		path: options.path,
 		send: options.send,
-		onUpdate: (_sync, why, applied) => updated(why, applied),
+		onUpdate: (_sync, why, applied) => ctx.hooks.updated(why, applied),
 	});
 	const recent = () => sync.changes;
 	const live = new LiveEditor(sync, {
@@ -587,27 +131,48 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			}
 			return url;
 		},
-		marks: () => marks,
+		marks: () => ctx.marks,
 		changes: recent,
-		onState: (state) => pressed(state),
+		onState: (state) => ctx.hooks.pressed(state),
 	});
 	const reading = new Reading(sync, {
 		...(options.markdown ? { markdown: options.markdown } : {}),
 		...(options.math ? { math: options.math } : {}),
 		...(options.file ? { file: options.file } : {}),
-		marks: () => marks,
+		marks: () => ctx.marks,
 	});
 	// A Google Doc, drawn from Google's own document as it lays it out (`gview.ts`); its styles go to Google once the typing before them has.
 	const gview = new GoogleView(sync, {
-		marks: () => marks,
-		style: (requests) => sendStyle(requests),
+		marks: () => ctx.marks,
+		style: (requests) => ctx.hooks.sendStyle(requests),
 		...(options.api ? { api: options.api } : {}),
-		selection: () => gpressed(),
-		command: (name) => (name === "link" ? askLink() : newComment()),
+		selection: () => ctx.hooks.gpressed(),
+		command: (name) => (name === "link" ? ctx.hooks.askLink() : ctx.hooks.newComment()),
 	});
+	/** Each message type's listeners, called in the order the panels were mounted. */
+	const listeners = new Map<string, Array<(message: DocServerMessage) => void>>();
+	const ctx: PageContext = {
+		options,
+		sync,
+		live,
+		reading,
+		gview,
+		dom,
+		marks: [],
+		mode: "page",
+		view: "none",
+		isGoogle: () => !!sync.remote,
+		isWord: () => sync.format === "docx",
+		isTex: () => /\.(tex|sty|cls|ltx)$/i.test(sync.path),
+		on: (type, fn) => {
+			listeners.set(type, [...(listeners.get(type) ?? []), fn as (message: DocServerMessage) => void]);
+		},
+		hooks: {} as PageHooks,
+	};
 	scroll.append(live.root, reading.root, gview.root, old);
 	reading.root.hidden = true;
 	gview.root.hidden = true;
+	const cleanups = [mountTools(ctx)];
 	/**
 	 * Styles for Google, each with the text the page had when it was made, sent in order once the
 	 * typing before it has reached the server: the server brings the Doc to that text, applies the
@@ -641,257 +206,20 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		if (styleQueue.length) pumping = setTimeout(pump, 30);
 	}
 
-	const isGoogle = () => !!sync.remote;
-	const isWord = () => sync.format === "docx";
-	const isTex = () => /\.(tex|sty|cls|ltx)$/i.test(sync.path);
+	const { isGoogle, isWord, isTex } = ctx;
 
-	// --- the styling tools -------------------------------------------------------------------
-
-	const buttons = new Map<string, HTMLButtonElement>();
-	// The paragraph style: a button naming it, and a menu drawing each style as it reads.
-	const styleBox = el("div", { class: "dp-style" });
-	const styleButton = el("button", { type: "button", class: "dp-btn", title: m.docs_paragraph_style(), "aria-haspopup": "menu", "aria-expanded": "false" });
-	const styleMenu = el("div", { class: "dp-menu", role: "menu", hidden: "" });
-	styleBox.append(styleButton, styleMenu);
-	let styles: Array<[string, string]> = [];
-	let styleNow = "p";
-	const styleLabel = () => {
-		styleButton.innerHTML = "";
-		styleButton.append(el("span", {}, styles.find(([v]) => v === styleNow)?.[1] ?? m.docs_style_body()));
-		styleButton.insertAdjacentHTML("beforeend", svg("chevron"));
-	};
-	const closeMenu = () => {
-		styleMenu.hidden = true;
-		styleButton.setAttribute("aria-expanded", "false");
-	};
-	styleButton.addEventListener("mousedown", (event) => event.preventDefault());
-	styleButton.onclick = () => {
-		const open = styleMenu.hidden;
-		styleMenu.replaceChildren(
-			...styles.map(([value, label]) => {
-				const item = el("button", { type: "button", role: "menuitemradio", class: `m-${value}`, "aria-checked": String(value === styleNow) }, label);
-				item.addEventListener("mousedown", (event) => event.preventDefault());
-				item.onclick = () => {
-					closeMenu();
-					if (isGoogle()) gview.setParagraph({ namedStyleType: value }, "namedStyleType");
-					else live.setBlock(value as BlockStyle);
-				};
-				return item;
-			}),
-		);
-		styleMenu.hidden = !open;
-		styleButton.setAttribute("aria-expanded", String(open));
-	};
-	document.addEventListener("mousedown", (event) => {
-		if (!styleBox.contains(event.target as Node)) closeMenu();
-	});
-	function buildTools(): void {
-		tools.replaceChildren();
-		buttons.clear();
-		if (isGoogle()) return buildGoogleTools();
-		const tex = isTex();
-		const button = (key: string, title: string, run: () => void, icon = key) => {
-			const b = el("button", { type: "button", class: "dp-ib", title, "aria-label": title, "aria-pressed": "false" });
-			b.innerHTML = svg(icon);
-			// Pressing a tool keeps the caret where it is in the page.
-			b.addEventListener("mousedown", (event) => event.preventDefault());
-			b.addEventListener("click", () => run());
-			buttons.set(key, b);
-			group.append(b);
-		};
-		// Tools come in bordered groups, one per kind: marks, inline objects, blocks, inserts, history.
-		let group = el("div", { class: "dp-group" });
-		const sep = () => {
-			if (group.childElementCount) tools.append(group);
-			group = el("div", { class: "dp-group" });
-		};
-		styles = tex
-			? [["p", m.docs_style_body_text()], ["h1", m.docs_style_section()], ["h2", m.docs_style_subsection()], ["h3", m.docs_style_subsubsection()], ["h4", m.docs_style_paragraph_heading()]]
-			: [["p", m.docs_style_body_text()], ["h1", m.docs_style_heading({ level: 1 })], ["h2", m.docs_style_heading({ level: 2 })], ["h3", m.docs_style_heading({ level: 3 })], ["h4", m.docs_style_heading({ level: 4 })], ["h5", m.docs_style_heading({ level: 5 })], ["h6", m.docs_style_heading({ level: 6 })]];
-		styleLabel();
-		tools.append(styleBox);
-		const inline = (key: InlineStyle, title: string) => button(key, title, () => live.toggle(key));
-		inline("bold", m.docs_tool_bold({ key: keyName("Mod+B") }));
-		inline("italic", m.docs_tool_italic({ key: keyName("Mod+I") }));
-		inline("underline", m.docs_tool_underline({ key: keyName("Mod+U") }));
-		if (!tex) inline("strike", m.docs_tool_strike({ key: keyName("Mod+Shift+X") }));
-		sep();
-		inline("code", m.docs_tool_code({ key: keyName("Mod+E") }));
-		if (!tex) inline("mark", m.docs_tool_highlight({ key: keyName("Mod+Shift+H") }));
-		button("link", m.docs_tool_link({ key: keyName("Mod+K") }), () => live.link());
-		inline("math", m.docs_tool_math({ key: keyName("Mod+Shift+M") }));
-		sep();
-		button("ul", m.docs_tool_bullets({ key: keyName("Mod+Shift+8") }), () => live.setBlock("ul"));
-		if (!tex) {
-			button("ol", m.docs_tool_numbers({ key: keyName("Mod+Shift+7") }), () => live.setBlock("ol"));
-			button("task", m.docs_tool_tasks(), () => live.setBlock("task"));
-			button("quote", m.docs_tool_quote(), () => live.setBlock("quote"));
-			button("codeblock", m.docs_tool_codeblock(), () => live.setBlock("code"));
-			sep();
-			button("table", m.docs_tool_table(), () => live.insertBlock("table"));
-			button("hr", m.docs_tool_rule(), () => live.insertBlock("hr"));
-		} else {
-			button("ol", m.docs_tool_numbered(), () => live.setBlock("ol"));
-			button("display", m.docs_tool_equation(), () => live.insertBlock("math"));
-		}
-		sep();
-		button("undo", m.docs_tool_undo({ key: keyName("Mod+Z") }), () => live.undo());
-		button("redo", m.docs_tool_redo({ key: keyName("Mod+Shift+Z") }), () => live.redo());
-		sep();
-	}
-
-	// --- a Google Doc's own tools: what Google's toolbar has, sent to Google as Docs requests ---------
-
-	const FONTS = ["Arial", "Roboto", "Times New Roman", "Georgia", "Lato", "Merriweather", "Montserrat", "Open Sans", "Playfair Display", "Source Sans 3", "Courier New", "Verdana", "Comic Sans MS"];
-	const gcontrols: { font?: HTMLSelectElement; size?: HTMLInputElement } = {};
-
-	function buildGoogleTools(): void {
-		let group = el("div", { class: "dp-group" });
-		const sep = () => {
-			if (group.childElementCount) tools.append(group);
-			group = el("div", { class: "dp-group" });
-		};
-		const button = (key: string, title: string, run: () => void, icon = key) => {
-			const b = el("button", { type: "button", class: "dp-ib", title, "aria-label": title, "aria-pressed": "false" });
-			b.innerHTML = svg(icon);
-			b.addEventListener("mousedown", (event) => event.preventDefault());
-			b.addEventListener("click", () => run());
-			buttons.set(key, b);
-			group.append(b);
-			return b;
-		};
-		button("undo", m.docs_tool_undo({ key: keyName("Mod+Z") }), () => gview.undo());
-		button("redo", m.docs_tool_redo({ key: keyName("Mod+Shift+Z") }), () => gview.redo());
-		sep();
-		styles = [["NORMAL_TEXT", m.docs_style_normal()], ["TITLE", m.docs_style_title()], ["SUBTITLE", m.docs_style_subtitle()], ["HEADING_1", m.docs_style_heading({ level: 1 })], ["HEADING_2", m.docs_style_heading({ level: 2 })], ["HEADING_3", m.docs_style_heading({ level: 3 })], ["HEADING_4", m.docs_style_heading({ level: 4 })]];
-		styleNow = "NORMAL_TEXT";
-		styleLabel();
-		tools.append(styleBox);
-		const font = el("select", { class: "dp-select", title: m.docs_tool_font(), "aria-label": m.docs_tool_font() });
-		for (const f of FONTS) font.append(el("option", { value: f, style: `font-family: "${f}"` }, f));
-		font.onchange = () => {
-			gview.setText("weightedFontFamily", { fontFamily: font.value });
-			gview.focus();
-		};
-		gcontrols.font = font;
-		group.append(font);
-		sep();
-		const size = el("input", { class: "dp-size", type: "text", inputmode: "numeric", title: m.docs_tool_font_size(), "aria-label": m.docs_tool_font_size() });
-		const setSize = (value: number) => {
-			const v = Math.max(1, Math.min(400, Math.round(value)));
-			size.value = String(v);
-			gview.setText("fontSize", { magnitude: v, unit: "PT" });
-		};
-		button("smaller", m.docs_tool_smaller(), () => setSize(Number(size.value || 11) - 1), "minus");
-		group.append(size);
-		button("bigger", m.docs_tool_bigger(), () => setSize(Number(size.value || 11) + 1), "plus");
-		size.onchange = () => {
-			setSize(Number(size.value) || 11);
-			gview.focus();
-		};
-		gcontrols.size = size;
-		sep();
-		button("bold", m.docs_tool_bold({ key: keyName("Mod+B") }), () => gview.toggle("bold"));
-		button("italic", m.docs_tool_italic({ key: keyName("Mod+I") }), () => gview.toggle("italic"));
-		button("underline", m.docs_tool_underline({ key: keyName("Mod+U") }), () => gview.toggle("underline"));
-		button("strike", m.docs_tool_strike({ key: keyName("Mod+Shift+X") }), () => gview.toggle("strikethrough"));
-		const colour = (key: string, title: string, field: "foregroundColor" | "backgroundColor") => {
-			const input = el("input", { type: "color", class: "dp-colour", "aria-label": title, value: field === "foregroundColor" ? "#000000" : "#ffff00" });
-			const b = button(key, title, () => input.click(), field === "foregroundColor" ? "textcolour" : "mark");
-			b.append(input);
-			input.onchange = () => {
-				const hex = input.value;
-				const c = (k: number) => Number.parseInt(hex.slice(k, k + 2), 16) / 255;
-				gview.setText(field, { color: { rgbColor: { red: c(1), green: c(3), blue: c(5) } } });
-				gview.focus();
-			};
-		};
-		colour("colour", m.docs_tool_text_colour(), "foregroundColor");
-		colour("highlight", m.docs_tool_highlight_colour(), "backgroundColor");
-		sep();
-		button("link", m.docs_tool_link({ key: keyName("Mod+K") }), () => askLink());
-		sep();
-		const align = (key: string, title: string, value: string) => button(key, title, () => gview.setParagraph({ alignment: value }, "alignment"));
-		align("alignleft", m.docs_tool_align_left(), "START");
-		align("aligncenter", m.docs_tool_align_centre(), "CENTER");
-		align("alignright", m.docs_tool_align_right(), "END");
-		align("justify", m.docs_tool_justify(), "JUSTIFIED");
-		sep();
-		button("ul", m.docs_tool_bullets({ key: keyName("Mod+Shift+8") }), () => gview.list(false));
-		button("ol", m.docs_tool_numbers({ key: keyName("Mod+Shift+7") }), () => gview.list(true));
-		button("outdent", m.docs_tool_outdent({ key: keyName("Mod+[") }), () => gview.indent(-1));
-		button("indent", m.docs_tool_indent({ key: keyName("Mod+]") }), () => gview.indent(1));
-		sep();
-		button("table", m.docs_tool_insert_table(), () => gview.table("insert"));
-		// Rows and columns, for the cell the caret is in.
-		button("rowabove", m.docs_tool_row_above(), () => gview.table("rowAbove"));
-		button("rowbelow", m.docs_tool_row_below(), () => gview.table("rowBelow"));
-		button("colleft", m.docs_tool_col_left(), () => gview.table("colLeft"));
-		button("colright", m.docs_tool_col_right(), () => gview.table("colRight"));
-		button("rowdelete", m.docs_tool_delete_row(), () => gview.table("deleteRow"));
-		button("coldelete", m.docs_tool_delete_col(), () => gview.table("deleteCol"));
-		sep();
-		button("comment", m.docs_tool_comment(), () => newComment());
-		button("clear", m.docs_tool_clear({ key: keyName("Mod+\\") }), () => gview.clearFormatting());
-		sep();
-		gpressed();
-	}
-
-	function askLink(): void {
-		const url = window.prompt(m.docs_link_prompt(), "https://");
-		if (url !== null) gview.link(url.trim() && url.trim() !== "https://" ? url.trim() : undefined);
-		gview.focus();
-	}
-
-	function gpressed(): void {
-		if (!isGoogle() || !gview.loaded) return;
-		const state = gview.state();
-		for (const key of ["bold", "italic", "underline", "strike"] as const) buttons.get(key)?.setAttribute("aria-pressed", String(state[key]));
-		const align = { START: "alignleft", CENTER: "aligncenter", END: "alignright", JUSTIFIED: "justify" }[state.align] ?? "alignleft";
-		for (const key of ["alignleft", "aligncenter", "alignright", "justify"]) buttons.get(key)?.setAttribute("aria-pressed", String(key === align));
-		buttons.get("ul")?.setAttribute("aria-pressed", String(state.bullet));
-		const inCell = !!gview.cellAt();
-		for (const key of ["rowabove", "rowbelow", "colleft", "colright", "rowdelete", "coldelete"]) {
-			const b = buttons.get(key);
-			if (b) b.hidden = !inCell;
-		}
-		buttons.get("ol")?.setAttribute("aria-pressed", String(state.numbered));
-		if (gcontrols.font && document.activeElement !== gcontrols.font) {
-			if (![...gcontrols.font.options].some((o) => o.value === state.font)) gcontrols.font.append(el("option", { value: state.font }, state.font));
-			gcontrols.font.value = state.font;
-		}
-		if (gcontrols.size && document.activeElement !== gcontrols.size) gcontrols.size.value = String(Math.round(state.size * 10) / 10);
-		const type = state.type === "TITLE" || state.type === "SUBTITLE" || state.type.startsWith("HEADING_") ? state.type : "NORMAL_TEXT";
-		if (type !== styleNow) {
-			styleNow = type;
-			if (!styles.some(([v]) => v === type)) styles.push([type, type.startsWith("HEADING_") ? m.docs_style_heading({ level: type.slice("HEADING_".length) }) : type]);
-			styleLabel();
-		}
-	}
-
-	function pressed(state: FormatState): void {
-		for (const key of ["bold", "italic", "strike", "underline", "code", "mark", "link", "math"] as const) buttons.get(key)?.setAttribute("aria-pressed", String(state[key]));
-		for (const key of ["ul", "ol", "task", "quote"] as const) buttons.get(key)?.setAttribute("aria-pressed", String(state.block === key));
-		buttons.get("codeblock")?.setAttribute("aria-pressed", String(state.block === "code"));
-		const block = /^h[1-6]$/.test(state.block) ? state.block : "p";
-		if (styles.some(([v]) => v === block) && block !== styleNow) {
-			styleNow = block;
-			styleLabel();
-		}
-	}
-
-	function setMode(next: typeof mode): void {
+	function setMode(next: Mode): void {
 		if (viewing) closeVersion();
-		mode = next;
-		sourceButton.setAttribute("aria-pressed", String(mode === "source"));
-		text.hidden = mode !== "source";
+		ctx.mode = next;
+		sourceButton.setAttribute("aria-pressed", String(ctx.mode === "source"));
+		text.hidden = ctx.mode !== "source";
 		const word = isWord();
 		const google = isGoogle();
-		live.root.hidden = mode !== "page" || word || google;
-		reading.root.hidden = mode !== "page" || !word;
-		gview.root.hidden = mode !== "page" || !google;
-		tools.hidden = mode !== "page" || word || sync.readOnly || !sync.ready;
-		if (mode === "source") draw(false);
+		live.root.hidden = ctx.mode !== "page" || word || google;
+		reading.root.hidden = ctx.mode !== "page" || !word;
+		gview.root.hidden = ctx.mode !== "page" || !google;
+		tools.hidden = ctx.mode !== "page" || word || sync.readOnly || !sync.ready;
+		if (ctx.mode === "source") draw(false);
 		else if (word) reading.render();
 		else if (google) gview.render();
 		else live.render();
@@ -946,7 +274,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	function draw(keepCaret = true): void {
 		const where = keepCaret ? caret() : undefined;
 		const frag = document.createDocumentFragment();
-		for (const segment of segments(sync.text, marks.filter((m) => m.kind === "ins"))) {
+		for (const segment of segments(sync.text, ctx.marks.filter((m) => m.kind === "ins"))) {
 			if (!("mark" in segment)) frag.append(document.createTextNode(segment.text));
 			else frag.append(el("span", { class: "dp-ins" }, segment.text));
 		}
@@ -980,7 +308,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 
 	function updated(why: "open" | "remote" | "local" | "outside" | "review", applied?: readonly Splice[]): void {
 		if (why === "open") {
-			marks = recent().flatMap((change) => findMarks(change, sync.text));
+			ctx.marks = recent().flatMap((change) => findMarks(change, sync.text));
 			text.setAttribute("contenteditable", sync.readOnly ? "false" : "plaintext-only");
 			// A Google Doc goes by its own title; its mirror's file name is this server's business.
 			name.textContent = sync.remote?.title ?? base(sync.path);
@@ -993,26 +321,26 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			// A Doc's text is its indices, not something to read as source.
 			sourceButton.hidden = isGoogle();
 			drawCommentsButton();
-			if (isGoogle() && mode === "source") mode = "page";
-			buildTools();
+			if (isGoogle() && ctx.mode === "source") ctx.mode = "page";
+			ctx.hooks.buildTools();
 			live.reset();
-			setMode(mode);
+			setMode(ctx.mode);
 		} else if (why === "local") {
-			for (const splice of applied ?? []) marks = shiftMarks(marks, splice);
-			if (mode === "source") {
-				if (marks.length) draw();
+			for (const splice of applied ?? []) ctx.marks = shiftMarks(ctx.marks, splice);
+			if (ctx.mode === "source") {
+				if (ctx.marks.length) draw();
 			} else if (isWord()) reading.update(applied ?? []);
 			else if (isGoogle()) gview.update(applied ?? [], true);
 			else live.local();
 		} else {
-			const where = mode === "source" ? caret() : undefined;
-			for (const splice of applied ?? []) marks = shiftMarks(marks, splice);
+			const where = ctx.mode === "source" ? caret() : undefined;
+			for (const splice of applied ?? []) ctx.marks = shiftMarks(ctx.marks, splice);
 			const change = why === "outside" ? sync.changes.at(-1) : undefined;
-			if (change) marks.push(...marksOf(change.id, applied ?? []));
+			if (change) ctx.marks.push(...marksOf(change.id, applied ?? []));
 			// Accepted or rejected: its highlight goes.
 			const waiting = new Set(sync.changes.map((c) => c.id));
-			marks = marks.filter((m) => waiting.has(m.change));
-			if (mode === "source") {
+			ctx.marks = ctx.marks.filter((m) => waiting.has(m.change));
+			if (ctx.mode === "source") {
 				draw(false);
 				if (where) place(shiftCaret(where, applied ?? []));
 			} else if (isWord()) reading.update(applied ?? []);
@@ -1040,39 +368,35 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			status.textContent = sync.settled ? m.docs_saved() : m.docs_saving();
 		}
 		const n = sync.changes.length;
-		changesButton.hidden = n === 0 && view !== "changes";
+		changesButton.hidden = n === 0 && ctx.view !== "changes";
 		changesButton.innerHTML = `${svg("changes")}<span>${m.docs_changes()}</span>${n ? `<span class="dp-count">${n}</span>` : ""}`;
 		// Only when the list changed: redrawing it every tick replaced the button under the pointer, and its hover flickered.
-		if (view === "changes" && changesDrawn !== changesKey()) drawChanges();
+		if (ctx.view === "changes" && changesDrawn !== changesKey()) drawChanges();
 	}
 
-	function show(next: typeof view): void {
-		view = view === next ? "none" : next;
-		changesButton.setAttribute("aria-pressed", String(view === "changes"));
-		historyButton.setAttribute("aria-pressed", String(view === "history"));
-		commentsButton.setAttribute("aria-pressed", String(view === "comments"));
-		panel.hidden = view === "none";
-		if (view !== "history" && viewing) closeVersion();
-		if (view === "changes") drawChanges();
-		if (view === "comments") drawComments();
-		if (view === "history") {
+	function show(next: View): void {
+		ctx.view = ctx.view === next ? "none" : next;
+		changesButton.setAttribute("aria-pressed", String(ctx.view === "changes"));
+		historyButton.setAttribute("aria-pressed", String(ctx.view === "history"));
+		commentsButton.setAttribute("aria-pressed", String(ctx.view === "comments"));
+		panel.hidden = ctx.view === "none";
+		if (ctx.view !== "history" && viewing) closeVersion();
+		if (ctx.view === "changes") drawChanges();
+		if (ctx.view === "comments") drawComments();
+		if (ctx.view === "history") {
 			panel.replaceChildren(header(m.docs_history()), el("p", { class: "dp-empty" }, m.docs_reading()));
 			sync.versions();
 		}
 		refresh();
 	}
 
-	const whoOf = (by: string) => (by === "outside" ? m.docs_another_program() : by);
-
 	function header(title: string, ...extra: HTMLElement[]): HTMLElement {
 		const head = el("div", { class: "dp-head" });
 		const close = iconButton("x", m.docs_close(), "dp-ib dp-sm");
-		close.onclick = () => show(view);
+		close.onclick = () => show(ctx.view);
 		head.append(el("h3", {}, title), ...extra, close);
 		return head;
 	}
-
-	const initial = (by: string) => (by === "outside" ? "?" : by.trim().charAt(0).toUpperCase() || "?");
 
 	let changesDrawn = "";
 	const changesKey = () => `${sync.readOnly}|${sync.changes.map((c) => c.id).join(",")}`;
@@ -1135,7 +459,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		const quote = gview.quote();
 		if (!quote) return;
 		drafting = quote;
-		if (view !== "comments") show("comments");
+		if (ctx.view !== "comments") show("comments");
 		else drawComments();
 	}
 
@@ -1219,7 +543,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	gview.page.addEventListener("click", (event) => {
 		const id = (event.target as HTMLElement).closest<HTMLElement>("[data-comment]")?.dataset.comment;
 		if (!id) return;
-		if (view !== "comments") show("comments");
+		if (ctx.view !== "comments") show("comments");
 		panel.querySelector(`[data-comment="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 	});
 
@@ -1351,7 +675,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		banner.replaceChildren(icon.firstElementChild!, el("b", {}, at ? when(at) : m.docs_earlier_version()), el("span", { class: "dp-spacer" }), ...(sync.readOnly ? [] : [restore]), back);
 		banner.hidden = false;
 		scroll.scrollTop = 0;
-		if (view === "history") drawHistory();
+		if (ctx.view === "history") drawHistory();
 	}
 
 	function closeVersion(redraw = true): void {
@@ -1364,12 +688,12 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		if (redraw) {
 			const word = isWord();
 			const google = isGoogle();
-			live.root.hidden = mode !== "page" || word || google;
-			reading.root.hidden = mode !== "page" || !word;
-			gview.root.hidden = mode !== "page" || !google;
-			text.hidden = mode !== "source";
-			tools.hidden = mode !== "page" || word || sync.readOnly || !sync.ready;
-			if (view === "history") drawHistory();
+			live.root.hidden = ctx.mode !== "page" || word || google;
+			reading.root.hidden = ctx.mode !== "page" || !word;
+			gview.root.hidden = ctx.mode !== "page" || !google;
+			text.hidden = ctx.mode !== "source";
+			tools.hidden = ctx.mode !== "page" || word || sync.readOnly || !sync.ready;
+			if (ctx.view === "history") drawHistory();
 		}
 	}
 
@@ -1610,7 +934,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 					.then((answer) => {
 						pasteSaid = answer.ok ? m.docs_google_signed_in({ email: answer.email ?? "" }) : (answer.message ?? m.docs_google_failed());
 						drawGoogle();
-						if (view === "comments") drawComments();
+						if (ctx.view === "comments") drawComments();
 					});
 			};
 			parts.push(form);
@@ -1687,43 +1011,73 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		divider.addEventListener("pointerup", up, { once: true });
 	});
 
-	sourceButton.onclick = () => setMode(mode === "source" ? "page" : "source");
+	sourceButton.onclick = () => setMode(ctx.mode === "source" ? "page" : "source");
 	historyButton.onclick = () => show("history");
 	commentsButton.onclick = () => show("comments");
 	changesButton.onclick = () => show("changes");
 
+	ctx.on("doc.versions", (message) => {
+		versions = message.versions;
+		if (ctx.view === "history") drawHistory();
+	});
+	ctx.on("doc.compiled", (message) => compiled(message));
+	ctx.on("doc.repo", (message) => repoAnswered(message));
+	ctx.on("doc.gdoc", (message) => {
+		gview.load(message.document as never, message.text);
+		gview.setComments(comments);
+	});
+	ctx.on("doc.gcomments", (message) => {
+		comments = message.comments as GComment[];
+		commentsError = message.error ?? "";
+		gview.setComments(comments);
+		drawCommentsButton();
+		if (ctx.view === "comments") drawComments();
+	});
+	ctx.on("doc.remote", (message) => {
+		remoteStatus = message.status;
+		drawGoogle();
+	});
+	ctx.on("doc.version", (message) => {
+		if (message.text !== undefined) openVersion(message.sha, picked?.sha === message.sha ? picked.at : message.at, message.text);
+		else if (message.error) {
+			status.dataset.state = "error";
+			status.textContent = message.error;
+		}
+	});
+	// A restore or someone's edit while looking at a version: the History list grows.
+	ctx.on("doc.changed", (message) => {
+		if (ctx.view === "history" && !message.client) sync.versions();
+	});
+	Object.assign(ctx.hooks, {
+		updated,
+		refresh,
+		show,
+		header,
+		setMode,
+		draw,
+		drawShifted: (applied: readonly Splice[]) => {
+			const where = caret();
+			draw(false);
+			if (where) place(shiftCaret(where, applied));
+		},
+		drawChanges: (onlyIfChanged = false) => {
+			if (!onlyIfChanged || changesDrawn !== changesKey()) drawChanges();
+		},
+		drawComments,
+		drawCommentsButton,
+		newComment,
+		isViewing: () => !!viewing,
+		closeVersion: () => closeVersion(),
+		compileSoon,
+		sendStyle,
+		drawGoogle,
+		signInParts,
+		remoteStatus: () => remoteStatus,
+	} satisfies Partial<PageHooks>);
+
 	const stop = options.listen((message) => {
 		sync.receive(message);
-		if (message.type === "doc.versions" && message.path === sync.path) {
-			versions = message.versions;
-			if (view === "history") drawHistory();
-		}
-		if (message.type === "doc.compiled" && message.path === sync.path) compiled(message);
-		if (message.type === "doc.repo" && message.path === sync.path) repoAnswered(message);
-		if (message.type === "doc.gdoc" && message.path === sync.path) {
-			gview.load(message.document as never, message.text);
-			gview.setComments(comments);
-		}
-		if (message.type === "doc.gcomments" && message.path === sync.path) {
-			comments = message.comments as GComment[];
-			commentsError = message.error ?? "";
-			gview.setComments(comments);
-			drawCommentsButton();
-			if (view === "comments") drawComments();
-		}
-		if (message.type === "doc.remote" && message.path === sync.path) {
-			remoteStatus = message.status;
-			drawGoogle();
-		}
-		if (message.type === "doc.version" && message.path === sync.path) {
-			if (message.text !== undefined) openVersion(message.sha, picked?.sha === message.sha ? picked.at : message.at, message.text);
-			else if (message.error) {
-				status.dataset.state = "error";
-				status.textContent = message.error;
-			}
-		}
-		// A restore or someone's edit while looking at a version: the History list grows.
-		if (message.type === "doc.changed" && view === "history" && !message.client && message.path === sync.path) sync.versions();
+		if ("path" in message && message.path === sync.path) for (const fn of listeners.get(message.type) ?? []) fn(message);
 		if (message.type === "doc.patched") refresh();
 	});
 	/*
@@ -1740,6 +1094,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		sync,
 		destroy() {
 			clearInterval(ticker);
+			for (const cleanup of cleanups) cleanup();
 			reading.destroy();
 			live.destroy();
 			viewing?.editor?.destroy();
