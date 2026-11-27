@@ -25,9 +25,9 @@ import { m } from "@decks/i18n";
  *
  * Hovering the handle started a preview with no dwell delay, and picking the row *held* one
  * that outlived the pointer. Two ways in, one of which you could take by accident, and both
- * ending in the same state: every board amber and inert, with the only way out inside this
+ * ending in the same state: every card amber and inert, with the only way out inside this
  * menu. What that produced is a canvas somebody is stuck in without having asked for
- * anything — and a reading of the boards that changes while your cursor drifts across a
+ * anything — and a reading of the cards that changes while your cursor drifts across a
  * transcript is not a feature, it is a flinch.
  *
  * So there is one way in and it is a press. Which also makes this menu what it says it is:
@@ -181,7 +181,7 @@ export function TimeMachine(props: {
 			 * row that is usually not there is a row nobody knows about — and the menu stops
 			 * being a list of what you can do to this message.
 			 *
-			 * Behind the rule, because this is the one that writes to the boards.
+			 * Behind the rule, because this is the one that writes to the cards.
 			 */}
 			<div class="rule" />
 			<button

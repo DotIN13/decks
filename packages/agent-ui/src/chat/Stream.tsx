@@ -13,30 +13,30 @@ import { Turn } from "./Turn.tsx";
 import { m } from "@decks/i18n";
 
 /**
- * The conversation: a column of cards over the boards.
+ * The conversation: a column of cards over the cards.
  *
  * **Not a panel.** The column itself has no background and takes no pointer events; the
- * cards take their own, so the 10px gaps between turns are still canvas and a board can be
+ * cards take their own, so the 10px gaps between turns are still canvas and a card can be
  * dragged through them. That was the one genuinely good idea in the floating transcript this
  * replaces, and it survives unchanged.
  *
  * **Every card is opaque, and none of them dims with age.** `index.css` refuses frosted
  * glass in writing — "40% words behind 100% words reads as grime, and it moves when the
  * camera does" — and a floating transcript is the exact case that argument was about: a
- * small surface directly on top of a board's own paragraphs, at whatever zoom the camera
+ * small surface directly on top of a card's own paragraphs, at whatever zoom the camera
  * happens to be at. So each card is the panel's colour at full opacity, a hairline, and the
  * `--shadow` rung. The `canvas-chat` lineage this idea comes from steps older turns back in
- * opacity so the board shows through; that is the same grime by a gentler name, and it buys
+ * opacity so the card shows through; that is the same grime by a gentler name, and it buys
  * nothing here — the newest card is at the bottom of the column, which is where the eye
  * already is, and the column scrolls rather than stacking.
  *
  * **It is not an inset, and that is deliberate.** The pinned version declared
- * `data-inset="right"`, so `fit` subtracted it and no board could sit underneath. A floating
- * column cannot do that and still be floating. The rule the boards settle on, and the reason
+ * `data-inset="right"`, so `fit` subtracted it and no card could sit underneath. A floating
+ * column cannot do that and still be floating. The rule the cards settle on, and the reason
  * the inspector still insets while this does not: *a surface that arrives on its own must be
  * subtracted; a surface you summoned may overlap.* You pressed a button to put this here,
  * one press takes it away, and it steps aside when the inspector needs the room — so
- * covering a board is a trade you made, not one made for you.
+ * covering a card is a trade you made, not one made for you.
  *
  * Whether it is up at all belongs to `state/edge.ts`, which owns the one bit of state deciding
  * who has the right edge. There is no `open` prop for the same reason there is no local
@@ -228,15 +228,15 @@ export function Stream(props: {
 	 * The wheel scrolls the column from anywhere over it, not only over a card.
 	 *
 	 * The column is `pointer-events: none` with the cards `auto`, which is what lets the
-	 * 10px gaps pass clicks through to the board underneath — and it is also why a wheel in
+	 * 10px gaps pass clicks through to the card underneath — and it is also why a wheel in
 	 * one of those gaps zoomed the canvas instead of scrolling the conversation. An element
 	 * that is not a hit-test target does not receive a wheel event either, so there is no
 	 * handler to put on it.
 	 *
 	 * So the listener is on the window, in the capture phase, and it asks the one question
 	 * `pointer-events` cannot express: *is the pointer inside the column's box?* If it is,
-	 * the scroll belongs to the conversation and the stage must not also see it. Clicks are
-	 * untouched, so dragging a board through a gap still works.
+	 * the scroll belongs to the conversation and the canvas must not also see it. Clicks are
+	 * untouched, so dragging a card through a gap still works.
 	 */
 	onMount(() => {
 		const wheel = (event: WheelEvent) => {
@@ -256,7 +256,7 @@ export function Stream(props: {
 			 * Over the conversation itself the browser scrolls it, with the smoothing and momentum
 			 * every other scrolling box has: the event is only kept from the canvas. Setting
 			 * `scrollTop` from each event moved the history in steps. Only a wheel in one of the
-			 * gaps, which lands on the board underneath, is scrolled by hand.
+			 * gaps, which lands on the card underneath, is scrolled by hand.
 			 */
 			event.stopPropagation();
 			if (event.target instanceof Node && scroller.contains(event.target)) return;
@@ -595,8 +595,8 @@ export function Stream(props: {
 							 * The line between one day and the next, in sentence case — this is what
 							 * replaces the uppercase "EARLIER" eyebrow the chat list used. A chip
 							 * rather than a label with a rule running off it: over the canvas a bare
-							 * hairline lands on top of whatever board is behind the column and reads as
-							 * a board's own rule, and a chip is opaque like everything else here.
+							 * hairline lands on top of whatever card is behind the column and reads as
+							 * a card's own rule, and a chip is opaque like everything else here.
 							 */}
 							<Show when={divides(cards()[index() - 1]?.at, card().at)}>
 								{(label) => <div class="stream-day">{label()}</div>}

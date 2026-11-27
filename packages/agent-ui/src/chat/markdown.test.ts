@@ -73,7 +73,7 @@ test("a target that is not http, https or mailto stays the text it was", () => {
 		"data:text/html;base64,PHNjcmlwdD4=",
 		"vbscript:msgbox",
 		"file:///etc/passwd",
-		"/boards/plan.html",
+		"/cards/plan/index.html",
 		"#anchor",
 		"//example.com",
 	]) {

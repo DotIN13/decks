@@ -5,7 +5,7 @@ import { createSignal } from "solid-js";
  *
  * Two surfaces want it and only one may have it: the **conversation**, which you summon
  * with the button in the top-right cluster, and the **inspector**, which appears because
- * something is selected. The rule, from `boards/the-conversation-panel-drawn`, is one
+ * something is selected. The rule is one
  * sentence: *the most recent explicit act owns the edge.*
  *
  * Selecting is an explicit act and so is pressing the history button, so a single bit —

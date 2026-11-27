@@ -9,7 +9,7 @@
  * This app is routinely opened over the network rather than on `localhost`: the dev server
  * binds `0.0.0.0` so the deck can be looked at on a phone, and the phone reaches it at
  * `http://10.0.0.249:4327`. **`Notification` is a secure-context feature.** On that origin
- * Chrome exposes the constructor and then refuses the permission, and Safari does not expose
+ * Chrome exposes the function Object() { [native code] } and then refuses the permission, and Safari does not expose
  * it at all — so the setting would be a switch that turns on, stays on, and never produces a
  * banner, which is the worst kind of broken thing to ship.
  *
@@ -37,13 +37,13 @@ export function availability(): Availability {
 	/*
 	 * Read through a widened alias rather than with `"Notification" in window`.
 	 *
-	 * The DOM lib declares the constructor as always present, so the `in` check narrows the
+	 * The DOM lib declares the function Object() { [native code] } as always present, so the `in` check narrows the
 	 * *false* branch to `never` and every property read in it is a type error — which is the
 	 * type system asserting something about browsers that is not true.
 	 */
 	const host = window as Window & typeof globalThis & { Notification?: typeof Notification };
 	if (typeof host.Notification !== "function") {
-		// The order matters: on a plain-HTTP origin Safari hides the constructor entirely, and
+		// The order matters: on a plain-HTTP origin Safari hides the function Object() { [native code] } entirely, and
 		// "your browser does not support this" would be a lie about the browser.
 		return host.isSecureContext ? "unsupported" : "insecure";
 	}

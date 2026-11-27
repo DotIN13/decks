@@ -43,32 +43,32 @@ test("in the sent words a pill stands as [comment n], and pills alone send no wo
 });
 
 /**
- * A board and a drawn item dragged onto the bar. They are pills for the same reason a comment
+ * A card and a drawn item dragged onto the bar. They are pills for the same reason a comment
  * is — the thing is carried inside, not read back off a label — but unlike a comment they have
  * an address the agent can use, so that is what they read as.
  */
-const BOARD = { type: "mention", kind: "card", id: "boards/plan.html", label: "The plan" } as const;
+const CARD = { type: "mention", kind: "card", id: "cards/plan/index.html", label: "The plan" } as const;
 const ITEM = { type: "mention", kind: "item", id: "plan-note", label: "Check the margin" } as const;
 
-test("a board and an item read as their address, where a comment reads as a number", () => {
-	assert.equal(draftText([BOARD, ITEM]), "", "no pill puts words into the typed text");
-	assert.equal(draftForAgent([{ type: "text", text: "look at " }, BOARD, { type: "text", text: " and " }, ITEM]), "look at @boards/plan.html and @item:plan-note");
+test("a card and an item read as their address, where a comment reads as a number", () => {
+	assert.equal(draftText([CARD, ITEM]), "", "no pill puts words into the typed text");
+	assert.equal(draftForAgent([{ type: "text", text: "look at " }, CARD, { type: "text", text: " and " }, ITEM]), "look at @cards/plan/index.html and @item:plan-note");
 	// Alone, they are the whole message; comments alone still send no words, because each is
 	// composed into a block of its own.
-	assert.equal(draftForAgent([BOARD]), "@boards/plan.html");
+	assert.equal(draftForAgent([CARD]), "@cards/plan/index.html");
 	assert.equal(draftForAgent([ITEM]), "@item:plan-note");
 });
 
 test("only comment pills are comments, and any pill is a message", () => {
-	const mixed: Draft = [BOARD, { type: "mention", kind: "comment", id: "c1", label: "“a”" }, ITEM];
-	assert.deepEqual(draftComments(mixed), ["c1"], "a board is not a comment to attach");
-	assert.equal(draftIsEmpty([BOARD]), false);
+	const mixed: Draft = [CARD, { type: "mention", kind: "comment", id: "c1", label: "“a”" }, ITEM];
+	assert.deepEqual(draftComments(mixed), ["c1"], "a card is not a comment to attach");
+	assert.equal(draftIsEmpty([CARD]), false);
 	assert.equal(draftIsEmpty([ITEM]), false);
 	assert.equal(draftIsEmpty([{ type: "text", text: "  " }]), true);
 });
 
 test("the clipboard round trip keeps all three kinds", () => {
-	const draft: Draft = [BOARD, { type: "text", text: " and " }, ITEM];
+	const draft: Draft = [CARD, { type: "text", text: " and " }, ITEM];
 	assert.deepEqual(parseDraft(serializeDraft(draft)), draft);
 	assert.equal(parseDraft(JSON.stringify([{ type: "mention", kind: "agent", id: "a1", label: "Ada" }])), null);
 });

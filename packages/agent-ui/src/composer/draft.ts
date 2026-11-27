@@ -9,14 +9,14 @@
  *
  * Three kinds of mention, each standing for something the app already holds:
  *
- * - a **comment** on words selected on a board (`markup/comments.ts`), whose id is the
+ * - a **comment** on words selected on a card (`markup/comments.ts`), whose id is the
  *   comment's;
  * - a **card**, whose id is its path;
- * - an **item** drawn on the stage, whose id is its id in `canvas.pen`.
+ * - an **item** drawn on the canvas, whose id is its id in `canvas.pen`.
  *
  * - a **file** in the deck, attached with the paperclip or dropped on the bar, whose id is its path.
  *
- * Boards and items arrive by dragging the thing onto the input bar (`view/CanvasView.tsx`). They are
+ * Cards and items arrive by dragging the thing onto the input bar (`view/CanvasView.tsx`). They are
  * pills rather than typed text for the reason the comment is: what a mention stands for should
  * not have to be guessed back out of its label, and a thing you dragged is a thing you pointed
  * at, not a path you typed. A file was spelled `@path` in plain text; it is a pill now too, so
@@ -38,12 +38,12 @@ export type DraftNode =
 	| {
 			type: "mention";
 			kind: MentionKind;
-			/** The comment's id in `state/comments.ts`, a board's or a file's path, or an item's id on the stage. */
+			/** The comment's id in `state/comments.ts`, a card's or a file's path, or an item's id on the canvas. */
 			id: string;
-			/** What the pill shows after its icon: the quoted words, the board's title, the item's name. */
+			/** What the pill shows after its icon: the quoted words, the card's title, the item's name. */
 			label: string;
 			/**
-			 * What it is called, in full: the board or card a comment is on, a board's title, an item's
+			 * What it is called, in full: the card a comment is on, a card's title, an item's
 			 * name or its words, a file's name. The pill's card and the stored message name it by this;
 			 * the label is what fits in a sentence.
 			 */
@@ -75,7 +75,7 @@ export function normalize(draft: Draft): Draft {
 /**
  * What a pill draws: the words it points at, and no `@`.
  *
- * A comment is not something anyone types, it is a place on a board, so it carries no sigil.
+ * A comment is not something anyone types, it is a place on a card, so it carries no sigil.
  * What marks it out is the icon the field puts in front of it and the wash behind it, which
  * is picone's rule for the same pill.
  */
@@ -96,7 +96,7 @@ export function commentLabel(quote: string): string {
  *
  * A card is `@canvases/plan/cards/a/index.html`, and a file `@assets/plan.pdf`, as an attached file has always
  * been spelled, because the path is what an agent opens it by. A drawn item has no file, so it is the same
- * spelling with the kind said: its id on the stage, which is what `decks.canvas.read()` lists.
+ * spelling with the kind said: its id on the canvas, which is what `decks.canvas.read()` lists.
  */
 export function mentionAddress(node: DraftMention): string {
 	return node.kind === "card" || node.kind === "file" ? `@${node.id}` : `@item:${node.id}`;
@@ -132,7 +132,7 @@ export function draftForAgent(draft: Draft): string {
 		.trim();
 	/*
 	 * A draft of comment pills and nothing else sends no words: the comments are the whole
-	 * message, and each is composed into a block of its own. A board or an item is not composed
+	 * message, and each is composed into a block of its own. A card or an item is not composed
 	 * into anything, so its address *is* the message, and dropping it would send nothing at all.
 	 */
 	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention" && node.kind !== "comment") ? "" : written;
@@ -151,7 +151,7 @@ export function draftComments(draft: Draft): string[] {
 	return ids;
 }
 
-/** Nothing typed and nothing mentioned. A comment, a board or an item alone is a message. */
+/** Nothing typed and nothing mentioned. A comment, a card or an item alone is a message. */
 export function draftIsEmpty(draft: Draft): boolean {
 	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention");
 }

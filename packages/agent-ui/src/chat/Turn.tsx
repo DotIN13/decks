@@ -21,12 +21,12 @@ import { m } from "@decks/i18n";
 export type { AgentPart, TurnCard };
 
 /**
- * One turn, as a card floating over the boards.
+ * One turn, as a card floating over the cards.
  *
  * **Both speakers get a card, and that is the change.** In the pinned-panel version the
  * agent's replies were flat markdown with no box, because the panel behind them *was* the
  * box. Floating, there is nothing behind them: flat prose would be text lying directly on
- * top of a board's own paragraphs. So the asymmetry moves from *box or no box* to **width
+ * top of a card's own paragraphs. So the asymmetry moves from *box or no box* to **width
  * and tint** — your turns are narrower, right-aligned and tinted; the agent's take the full
  * column in the panel's own colour.
  *

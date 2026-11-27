@@ -86,7 +86,7 @@ export function StatusLine(props: {
 		/*
 		 * `pointer-events-none` on the row and back on for the chip: the reserved height is
 		 * full-width and mostly empty, and an empty strip across the canvas that swallowed
-		 * clicks would be a 28px band above the composer where the boards stopped answering.
+		 * clicks would be a 28px band above the composer where the cards stopped answering.
 		 *
 		 * Gone rather than collapsed while the column has the sign: the dock is a flex column
 		 * with an 8px gap, so a zero-height child still costs 8px of the gap it sits in.
