@@ -12,7 +12,7 @@ import type { ShotFormat, ShotOf } from "../canvas/shots.ts";
 import { fitOn } from "./fit.ts";
 import { documentItemPath } from "../docs/item-path.ts";
 import { shootOn } from "./shoot.ts";
-import type { Verbs as Stage } from "@decks/sdk";
+import type { Verbs } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 import { freeSpot, type Side } from "./space.ts";
 import { exportPage } from "./export.ts";
@@ -98,7 +98,7 @@ function preview(doc: PenDocument, more: Op[], theme: ReturnType<typeof baseThem
 		: apply(doc, more, { theme, measure }).doc;
 }
 
-export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
+export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 	const { service, agent, notes, needPens, canvasOf, canvasRow } = ctx;
 	const measure = serverText.measure;
 
@@ -134,7 +134,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		return { doc: entry.doc, layout: (doc) => lay(doc, pens.files.withImported(target.canvas, doc)) };
 	};
 
-	/** The canvas the ops being turned into pen's are for, if a canvas: a board named from elsewhere is its copy there. */
+	/** The canvas the ops being turned into pen's are for, if a canvas: a card named from elsewhere is its copy there. */
 	let onCanvas: string | undefined;
 	/** What an item's document path was taken as (`docs/item-path.ts`): said with the call's notes. */
 	const docNotes: string[] = [];
@@ -144,10 +144,10 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		if (note) docNotes.push(note);
 		return path;
 	};
-	/** A board's path as this canvas holds it: its own copy of a board from elsewhere (`CanvasPens.copyOf`). */
+	/** A card's path as this canvas holds it: its own copy of a card from elsewhere (`CanvasPens.copyOf`). */
 	const ownOn = (path: string): string => (onCanvas ? needPens().cards.copyOf(onCanvas, path) : path);
 
-	/** An item's id, or a board's path on this document turned into its item's id. */
+	/** An item's id, or a card's path on this document turned into its item's id. */
 	const idIn = (doc: PenDocument, ref: unknown, what = "id"): string => {
 		if (typeof ref !== "string" || !ref.trim()) throw new Error(`${what} names an item: its id from decks canvas read, or a board's path.`);
 		const own = ownOn(ref);
@@ -155,7 +155,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		return ref;
 	};
 
-	/** A caller's item as pen's: a board becomes its `browser` item, sized as its file says unless told. */
+	/** A caller's item as pen's: a card becomes its `browser` item, sized as its file says unless told. */
 	/** Whether a deck path is a file already, recorded or not. */
 	const existsIn = (path: string): boolean => existsSync(resolveInDeck(service.deckPath(), path) ?? "");
 	const fromItem = (raw: unknown, taken: Set<string>, frame?: string): Record<string, unknown> => {
@@ -181,7 +181,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		/*
 		 * An app or a document, by name: `{ type: "app", app: "<name>" }` and `{ type: "document", path }` are
 		 * the items that show one (`browser` items tagged `decks.app` and `decks.document`, `@decks/canvas`
-		 * `itemKind`), with no file of their own; sized as their boards were.
+		 * `itemKind`), with no file of their own; sized as their cards were.
 		 */
 		if (item.type === "app" || item.type === "document") {
 			if (frame) throw new Error(`${frame} is a frame, and a frame holds drawn items: place the ${item.type} on a canvas, beside the frame.`);
@@ -278,7 +278,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			try {
 				const placed = surface.layout(doc);
 				let pen: Op;
-				// pen.dev's own form (what the canvas editor sends): taken as it is, with a board's path for an id.
+				// pen.dev's own form (what the canvas editor sends): taken as it is, with a card's path for an id.
 				const raw = op as unknown as Record<string, unknown>;
 				if (raw && ("node" in raw || "box" in raw)) {
 					const given = { ...raw } as Record<string, unknown>;
@@ -323,7 +323,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							delete set.card;
 						}
 						if (op.size) {
-							// A board is held to the sizes a resize always allowed: a resize is not the place to find a typo.
+							// A card is held to the sizes a resize always allowed: a resize is not the place to find a typo.
 							const round = (value: unknown, low: number, high: number) => (typeof value === "number" && Number.isFinite(value) ? (path ? Math.min(high, Math.max(low, Math.round(value))) : Math.round(value)) : undefined);
 							const w = round(op.size.w, 320, 4000);
 							const h = round(op.size.h, 200, 8000);
@@ -333,7 +333,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							if (path) sized.push({ path, ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) });
 						}
 						/*
-						 * A board the person resized on the canvas (the app sends its new width and height as the
+						 * A card the person resized on the canvas (the app sends its new width and height as the
 						 * item's own fields) keeps that size in its file too, as a resize by `size` does.
 						 */
 						if (path && !op.size && agent.person && (typeof set.width === "number" || typeof set.height === "number")) {
@@ -400,7 +400,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 
 	/**
 	 * Apply ops to a canvas or a frame, all or nothing, and answer with each item as it now is.
-	 * The canvas first, then a board's file when a board was sized, as a person's resize does. A
+	 * The canvas first, then a card's file when a card was sized, as a person's resize does. A
 	 * frame's file is written once, and every canvas placing it is sent it again (`CanvasPens.editFile`).
 	 */
 	const change = (target: Target, ops: readonly CanvasOpIn[]): Array<Record<string, unknown>> => {
@@ -479,7 +479,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					return { frame: target.frame, file, ...rest, ...withValues(rest), items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 				}
 				const name = target.canvas;
-				const { stage: _stage, file: _file, children, ...rest } = pens.read(name, more);
+				const { stage: _canvas, file: _file, children, ...rest } = pens.read(name, more);
 				return { canvas: name, title: pens.titleOf(name), rev: pens.get(name).rev, ...rest, ...withValues(rest), items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 			},
 			space: async (size: { w: number; h: number }, options?: On & { near?: string; around?: { x: number; y: number }; side?: Side; margin?: number }) => {
@@ -532,7 +532,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const deck = service.deckPath();
 				const page = resolveInDeck(deck, to ?? `exports/${itemIds[0]!.replace(/\//g, "-")}.html`);
 				const folder = frame ? dirname(pens.files.penFile(target.frame!).file) : pens.folderOf(target.canvas!);
-				const done = await exportPage({ doc, ids: itemIds, format, deck, page, folder, measure, ...(target.canvas ? { title: pens.titleOf(target.canvas) } : {}), boardOf: (node) => cardOf(node) });
+				const done = await exportPage({ doc, ids: itemIds, format, deck, page, folder, measure, ...(target.canvas ? { title: pens.titleOf(target.canvas) } : {}), cardOf: (node) => cardOf(node) });
 				ctx.notes.push(...done.notes);
 				return { file: done.file } as never;
 			},
@@ -609,10 +609,10 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				pens.log.step(name, direction === "redo" ? "redo" : "undo");
 				return pens.log.steps(name);
 			},
-			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
+			fit: async (card: string, options?: { canvas?: string; margin?: number }) => {
 				// The canvas named; else, for an agent, the one the card's own path names (a card says where it is); the person's fit is where they are looking.
-				const name = canvasOf(options?.canvas ?? (!ctx.agent.person && typeof board === "string" ? canvasOfPath(board) : undefined));
-				const { board: sized, canvas, said } = await fitOn(ctx, board, name, options?.margin);
+				const name = canvasOf(options?.canvas ?? (!ctx.agent.person && typeof card === "string" ? canvasOfPath(card) : undefined));
+				const { board: sized, canvas, said } = await fitOn(ctx, card, name, options?.margin);
 				return { card: sized.path, canvas, w: sized.w, h: sized.h, notes: said };
 			},
 			save: async (id: string, frame: string, options?: { canvas?: string; replace?: boolean }) => {

@@ -38,7 +38,7 @@ export interface PersonCall {
 	/** The id of the token the call came with, for what names the caller back (the paired front end that is you). */
 	tokenId?: string;
 	/** What the caller says it acts on: the canvas on screen and the agent it is talking to, from `X-Decks-Stage` and `X-Decks-Agent` or the line's `stage` and `agent`. */
-	on: { stage?: string; agent?: string; edit?: string };
+	on: { canvas?: string; agent?: string; edit?: string };
 }
 
 /** One group of the person's verbs, by name. */
@@ -56,9 +56,9 @@ export function notice(call: PersonCall, level: "info" | "warn" | "error", text:
 	call.tell({ type: "harness.notice", level, text });
 }
 
-/** What the person's hands did, run on the stage they act on (`calls/gestures.ts`): its value, or its refusal thrown. */
-export async function personGesture(host: { readonly agents: Registry; readonly stage: CanvasService }, asked: { stage?: string; agent?: string }, name: "move" | "resize" | "hide" | "edit" | "open" | "newStage", args: unknown[]): Promise<unknown> {
-	const answer = await personToolOf(personAgent({ agents: host.agents, pens: host.stage.pens }, asked)).gesture(name, args as never);
+/** What the person's hands did, run on the canvas they act on (`calls/gestures.ts`): its value, or its refusal thrown. */
+export async function personGesture(host: { readonly agents: Registry; readonly canvas: CanvasService }, asked: { canvas?: string; agent?: string }, name: "move" | "resize" | "hide" | "edit" | "open" | "newStage", args: unknown[]): Promise<unknown> {
+	const answer = await personToolOf(personAgent({ agents: host.agents, pens: host.canvas.pens }, asked)).gesture(name, args as never);
 	if (!answer.ok) throw new Error(answer.error ?? `${name} failed`);
 	return answer.value;
 }

@@ -148,7 +148,7 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 	router.post("/card-seen", (req: Request, res: Response) => {
 		const path = onItsCanvas(req, res);
 		if (!path) return;
-		app.boards.seen(path);
+		app.cards.seen(path);
 		res.json({ ok: true });
 	});
 	router.post("/card-extent", (req: Request, res: Response) => {
@@ -168,7 +168,7 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 			const value = num(key);
 			if (value !== undefined) extra[key] = value;
 		}
-		app.boards.noteExtent(path, { rev, w, h, ...extra });
+		app.cards.noteExtent(path, { rev, w, h, ...extra });
 		res.json({ ok: true });
 	});
 	router.post("/:verb", async (req: Request, res: Response) => {

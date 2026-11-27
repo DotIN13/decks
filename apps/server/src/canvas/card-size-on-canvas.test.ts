@@ -43,10 +43,10 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		one.seat.setInPlay([PATH], { place: true });
 		const mine = app.pens.cards.copyOf(one.seat.stageName()!, PATH);
 		assert.equal(mine, `canvases/${one.seat.stageName()}/cards/plan/index.html`, "the canvas places its own copy, as a card");
-		const shown = () => app.stage.cards(one.id).find((card) => card.path === mine)!;
+		const shown = () => app.canvas.cards(one.id).find((card) => card.path === mine)!;
 		assert.deepEqual([shown().w, shown().h], [900, 400], "it joins at its file's size");
 
-		app.boards.noteExtent(mine, { rev: shown().rev, w: 900, h: 690 });
+		app.cards.noteExtent(mine, { rev: shown().rev, w: 900, h: 690 });
 		assert.equal(shown().h, 400, "a reading sizes nothing");
 
 		one.seat.setSize(PATH, { h: 520 });
@@ -62,8 +62,8 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		two.seat.setInPlay([PATH], { place: true });
 		const theirs = app.pens.cards.copyOf(two.seat.stageName()!, PATH);
 		assert.notEqual(theirs, mine, "another canvas places a copy of its own");
-		assert.equal(app.stage.cards(two.id).find((card) => card.path === theirs)?.h, 400, "another stage takes it at its file's size");
-		assert.equal(app.stage.cards(one.id).find((card) => card.path === mine)?.h, 520, "and the first keeps its own");
+		assert.equal(app.canvas.cards(two.id).find((card) => card.path === theirs)?.h, 400, "another stage takes it at its file's size");
+		assert.equal(app.canvas.cards(one.id).find((card) => card.path === mine)?.h, 520, "and the first keeps its own");
 		one.seat.setInPlay([PATH], { place: true });
 		assert.deepEqual(app.pens.cards.cards(one.seat.stageName()!).map((card) => card.path), [mine], "asked for again, the canvas keeps the copy it has");
 	} finally {
@@ -86,8 +86,8 @@ test("two agents on one stage: a save by one does not put back a size or a place
 		// waiting when One's lands, so Two never reads One's change before it writes its own copy.
 		const plan = app.pens.cards.copyOf(one.seat.stageName()!, PATH);
 		const notesOwn = app.pens.cards.copyOf(one.seat.stageName()!, "canvases/t/cards/notes/index.html");
-		const before = app.stage.cards(one.id).find((card) => card.path === plan)!;
-		const notes = app.stage.cards(two.id).find((card) => card.path === notesOwn)!;
+		const before = app.canvas.cards(one.id).find((card) => card.path === plan)!;
+		const notes = app.canvas.cards(two.id).find((card) => card.path === notesOwn)!;
 		one.seat.setSize(PATH, { h: 640 });
 		one.seat.setPosition(PATH, before.x + 500, before.y);
 		two.seat.setPosition("canvases/t/cards/notes/index.html", notes.x, notes.y + 900);

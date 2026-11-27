@@ -5,8 +5,8 @@ import { iconUrl, parseIcon } from "@decks/canvas/headless";
 
 /**
  * Frames written out as one HTML page in the deck (`decks.canvas.export`): `@decks/pen`'s `toHtml`,
- * with what only the server has: the icons fetched from the sets the stage draws them from, image
- * fills and boards addressed from where the page is written, and the file itself.
+ * with what only the server has: the icons fetched from the sets the canvas draws them from, image
+ * fills and cards addressed from where the page is written, and the file itself.
  */
 
 /** Icons fetched once each while the server runs, by library, name and weight. */
@@ -59,8 +59,8 @@ interface ExportRequest {
 	folder: string;
 	measure: MeasureText;
 	title?: string;
-	/** A board item's deck path. */
-	boardOf: (node: PenNode) => string | undefined;
+	/** A card item's deck path. */
+	cardOf: (node: PenNode) => string | undefined;
 }
 
 /** Write the page: answers its deck path, and a note for each icon that could not be fetched. */
@@ -82,7 +82,7 @@ export async function exportPage(asked: ExportRequest): Promise<{ file: string; 
 		// An address with a scheme (https:, data:) or from the root stays; a relative one is read from the page's folder.
 		url: (url) => (/^[a-z][\w+.-]*:/i.test(url) || url.startsWith("/") ? url : fromPage(request.page, isAbsolute(url) ? url : resolve(request.folder, url))),
 		board: (node) => {
-			const path = request.boardOf(node);
+			const path = request.cardOf(node);
 			return path ? fromPage(request.page, resolve(request.deck, path)) : undefined;
 		},
 	});

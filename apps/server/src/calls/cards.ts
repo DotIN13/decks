@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { cardShell, slug } from "@decks/deck-kit";
 import { cardWidth } from "../cards/size.ts";
-import type { Verbs as Stage } from "@decks/sdk";
+import type { Verbs } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /**
@@ -11,22 +11,22 @@ import type { VerbContext } from "./context.ts";
  * (file addresses and the file calls are `calls/files.ts`). A card is a folder of its canvas's
  * `cards/`: making one does not place it, which is the canvas's job (`canvas.insert`).
  */
-export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
+export function cardVerbs(ctx: VerbContext): Pick<Verbs, "card" | "frame"> {
 	const { service, agent, notes, needPens } = ctx;
 
-	/** Who wrote a board, as a name: an agent's, or "person" for the person's own edit. */
+	/** Who wrote a card, as a name: an agent's, or "person" for the person's own edit. */
 	const writer = (who: string | undefined): string | undefined => {
 		if (!who) return undefined;
 		if (who === "you") return "person";
 		return agent.agents().find((one) => one.id === who)?.name ?? who;
 	};
-	const needBoard = (path: unknown) => {
+	const needCard = (path: unknown) => {
 		if (typeof path !== "string" || !path.trim()) throw new Error('A card is named by its path, as in "canvases/plan/cards/q3/index.html": decks card list lists them.');
 		const board = service.fileCard(path);
 		if (!board) throw new Error(`There is no card ${path}. decks card list lists them.`);
 		return board;
 	};
-	const asBoard = (board: { path: string; title: string; lastWrittenBy?: string }) => {
+	const asCard = (board: { path: string; title: string; lastWrittenBy?: string }) => {
 		const by = writer(board.lastWrittenBy);
 		return { path: board.path, title: board.title, ...(by ? { lastWrittenBy: by } : {}) };
 	};
@@ -46,10 +46,10 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 
 	const card = {
 			/** Every card in the deck, placed or not. */
-			list: async () => service.allCards().map(asBoard),
-			get: async (path: string) => asBoard(needBoard(path)),
+			list: async () => service.allCards().map(asCard),
+			get: async (path: string) => asCard(needCard(path)),
 			canvases: async (path: string) => {
-				const file = needBoard(path);
+				const file = needCard(path);
 				const pens = needPens();
 				// A card is in a canvas's folder, and on that canvas or on none (`deck/layout.ts`).
 				const home = canvasOfPath(path);
@@ -65,19 +65,19 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 				return [{ card: path, canvas: home.name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) }];
 			},
 			url: async (path: string) => {
-				needBoard(path);
+				needCard(path);
 				return service.url(path, ctx.port);
 			},
 			/**
-			 * A blank card, `cards/<title>/index.html` in a canvas's own folder: a piece of HTML the stage draws
+			 * A blank card, `cards/<title>/index.html` in a canvas's own folder: a piece of HTML the canvas draws
 			 * in its own page (`card.ts`), with a folder for what it keeps beside it. Placing it is the canvas's job.
 			 */
 			create: async (options: { title: string; w?: number; h?: number; canvas?: string }) => {
-				const { path, title, width, canvas: stageName } = makeCard(ctx, options, homeOf(options?.canvas, "card"));
+				const { path, title, width, canvas: canvasName } = makeCard(ctx, options, homeOf(options?.canvas, "card"));
 				notes.push(
-					`card width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. Its folder is ${path.replace(/\/index\.html$/, "/")}: anything it keeps beside it (card.css, chart.js, data.json) goes there. Not placed yet: decks canvas insert --type card --card ${path} --canvas ${stageName} --beside <id> puts it there, then decks canvas fit ${path}.`,
+					`card width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. Its folder is ${path.replace(/\/index\.html$/, "/")}: anything it keeps beside it (card.css, chart.js, data.json) goes there. Not placed yet: decks canvas insert --type card --card ${path} --canvas ${canvasName} --beside <id> puts it there, then decks canvas fit ${path}.`,
 				);
-				return asBoard(service.fileCard(path) ?? { path, title });
+				return asCard(service.fileCard(path) ?? { path, title });
 			},
 	};
 
@@ -103,17 +103,17 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
  * Write a blank card, `cards/<title>/index.html` in a canvas's own folder (`card.create`): the shell from its title, at a width held inside the screen when none is asked for.
  * Placing it is the caller's job. The viewport goes in the call's notes.
  */
-function makeCard(ctx: VerbContext, options: { title: string; w?: number; h?: number }, stageName: string): { path: string; title: string; width: number; canvas: string } {
+function makeCard(ctx: VerbContext, options: { title: string; w?: number; h?: number }, canvasName: string): { path: string; title: string; width: number; canvas: string } {
 	const { service, agent, notes, viewport } = ctx;
 	const title = options?.title?.trim();
 	if (!title) throw new Error("A card needs a title: the finding it states, as a sentence.");
 	const view = viewport();
 	const width = cardWidth(options.w, view?.width);
 	const base = slug(title, 48) || "card";
-	let path = `${canvasFolder(stageName)}/cards/${base}/index.html`;
-	for (let n = 2; service.fileCard(path) || existsSync(join(service.deckPath(), path)); n++) path = `${canvasFolder(stageName)}/cards/${base}-${n}/index.html`;
+	let path = `${canvasFolder(canvasName)}/cards/${base}/index.html`;
+	for (let n = 2; service.fileCard(path) || existsSync(join(service.deckPath(), path)); n++) path = `${canvasFolder(canvasName)}/cards/${base}-${n}/index.html`;
 	service.writeCard(path, cardShell(title, { w: width, ...(options.h ? { h: options.h } : {}) }));
 	agent.worked?.(path);
 	if (view) notes.push(`viewport ${view.width}×${view.height} px`);
-	return { path, title, width, canvas: stageName };
+	return { path, title, width, canvas: canvasName };
 }

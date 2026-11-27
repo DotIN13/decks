@@ -181,7 +181,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const canvas = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : undefined;
 			let into: { folder: string; ref: string } | undefined;
 			if (canvas) {
-				const pens = app.stage.pens;
+				const pens = app.canvas.pens;
 				if (!pens || !canvasNameOk(canvas) || !pens.has(canvas)) throw new UploadRefused(`There is no canvas ${canvas} to put the file in.`, 404);
 				try {
 					pens.rights.mayWrite(canvas);

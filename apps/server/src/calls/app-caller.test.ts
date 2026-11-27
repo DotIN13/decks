@@ -24,7 +24,7 @@ function open() {
 	// Restored rows: chats that exist and start no runtime, which is all this needs.
 	const front = app.agents.create({ name: "Front", restored: { id: "front", context: [], inPlay: [], createdAt: 2 } });
 	const shows = app.agents.create({ name: "Shows", restored: { id: "shows", context: [], inPlay: [], createdAt: 1 } });
-	const pens = app.stage.pens!;
+	const pens = app.canvas.pens!;
 	front.seat.newStage("Front");
 	shows.seat.newStage("Shows");
 	pens.edit(shows.seat.stageName()!, [
@@ -61,8 +61,8 @@ test("an app acts for the conversation on a canvas showing it, whichever chat is
 		assert.equal((here.value as { name: string }).name, shows.seat.stageName());
 		const note = await tool.call("canvas.insert", [{ type: "note", id: "from-app", content: "hello" }], {});
 		assert.equal(note.ok, true, note.error);
-		assert.ok(app.stage.pens!.get(shows.seat.stageName()!).doc.children.some((one) => one.id === "from-app"), "the note is on the canvas showing the app");
-		assert.ok(!app.stage.pens!.get(front.seat.stageName()!).doc.children.some((one) => one.id === "from-app"));
+		assert.ok(app.canvas.pens!.get(shows.seat.stageName()!).doc.children.some((one) => one.id === "from-app"), "the note is on the canvas showing the app");
+		assert.ok(!app.canvas.pens!.get(front.seat.stageName()!).doc.children.some((one) => one.id === "from-app"));
 	} finally {
 		cleanup();
 	}

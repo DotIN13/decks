@@ -12,7 +12,7 @@ export function greet(app: RouteDeps["app"], reply: (message: ServerMessage) => 
 	if (view) view.focused = app.agents.looking()?.id;
 	// Who is answering, first: a front end that holds several connections draws its controls from it.
 	reply({ type: "harness.hello", backend: { name: app.deck.name, can: { agents: true, write: true, share: true } } });
-	reply({ type: "deck.changed", deck: app.stageState() });
+	reply({ type: "deck.changed", deck: app.canvasState() });
 	/*
 	 * And what this install can run.
 	 *

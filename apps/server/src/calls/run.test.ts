@@ -16,7 +16,7 @@ function put(file: string, data: string | Uint8Array): void {
 }
 
 
-/** A deck with one board, its HTTP server on a free port, and the focused agent's id. */
+/** A deck with one card, its HTTP server on a free port, and the focused agent's id. */
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-verbs-")));
 	const deck = join(dataDir, "decks");
@@ -247,7 +247,7 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 	const { app, base, agent, cleanup } = await open();
 	try {
 		app.agents.focus(agent.id);
-		// On screen first, so there is a board to move (`canvas.insert`, as the person).
+		// On screen first, so there is a card to move (`canvas.insert`, as the person).
 		// The person's token, as a Decks tab has it; the agent they talk to is a parameter.
 		const person = { "content-type": "application/json", authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id };
 		const put = await fetch(`${base}/canvas.insert`, { method: "POST", headers: person, body: JSON.stringify({ args: [{ type: "card", card: "canvases/t/cards/tall/index.html" }, { at: { x1: 0, y1: 0 } }] }) });

@@ -1,5 +1,5 @@
 /**
- * The verbs removed with boards (2026-10-30), each with the call that does its work now. Used only
+ * The verbs removed with cards (2026-10-30), each with the call that does its work now. Used only
  * to word the refusal of an old name: none of them is a call, and nothing here runs one.
  */
 const RENAMED: ReadonlyMap<string, string> = new Map([

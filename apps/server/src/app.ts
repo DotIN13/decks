@@ -18,7 +18,7 @@ import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { DeviceLogins, LoginThrottle, PasswordStore, passwordLoginOn } from "./auth/password.ts";
 import { ClaudeLogin } from "./runtimes/claude/login.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
-import { boardOnCanvas } from "./calls/canvas-frame.ts";
+import { cardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { hostname } from "node:os";
 import { saveStudioLink, studioLink, unpairStudio } from "./studio/index.ts";
@@ -63,7 +63,7 @@ import { deckImportPaths } from "./cards/cards.ts";
 export class App {
 	deck: Deck;
 	readonly agents: Registry;
-	readonly stage: CanvasService;
+	readonly canvas: CanvasService;
 	/** Every agent's stage drawing, as `.pen` files under `canvases/` (`canvas/pens.ts`). */
 	readonly pens: CanvasPens;
 	/** The ports agents have forwarded through this server (`ports.ts`). */
@@ -73,7 +73,7 @@ export class App {
 	/** What each agent is doing to which board, said to the browsers as it happens (`agents/acts.ts`). */
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
-	readonly boards: CardService;
+	readonly cards: CardService;
 	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
 	/** Google Docs opened as document pages, kept in step through a markdown mirror (`google/docs.ts`). */
@@ -136,10 +136,10 @@ export class App {
 	placedOn(path: string, canvas: string): boolean {
 		// An app's picture (`apps/<name>`) is the canvas's to read when the app is placed on it.
 		const app = /^apps\/([^/]+)$/.exec(path)?.[1];
-		if (app && this.stage.pens) return canvasShowsApp(this.stage.pens, canvas, app);
+		if (app && this.canvas.pens) return canvasShowsApp(this.canvas.pens, canvas, app);
 		// A document's file is the canvas's to picture when a document item naming it is placed there (`connections/routes/pictures.ts`, `docPage`).
-		if (/\.(?:md|markdown)$/i.test(path) && this.stage.pens && canvasShowsDocument(this.stage.pens, canvas, path)) return true;
-		return boardOnCanvas(this, path, canvas);
+		if (/\.(?:md|markdown)$/i.test(path) && this.canvas.pens && canvasShowsDocument(this.canvas.pens, canvas, path)) return true;
+		return cardOnCanvas(this, path, canvas);
 	}
 	/** The port this server is on, so a card's `decks.card.url()` answers like an agent's. */
 	get port(): number {
@@ -160,7 +160,7 @@ export class App {
 	readonly pages: Broadcast<DeckAgent> = new Broadcast<DeckAgent>({
 		looking: () => this.agents.looking(),
 		agent: (id) => this.agents.get(id),
-		stateFor: (agent) => this.stageState(agent),
+		stateFor: (agent) => this.canvasState(agent),
 		// Every change to a card is announced through the broadcast, whoever made it, which makes it the one place to keep the card's picture up with it (`pictures/service.ts`).
 		saying: (message) => {
 			if (message.type !== "card.changed") return;
@@ -196,14 +196,14 @@ export class App {
 				live: (id) => this.tokens.live(id),
 				// The person's role on a canvas now: none for one that is not there (any more), view for one shared to view.
 				role: (canvas) => {
-					const pens = this.stage?.pens;
+					const pens = this.canvas?.pens;
 					if (!pens?.has(canvas)) return undefined;
 					return pens.rights.sharing(canvas)?.role === "view" ? "view" : "edit";
 				},
 				appRun: (name) => this.apps?.runOf(name),
 				// An app on a canvas runs in its frame only while it is placed there and the canvas is yours alone.
 				appOnCanvas: (name, canvas) => {
-					const pens = this.stage?.pens;
+					const pens = this.canvas?.pens;
 					return !!pens?.has(canvas) && pens.rights.yoursAlone(canvas) && canvasShowsApp(pens, canvas, name);
 				},
 				document: (path) => this.documentKey(path) === path,
@@ -212,7 +212,7 @@ export class App {
 		);
 		this.bridge = new CanvasBridge(this.tokens);
 		this.appTrust = new AppTrust(config.dataDir);
-		this.boards = new CardService(deck, {
+		this.cards = new CardService(deck, {
 			send: (message) => {
 				this.send(message);
 			},
@@ -221,10 +221,10 @@ export class App {
 			 * loader's copy of one has no place of its own any more. It asks rather than is handed the
 			 * positions so that the seeding `stageState` does happens on this path too.
 			 */
-			state: () => this.stageState(),
+			state: () => this.canvasState(),
 			removed: (path) => this.agents.boardRemoved(path),
 		});
-		this.stage = new CanvasService(deck, {
+		this.canvas = new CanvasService(deck, {
 			/*
 
 			 * Move a board on the stage being served, and answer with the board as that stage sees it.
@@ -241,7 +241,7 @@ export class App {
 
 				agent.seat.setPosition(path, x, y);
 
-				return this.stageState(agent).boards.find((board) => board.path === path);
+				return this.canvasState(agent).boards.find((board) => board.path === path);
 
 			},
 
@@ -254,26 +254,26 @@ export class App {
 			 * No id is an app running its own code, which acts for a conversation on a canvas
 			 * showing it (`calls/app-caller.ts`), so that case keeps the old answer.
 			 */
-			cards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
+			cards: (agentId?: string) => this.canvasState(agentId ? this.agents.get(agentId) : undefined).boards,
 
-			writeCard: (path, html) => this.boards.writeCard(path, html),
+			writeCard: (path, html) => this.cards.writeCard(path, html),
 			deleteCard: (path) => {
 				let refused: string | undefined;
-				this.boards.deleteCard(path, (message) => {
+				this.cards.deleteCard(path, (message) => {
 					if (message.type === "harness.notice") refused = message.text;
 				});
 				return refused;
 			},
-			extent: (path, rev, at) => this.boards.extent(path, rev, at),
-			awaitExtent: (path, rev, ms, at) => this.boards.awaitExtent(path, rev, ms, at),
-			reading: (path, rev) => this.boards.reading(path, rev),
+			extent: (path, rev, at) => this.cards.extent(path, rev, at),
+			awaitExtent: (path, rev, ms, at) => this.cards.awaitExtent(path, rev, ms, at),
+			reading: (path, rev) => this.cards.reading(path, rev),
 			views: async (path) => {
 				const board = this.deck.card(path);
 				return board ? this.thumbs.views(board) : undefined;
 			},
 			measureAway: async (path, w) => {
 				const board = this.deck.card(path);
-				return board && this.stage.shots ? this.stage.shots.measure(w === undefined ? board : { ...board, w }) : undefined;
+				return board && this.canvas.shots ? this.canvas.shots.measure(w === undefined ? board : { ...board, w }) : undefined;
 			},
 			call: (call, timeoutMs) => this.pageCalls.ask(call, timeoutMs),
 			callAll: (call, timeoutMs) => this.pageCalls.askAll(call, timeoutMs),
@@ -281,7 +281,7 @@ export class App {
 			connected: () => this.pages.connected,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
-			wrote: (path, who) => this.boards.wrote(path, who),
+			wrote: (path, who) => this.cards.wrote(path, who),
 			retitle: (name, title) => titleCanvas({ deck: this.deck, pens: this.pens, agents: this.agents.all() }, name, title),
 			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.stageName()),
 			agents: () => this.agents.summaries(),
@@ -292,10 +292,10 @@ export class App {
 		 */
 		this.pens = new CanvasPens(deck.path, (name, entry) => this.publishPen(name, entry));
 		// A canvas's copy of a board from elsewhere is a board of the deck the moment it is made.
-		this.pens.cards.copied = (path) => this.boards?.appeared(path);
-		this.stage.pens = this.pens;
+		this.pens.cards.copied = (path) => this.cards?.appeared(path);
+		this.canvas.pens = this.pens;
 		this.forwards = new Forwards(deck.path, config.port);
-		this.stage.forwards = this.forwards;
+		this.canvas.forwards = this.forwards;
 		this.apps = new Apps(deck.path);
 		this.apps.decksPort = config.port;
 		this.apps.passes = this.passes;
@@ -303,12 +303,12 @@ export class App {
 		this.apps.onChange = (name, state) => this.pages.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status });
 		// Its pages load again (`apps.reload`): every window showing it hears the same word, with the count.
 		this.apps.onReload = (name, state, reload) => this.pages.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status, reload });
-		this.stage.apps = this.apps;
+		this.canvas.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.
 		this.docs = new DocService({
 			resolve: (path) => resolveDoc(this.deck.roots, path),
-			versions: this.boards.revisions,
+			versions: this.cards.revisions,
 			send: (message) => this.send(message),
 			writer: (file) => this.google.writer(file) ?? this.writers.who(file),
 			remote: (file) => this.google.remote(file),
@@ -365,7 +365,7 @@ export class App {
 		 * Your Chrome and the extension's popup say the same thing at the same time.
 		 */
 		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.changed", status }));
-		this.stage.web = this.web;
+		this.canvas.web = this.web;
 		/*
 		 * Board pictures, taken by this server of itself. `127.0.0.1` whatever
 		 * the host is: `0.0.0.0` is somewhere to listen, not somewhere to go.
@@ -408,7 +408,7 @@ export class App {
 				return { why: `the card ${path} has no picture of its current revision yet (one is being taken)` };
 			},
 		});
-		this.stage.shots = new CanvasShots({
+		this.canvas.shots = new CanvasShots({
 			deck: deck.path,
 			pens: this.pens,
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),
@@ -420,29 +420,29 @@ export class App {
 				return id ? this.agents.get(id)?.who() : undefined;
 			},
 		});
-		this.stage.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
-		this.stage.cardPicture = async (path, scheme) => {
+		this.canvas.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
+		this.canvas.cardPicture = async (path, scheme) => {
 			const board = deck.card(path);
 			if (!board) throw new Error(`There is no board ${path}.`);
 			return readFileSync(await this.thumbs.get(board, scheme, () => false));
 		};
-		this.stage.pairCode = () => {
+		this.canvas.pairCode = () => {
 			const made = this.codes.newCode();
 			this.send(this.pairingMessage());
 			return made;
 		};
-		this.stage.studioLogin = async (url) => {
+		this.canvas.studioLogin = async (url) => {
 			if (studioLink(this.deck.path)?.env) throw new Error("This harness's Studio key is set by DECKS_STUDIO_KEY: remove it there to sign in another way.");
 			// From a terminal there is no tab to send back: the address shows a code, and the code is pasted (`studioCode`).
 			return this.studioLogin.start(studioAddress(url));
 		};
-		this.stage.studioCode = async (code) => {
+		this.canvas.studioCode = async (code) => {
 			const got = await this.studioLogin.finish(code);
 			return { url: got.url, ...(got.account.email ? { account: got.account.email } : {}) };
 		};
-		this.stage.studioShowing = () => this.studioLogin.showing();
-		this.stage.studioSync = () => this.studioSync;
-		this.stage.studioSignOut = () => {
+		this.canvas.studioShowing = () => this.studioLogin.showing();
+		this.canvas.studioSync = () => this.studioSync;
+		this.canvas.studioSignOut = () => {
 			this.studioLogin.stop();
 			try {
 				unpairStudio(this.deck.path, this.tokens);
@@ -454,10 +454,10 @@ export class App {
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
 			identity: (agentId) => this.agents.get(agentId)?.who(),
-			boardPathOf: (file) => this.boards.cardPathOf(file),
+			boardPathOf: (file) => this.cards.cardPathOf(file),
 			read: (path) => {
 				try {
-					return this.stage.read(path);
+					return this.canvas.read(path);
 				} catch {
 					return undefined;
 				}
@@ -466,7 +466,7 @@ export class App {
 		this.agents = new Registry(
 			deck,
 			(message) => this.send(message),
-			this.stage,
+			this.canvas,
 			{
 				port: config.port,
 				act: (agentId, act) => {
@@ -481,11 +481,11 @@ export class App {
 				 * `context.changed` that says the board is on the canvas, which is the order the two
 				 * arrive in.
 				 */
-				arranged: () => this.send({ type: "deck.changed", deck: this.stageState() }),
+				arranged: () => this.send({ type: "deck.changed", deck: this.canvasState() }),
 				publishRuntimes: () => this.send({ type: "harness.runtimes", list: this.runtimes() }),
-				recordRevision: (path) => this.boards.recordRevision(path),
-				wrote: (path, who) => this.boards.wrote(path, who),
-				boardPathOf: (file) => this.boards.cardPathOf(file),
+				recordRevision: (path) => this.cards.recordRevision(path),
+				wrote: (path, who) => this.cards.wrote(path, who),
+				boardPathOf: (file) => this.cards.cardPathOf(file),
 				accounts: this.claudeAccounts,
 				accountsChanged: () => void this.accountList.publish(),
 				// Ask the person to sign in (the page's modal), unless this agent's account is there to run on (`claude/login.ts`).
@@ -565,11 +565,11 @@ export class App {
 		this.unwatch?.();
 		this.unwatch = followDeck({
 			deck: () => this.deck,
-			cards: this.boards,
+			cards: this.cards,
 			send: (message) => this.send(message),
-			state: () => this.stageState(),
+			state: () => this.canvasState(),
 			placed: (card) => this.placed(card),
-			landed: (path) => this.acts.landed(path, this.stage.read(path)),
+			landed: (path) => this.acts.landed(path, this.canvas.read(path)),
 			gone: (path) => this.agents.boardRemoved(path),
 		});
 		this.accountList.startLimits();
@@ -613,11 +613,11 @@ export class App {
 		const existing = existsSync(join(deckPath, "deck.json")) || existsSync(join(deckPath, "boards"));
 		this.deck = existing ? Deck.open(deckPath) : Deck.create(deckPath, App.runtimeLib);
 		if (existing) App.refreshLib(this.deck);
-		this.stage.setDeck(this.deck);
+		this.canvas.setDeck(this.deck);
 		this.pens.setDeck(this.deck.path);
 		this.forwards.setDeck(this.deck.path);
 		this.apps.setDeck(this.deck.path);
-		this.boards.setDeck(this.deck);
+		this.cards.setDeck(this.deck);
 		this.docs.closeAll();
 		this.settings.setDeck(this.deck.path);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening
@@ -632,7 +632,7 @@ export class App {
 		this.claudeAccounts.sweepAgents(this.agents.all().map((agent) => agent.id));
 		});
 		this.follow();
-		this.send({ type: "deck.changed", deck: this.stageState() });
+		this.send({ type: "deck.changed", deck: this.canvasState() });
 		for (const warning of this.deck.warnings) this.send({ type: "harness.notice", level: "warn", text: warning });
 	}
 
@@ -646,7 +646,7 @@ export class App {
 	 * effect of being sent. No agent means the deck's own layout, which is what a deck with nobody
 	 * looking at it has anyway.
 	 */
-	stageState(asked?: DeckAgent): DeckState {
+	canvasState(asked?: DeckAgent): DeckState {
 		return (asked ?? this.agents.looking())?.seat.deckState() ?? this.deck.state();
 	}
 
@@ -670,7 +670,7 @@ export class App {
 	 * at the origin for everybody, because the loader's boards have no place of their own any more.
 	 */
 	private placed(board: Page): Page {
-		return this.stageState().boards.find((one) => one.path === board.path) ?? board;
+		return this.canvasState().boards.find((one) => one.path === board.path) ?? board;
 	}
 
 	/** Apps the person let call verbs with "Allow once": remembered until the server restarts (`calls/caller.ts`). */

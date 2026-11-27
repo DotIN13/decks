@@ -1,6 +1,6 @@
 import { normalizeCardPath } from "../../deck/schema.ts";
 import { UploadRefused } from "../../files/upload.ts";
-import { boardOnCanvas } from "../../calls/canvas-frame.ts";
+import { cardOnCanvas } from "../../calls/canvas-frame.ts";
 import { runVerb } from "../../calls/run.ts";
 import { renderSnapshot } from "../../pictures/snapshot.ts";
 import { compressedName, squeezed, wireEncoding } from "../../pictures/compress.ts";
@@ -158,8 +158,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 	api.get(
 		"/stage-thumb/:name",
 		asyncRoute(async (req, res) => {
-			const shots = app.stage.shots;
-			const pens = app.stage.pens;
+			const shots = app.canvas.shots;
+			const pens = app.canvas.pens;
 			const name = String(req.params.name ?? "");
 			if (!shots || !pens || !pens.names().includes(name)) {
 				res.status(404).end();
@@ -187,7 +187,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	api.get(
 		"/bundle/:name",
 		asyncRoute(async (req, res) => {
-			const pens = app.stage.pens;
+			const pens = app.canvas.pens;
 			const name = String(req.params.name ?? "");
 			if (!pens || !pens.names().includes(name)) {
 				res.status(404).type("text").send("No such canvas.");
@@ -220,7 +220,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * image fills are read against, and where each board on it is.
 	 */
 	api.get("/stage-pen/:name", (req, res) => {
-		const pens = app.stage.pens;
+		const pens = app.canvas.pens;
 		const name = String(req.params.name ?? "");
 		if (!pens || !pens.names().includes(name)) {
 			res.status(404).end();
@@ -245,7 +245,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * to the deck or absolute (`CanvasPens.penFile`).
 	 */
 	api.get("/pen-file", (req, res) => {
-		const pens = app.stage.pens;
+		const pens = app.canvas.pens;
 		if (!pens || typeof req.query.path !== "string") {
 			res.status(404).end();
 			return;
@@ -292,7 +292,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				return;
 			}
 			const shot = answer.value as { file: string; box: unknown; how?: string };
-			const file = resolve(app.stage.deckPath(), shot.file);
+			const file = resolve(app.canvas.deckPath(), shot.file);
 			const bytes = readFileSync(file);
 			// Taken for this download only: not kept among the agents' screenshots.
 			if (shot.file.startsWith(".decks/shots/")) rmSync(file, { force: true });
@@ -324,7 +324,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				res.status(404).type("text").send("No such board.");
 				return;
 			}
-			if (principal?.kind === "canvas" && !boardOnCanvas(app, path, principal.canvas)) throw new UploadRefused(`${path} is not on this canvas.`, 403);
+			if (principal?.kind === "canvas" && !cardOnCanvas(app, path, principal.canvas)) throw new UploadRefused(`${path} is not on this canvas.`, 403);
 			const shot = await renderSnapshot(app.thumbs, `http://127.0.0.1:${req.socket.localPort}`, {
 				path,
 				html: typeof req.body === "string" ? req.body : "",

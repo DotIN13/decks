@@ -128,7 +128,7 @@ test("each device's board list carries its own conversation's arrangement", asyn
 		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 
 		// Something changed the deck: each device hears it as its own stage sees it.
-		app.send({ type: "deck.changed", deck: app.stageState() });
+		app.send({ type: "deck.changed", deck: app.canvasState() });
 		assert.deepEqual(plan(last(laptop, "deck.changed")), [10, 20]);
 		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 		// A card moved on one device names the canvas on its screen: `canvas/card-size-on-canvas.test.ts` holds that it lands there.

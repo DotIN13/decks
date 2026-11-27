@@ -18,17 +18,17 @@ export interface Gestures {
 }
 
 export function gestures(ctx: VerbContext): Gestures {
-	const { service, agent, asList, here, needPens, needStage } = ctx;
+	const { service, agent, asList, here, needPens, needCanvas } = ctx;
 	return {
-		/** A card dragged: placed where it was let go, on the stage on screen. */
+		/** A card dragged: placed where it was let go, on the canvas on screen. */
 		move: async (path: string, at: { x: number; y: number }) => {
-			const board = service.move(agent.id, path, at);
-			agent.acted?.("move", board.path);
-			return withBox(board);
+			const card = service.move(agent.id, path, at);
+			agent.acted?.("move", card.path);
+			return withBox(card);
 		},
 
 		/**
-		 * A card dragged to a new size: on this stage's canvas, and in its file, so it comes at that size
+		 * A card dragged to a new size: on this canvas's canvas, and in its file, so it comes at that size
 		 * where a canvas places it next.
 		 *
 		 * - **Clamped**: 320 wide is about the narrowest card, and the ceiling is well past the tallest
@@ -56,7 +56,7 @@ export function gestures(ctx: VerbContext): Gestures {
 			return { path, w: now?.w ?? w ?? file.w, h: now?.h ?? h ?? file.h };
 		},
 
-		/** Cards taken off the stage, kept in its context. */
+		/** Cards taken off the canvas, kept in its context. */
 		hide: async (path: string | string[]) => {
 			const dropping = new Set(asList(path));
 			const up = agent.inPlay();
@@ -65,20 +65,20 @@ export function gestures(ctx: VerbContext): Gestures {
 		},
 
 		/**
-		 * Pen operations on the stage's own drawing, applied together or not at all (`canvas.edit`).
-		 * The person's own edits can be taken back with the stage's undo; each item's new box comes back.
+		 * Pen operations on the canvas's own drawing, applied together or not at all (`canvas.edit`).
+		 * The person's own edits can be taken back with the canvas's undo; each item's new box comes back.
 		 */
 		edit: async (ops: readonly unknown[]) => {
 			const pens = needPens();
-			const boards = new Map(here().map((board) => [board.path, { x: board.x, y: board.y, w: board.w, h: board.h }]));
-			const { entry, results } = pens.edit(needStage(), ops as readonly Op[], (path) => boards.get(path), agent.person ? { undoable: true } : undefined);
-			const placed = placements(pens.files.withImported(needStage(), entry.doc), { theme: baseTheme(entry.doc, "light"), measure: serverText.measure });
+			const cards = new Map(here().map((card) => [card.path, { x: card.x, y: card.y, w: card.w, h: card.h }]));
+			const { entry, results } = pens.edit(needCanvas(), ops as readonly Op[], (path) => cards.get(path), agent.person ? { undoable: true } : undefined);
+			const placed = placements(pens.files.withImported(needCanvas(), entry.doc), { theme: baseTheme(entry.doc, "light"), measure: serverText.measure });
 			const answered = results.map((result) => {
 				const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
 				return { ...result, ...(box ? { box } : {}) };
 			});
 			const touched = answered.filter((result) => result.box && !result.id.startsWith("board:"));
-			if (touched.length > 0) agent.drew?.(needStage(), touched.map((result) => result.id), touched.map((result) => result.box!));
+			if (touched.length > 0) agent.drew?.(needCanvas(), touched.map((result) => result.id), touched.map((result) => result.box!));
 			return { rev: entry.rev, results: answered };
 		},
 

@@ -68,7 +68,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			res.status(403).json({ error: "An app is opened in a canvas by that canvas's frame, with its canvas pass." });
 			return;
 		}
-		const pens = app.stage?.pens;
+		const pens = app.canvas?.pens;
 		if (!pens?.has(principal.canvas) || !pens.rights.yoursAlone(principal.canvas)) {
 			res.status(403).json({ error: "Apps open inside a canvas only on a canvas that is yours alone; on this one, open it in a tab.", tab: true });
 			return;

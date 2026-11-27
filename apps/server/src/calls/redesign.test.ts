@@ -19,20 +19,20 @@ function put(file: string, data: string | Uint8Array): void {
 
 
 /**
- * The calls of the SDK redesign, end to end over `/api/v1`: a board as a canvas item, beside and
+ * The calls of the SDK redesign, end to end over `/api/v1`: a card as a canvas item, beside and
  * below, batch's all or nothing, `here()`, the old names' notes, and
  * `send` against `queue`.
  */
 
-const board = (title: string, w = 900, h = 400) =>
+const card = (title: string, w = 900, h = 400) =>
 	`<!doctype html><html><head><title>${title}</title><meta name="board" content='{"w":${w},"h":${h},"bg":"grid"}' /></head><body class="board"></body></html>`;
 
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-redesign-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	put(join(deck, "canvases", "t", "cards", "a", "index.html"), board("Revenue is up"));
-	put(join(deck, "canvases", "t", "cards", "b", "index.html"), board("Costs are flat", 600, 300));
+	put(join(deck, "canvases", "t", "cards", "a", "index.html"), card("Revenue is up"));
+	put(join(deck, "canvases", "t", "cards", "b", "index.html"), card("Costs are flat", 600, 300));
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));
@@ -76,7 +76,7 @@ test("a pen browser item tagged decks.card reads as a card item, and other items
 	const item = toItem({ type: "browser", id: "a", name: "Revenue is up", url: "../../boards/a.html", width: 900, height: 400, metadata: { type: "decks.card", path: "canvases/t/cards/a/index.html" }, box: { x1: 0, y1: 0, x2: 900, y2: 400 } });
 	assert.deepEqual(item, { type: "card", id: "a", width: 900, height: 400, box: { x1: 0, y1: 0, x2: 900, y2: 400 }, card: "canvases/t/cards/a/index.html", title: "Revenue is up" });
 	assert.deepEqual(toItem({ type: "note", id: "n", content: "hi" }), { type: "note", id: "n", content: "hi" });
-	// A browser item that is not a deck board stays pen's own.
+	// A browser item that is not a deck card stays pen's own.
 	assert.equal(toItem({ type: "browser", id: "w", url: "https://example.com" }).type, "browser");
 });
 
@@ -285,7 +285,7 @@ test("clearing your tags is answered with a request to set them again: they show
 test("an arrow joined at both ends goes between them, with no note to say where", async () => {
 	const { must, cleanup } = await open();
 	try {
-		// A placed board is copied into the canvas and has an id there; an arrow joins those ids.
+		// A placed card is copied into the canvas and has an id there; an arrow joins those ids.
 		const a = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }])).value.id;
 		const b = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/b/index.html" }, { beside: a }])).value.id;
 		const arrow = await must("canvas.insert", [{ type: "path", id: "a-to-b", stroke: "#888", strokeWidth: 4, metadata: { type: "decks.arrow", from: { item: a, side: "right" }, to: { item: b, side: "left" } } }]);

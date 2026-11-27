@@ -36,7 +36,7 @@ function open() {
 }
 
 const TALL = "canvases/work/cards/tall/index.html";
-const boardOf = (app: App) => app.stage.cards().find((one) => one.path === TALL)!;
+const boardOf = (app: App) => app.canvas.cards().find((one) => one.path === TALL)!;
 
 test("a frame's measurement is reported but sizes nothing, and fit writes it back", async () => {
 	const { app, deck, cleanup } = open();
@@ -46,7 +46,7 @@ test("a frame's measurement is reported but sizes nothing, and fit writes it bac
 		assert.equal(before.clipped, undefined);
 
 		// Laid out at the board's own 900: `decks.canvas.fit` takes a height only from a layout at the width it fits at.
-		app.boards.noteExtent(TALL, { rev: before.rev, w: 648, h: 690, at: 900 });
+		app.cards.noteExtent(TALL, { rev: before.rev, w: 648, h: 690, at: 900 });
 		const measured = boardOf(app);
 		assert.deepEqual(measured.content, { w: 648, h: 690 });
 		/*
@@ -57,7 +57,7 @@ test("a frame's measurement is reported but sizes nothing, and fit writes it bac
 		assert.equal(measured.h, 400, "the reading left the board at the number in its file");
 		assert.equal(measured.clipped, true, "and says its content runs past it");
 
-		const { board: fitted } = await app.stage.fit(TALL);
+		const { board: fitted } = await app.canvas.fit(TALL);
 		assert.equal(fitted.h, 738, "the content plus a margin: this reading carries no page height (an older frame)");
 		// And the width is the file's, untouched: a fit is a height, not a resize.
 		assert.equal(fitted.w, 900, "the width the board declares");
@@ -76,10 +76,10 @@ test("a measurement of a version that has been rewritten is not reported", async
 	const { app, cleanup } = open();
 	try {
 		const board = boardOf(app);
-		app.boards.noteExtent(TALL, { rev: board.rev + 1, w: 648, h: 690 });
+		app.cards.noteExtent(TALL, { rev: board.rev + 1, w: 648, h: 690 });
 		assert.equal(boardOf(app).content, undefined, "a reading of a document we no longer hold says nothing");
 
-		await assert.rejects(app.stage.fit(TALL), /put it on the canvas/);
+		await assert.rejects(app.canvas.fit(TALL), /put it on the canvas/);
 	} finally {
 		cleanup();
 	}
@@ -98,12 +98,12 @@ test("a size written just after an edit the watcher has not heard yet is not tak
 		// An agent's own tools write new words, and before the watcher reads them `decks canvas fit` writes the height.
 		const edited = readFileSync(file, "utf8").replace("<body class=\"board\"></body>", "<body class=\"board\"><p>New words</p></body>");
 		writeFileSync(file, edited);
-		app.boards.writeCard(TALL, edited.replace('"h":400', '"h":520'));
+		app.cards.writeCard(TALL, edited.replace('"h":400', '"h":520'));
 		const changed = said.filter((m) => m.type === "card.changed" && m.path === TALL);
 		assert.equal(changed.length, 1);
 		assert.equal(changed[0]!.sized, undefined, "not size-only: the words changed since the browsers last heard");
 		// The height alone, with nothing unheard on disk: size-only, as before.
-		app.boards.writeCard(TALL, readFileSync(file, "utf8").replace('"h":520', '"h":600'));
+		app.cards.writeCard(TALL, readFileSync(file, "utf8").replace('"h":520', '"h":600'));
 		assert.equal(said.filter((m) => m.type === "card.changed" && m.path === TALL).at(-1)!.sized, true);
 	} finally {
 		cleanup();

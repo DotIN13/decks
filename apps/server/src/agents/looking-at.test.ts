@@ -41,7 +41,7 @@ test("a message is sent with the line as its last note, and a slash command with
 	try {
 		const agent = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		const canvas = agent.seat.stageName(true)!;
-		const title = app.stage.pens!.titleOf(canvas);
+		const title = app.canvas.pens!.titleOf(canvas);
 		const card = `canvases/${canvas}/cards/q3/index.html`;
 		mkdirSync(dirname(join(deck, card)), { recursive: true });
 		writeFileSync(join(deck, card), "<title>Q3 is up</title><meta name=\"card\" content='{\"w\":600}' /><div class=\"doc\"></div>\n");

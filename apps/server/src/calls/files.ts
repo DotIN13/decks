@@ -1,6 +1,6 @@
 import { isCardPath } from "@decks/hub/layout";
 import { deleteFile, editFile, findFiles, grepFiles, listFiles, moveFile, readFile, writeFile, type TextEdit } from "../files/deck-files.ts";
-import type { Verbs as Stage } from "@decks/sdk";
+import type { Verbs } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /**
@@ -11,7 +11,7 @@ import type { VerbContext } from "./context.ts";
  * to view is not written to. A card's page written this way has its writer for a byline, as one
  * written with `card.create` does.
  */
-export function fileVerbs(ctx: VerbContext): Pick<Stage, "file"> {
+export function fileVerbs(ctx: VerbContext): Pick<Verbs, "file"> {
 	const { service, agent } = ctx;
 	const root = () => service.deckPath();
 

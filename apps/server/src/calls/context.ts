@@ -4,7 +4,7 @@ import type { CanvasService, WebTarget } from "../canvas/service.ts";
 import type { AgentHooks } from "../agents/hooks.ts";
 
 /**
- * What every verb's handler is given: the stage service, the caller's hooks, and the helpers the
+ * What every verb's handler is given: the canvas service, the caller's hooks, and the helpers the
  * handlers share. Made once per caller by `createDecksTool` (`calls/tool.ts`). The notes, pictures and
  * canvas of one call are that call's own (`inCall`), though the context is shared by every call of
  * the caller.
@@ -20,7 +20,7 @@ export interface VerbContext {
 	asList(path: string | string[]): string[];
 	viewport(): ReturnType<CanvasService["viewport"]>;
 	needPens(): NonNullable<CanvasService["pens"]>;
-	needStage(): string;
+	needCanvas(): string;
 	needWeb(): NonNullable<CanvasService["web"]>;
 	needTarget(value: unknown, sentence: string): WebTarget;
 	here(): ReturnType<CanvasService["cards"]>;
@@ -36,10 +36,10 @@ export interface VerbContext {
 	cameraCanvas(): string | undefined;
 	/** A canvas as a caller names it (folder, title, or `canvases/<name>/canvas.pen`); with none named, `hereCanvas()`, or for an agent a refusal that says to name one. */
 	canvasOf(asked?: unknown): string;
-	/** A canvas as the `Canvas` type has it: its name, title, who has it open, how many boards. */
+	/** A canvas as the `Canvas` type has it: its name, title, who has it open, how many cards. */
 	canvasRow(name: string): { name: string; title: string; open: string[]; cards: number };
 	/** The canvas the request says it was made on, for this one call (`DecksTool.call`). */
-	callOn: { stage?: string };
+	callOn: { canvas?: string };
 }
 
 /**
@@ -55,13 +55,13 @@ export interface VerbContext {
 interface CallFrame {
 	notes: string[];
 	images: Array<{ data: string; mimeType: string }>;
-	stage: string | undefined;
+	canvas: string | undefined;
 }
 const frames = new AsyncLocalStorage<CallFrame>();
 
 /** Run one call in a frame of its own; `work` is handed the frame, to read its notes and pictures after. */
-export function inCall<T>(stage: string | undefined, work: (frame: CallFrame) => Promise<T>): Promise<T> {
-	const frame: CallFrame = { notes: [], images: [], stage };
+export function inCall<T>(canvas: string | undefined, work: (frame: CallFrame) => Promise<T>): Promise<T> {
+	const frame: CallFrame = { notes: [], images: [], canvas };
 	return frames.run(frame, () => work(frame));
 }
 
@@ -88,8 +88,8 @@ function perCall<T extends unknown[]>(pick: (frame: CallFrame) => T, outside: T)
 const NAME_A_CANVAS =
 	"Name the canvas this call works on: --canvas <name or title> (in a script, { canvas }). An agent has no home canvas, so its work lands where it says whatever the person is looking at. decks canvas list names them, decks canvas create makes one, and decks here says which one the person has open beside your chat.";
 
-export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; port: number }): VerbContext {
-	const { stage: service, agent, port } = deps;
+export function verbContext(deps: { canvas: CanvasService; agent: AgentHooks; port: number }): VerbContext {
+	const { canvas: service, agent, port } = deps;
 	const notes = perCall((frame) => frame.notes, [] as string[]);
 	const images = perCall((frame) => frame.images, [] as Array<{ data: string; mimeType: string }>);
 	const asList = (path: string | string[]) => (Array.isArray(path) ? path : [path]);
@@ -102,8 +102,8 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 		if (!service.pens) throw new Error("This server keeps no stage drawing.");
 		return service.pens;
 	};
-	/** This agent's stage folder, claimed the first time it draws. */
-	const needStage = () => {
+	/** This agent's canvas folder, claimed the first time it draws. */
+	const needCanvas = () => {
 		const name = agent.stageName?.();
 		if (!name) throw new Error("This stage has no drawing: the server keeps no stage files.");
 		return name;
@@ -136,7 +136,7 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 	};
 
 	/**
-	 * The boards as **this agent** sees them: its own stage, which is the one `decks.canvas.move` writes
+	 * The cards as **this agent** sees them: its own canvas, which is the one `decks.canvas.move` writes
 	 * to. Every read in this file goes through here, so a verb cannot quietly answer for somebody
 	 * else's arrangement.
 	 */
@@ -147,21 +147,21 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 		if (!clean) throw new Error('workspace is a project name, as in { workspace: "political-llm" }.');
 		return clean;
 	};
-	const callOn: { stage?: string } = {
-		get stage() {
-			return frames.getStore()?.stage;
+	const callOn: { canvas?: string } = {
+		get canvas() {
+			return frames.getStore()?.canvas;
 		},
 	};
 	const hereCanvas = (): string | undefined => {
 		const pens = service.pens;
-		if (callOn.stage && pens?.has(callOn.stage)) return callOn.stage;
+		if (callOn.canvas && pens?.has(callOn.canvas)) return callOn.canvas;
 		if (agent.here) return agent.here();
 		// The person acts where they are looking. An agent has no canvas of its own to fall back on: it names one.
 		return agent.person ? agent.stageName?.() : undefined;
 	};
 	const cameraCanvas = (): string | undefined => {
 		const pens = service.pens;
-		if (callOn.stage && pens?.has(callOn.stage)) return callOn.stage;
+		if (callOn.canvas && pens?.has(callOn.canvas)) return callOn.canvas;
 		return agent.here?.() ?? agent.stageName?.();
 	};
 	const canvasOf = (asked?: unknown): string => {
@@ -201,12 +201,12 @@ export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; por
 			cards,
 		};
 	};
-	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, needWeb, needTarget, here, askedWorkspace, hereCanvas, cameraCanvas, canvasOf, canvasRow, callOn };
+	return { service, agent, port, notes, images, asList, viewport, needPens, needCanvas, needWeb, needTarget, here, askedWorkspace, hereCanvas, cameraCanvas, canvasOf, canvasRow, callOn };
 }
 
-/** A board with its box as both corners, beside `x`, `y`, `w`, `h`, so a reader never adds a width. */
-export function withBox<B extends { x: number; y: number; w: number; h: number }>(board: B): B & { box: { x1: number; y1: number; x2: number; y2: number } } {
-	return { ...board, box: { x1: board.x, y1: board.y, x2: board.x + board.w, y2: board.y + board.h } };
+/** A card with its box as both corners, beside `x`, `y`, `w`, `h`, so a reader never adds a width. */
+export function withBox<B extends { x: number; y: number; w: number; h: number }>(card: B): B & { box: { x1: number; y1: number; x2: number; y2: number } } {
+	return { ...card, box: { x1: card.x, y1: card.y, x2: card.x + card.w, y2: card.y + card.h } };
 }
 
 export function escapeXml(text: string): string {

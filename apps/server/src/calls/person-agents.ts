@@ -14,13 +14,13 @@ import { needAgent, personGesture, type PersonVerbs } from "./person-call.ts";
 /** What the agent verbs need of the harness: the agents, their canvases and runtimes, and the account list a new agent joins. */
 export interface AgentTableHost {
 	readonly agents: Registry;
-	readonly stage: CanvasService;
+	readonly canvas: CanvasService;
 	readonly acts: Acts;
 	readonly accountList: AccountList;
 	/** The canvas list again, to every page: an agent's home canvas changed. */
 	publishStages(): void;
 	/** The deck as this agent's canvas arranges it, for the screen that focused it. */
-	stageState(agent?: DeckAgent): DeckState;
+	canvasState(agent?: DeckAgent): DeckState;
 	runtimes(): RuntimeInfo[];
 }
 
@@ -32,7 +32,7 @@ export function agentTable(host: AgentTableHost): PersonVerbs {
 			// This screen first, then everyone: the agent.list the focus publishes is rendered for each line by its view (`forView`), and this one must already say the new agent.
 			if (call.view) call.view.focused = String(id);
 			agents.focus(String(id));
-			if (call.view) call.tell({ type: "deck.changed", deck: host.stageState(agents.get(String(id))) });
+			if (call.view) call.tell({ type: "deck.changed", deck: host.canvasState(agents.get(String(id))) });
 		},
 		"agent.remove": async ([id]) => {
 			const outcome = agents.remove(String(id));

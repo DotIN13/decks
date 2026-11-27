@@ -56,14 +56,14 @@ export function canvasShowsDocument(pens: Pens, canvas: string | undefined, file
  * An app on no agent's canvas falls back to the focused conversation, made if nobody has spoken
  * yet. Never simply the last agent any browser touched, which may be on another canvas entirely.
  */
-export function conversationForApp(host: { agents: Registry; stage?: Pick<CanvasService, "pens"> }, name: string): DeckAgent {
+export function conversationForApp(host: { agents: Registry; canvas?: Pick<CanvasService, "pens"> }, name: string): DeckAgent {
 	const looking = host.agents.looking();
 	const all = looking ? [looking, ...host.agents.all().filter((one) => one !== looking)] : [...host.agents.all()];
-	return all.find((one) => canvasShowsApp(host.stage?.pens, one.seat.stageName(), name)) ?? host.agents.focused();
+	return all.find((one) => canvasShowsApp(host.canvas?.pens, one.seat.stageName(), name)) ?? host.agents.focused();
 }
 
 /** The tool an app's calls run through, and the conversation it acts for. */
-export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | "stage" | "port">, name: string): { tool: DecksTool; conversation: DeckAgent } {
+export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "cards" | "canvas" | "port">, name: string): { tool: DecksTool; conversation: DeckAgent } {
 	const conversation = conversationForApp(host, name);
 	let identity: Identity = { name: `app ${name}`, color: APP_COLOR };
 	const actor: AgentHooks = {
@@ -96,12 +96,12 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | 
 		create: (spec) => host.agents.createFor(conversation.id, spec),
 		// The app's canvas: the conversation's when it shows the app, else any that does.
 		here: () => {
-			if (canvasShowsApp(host.stage.pens, conversation.seat.stageName?.(), name)) return conversation.seat.stageName?.();
-			const pens = host.stage.pens;
+			if (canvasShowsApp(host.canvas.pens, conversation.seat.stageName?.(), name)) return conversation.seat.stageName?.();
+			const pens = host.canvas.pens;
 			return pens?.names().find((canvas) => canvasShowsApp(pens, canvas, name)) ?? conversation.seat.stageName?.();
 		},
-		recordRevision: (path) => host.boards.recordRevision(path),
-		boardPathOf: (file) => host.boards.cardPathOf(file),
+		recordRevision: (path) => host.cards.recordRevision(path),
+		boardPathOf: (file) => host.cards.cardPathOf(file),
 	};
-	return { tool: createDecksTool({ stage: host.stage, agent: actor, port: host.port }), conversation };
+	return { tool: createDecksTool({ stage: host.canvas, agent: actor, port: host.port }), conversation };
 }

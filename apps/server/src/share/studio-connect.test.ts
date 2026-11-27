@@ -205,7 +205,7 @@ test("Studio trades its token for a canvas pass, and a frame from Studio reads t
 	try {
 		// As a browser at Studio is given one: through the harness's own line to Studio.
 		const { token } = studioToken(app.tokens, { user: { id: "u1", name: "Ada" }, origin: "https://studio.test" });
-		const pens = app.stage.pens!;
+		const pens = app.canvas.pens!;
 		const one = pens.claim("One");
 		const two = pens.claim("Two");
 		for (const name of [one, two]) {

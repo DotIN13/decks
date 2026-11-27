@@ -20,7 +20,7 @@ export async function moveHome(ctx: VerbContext, name: string, keep = false): Pr
 	return { moved: true, onScreen: may.onScreen };
 }
 
-/** The canvas a card's or board's deck path names (`canvases/<name>/…`, `shared/canvases/<owner>/<name>/…`), if it names one. */
+/** The canvas a card's deck path names (`canvases/<name>/…`, `shared/canvases/<owner>/<name>/…`), if it names one. */
 export function canvasOfPath(path: string): string | undefined {
 	const own = /^canvases\/([^/]+)\//.exec(path);
 	if (own) return own[1];

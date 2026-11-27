@@ -1,6 +1,6 @@
 import { walk } from "@decks/pen";
 import { cardOf } from "../canvas/pens.ts";
-import type { Verbs as Stage } from "@decks/sdk";
+import type { Verbs } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 import { documentKeyOf } from "../docs/resolve.ts";
 import { canvasOfPath, moveHome } from "./move-home.ts";
@@ -12,7 +12,7 @@ import { canvasOfPath, moveHome } from "./move-home.ts";
  * from another conversation waits for when that one is opened, and a person mid-gesture is offered
  * a button rather than moved.
  */
-export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
+export function viewVerbs(ctx: VerbContext): Pick<Verbs, "view"> {
 	const { service, agent, notes, needPens, canvasOf } = ctx;
 	const asCamera = (at: { x: number; y: number; zoom: number }) => ({ x: at.x, y: at.y, zoom: at.zoom });
 	return {
@@ -57,14 +57,14 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 				const paths: string[] = [];
 				const items: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }> = [];
 				for (const one of wanted) {
-					const board = [...walk(doc.children)].find((node) => cardOf(node) === one);
-					if (board) {
+					const card = [...walk(doc.children)].find((node) => cardOf(node) === one);
+					if (card) {
 						paths.push(one);
 						continue;
 					}
 					const box = placed.get(one)?.box;
 					if (!box) throw new Error(`Nothing called ${one} is on the canvas "${pens.titleOf(name)}": decks canvas read lists what is.`);
-					// A board named by its item id is the board.
+					// A card named by its item id is the card.
 					const path = cardOf(placed.get(one)!.node);
 					if (path) paths.push(path);
 					else items.push({ id: one, box: { x: box.x, y: box.y, w: box.w, h: box.h } });
