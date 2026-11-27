@@ -43,7 +43,8 @@
 	.log { overflow: auto; padding: 0 18px 14px }
 	.sep { position: sticky; top: 0; z-index: 1; background: var(--b-bg); padding: 12px 0 6px; font-size: 14px; font-weight: 700; color: var(--b-muted); letter-spacing: .04em; text-transform: uppercase; display: flex; gap: 8px; align-items: center }
 	.sep::after { content: ""; flex: 1; height: 1px; background: var(--b-border) }
-	.e { display: grid; grid-template-columns: 46px 20px 1fr; gap: 8px; align-items: start; padding: 5px 6px; border-radius: 8px; font-size: 15px; line-height: 1.4 }
+	.e > .x { min-width: 0 }
+	.e { display: grid; grid-template-columns: 46px 20px minmax(0, 1fr); gap: 8px; align-items: start; padding: 5px 6px; border-radius: 8px; font-size: 15px; line-height: 1.4 }
 	.e.lit { background: var(--b-accent-soft) }
 	.e.lit .ic { box-shadow: 0 0 0 2px var(--b-bg) }
 	.at { color: var(--b-faint); font-family: var(--b-mono); font-size: 14px; padding-top: 2px }
@@ -72,6 +73,7 @@
 	.ask button[disabled] { opacity: .6; cursor: default }
 	.empty { color: var(--b-muted); padding: 14px 0 }
 </style>
+<style data-viz></style>
 <div class="doc" data-id="doc">
 	<div class="head">
 		<h1 id="task">Loading the progress…</h1>
@@ -85,10 +87,12 @@
 	</div>
 </div>
 <script type="module">
+	import { vizHtml, vizCss } from "./viz.js";
 	// A progress card. Left: the steps, each a goal or hypothesis, a method and what is expected. Right:
 	// a log of what actually happened (commands, failures, findings, results) under each step, newest at
 	// the foot. It reads progress.json beside it every 4 seconds; the agent, or a script it runs, rewrites
 	// that file in place. Copy the folder and change anything: the JSON's shape is this card's own.
+	// A log entry's "viz" draws a small picture under it (viz.js lists the kinds).
 	const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 	const VERDICT = { held: "done", "not held": "not", blocked: "blocked" };
 	const stateOf = (step) => (step.verdict && VERDICT[step.verdict]) || (step.status === "active" ? "active" : step.status === "done" ? "done" : step.status === "blocked" ? "blocked" : "todo");
@@ -98,6 +102,7 @@
 
 	export default function (card) {
 		const $ = (id) => card.root.getElementById(id);
+		card.root.querySelector("style[data-viz]").textContent = vizCss;
 		let text = "", data = null, chosen = null, follow = true, face = { name: "", src: "" };
 
 		async function faceOf(name) {
@@ -152,6 +157,7 @@
 				body = `${e.command ? `<span class="term">${esc(e.command)}</span>` : ""}${e.why ? `<span class="why">${esc(e.why)}</span>` : ""}${e.text ? `<span class="why">${esc(e.text)}</span>` : ""}${bar}`;
 			} else if (kind === "finding") body = `<small>Finding</small>${esc(e.text)}`;
 			else body = esc(e.text);
+			body += vizHtml(e.viz);
 			return `<div class="e ${kind}${running ? " running" : ""}${String(e.step) === String(chosen) ? " lit" : ""}" data-s="${esc(e.step)}"><span class="at">${esc(e.at ?? "")}</span><span class="ic">${ICON[kind]}</span><span class="x">${body}</span></div>`;
 		}
 

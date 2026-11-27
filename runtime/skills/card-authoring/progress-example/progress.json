@@ -5,42 +5,435 @@
 	"updated": "2026-11-26T18:18:40-08:00",
 	"steps": [
 		{
-			"id": 1, "title": "Make sure the counter is right", "status": "done", "verdict": "held",
+			"id": 1,
+			"title": "Make sure the counter is right",
+			"status": "done",
+			"verdict": "held",
 			"goal": "count words correctly, so later timings measure correct code",
 			"method": "write count.py, check one paragraph by hand",
 			"expect": "matches a hand count of 41 words"
 		},
 		{
-			"id": 2, "title": "Lock the rules in with tests", "status": "done", "verdict": "held", "badge": "23 of 23",
+			"id": 2,
+			"title": "Lock the rules in with tests",
+			"status": "done",
+			"verdict": "held",
+			"badge": "23 of 23",
 			"hypothesis": "the rules survive odd input, so a speed-up cannot quietly break counting",
 			"method": "23 unit tests on punctuation, case and cut words",
 			"expect": "23 of 23 pass"
 		},
 		{
-			"id": 3, "title": "Make a big, realistic test text", "status": "done", "verdict": "held",
+			"id": 3,
+			"title": "Make a big, realistic test text",
+			"status": "done",
+			"verdict": "held",
 			"goal": "real word frequencies, so the race is fair",
 			"method": "draw 1.9 million words, Zipf weighted",
 			"expect": "10 MB in under a minute"
 		},
 		{
-			"id": 4, "title": "Race Counter against a loop", "status": "active",
+			"id": 4,
+			"title": "Race Counter against a loop",
+			"status": "active",
 			"hypothesis": "Counter is faster, since it counts in C",
 			"method": "time both on the same words, 7 rounds",
 			"expect": "Counter about twice as fast"
 		}
 	],
 	"log": [
-		{ "step": 1, "at": "18:07", "kind": "run", "command": "python3 count.py sample.txt", "why": "check one paragraph by hand", "status": "done" },
-		{ "step": 1, "at": "18:07", "kind": "result", "text": "Matches a hand count: 41 words" },
-		{ "step": 2, "at": "18:08", "kind": "run", "command": "python3 -m unittest test_count", "why": "23 tests on the counting rules", "status": "done" },
-		{ "step": 2, "at": "18:08", "kind": "fail", "text": "21 of 23 pass: a word cut across a read loses its apostrophe" },
-		{ "step": 2, "at": "18:09", "kind": "finding", "text": "A real bug: reads split words. Carry the tail into the next read." },
-		{ "step": 2, "at": "18:09", "kind": "result", "text": "23 of 23 pass" },
-		{ "step": 3, "at": "18:10", "kind": "run", "command": "timeout 300 python3 make_corpus.py", "why": "build the 10 MB test text", "status": "done" },
-		{ "step": 3, "at": "18:15", "kind": "fail", "text": "Stopped at the 5 minute limit" },
-		{ "step": 3, "at": "18:16", "kind": "finding", "text": "Each weighted draw rescans 50,000 words. Draw in batches." },
-		{ "step": 3, "at": "18:17", "kind": "result", "text": "10.5 MB in 0.83 s" },
-		{ "step": 4, "at": "18:18", "kind": "run", "command": "python3 bench.py --repeat 7", "why": "time Counter and the plain loop on the same words", "status": "running", "done": 2, "of": 7, "unit": "rounds" }
+		{
+			"step": 1,
+			"at": "18:07",
+			"kind": "run",
+			"command": "python3 count.py sample.txt",
+			"why": "check one paragraph by hand",
+			"status": "done"
+		},
+		{
+			"step": 1,
+			"at": "18:07",
+			"kind": "result",
+			"text": "Matches a hand count: 41 words",
+			"viz": {
+				"type": "tally",
+				"text": "The cat saw the dog, and the dog saw the cat. The end.",
+				"top": 5,
+				"caption": "one paragraph, counted case-blind"
+			}
+		},
+		{
+			"step": 2,
+			"at": "18:08",
+			"kind": "run",
+			"command": "python3 -m unittest test_count",
+			"why": "23 tests on the counting rules",
+			"status": "done"
+		},
+		{
+			"step": 2,
+			"at": "18:08",
+			"kind": "fail",
+			"text": "21 of 23 pass: a word cut across a read loses its apostrophe",
+			"viz": {
+				"type": "tests",
+				"items": [
+					{
+						"name": "empty text",
+						"status": "pass"
+					},
+					{
+						"name": "one word",
+						"status": "pass"
+					},
+					{
+						"name": "case folded",
+						"status": "pass"
+					},
+					{
+						"name": "commas dropped",
+						"status": "pass"
+					},
+					{
+						"name": "full stops dropped",
+						"status": "pass"
+					},
+					{
+						"name": "hyphen kept",
+						"status": "pass"
+					},
+					{
+						"name": "apostrophe kept",
+						"status": "pass"
+					},
+					{
+						"name": "numbers counted",
+						"status": "pass"
+					},
+					{
+						"name": "tabs and newlines",
+						"status": "pass"
+					},
+					{
+						"name": "unicode letters",
+						"status": "pass"
+					},
+					{
+						"name": "top N order",
+						"status": "pass"
+					},
+					{
+						"name": "ties by first seen",
+						"status": "pass"
+					},
+					{
+						"name": "top N larger than words",
+						"status": "fail",
+						"detail": "the test asked for the wrong length"
+					},
+					{
+						"name": "only punctuation",
+						"status": "pass"
+					},
+					{
+						"name": "repeated spaces",
+						"status": "pass"
+					},
+					{
+						"name": "quotes dropped",
+						"status": "pass"
+					},
+					{
+						"name": "leading apostrophe",
+						"status": "pass"
+					},
+					{
+						"name": "trailing apostrophe",
+						"status": "pass"
+					},
+					{
+						"name": "apostrophe at a cut",
+						"status": "fail",
+						"detail": "\"don\" + \"t\" counted as two words"
+					},
+					{
+						"name": "word at a cut",
+						"status": "pass"
+					},
+					{
+						"name": "huge word",
+						"status": "pass"
+					},
+					{
+						"name": "mixed scripts",
+						"status": "pass"
+					},
+					{
+						"name": "chunked read matches whole",
+						"status": "pass"
+					}
+				]
+			}
+		},
+		{
+			"step": 2,
+			"at": "18:09",
+			"kind": "finding",
+			"text": "A real bug: reads split words. Carry the tail into the next read."
+		},
+		{
+			"step": 2,
+			"at": "18:09",
+			"kind": "result",
+			"text": "23 of 23 pass",
+			"viz": {
+				"type": "tests",
+				"items": [
+					{
+						"name": "empty text",
+						"status": "pass"
+					},
+					{
+						"name": "one word",
+						"status": "pass"
+					},
+					{
+						"name": "case folded",
+						"status": "pass"
+					},
+					{
+						"name": "commas dropped",
+						"status": "pass"
+					},
+					{
+						"name": "full stops dropped",
+						"status": "pass"
+					},
+					{
+						"name": "hyphen kept",
+						"status": "pass"
+					},
+					{
+						"name": "apostrophe kept",
+						"status": "pass"
+					},
+					{
+						"name": "numbers counted",
+						"status": "pass"
+					},
+					{
+						"name": "tabs and newlines",
+						"status": "pass"
+					},
+					{
+						"name": "unicode letters",
+						"status": "pass"
+					},
+					{
+						"name": "top N order",
+						"status": "pass"
+					},
+					{
+						"name": "ties by first seen",
+						"status": "pass"
+					},
+					{
+						"name": "top N larger than words",
+						"status": "pass"
+					},
+					{
+						"name": "only punctuation",
+						"status": "pass"
+					},
+					{
+						"name": "repeated spaces",
+						"status": "pass"
+					},
+					{
+						"name": "quotes dropped",
+						"status": "pass"
+					},
+					{
+						"name": "leading apostrophe",
+						"status": "pass"
+					},
+					{
+						"name": "trailing apostrophe",
+						"status": "pass"
+					},
+					{
+						"name": "apostrophe at a cut",
+						"status": "pass"
+					},
+					{
+						"name": "word at a cut",
+						"status": "pass"
+					},
+					{
+						"name": "huge word",
+						"status": "pass"
+					},
+					{
+						"name": "mixed scripts",
+						"status": "pass"
+					},
+					{
+						"name": "chunked read matches whole",
+						"status": "pass"
+					}
+				]
+			}
+		},
+		{
+			"step": 3,
+			"at": "18:10",
+			"kind": "run",
+			"command": "timeout 300 python3 make_corpus.py",
+			"why": "build the 10 MB test text",
+			"status": "done"
+		},
+		{
+			"step": 3,
+			"at": "18:15",
+			"kind": "fail",
+			"text": "Stopped at the 5 minute limit"
+		},
+		{
+			"step": 3,
+			"at": "18:16",
+			"kind": "finding",
+			"text": "Each weighted draw rescans 50,000 words. Draw in batches."
+		},
+		{
+			"step": 3,
+			"at": "18:17",
+			"kind": "result",
+			"text": "10.5 MB in 0.83 s",
+			"viz": {
+				"type": "cloud",
+				"words": [
+					[
+						"the",
+						70
+					],
+					[
+						"of",
+						38
+					],
+					[
+						"and",
+						36
+					],
+					[
+						"kalo",
+						22
+					],
+					[
+						"mi",
+						19
+					],
+					[
+						"renta",
+						15
+					],
+					[
+						"to",
+						30
+					],
+					[
+						"voshi",
+						11
+					],
+					[
+						"brido",
+						9
+					],
+					[
+						"in",
+						24
+					],
+					[
+						"nor",
+						8
+					],
+					[
+						"supel",
+						6
+					],
+					[
+						"quazin",
+						5
+					],
+					[
+						"a",
+						28
+					],
+					[
+						"delka",
+						4
+					]
+				],
+				"examples": [
+					"the kalo of mi renta voshi and the brido in nor supel",
+					"a quazin to the delka, and mi renta of kalo"
+				],
+				"caption": "the 15 most common of 50,000 words, sized by count"
+			}
+		},
+		{
+			"step": 4,
+			"at": "18:18",
+			"kind": "run",
+			"command": "python3 bench.py --repeat 7",
+			"why": "time Counter and the plain loop on the same words",
+			"status": "running",
+			"done": 2,
+			"of": 7,
+			"unit": "rounds",
+			"viz": {
+				"type": "waterfall",
+				"unit": "ms",
+				"spans": [
+					{
+						"lane": "Counter",
+						"label": "read",
+						"start": 0,
+						"dur": 118
+					},
+					{
+						"lane": "Counter",
+						"label": "split",
+						"start": 118,
+						"dur": 101
+					},
+					{
+						"lane": "Counter",
+						"label": "count",
+						"start": 219,
+						"dur": 65
+					},
+					{
+						"lane": "dict loop",
+						"label": "read",
+						"start": 0,
+						"dur": 121
+					},
+					{
+						"lane": "dict loop",
+						"label": "split",
+						"start": 121,
+						"dur": 148
+					},
+					{
+						"lane": "dict loop",
+						"label": "count",
+						"start": 269,
+						"dur": 84
+					}
+				],
+				"caption": "round 5 of 7: splitting costs more than counting either way"
+			}
+		}
 	],
 	"questions": []
 }

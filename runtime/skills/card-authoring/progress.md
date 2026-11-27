@@ -47,6 +47,19 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
 
   The log follows the newest line; pressing a step scrolls to its lines.
 
+- **Show, do not only tell.** Any log entry can carry a `viz`, a small picture drawn under it, so the
+  reader sees what the run did. Pick the one that makes the result obvious:
+  - `tally`: words being counted, then the counts (`{ "type": "tally", "text": "the cat saw the dog" }`);
+  - `tests`: one block per test, green or red, with the failing ones named and why
+    (`{ "type": "tests", "items": [{ "name": "apostrophe at a cut", "status": "fail", "detail": "…" }] }`);
+  - `cloud`: a word cloud and a few example lines, for data you made or read;
+  - `waterfall`: a trace of where the time went, one lane per variant
+    (`{ "type": "waterfall", "unit": "ms", "spans": [{ "lane": "Counter", "label": "read", "start": 0, "dur": 118 }] }`);
+  - `bars`: a few numbers side by side, the best in the accent colour; `image`: a plot or a screenshot you saved.
+
+  [viz.js](progress-example/viz.js) draws them; add a kind there when none fits (a diff, a map, a
+  before and after).
+
 ```jsonc
 {
   "task": "Word counter", "agent": "<your name>",
@@ -59,7 +72,9 @@ cp -R "$DECKS_SKILLS/card-authoring/progress-example/." canvases/<canvas>/cards/
               "verdict": "held", "badge": "2.1x" }],                              // when it ends
   "log": [{ "step": 4, "at": "18:18", "kind": "run", "command": "python3 bench.py --repeat 7",
             "why": "time both on the same words", "status": "running", "done": 2, "of": 7, "unit": "rounds" },
-          { "step": 3, "at": "18:16", "kind": "finding", "text": "Each weighted draw rescans 50,000 words." }],
+          { "step": 3, "at": "18:16", "kind": "finding", "text": "Each weighted draw rescans 50,000 words." },
+          { "step": 2, "at": "18:08", "kind": "fail", "text": "21 of 23 pass",
+            "viz": { "type": "tests", "items": [{ "name": "apostrophe at a cut", "status": "fail" }] } }],
   "questions": [{ "ask": "Keep Counter?", "options": ["Yes", "No"] }]          // buttons that message you
 }
 ```
