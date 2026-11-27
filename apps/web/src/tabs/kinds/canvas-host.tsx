@@ -8,6 +8,8 @@ import { camera, glide } from "../../state/camera.ts";
 import { state } from "../../state/deck.ts";
 import { stages } from "../../state/canvases.ts";
 import { setDrawingEditor } from "../../state/decks.ts";
+import { offer } from "../../state/notices.ts";
+import { m } from "@decks/i18n";
 import { mode, selected, setMode, setSelected } from "../../state/selection.ts";
 import { reportCameraSoon } from "../../app/camera-report.ts";
 import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "../../app/frame-handoffs.ts";
@@ -128,6 +130,8 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])),
 			viewFor: rememberView,
 			moveTo: moveConversation,
+			// Taken off with its ×, which nothing on the canvas shows: said, with the way back (UI review).
+			hidden: (title, undo) => offer(m.canvas_hidden_offer({ title }), { label: m.canvas_hidden_undo(), run: undo }, "hidden"),
 		},
 	});
 	setEditorHandle(editor.handle);

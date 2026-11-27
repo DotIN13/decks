@@ -283,7 +283,9 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 			onRead: (path) => void (studio ? undefined : backend.post("card-seen", { path })),
 			// Hidden is the card taken off the drawing, as canvas.delete does, but as an edit of yours: gone at once, not when the harness answers.
 			onHide: (path) => {
+				const title = pageOf(untrack(pages), path)?.title ?? path.split("/").at(-2) ?? path;
 				if (!takeOff(path) && !studio) void backend.call("canvas.delete", [path.startsWith("item:") ? path.slice(5) : path]);
+				end.emit("hidden", { title });
 			},
 		},
 		// Said once the camera rests, not for every step of a pan: the page keeps it, and the view is drawn here.

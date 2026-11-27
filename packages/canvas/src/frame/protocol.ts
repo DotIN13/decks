@@ -143,6 +143,8 @@ interface FrameToPage {
 	tools: Record<string, unknown>;
 	/** The person pressed Go on an agent's move to another canvas (`view.goto` offered): the page moves that conversation there, as its canvas switcher does. */
 	goto: { agent: string; canvas: string };
+	/** A card or item was taken off the canvas with its ×: the page says so, with Undo, since nothing on the canvas shows where it went. */
+	hidden: { title: string };
 }
 
 /** The calls the frame makes of the page, and what each answers. */

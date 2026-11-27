@@ -1638,6 +1638,20 @@ export const canvas_handle_move_block: ((inputs?: Canvas_Handle_Move_BlockInputs
 /**
 * | output |
 * | --- |
+* | "“{title}” is off the canvas. Its folder stays in the deck." |
+*
+*/
+export const canvas_hidden_offer: ((inputs: Canvas_Hidden_OfferInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Hidden_OfferInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Undo" |
+*
+*/
+export const canvas_hidden_undo: ((inputs?: Canvas_Hidden_UndoInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Hidden_UndoInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Add an icon…" |
 *
 */
@@ -11228,6 +11242,8 @@ export type Canvas_Handle_Arrow_JoinedInputs = {};
 export type Canvas_Handle_CornersInputs = {};
 export type Canvas_Handle_Draw_ArrowInputs = {};
 export type Canvas_Handle_Move_BlockInputs = {};
+export type Canvas_Hidden_OfferInputs = { title: NonNullable<unknown> };
+export type Canvas_Hidden_UndoInputs = {};
 export type Canvas_Hold_Add_IconInputs = {};
 export type Canvas_Hold_Add_ShapeInputs = {};
 export type Canvas_Hold_An_ItemInputs = {};

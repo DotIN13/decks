@@ -414,5 +414,7 @@
 	"canvas_card_image": "image",
 	"canvas_cursor_agent": "agent",
 	"canvas_pill_refresh": "Reload",
-	"canvas_pill_refresh_title": "Load it again from its files, in this window"
+	"canvas_pill_refresh_title": "Load it again from its files, in this window",
+	"canvas_hidden_offer": "“{title}” is off the canvas. Its folder stays in the deck.",
+	"canvas_hidden_undo": "Undo"
 }

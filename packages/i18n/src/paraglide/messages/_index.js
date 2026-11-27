@@ -235,6 +235,8 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Canvas_Handle_CornersInputs */
 /** @typedef {{}} Canvas_Handle_Draw_ArrowInputs */
 /** @typedef {{}} Canvas_Handle_Move_BlockInputs */
+/** @typedef {{ title: NonNullable<unknown> }} Canvas_Hidden_OfferInputs */
+/** @typedef {{}} Canvas_Hidden_UndoInputs */
 /** @typedef {{}} Canvas_Hold_Add_IconInputs */
 /** @typedef {{}} Canvas_Hold_Add_ShapeInputs */
 /** @typedef {{}} Canvas_Hold_An_ItemInputs */
@@ -4836,6 +4838,34 @@ export const canvas_handle_move_block = /** @type {((inputs?: Canvas_Handle_Move
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "zh-CN") return __zh_cn2.canvas_handle_move_block(inputs)
 	return __en.canvas_handle_move_block(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "“{title}” is off the canvas. Its folder stays in the deck." |
+*
+* @param {Canvas_Hidden_OfferInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_hidden_offer = /** @type {((inputs: Canvas_Hidden_OfferInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Hidden_OfferInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_hidden_offer(inputs)
+	return __en.canvas_hidden_offer(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Undo" |
+*
+* @param {Canvas_Hidden_UndoInputs} inputs
+* @param {{ locale?: "en" | "zh-CN" }} options
+* @returns {LocalizedString}
+*/
+export const canvas_hidden_undo = /** @type {((inputs?: Canvas_Hidden_UndoInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Canvas_Hidden_UndoInputs, { locale?: "en" | "zh-CN" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "zh-CN") return __zh_cn2.canvas_hidden_undo(inputs)
+	return __en.canvas_hidden_undo(inputs)
 });
 /**
 * | output |

@@ -70,6 +70,7 @@ export function createWire(d: WireNeeds) {
 		// The words every frame shares (`@decks/frame`): a press or Escape in the frame puts this page's menus away, a link opens in a tab, a shortcut the canvas did not take is played here, and a card's agent call is this page's to answer.
 		hearShared(page as never, { dismiss: dismissMenus, agent: d.options.frame.agent, openAt: d.options.frame.openAt, refuse: (message) => new CallRefused(message, "refused") });
 		page.on("goto", (data) => mine() && d.options.frame.moveTo?.(data.agent, data.canvas));
+		page.on("hidden", (data) => mine() && d.options.frame.hidden?.(data.title, () => page.emit("step", { direction: "undo" })));
 		page.on("camera", (data) => {
 			/*
 			 * A view that is an agent's chat's: kept for it. One the frame has carried out itself (`moved`,

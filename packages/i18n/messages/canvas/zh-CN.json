@@ -372,5 +372,7 @@
 	"canvas_card_image": "图片",
 	"canvas_cursor_agent": "智能体",
 	"canvas_pill_refresh": "重新加载",
-	"canvas_pill_refresh_title": "在这个窗口里从文件重新加载"
+	"canvas_pill_refresh_title": "在这个窗口里从文件重新加载",
+	"canvas_hidden_offer": "“{title}”已从画布上移除，它的文件夹仍在牌组中。",
+	"canvas_hidden_undo": "撤销"
 }

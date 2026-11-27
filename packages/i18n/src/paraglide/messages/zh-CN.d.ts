@@ -231,6 +231,8 @@ export const canvas_handle_arrow_joined: (inputs: Canvas_Handle_Arrow_JoinedInpu
 export const canvas_handle_corners: (inputs: Canvas_Handle_CornersInputs) => LocalizedString;
 export const canvas_handle_draw_arrow: (inputs: Canvas_Handle_Draw_ArrowInputs) => LocalizedString;
 export const canvas_handle_move_block: (inputs: Canvas_Handle_Move_BlockInputs) => LocalizedString;
+export const canvas_hidden_offer: (inputs: Canvas_Hidden_OfferInputs) => LocalizedString;
+export const canvas_hidden_undo: (inputs: Canvas_Hidden_UndoInputs) => LocalizedString;
 export const canvas_hold_add_icon: (inputs: Canvas_Hold_Add_IconInputs) => LocalizedString;
 export const canvas_hold_add_shape: (inputs: Canvas_Hold_Add_ShapeInputs) => LocalizedString;
 export const canvas_hold_an_item: (inputs: Canvas_Hold_An_ItemInputs) => LocalizedString;
@@ -1798,6 +1800,8 @@ export type Canvas_Handle_Arrow_JoinedInputs = {};
 export type Canvas_Handle_CornersInputs = {};
 export type Canvas_Handle_Draw_ArrowInputs = {};
 export type Canvas_Handle_Move_BlockInputs = {};
+export type Canvas_Hidden_OfferInputs = { title: NonNullable<unknown> };
+export type Canvas_Hidden_UndoInputs = {};
 export type Canvas_Hold_Add_IconInputs = {};
 export type Canvas_Hold_Add_ShapeInputs = {};
 export type Canvas_Hold_An_ItemInputs = {};

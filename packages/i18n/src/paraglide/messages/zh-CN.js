@@ -233,6 +233,8 @@
 /** @typedef {{}} Canvas_Handle_CornersInputs */
 /** @typedef {{}} Canvas_Handle_Draw_ArrowInputs */
 /** @typedef {{}} Canvas_Handle_Move_BlockInputs */
+/** @typedef {{ title: NonNullable<unknown> }} Canvas_Hidden_OfferInputs */
+/** @typedef {{}} Canvas_Hidden_UndoInputs */
 /** @typedef {{}} Canvas_Hold_Add_IconInputs */
 /** @typedef {{}} Canvas_Hold_Add_ShapeInputs */
 /** @typedef {{}} Canvas_Hold_An_ItemInputs */
@@ -2498,6 +2500,14 @@ export const canvas_handle_draw_arrow = /** @type {(inputs: Canvas_Handle_Draw_A
 
 export const canvas_handle_move_block = /** @type {(inputs: Canvas_Handle_Move_BlockInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`拖动以移动此段落`)
+};
+
+export const canvas_hidden_offer = /** @type {(inputs: Canvas_Hidden_OfferInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`“${i?.title}”已从画布上移除，它的文件夹仍在牌组中。`)
+};
+
+export const canvas_hidden_undo = /** @type {(inputs: Canvas_Hidden_UndoInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`撤销`)
 };
 
 export const canvas_hold_add_icon = /** @type {(inputs: Canvas_Hold_Add_IconInputs) => LocalizedString} */ () => {

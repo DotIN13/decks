@@ -73,6 +73,8 @@ export interface FrameHostOptions {
 	viewFor?(agent: string, camera: Camera, selected?: string, canvas?: string): void;
 	/** Move a conversation to a canvas, as the page's canvas switcher does: an agent's `view.goto` the person said Go to. */
 	moveTo?(agent: string, canvas: string): void;
+	/** A card or item was taken off the canvas with its ×: say so, with `undo`, which puts it back. */
+	hidden?(title: string, undo: () => void): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
 	upload?(drop: { files: File[]; at: { x: number; y: number }; card?: CardSlot }): void;
 }
