@@ -24,7 +24,7 @@
 		"apps/server/src/connections/routes/v1.ts: verbRoutes": 159,
 		"apps/web/src/agents/AgentEdit.tsx: AgentEdit": 233,
 		"apps/web/src/agents/AgentHoverCard.tsx: AgentHoverCard": 176,
-		"apps/web/src/agents/AgentPill.tsx: AgentMenu": 372,
+		"apps/web/src/agents/AgentPill.tsx: AgentMenu": 196,
 		"apps/web/src/agents/AgentPill.tsx: AgentPill": 231,
 		"apps/web/src/agents/AgentRow.tsx: AgentRow": 350,
 		"apps/web/src/agents/Dialog.tsx: Dialog": 269,
