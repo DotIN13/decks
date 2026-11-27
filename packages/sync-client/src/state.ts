@@ -144,7 +144,7 @@ export class SyncStore {
 	}
 
 	/** The name here of the canvas Studio knows by this id, or undefined. */
-	nameOf(id: string): string | undefined {
+	nameOf(id: string | undefined): string | undefined {
 		return Object.entries(this.state.canvases).find(([, s]) => s.id === id)?.[0];
 	}
 
