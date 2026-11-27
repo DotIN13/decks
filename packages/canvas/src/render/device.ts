@@ -186,12 +186,6 @@ export async function readGpuClass(): Promise<GpuClass> {
 }
 
 /**
- * A device's cards (`items/awake.ts`): how many are live at once besides the selected one, the
- * nearest the middle of the screen, and how many let go keep their roots, asleep, so that coming back
- * to one is instant. A live card is a root of elements this one page lays out, paints and runs the
- * scripts of; an iPad or a phone has one thread and a hard memory ceiling for all of it.
- */
-/**
  * A device's awake items (`items/awake.ts`): how many of each kind are awake at once besides the
  * selected one, the nearest the middle of the screen, and how many let go keep their surfaces, asleep,
  * so that coming back to one is instant. A card is a root of elements this one page lays out and
@@ -199,6 +193,8 @@ export async function readGpuClass(): Promise<GpuClass> {
  * phone has one thread and a hard memory ceiling for all of it.
  */
 export const AWAKE: Record<DeviceKind, { live: { card: number; app: number; document: number }; kept: number }> = {
-	computer: { live: { card: 12, app: 2, document: 2 }, kept: 4 },
-	mobile: { live: { card: 3, app: 1, document: 1 }, kept: 2 },
+	// Kept: 12 on a computer, about 0.5 to 1 MB each, so a pan back and forth wakes cards instantly instead of
+	// mounting about 15 again per step; affordable since a kept card stops animating (`CardContext.awake`).
+	computer: { live: { card: 12, app: 2, document: 2 }, kept: 12 },
+	mobile: { live: { card: 3, app: 1, document: 1 }, kept: 4 },
 };
