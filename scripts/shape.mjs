@@ -166,6 +166,18 @@ const counts = {
 	"canvas package imports that point up a layer": canvasUpward.length,
 };
 
+/*
+ * Each offender's own size: a long file, function or class, by its place (`file: name`), so the gate
+ * holds each one to where it stands and not only their number. Held as a count alone, the largest
+ * function could grow from 1,270 lines to 2,000, or a new one take the place of one that shrank, unseen.
+ */
+const sizes = {};
+for (const one of [...longFiles, ...longFunctions, ...bigClasses]) {
+	const cut = one.lastIndexOf(": ");
+	const key = one.slice(0, cut);
+	sizes[key] = Math.max(sizes[key] ?? 0, Number(one.slice(cut + 2)));
+}
+
 // ---- report, update, or hold -------------------------------------------------------------------
 
 if (process.argv.includes("--report")) {
@@ -194,7 +206,7 @@ if (process.argv.includes("--json")) {
 }
 
 if (process.argv.includes("--update")) {
-	writeFileSync(BASELINE, `${JSON.stringify({ counts, upward, canvasUpward }, null, "\t")}\n`);
+	writeFileSync(BASELINE, `${JSON.stringify({ counts, sizes, upward, canvasUpward }, null, "\t")}\n`);
 	console.log(`shape: the baseline is the code as it is (${Object.entries(counts).map(([name, count]) => `${count} ${name}`).join("; ")})`);
 	process.exit(0);
 }
@@ -204,6 +216,13 @@ const problems = [];
 for (const [name, count] of Object.entries(counts)) {
 	const held = baseline.counts[name];
 	if (held !== undefined && count > held) problems.push(`${name}: ${count}, where the baseline holds ${held}. node scripts/shape.mjs --report lists them.`);
+}
+if (baseline.sizes) {
+	for (const [key, size] of Object.entries(sizes)) {
+		const held = baseline.sizes[key];
+		if (held === undefined) problems.push(`a new one over the limit: ${key} (${size}); split it, or bring it under the limit.`);
+		else if (size > held) problems.push(`${key} grew from ${held} to ${size}; bring it back, or split it.`);
+	}
 }
 const known = new Set(baseline.upward);
 for (const one of upward) if (!known.has(one)) problems.push(`a new import points up a layer (${layerName(layerOf(one.split(" -> ")[0]))} to ${layerName(layerOf(one.split(" -> ")[1]))}): ${one}`);
