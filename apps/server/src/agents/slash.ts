@@ -1,4 +1,5 @@
 import type { SlashCommand } from "@decks/protocol";
+import type { AgentBackendContext } from "./backend.ts";
 
 /**
  * A prompt that starts with `/`, split into its command and its argument.
@@ -62,7 +63,7 @@ export function sameCommands(a: SlashCommand[], b: SlashCommand[]): boolean {
  * transcript is not a reference manual, and the `/` menu — which shows every hint next
  * to every name, and filters — is the reference manual.
  */
-export function helpText(commands: SlashCommand[]): string {
+function helpText(commands: SlashCommand[]): string {
 	if (commands.length === 0) return "No commands.";
 	const deck = commands.filter((command) => command.source === "deck");
 	const rest = commands.filter((command) => command.source !== "deck");
@@ -72,4 +73,59 @@ export function helpText(commands: SlashCommand[]): string {
 		lines.push(`And ${rest.length} from the runtime — type / to see them: ${rest.map((command) => `/${command.name}`).join(" ")}`);
 	}
 	return lines.join("\n");
+}
+
+/**
+ * What a runtime tells the deck so the deck can answer its own commands for it.
+ *
+ * `/cost`, `/help`, `/status` and `/models` mean the same thing on every runtime, and each
+ * backend used to answer them in its own `runSlash`, with its own status format. The facts are
+ * the runtime's; the answers are written here, once.
+ */
+export interface DeckSlashFacts {
+	/** The runtime's name, which `/status` opens with: `Claude Code`, `opencode`. */
+	runtime: string;
+	/** The menu, for `/help`. */
+	commands(): SlashCommand[];
+	/**
+	 * What `/status` says after the name, each a short phrase (`model x`, `mode auto`); an
+	 * undefined one is left out. Absent when the deck does not answer `/status` for this
+	 * runtime, so it is handed to the runtime.
+	 */
+	status?(): Array<string | undefined> | Promise<Array<string | undefined>>;
+	/** What `/models` says. Absent when the deck does not answer `/models` for this runtime. */
+	models?(): string;
+}
+
+/** One status line, the same on every runtime: the name, then its facts, between middle dots. */
+function statusLine(runtime: string, facts: Array<string | undefined>): string {
+	return [runtime, ...facts.filter((fact): fact is string => fact !== undefined)].join(" · ");
+}
+
+/**
+ * Answer a deck-owned command, or say it is not one.
+ *
+ * True when the command was answered here; false for anything else, which the runtime then
+ * runs as its own. `/cost` opens the usage panel rather than printing a paragraph: the shell
+ * reads the figures and sends them with the instruction to open it (`session.pushReport`).
+ */
+export async function deckSlash(name: string, context: Pick<AgentBackendContext, "notice" | "showUsage">, facts: DeckSlashFacts): Promise<boolean> {
+	switch (name) {
+		case "cost":
+			context.showUsage?.();
+			return true;
+		case "help":
+			context.notice("info", helpText(facts.commands()));
+			return true;
+		case "status":
+			if (!facts.status) return false;
+			context.notice("info", statusLine(facts.runtime, await facts.status()));
+			return true;
+		case "models":
+			if (!facts.models) return false;
+			context.notice("info", facts.models());
+			return true;
+		default:
+			return false;
+	}
 }

@@ -12,7 +12,7 @@
 	},
 	"sizes": {
 		"apps/server/src/runtimes/claude/accounts.ts": 1156,
-		"apps/server/src/runtimes/claude/backend.ts": 1479,
+		"apps/server/src/runtimes/claude/backend.ts": 1444,
 		"apps/web/src/panel/LeftPanel.tsx": 1049,
 		"packages/docs/src/page/gview.ts": 2091,
 		"packages/docs/src/page/live.ts": 2054,

@@ -1,4 +1,3 @@
-import { sentAs } from "../../agents/sent-as.ts";
 import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -19,7 +18,8 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
-import { helpText, mergeCommands, parseSlash, sameCommands } from "../../agents/slash.ts";
+import { deckSlash, mergeCommands, parseSlash, sameCommands, type DeckSlashFacts } from "../../agents/slash.ts";
+import { pairUserEntries, translatorTimeline } from "../../agents/entries.ts";
 import { answerQuestions } from "./ask-user-question.ts";
 import { runtimeDir } from "@decks/runtime";
 import { agentBriefing } from "../../agents/context.ts";
@@ -535,7 +535,6 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	private async runSlash(name: string, args: string): Promise<void> {
-		const { notice } = this.context;
 		switch (name) {
 			case "login":
 				// The harness's sign-in, in the page's modal (`claude/login.ts`), not a flow of this agent's own.
@@ -544,28 +543,9 @@ export class ClaudeBackend implements AgentBackend {
 			case "logout":
 				await this.slashLogout();
 				return;
-			case "status": {
-				const auth = await claudeAuthStatus();
-				notice(
-					"info",
-					`Claude Code · model ${this.currentModel ?? "default"} · mode ${this.currentMode ?? "default"} · ${
-						auth.loggedIn ? `signed in (${auth.label})` : "not signed in"
-					}`,
-				);
-				return;
-			}
-			case "help":
-				notice(
-					"info",
-					helpText(this.commands()),
-				);
-				return;
-			case "cost":
-				// The panel, not a paragraph. The shell reads the figures and sends them with
-				// the instruction to open it (`session.pushReport`).
-				this.context.showUsage?.();
-				return;
 			default:
+				// `/status`, `/help` and `/cost` are the deck's, answered as on every runtime (`agents/slash.ts`).
+				if (await deckSlash(name, this.context, this.slashFacts())) return;
 				/*
 				 * The CLI's own commands — /compact, /doctor — run inside the session and answer
 				 * back through the stream, and **every one of them ends in a `result` frame**, the
@@ -580,6 +560,18 @@ export class ClaudeBackend implements AgentBackend {
 				this.context.translator.setState("thinking");
 				this.push(`/${name}${args ? ` ${args}` : ""}`);
 		}
+	}
+
+	/** What `/status` and `/help` say for Claude Code. */
+	private slashFacts(): DeckSlashFacts {
+		return {
+			runtime: "Claude Code",
+			commands: () => this.commands(),
+			status: async () => {
+				const auth = await claudeAuthStatus();
+				return [`model ${this.currentModel ?? "default"}`, `mode ${this.currentMode ?? "default"}`, auth.loggedIn ? `signed in (${auth.label})` : "not signed in"];
+			},
+		};
 	}
 
 	/** Sign out, the same way: the CLI's own `auth logout`, outside the session. */
@@ -1044,13 +1036,8 @@ export class ClaudeBackend implements AgentBackend {
 	/**
 	 * Tag each user message with the session message it became.
 	 *
-	 * The same shape as Pi's, and for the same reason: the ids are what a rewind, a fork
-	 * and a board restore are addressed to. Walked from the end because the transcript in
-	 * memory is a capped tail, so the two sequences share a *suffix* — pairing from the
-	 * start would line the oldest message up against one from the middle.
-	 *
-	 * Stops at the first disagreement, which costs one message its rewind affordance and
-	 * is the right way to be wrong.
+	 * The ids are what a rewind, a fork and a board restore are addressed to; the walk is
+	 * every runtime's (`agents/entries.ts`), and what is Claude's own is reading the entries.
 	 */
 	async syncEntryIds(): Promise<void> {
 		if (!this.sessionId) return;
@@ -1070,17 +1057,10 @@ export class ClaudeBackend implements AgentBackend {
 		 * left the second message onwards with no rewind, fork or restore.
 		 */
 		const entries = messages.filter((message) => message.type === "user" && isTyped(message.message));
-		const items = this.context.translator.userMessages();
-
-
-		for (let offset = 1; offset <= Math.min(entries.length, items.length); offset += 1) {
-			const entry = entries[entries.length - offset];
-			const item = items[items.length - offset];
-			if (!entry || !item) break;
-			if (item.entryId === entry.uuid) continue;
-			if (!sentAs((entry.message as { content?: unknown } | undefined)?.content, item.text)) break;
-			this.context.translator.tagUser(item.id, entry.uuid);
-		}
+		pairUserEntries(
+			this.context.translator,
+			entries.map((entry) => ({ id: entry.uuid, content: (entry.message as { content?: unknown } | undefined)?.content })),
+		);
 	}
 
 	/**
@@ -1092,22 +1072,7 @@ export class ClaudeBackend implements AgentBackend {
 	 * from the side that has both halves.
 	 */
 	timeline(): ConversationPoint[] {
-		return this.context.translator
-			.userMessages()
-			.filter((item) => item.entryId)
-			.map((item) => ({ id: item.entryId as string, at: item.at }));
-	}
-
-	/**
-	 * Nothing recorded, on purpose.
-	 *
-	 * Pi writes a `board-rev` entry per write, which names the exact revision a board was
-	 * at. Claude has no custom-entry API, and `App.boardsAt` already falls back to the
-	 * revision store's own timestamps — the same answer, except where two writes share a
-	 * second. An empty map is how that fallback is asked for.
-	 */
-	revisionsAt(): Record<string, string> {
-		return {};
+		return translatorTimeline(this.context.translator);
 	}
 
 	/**

@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { helpText, mergeCommands, parseSlash, sameCommands } from "./slash.ts";
+import type { SlashCommand } from "@decks/protocol";
+import { deckSlash, mergeCommands, parseSlash, sameCommands } from "./slash.ts";
+
+/** What `/help` says for a menu, as the deck answers it. */
+async function helpText(commands: SlashCommand[]): Promise<string> {
+	let said = "";
+	await deckSlash("help", { notice: (_level, text) => void (said = text) }, { runtime: "test", commands: () => commands });
+	return said;
+}
 
 test("a slash prompt is a command with its argument", () => {
 	assert.deepEqual(parseSlash("/login"), { name: "login", args: "" });
@@ -59,8 +67,8 @@ test("a menu is unchanged when the names, hints and arguments are", () => {
 	assert.equal(sameCommands([{ name: "a" }], [{ name: "a" }, { name: "b" }]), false);
 });
 
-test("help describes the deck's own and only names the runtime's", () => {
-	const text = helpText([
+test("help describes the deck's own and only names the runtime's", async () => {
+	const text = await helpText([
 		{ name: "login", hint: "Sign in", source: "deck" },
 		{ name: "doctor", hint: "Check the install", source: "runtime" },
 		{ name: "review", hint: "Review the branch", source: "runtime" },
@@ -73,6 +81,22 @@ test("help describes the deck's own and only names the runtime's", () => {
 	assert.doesNotMatch(text, /Check the install/);
 });
 
-test("help on an empty menu says so", () => {
-	assert.equal(helpText([]), "No commands.");
+test("help on an empty menu says so", async () => {
+	assert.equal(await helpText([]), "No commands.");
+});
+
+test("the deck answers its own commands the same way on every runtime, and hands the rest back", async () => {
+	const notices: string[] = [];
+	let usage = 0;
+	const context = { notice: (_level: string, text: string) => void notices.push(text), showUsage: () => void (usage += 1) };
+	const facts = { runtime: "opencode", commands: () => [{ name: "cost", hint: "Usage", source: "deck" as const }], status: () => ["model a/b", undefined, "session s1"] };
+	assert.equal(await deckSlash("cost", context, facts), true);
+	assert.equal(usage, 1);
+	assert.equal(await deckSlash("status", context, facts), true);
+	assert.equal(notices.at(-1), "opencode · model a/b · session s1");
+	assert.equal(await deckSlash("help", context, facts), true);
+	assert.equal(notices.at(-1), "/cost: Usage");
+	// No `models` fact: not the deck's on this runtime, so the runtime answers it.
+	assert.equal(await deckSlash("models", context, facts), false);
+	assert.equal(await deckSlash("compact", context, facts), false);
 });

@@ -4,8 +4,8 @@ import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
 import { agentBriefing } from "../../agents/context.ts";
-import { sentAs } from "../../agents/sent-as.ts";
-import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
+import { deckSlash, mergeCommands, parseSlash, type DeckSlashFacts } from "../../agents/slash.ts";
+import { pairUserEntries, translatorTimeline } from "../../agents/entries.ts";
 import { DEFAULT_THINKING } from "@decks/protocol";
 import { OpencodeStream } from "./events.ts";
 import { rankedVariants, variantFor } from "./variants.ts";
@@ -372,26 +372,31 @@ export class OpencodeBackend implements AgentBackend {
 		}
 	}
 
+	/** What `/status`, `/models` and `/help` say for opencode. */
+	private slashFacts(): DeckSlashFacts {
+		return {
+			runtime: "opencode",
+			commands: () => this.commands(),
+			status: () => {
+				const level = this.currentVariant();
+				return [
+					`model ${this.currentModel ? `${this.currentModel.provider}/${this.currentModel.model}` : "default"}`,
+					`mode ${this.currentMode}`,
+					level ? `level ${level}` : undefined,
+					this.url,
+					`session ${this.sessionId ?? "none"}`,
+				];
+			},
+			models: () =>
+				this.available.length === 0
+					? "No models. Sign a provider in with `opencode auth login` in a terminal, then start a new chat."
+					: this.available.map((option) => `${option.provider}/${option.model}: ${option.label}`).join("\n"),
+		};
+	}
+
 	private async runSlash(name: string, args: string): Promise<void> {
 		const { notice } = this.context;
 		switch (name) {
-			case "cost":
-				this.context.showUsage?.();
-				return;
-			case "models":
-				notice(
-					"info",
-					this.available.length === 0
-						? "No models. Sign a provider in with `opencode auth login` in a terminal, then start a new chat."
-						: this.available.map((option) => `${option.provider}/${option.model}: ${option.label}`).join("\n"),
-				);
-				return;
-			case "status":
-				notice(
-					"info",
-					`opencode · model ${this.currentModel ? `${this.currentModel.provider}/${this.currentModel.model}` : "default"} · mode ${this.currentMode} · ${this.currentVariant() ? `variant ${this.currentVariant()} · ` : ""}${this.url} · session ${this.sessionId ?? "none"}`,
-				);
-				return;
 			case "compact":
 				// As opencode2 does: no session, nothing to summarise; a failed summary must not leave the chat busy.
 				if (!this.sessionId) return;
@@ -401,10 +406,9 @@ export class OpencodeBackend implements AgentBackend {
 					notice("warn", `Could not summarise: ${error.message}`);
 				});
 				return;
-			case "help":
-				notice("info", helpText(this.commands()));
-				return;
 			default:
+				// `/cost`, `/models`, `/status` and `/help` are the deck's, answered as on every runtime (`agents/slash.ts`).
+				if (await deckSlash(name, this.context, this.slashFacts())) return;
 				// opencode's own. Handed over as a prompt, which is how its core parses a
 				// command out of one — the same bargain the pi backend makes.
 				this.streamingNow = true;
@@ -553,32 +557,15 @@ export class OpencodeBackend implements AgentBackend {
 		} catch {
 			return;
 		}
-		const items = this.context.translator.userMessages();
-		for (let offset = 1; offset <= Math.min(entries.length, items.length); offset += 1) {
-			const entry = entries[entries.length - offset];
-			const item = items[items.length - offset];
-			if (!entry || !item) break;
-			if (item.entryId === entry.id) continue;
-			if (!sentAs(entry.text, item.text)) break;
-			this.context.translator.tagUser(item.id, entry.id);
-		}
+		pairUserEntries(
+			this.context.translator,
+			entries.map((entry) => ({ id: entry.id, content: entry.text })),
+		);
 	}
 
 	/** The points worth returning to: the user's messages that `syncEntryIds` paired. */
 	timeline(): ConversationPoint[] {
-		return this.context.translator
-			.userMessages()
-			.filter((item) => item.entryId)
-			.map((item) => ({ id: item.entryId as string, at: item.at }));
-	}
-
-	/**
-	 * Nothing recorded, as for Claude and OpenCode 2: opencode has no entry Decks can write a
-	 * board revision into, and `App.boardsAt` falls back to the revision store's own times,
-	 * which is how an empty map asks for it.
-	 */
-	revisionsAt(): Record<string, string> {
-		return {};
+		return translatorTimeline(this.context.translator);
 	}
 
 	/**
