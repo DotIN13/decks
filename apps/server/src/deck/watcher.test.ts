@@ -119,8 +119,9 @@ test("the revision store is not watched, or every save would loop", async () => 
 	try {
 		put(join(root, ".decks", "revisions", "index.json"), "{}");
 		put(join(root, "canvases", "t", "cards", "b", "index.html"), board(800));
-		// The board is the thing that proves the watcher was listening at all.
-		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/b/index.html")));
+		// The board is the thing that proves the watcher was listening at all; under load the watcher may
+		// say "look at everything" (a rescan) instead, as in the test above.
+		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/b/index.html") || seen.some((c) => c.kind === "rescan")));
 		assert.deepEqual(
 			// The probe that proved the watcher listening (`watching`) may still be heard late.
 			changes.filter((c) => c.kind === "asset").map((c) => c.path).filter((path) => path !== "probe.txt"),
