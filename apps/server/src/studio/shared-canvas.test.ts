@@ -72,7 +72,9 @@ function harness(url: string, key: string) {
 	} };
 }
 
-const until = async (test: () => boolean, ms = 4000) => {
+// The deadline only matters when the change never comes: a round trip through Studio under a full
+// test run took longer than 4 s, and the test failed though the sync was right.
+const until = async (test: () => boolean, ms = 15_000) => {
 	const deadline = Date.now() + ms;
 	while (Date.now() < deadline) {
 		if (test()) return true;

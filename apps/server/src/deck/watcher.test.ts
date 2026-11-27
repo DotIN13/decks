@@ -24,7 +24,11 @@ function board(w: number): string {
 }
 
 /** Wait for the changes to satisfy `done`, or give up. Real events, so real time. */
-async function until(changes: DeckChange[], done: (seen: DeckChange[]) => boolean, ms = 4000): Promise<boolean> {
+/**
+ * Wait for what a check expects. The deadline only matters when it never comes: under a full test run a
+ * new folder's first file was heard after more than 4 s, and the check failed though the watcher was right.
+ */
+async function until(changes: DeckChange[], done: (seen: DeckChange[]) => boolean, ms = 15_000): Promise<boolean> {
 	const deadline = Date.now() + ms;
 	while (Date.now() < deadline) {
 		if (done(changes)) return true;
@@ -118,7 +122,8 @@ test("the revision store is not watched, or every save would loop", async () => 
 		// The board is the thing that proves the watcher was listening at all.
 		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/b/index.html")));
 		assert.deepEqual(
-			changes.filter((c) => c.kind === "asset").map((c) => c.path),
+			// The probe that proved the watcher listening (`watching`) may still be heard late.
+			changes.filter((c) => c.kind === "asset" && c.path !== "probe.txt").map((c) => c.path),
 			[],
 		);
 	} finally {
