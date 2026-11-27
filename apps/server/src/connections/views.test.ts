@@ -12,7 +12,7 @@ import { Deck } from "../deck/loader.ts";
 import { realPathOf } from "../deck/roots.ts";
 import type { CanvasService } from "../canvas/service.ts";
 import { runVerb } from "../calls/run.ts";
-import type { View } from "../calls/person-table.ts";
+import type { View } from "../calls/person-call.ts";
 import { greet } from "./greeting.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */

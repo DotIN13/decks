@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import type { CanvasService, WebTarget } from "../canvas/service.ts";
-import type { AgentHooks } from "./tool.ts";
+import type { AgentHooks } from "../agents/hooks.ts";
 
 /**
  * What every verb's handler is given: the stage service, the caller's hooks, and the helpers the

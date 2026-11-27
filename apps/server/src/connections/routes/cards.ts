@@ -7,7 +7,7 @@ import { canvasOfPath, isCardPath, isSharedCanvas } from "@decks/hub/layout";
 import { libVersion, versionLibRefs } from "../../deck/lib-version.ts";
 import { NotFound, PathRefused, resolveServed } from "../../deck/roots.ts";
 import { boardHeaders } from "../../files/serve.ts";
-import type { App } from "../../app.ts";
+import type { Deck } from "../../deck/loader.ts";
 
 /**
  * A card's two answers under `/api/card/*path` (`card-path.ts`): one of its scripts, and its page.
@@ -19,7 +19,7 @@ import type { App } from "../../app.ts";
  * imports resolve from its folder (`cards/cards.ts`). A friend's card runs none: the stage cleans
  * them out, and none is served either.
  */
-export async function cardModuleAnswer(app: App, asked: string, requested: string, res: Response): Promise<boolean> {
+export async function cardModuleAnswer(app: { readonly deck: Deck }, asked: string, requested: string, res: Response): Promise<boolean> {
 	const cardModule = /^(.+\.html?)\.m(\d+)\.js$/i.exec(requested);
 	if (!cardModule || !isCardPath(cardModule[1]!)) return false;
 	const file = resolveServed(app.deck.path, cardModule[1]!);
@@ -34,7 +34,7 @@ export async function cardModuleAnswer(app: App, asked: string, requested: strin
 }
 
 /** A card opened by itself, or pictured: the piece in a page of its own (`cards/cards.ts`). */
-export async function cardPageAnswer(app: App, asked: string, requested: string, target: string, board: Page | undefined, raw: boolean, res: Response): Promise<boolean> {
+export async function cardPageAnswer(app: { readonly deck: Deck }, asked: string, requested: string, target: string, board: Page | undefined, raw: boolean, res: Response): Promise<boolean> {
 	if (raw || !isCardPath(requested)) return false;
 	const shared = isSharedCanvas(canvasOfPath(asked)?.name ?? "");
 	const mapFile = resolveServed(app.deck.path, "assets/importmap.json");

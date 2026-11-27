@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import type { Request, Response, Router } from "express";
 import { createMcp, type McpSession } from "@decks/sdk/mcp";
 import VERBS from "@decks/sdk/verbs.json" with { type: "json" };
-import type { App } from "../../app.ts";
 import { actsAsPerson, type Principal } from "../../auth/principal.ts";
+import type { CallsHost } from "../../calls/host.ts";
+import type { PersonHost } from "../../calls/person-table.ts";
 import { runVerb } from "../../calls/run.ts";
 
 /**
@@ -34,8 +35,11 @@ interface Session {
 	used: number;
 }
 
-/** One MCP door, answered at `/mcp` on each router given: the sessions are the door's, whichever address a request came by. */
-export function registerMcp(routers: Router[], deps: { app: App }): void {
+/**
+ * One MCP door, answered at `/mcp` on each router given: the sessions are the door's, whichever address a request came by.
+ * Given what a verb runs on (`calls/run.ts`): the agents and canvases a session joins are among those parts.
+ */
+export function registerMcp(routers: Router[], deps: { app: CallsHost & PersonHost }): void {
 	const { app } = deps;
 	const sessions = new Map<string, Session>();
 	const sweep = setInterval(() => {

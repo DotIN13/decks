@@ -1,6 +1,7 @@
 import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { CanvasPens } from "../canvas/pens.ts";
+import { personToolOf } from "./agent-tools.ts";
 
 /**
  * Whose stage the person's click acts on.
@@ -32,7 +33,7 @@ export async function asPerson(
 	args: unknown[],
 	reply: (message: { type: "harness.notice"; level: "warn"; text: string }) => void,
 ): Promise<boolean> {
-	const answer = await personAgent(context, asked).personTool().call(verb, args);
+	const answer = await personToolOf(personAgent(context, asked)).call(verb, args);
 	if (!answer.ok) reply({ type: "harness.notice", level: "warn", text: answer.error ?? `${verb} failed` });
 	return answer.ok;
 }

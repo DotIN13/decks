@@ -3,7 +3,8 @@ import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { CanvasService } from "../canvas/service.ts";
 import type { CallsHost } from "./host.ts";
-import { createDecksTool, type AgentHooks, type DecksTool } from "./tool.ts";
+import type { AgentHooks } from "../agents/hooks.ts";
+import { createDecksTool, type DecksTool } from "./tool.ts";
 
 /**
  * An app as a caller: the calls its own code makes, once the person has let it (`calls/caller.ts`).

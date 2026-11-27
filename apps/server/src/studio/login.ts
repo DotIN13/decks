@@ -65,7 +65,7 @@ export function studioAddress(url: string | undefined, env: NodeJS.ProcessEnv = 
 }
 
 /** Whether an origin is this machine's own, by loopback: where Studio may send a tab back to. */
-export function isLoopbackOrigin(origin: string | undefined): origin is string {
+function isLoopbackOrigin(origin: string | undefined): origin is string {
 	try {
 		const url = new URL(origin ?? "");
 		return url.protocol === "http:" && url.port !== "" && (url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]");

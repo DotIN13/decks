@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Identity, MessagePart, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { CanvasService } from "../canvas/service.ts";
-import { createDecksTool, type DecksTool } from "../calls/tool.ts";
+import type { AgentHooks, StageToolSpec, ToolBriefing } from "./hooks.ts";
+import { GUIDELINES } from "./guidelines.ts";
 import { PERSON, type CreateSpec, type QueuedWork, type SendSpec, type CanvasSnapshot } from "./work.ts";
 import type { AgentStateStore } from "./agent-state.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
@@ -44,9 +45,6 @@ export class DeckAgent {
 	readonly seat: Seat;
 	readonly turns: Turns;
 	readonly inbox: Inbox;
-
-	private tool: DecksTool | undefined;
-	private personal: DecksTool | undefined;
 
 	private identity: Identity;
 
@@ -311,7 +309,7 @@ export class DeckAgent {
 					} else this.turns.wentBusy();
 				},
 				acted: (event) => host.act?.(this.id, { kind: "tool", event }),
-				tool: () => this.stageTool(),
+				tool: () => this.briefing(),
 				hooks: () => this.stageHooks(),
 				opened: (name) => {
 					if (name) this.identity = { ...this.identity, name };
@@ -410,7 +408,7 @@ export class DeckAgent {
 	}
 
 	/** What the canvas extension is allowed to reach on this agent (§6.2). */
-	private stageHooks() {
+	private stageHooks(): AgentHooks {
 		return {
 			id: this.id,
 			identity: () => this.identity,
@@ -538,29 +536,25 @@ export class DeckAgent {
 	}
 
 	/**
-	 * This agent's stage tool: the `stage` its code runs against, and what `/api/v1/<verb>` calls
-	 * when a request names this agent (`calls/caller.ts`). Made once and kept, so a verb called
-	 * over HTTP before the agent's first turn acts on the same stage its turns will.
+	 * What this agent's stage tools are made from (`calls/agent-tools.ts` makes each once and keeps it).
+	 *
+	 * - `agent`: the `stage` its code runs against, and what `/api/v1/<verb>` calls when a request
+	 *   names this agent (`calls/caller.ts`). Each run is recorded, so a rewind can put the canvas back
+	 *   to what it was at that point and a fork can inherit it (§6.2).
+	 * - `person`: the person acting on this agent's stage from the browser (`calls/person.ts`): the
+	 *   same verbs, and the same stage, with the person as the one who acted, so nothing they do draws
+	 *   this agent's cursor or counts as its work.
 	 */
-	stageTool(): DecksTool {
-		this.tool ??= createDecksTool({
-			stage: this.stage,
-			agent: this.stageHooks(),
-			port: this.host.port,
-			// Recorded after every run, so a rewind can put the canvas back to what it was
-			// at that point and a fork can inherit it (§6.2).
-			persist: (snapshot) => this.snapshots.record(this.id, snapshot),
-		});
-		return this.tool;
-	}
-
-	/**
-	 * The stage tool for the person, acting on this agent's stage from the browser (`calls/person.ts`):
-	 * the same verbs, and the same stage, with the person as the one who acted, so nothing they do
-	 * draws this agent's cursor or counts as its work.
-	 */
-	personTool(): DecksTool {
-		this.personal ??= createDecksTool({
+	toolSpec(who: "agent" | "person"): StageToolSpec {
+		if (who === "agent") {
+			return {
+				stage: this.stage,
+				agent: this.stageHooks(),
+				port: this.host.port,
+				persist: (snapshot) => this.snapshots.record(this.id, snapshot),
+			};
+		}
+		return {
 			stage: this.stage,
 			agent: {
 				...this.stageHooks(),
@@ -580,8 +574,12 @@ export class DeckAgent {
 				},
 			},
 			port: this.host.port,
-		});
-		return this.personal;
+		};
+	}
+
+	/** What a backend's briefing says of the tool: the guidelines, and whether a tab is shared now. */
+	private briefing(): ToolBriefing {
+		return { guidelines: GUIDELINES, webShared: () => this.stage.web?.status().paired === true };
 	}
 
 	/**

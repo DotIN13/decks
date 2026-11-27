@@ -468,7 +468,7 @@ export class Registry {
 
 	/**
 	 * Move the focus without saying so: nothing is published, since each page keeps its own
-	 * conversation (`calls/person-table.ts`'s `View`). An id that is gone is ignored, and the
+	 * conversation (`calls/person-call.ts`'s `View`). An id that is gone is ignored, and the
 	 * last focus stands.
 	 */
 	look(id: string | undefined): void {

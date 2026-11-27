@@ -1,5 +1,5 @@
 import type { DeckState, ServerMessage } from "@decks/protocol";
-import type { View } from "../calls/person-table.ts";
+import type { View } from "../calls/person-call.ts";
 
 /**
  * What is said to the pages: every change the harness makes, to everyone who is listening.

@@ -1,12 +1,9 @@
 import { identityReminder } from "../agents/identity-reminder.ts";
 import { canvasNameReminder } from "../canvas/canvas-name.ts";
-import { existsSync, readFileSync } from "node:fs";
-import type { ActBox, ActKind, AgentKind, AgentState, Camera, Identity } from "@decks/protocol";
-import { guidelinesFile } from "@decks/runtime";
 import type { Verbs as Stage } from "@decks/sdk";
-import type { CreateSpec, QueuedWork, SendSpec, CanvasSnapshot } from "../agents/work.ts";
+import type { StageToolSpec } from "../agents/hooks.ts";
+import type { CanvasSnapshot } from "../agents/work.ts";
 import { penWriter } from "../canvas/pens.ts";
-import type { CanvasService } from "../canvas/service.ts";
 import { inCall, verbContext } from "./context.ts";
 import { appsVerbs } from "./apps.ts";
 import { webVerbs } from "./web.ts";
@@ -29,102 +26,12 @@ import { gestures, type Gestures } from "./gestures.ts";
  * words of its own about what a board is for.
  */
 
-export interface AgentHooks {
-	id: string;
-	identity(): Identity;
-	context(): string[];
-	inPlay(): string[];
-	/**
-	 * Put exactly these boards on the stage. `at` names where joining ones go, top-left corner,
-	 * and is kept as given; any other joining board is placed beside the stage's newest.
-	 */
-	setInPlay(paths: string[], at?: Record<string, { x: number; y: number }>): void;
-	/** Where this stage has put its boards. Optional so a host that does not arrange can omit it. */
-	positions?(): Record<string, { x: number; y: number }>;
-	setPosition?(path: string, x: number, y: number): void;
-	rename(name: string): void;
-	setAvatar(url: string): void;
-	/** Replaces the agent's own tags and returns them as stored — see `agents/tags.ts`. */
-	setTags(tags: unknown): string[];
-	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
-	setWorkspace(workspace: unknown): string | null;
-	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; stage?: string; avatar?: string; outside?: { client: string; seen: number; waiting: number } }>;
-	/** Where the browser last said it was looking. */
-	camera(): Camera;
-	/** Queue work for an agent that already exists, and return without waiting. */
-	send(target: string, spec: SendSpec): { queued: true; position: number };
-	/** Make an agent and return at once; optional so a host with no registry can omit it. */
-	create?(spec: CreateSpec): Promise<{ agent: string; name: string; kind?: AgentKind; model?: string; thinking?: string; mode?: string; canvas?: string }>;
-	/** What is waiting for an agent — this one, unless another is named. */
-	queue(agentId?: string): QueuedWork[];
-	/**
-	 * Store the board's current bytes as a revision and return its id.
-	 *
-	 * Called right after a write, so the session can record *which* version of a
-	 * board existed at that point in the conversation (§6.7). Idempotent: the same
-	 * bytes are the same revision.
-	 */
-	recordRevision(path: string): string | undefined;
-	/** What waits for the caller: its messages (taken, for an agent that works outside Decks) and its canvases' news. Optional: an app has neither. */
-	news?(): { messages: QueuedWork[]; changes: string[] };
-	/**
-	 * The agent worked on this board: it becomes its writer, and the board joins what the turn
-	 * reports. Called by `decks.card.create`, `decks.canvas.fit` and `decks.agent.claim`. Optional so a host
-	 * with no deck record (an app) can leave it out.
-	 */
-	worked?(path: string): void;
-	/** The agent acted on a board with a stage verb: the canvas draws its cursor there (`agents/acts.ts`). */
-	acted?(what: ActKind, path: string): void;
-	/**
-	 * The agent sized a board (`decks.canvas.fit`, `decks.canvas.update` with a size): the size goes to its own stage, in the stage file,
-	 * which is the one record of how big a board is drawn there (`DeckAgent.setSize`).
-	 */
-	sized?(path: string, size: { w: number; h: number }): void;
-	/** The agent edited its stage's drawing: the canvas outlines what it touched (`agents/acts.ts`). */
-	drew?(stage: string, ids: string[], boxes: ActBox[]): void;
-	/** Deck-relative path for an absolute one, or undefined if it is not a board. */
-	boardPathOf(file: string): string | undefined;
-	/** The folder this agent's stage drawing lives in, named on first use (`canvas/pens.ts`). Optional for hosts with no drawing. */
-	stageName?(): string | undefined;
-	/** Set when the caller is an app's own code (`calls/app-caller.ts`), not an agent: the app's name. */
-	app?: string;
-	/**
-	 * Set when the caller is the person, in the browser, acting on this agent's stage (`calls/person.ts`):
-	 * their change is theirs, so it draws no agent cursor, is undoable, and hears no agent's reminders.
-	 */
-	person?: boolean;
-	/** Work on another stage: its boards become this agent's (`agents/session.ts`). */
-	openStage?(name: string): void;
-	/** Make an empty stage from a title, open it, and return its name. */
-	newStage?(title: string): string;
-	/**
-	 * The canvas this caller is on when a call names none (`decks.here()`), where that is not its own
-	 * stage: an app is on a canvas that shows it. Left out, it is `stageName()`.
-	 */
-	here?(): string | undefined;
-	/** Deliver a message now: steer the running turn, start one, or queue it (`agent.send`). */
-	deliver?(target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
-	/** Wait until another agent's work is done (`agent.wait`): its turn over, nothing queued. */
-	wait?(target: string, timeoutMs: number): Promise<{ name: string; state: AgentState; reply: string; waited: number; timedOut: boolean }>;
-	/** Make another canvas this agent's home (`agent.update({ canvas })`). */
-	setHome?(name: string): void;
-}
-
 export interface DecksTool {
-	/** The guidelines appended to every agent's context (`runtime/guidelines.txt`). */
-	readonly guidelines: string[];
 	/**
 	 * The `stage` object the verbs act through, bound to this caller: an agent, the person, or an
 	 * app acting for a conversation (`calls/app-caller.ts`).
 	 */
 	readonly stage: Stage;
-	/**
-	 * Whether the person is sharing a tab right now.
-	 *
-	 * The backends ask before they write the deck context, because the browser's thirteen
-	 * verbs are only described to an agent that can use them (`agents/context.ts`).
-	 */
-	webShared(): boolean;
 	/**
 	 * Call one verb by its name in the verb table (`canvas.move`, `canvas.batch`); an old name is refused with its new call, with its arguments as a list.
 	 *
@@ -147,30 +54,7 @@ export interface CallResult {
 	images?: Array<{ data: string; mimeType: string }>;
 }
 
-/** What an agent is told when `runtime/guidelines.txt` is missing: the one rule the rest hang from. */
-const BUILT_IN_GUIDELINES = [
-	"Answer on the canvas: draw designs, maps and diagrams with decks canvas batch (the canvas-design skill); write an HTML card for demos and interactive mockups (decks card create, write/edit, decks canvas insert, decks canvas fit); build an app for a reusable tool. decks view focus shows it.",
-];
-
-/**
- * The guidelines an agent is given: `runtime/guidelines.txt` when there is one, a line each,
- * and the list above when there is not. A file for the reason the description is one: the
- * words can then be changed, and tried in variants, without touching this module.
- */
-function guidelines(): string[] {
-	const file = guidelinesFile();
-	if (!existsSync(file)) return BUILT_IN_GUIDELINES;
-	return readFileSync(file, "utf8").split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
-}
-const GUIDELINES = guidelines();
-
-export function createDecksTool(deps: {
-	stage: CanvasService;
-	agent: AgentHooks;
-	port: number;
-	/** Where the snapshot goes after every run, so a resume or a rewind can restore it. */
-	persist?: (snapshot: CanvasSnapshot) => void;
-}): DecksTool {
+export function createDecksTool(deps: StageToolSpec): DecksTool {
 	const { stage: service, agent, port } = deps;
 	const ctx = verbContext({ stage: service, agent, port });
 
@@ -203,10 +87,8 @@ export function createDecksTool(deps: {
 	});
 
 	return {
-		guidelines: GUIDELINES,
 		stage,
 		snapshot,
-		webShared: () => service.web?.status().paired === true,
 
 		async gesture(name, args) {
 			return inCall(undefined, async (frame) => {

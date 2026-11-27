@@ -11,7 +11,7 @@ import { runVerb } from "../calls/run.ts";
 import { createHttpApp } from "../connections/http.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { Addresses } from "./addresses.ts";
-import { isLoopbackOrigin, studioAddress, StudioLogin, type SignedIn } from "./login.ts";
+import { studioAddress, StudioLogin, type SignedIn } from "./login.ts";
 
 /*
  * The harness signs in to Studio itself, the way Claude Code signs in: it keeps a secret and opens
@@ -82,8 +82,14 @@ test("Studio's address is an http or https origin, the usual one unless said, an
 	assert.equal(studioAddress(" https://studio.example.com/connect?x=1 ", {}), "https://studio.example.com");
 	assert.throws(() => studioAddress("studio.example.com", {}), /http or https/);
 	assert.throws(() => studioAddress("ftp://studio.example.com", {}), /http or https/);
-	for (const here of ["http://127.0.0.1:4329", "http://localhost:4329", "http://[::1]:4329"]) assert.ok(isLoopbackOrigin(here), here);
-	for (const away of ["https://mac.tail1.ts.net:8443", "http://192.168.1.4:4329", "https://127.0.0.1:4329", "http://127.0.0.1", "", undefined, "nope"]) assert.ok(!isLoopbackOrigin(away), String(away));
+	const login = new StudioLogin({ name: () => "Mac mini", signedIn: () => {}, changed: () => {} });
+	const sentBack = (back: string | undefined) => new URL(login.start("https://studio.example.com", back).url).searchParams.has("redirect");
+	try {
+		for (const here of ["http://127.0.0.1:4329", "http://localhost:4329", "http://[::1]:4329"]) assert.ok(sentBack(here), here);
+		for (const away of ["https://mac.tail1.ts.net:8443", "http://192.168.1.4:4329", "https://127.0.0.1:4329", "http://127.0.0.1", "", undefined, "nope"]) assert.ok(!sentBack(away), String(away));
+	} finally {
+		login.stop();
+	}
 });
 
 test("on this machine: the address to open carries only the secret's hash and where to come back, and the tab coming back is traded once, for the sign-in this harness started", async () => {
