@@ -7,6 +7,7 @@ import { GoogleView } from "./gview.ts";
 import { getLocale, m } from "@decks/i18n";
 import { pageDom, type PageContext, type PageHooks, type View } from "./context.ts";
 import { addStyle } from "./style.ts";
+import { mountComments } from "./comments.ts";
 import { mountGit } from "./git.ts";
 import { mountGoogle } from "./google.ts";
 import { mountHistory } from "./history.ts";
@@ -55,24 +56,11 @@ interface DocPage {
 	destroy(): void;
 }
 
-/** A comment on a Google Doc, as Drive answers it. */
-interface GComment {
-	id: string;
-	content: string;
-	author?: { displayName?: string; me?: boolean };
-	createdTime?: string;
-	quotedFileContent?: { value?: string };
-	replies?: Array<{ id: string; content?: string; author?: { displayName?: string }; createdTime?: string }>;
-}
-
 export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPage {
 	addStyle();
 	const dom = pageDom(host, options.path);
 	const { name, status, changesButton, commentsButton, pdfButton, sourceButton, historyButton, main, scroll, text, panel, old, pill } = dom;
 
-	/** A Google Doc's open comments, from Drive, or why they cannot be shown. */
-	let comments: GComment[] = [];
-	let commentsError = "";
 	const urls = new Map<string, Promise<string | undefined>>();
 	const pictures = new Map<string, Promise<string | undefined>>();
 	const near = (src: string) => (src.startsWith("/") ? src : `${dir(sync.path)}/${decodeURI(src)}`);
@@ -155,7 +143,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	scroll.append(live.root, reading.root, gview.root, old);
 	reading.root.hidden = true;
 	gview.root.hidden = true;
-	const cleanups = [mountTools(ctx), mountSource(ctx), mountPdf(ctx), mountGit(ctx), mountGoogle(ctx), mountHistory(ctx)];
+	const cleanups = [mountTools(ctx), mountSource(ctx), mountPdf(ctx), mountGit(ctx), mountGoogle(ctx), mountHistory(ctx), mountComments(ctx)];
 	const { isGoogle, isWord, isTex } = ctx;
 
 	// --- what changed ---------------------------------------------------------------------
@@ -174,7 +162,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			ctx.hooks.drawGoogle();
 			// A Doc's text is its indices, not something to read as source.
 			sourceButton.hidden = isGoogle();
-			drawCommentsButton();
+			ctx.hooks.drawCommentsButton();
 			if (isGoogle() && ctx.mode === "source") ctx.mode = "page";
 			ctx.hooks.buildTools();
 			live.reset();
@@ -233,7 +221,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		panel.hidden = ctx.view === "none";
 		if (ctx.view !== "history") ctx.hooks.closeVersion();
 		if (ctx.view === "changes") drawChanges();
-		if (ctx.view === "comments") drawComments();
+		if (ctx.view === "comments") ctx.hooks.drawComments();
 		if (ctx.view === "history") {
 			panel.replaceChildren(header(m.docs_history()), el("p", { class: "dp-empty" }, m.docs_reading()));
 			sync.versions();
@@ -291,112 +279,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			panel.append(item);
 		}
 	}
-
-	// --- a Google Doc's comments, kept by Drive ---------------------------------------------------
-
-	function drawCommentsButton(): void {
-		commentsButton.hidden = !isGoogle();
-		const n = comments.length;
-		commentsButton.innerHTML = `${svg("comment")}<span>${m.docs_comments()}</span>${n ? `<span class="dp-count dp-count-soft">${n}</span>` : ""}`;
-	}
-
-	function sendComment(action: "create" | "reply" | "resolve", fields: { comment?: string; content?: string; quote?: string }): void {
-		options.send({ type: "doc.gcomment", path: sync.path, client: sync.client, action, ...fields });
-	}
-
-	/** A new comment on the selected words: the panel opens with a box for it at the top. */
-	let drafting: string | undefined;
-	function newComment(): void {
-		const quote = gview.quote();
-		if (!quote) return;
-		drafting = quote;
-		if (ctx.view !== "comments") show("comments");
-		else drawComments();
-	}
-
-	function drawComments(): void {
-		const parts: HTMLElement[] = [header(m.docs_comments())];
-		if (commentsError) {
-			parts.push(el("p", { class: "dp-empty" }, commentsError));
-			if (ctx.hooks.remoteStatus()?.paste !== undefined || options.api) parts.push(...ctx.hooks.signInParts());
-		}
-		if (drafting !== undefined) {
-			const box = el("div", { class: "dp-comment dp-comment-new" });
-			box.append(el("div", { class: "dp-quote" }, clip(drafting, 120)));
-			const input = el("textarea", { class: "dp-reply", rows: "3", placeholder: m.docs_comment() });
-			const post = el("button", { type: "button", class: "dp-btn dp-sm dp-primary" }, m.docs_comment());
-			const cancel = el("button", { type: "button", class: "dp-btn dp-sm" }, m.docs_cancel());
-			post.onclick = () => {
-				if (!input.value.trim()) return;
-				sendComment("create", { content: input.value.trim(), quote: drafting });
-				drafting = undefined;
-				drawComments();
-			};
-			cancel.onclick = () => {
-				drafting = undefined;
-				drawComments();
-			};
-			const acts = el("div", { class: "dp-comment-acts" });
-			acts.append(cancel, post);
-			box.append(input, acts);
-			parts.push(box);
-			setTimeout(() => input.focus(), 0);
-		}
-		if (!commentsError && comments.length === 0 && drafting === undefined) parts.push(el("p", { class: "dp-empty" }, m.docs_no_comments()));
-		for (const c of comments) {
-			const card = el("div", { class: "dp-comment", "data-comment": c.id });
-			const who = (a: GComment["author"], at?: string) => {
-				const row = el("div", { class: "dp-who" });
-				row.append(el("span", { class: "dp-av" }, initial(a?.displayName ?? "?")), el("b", {}, a?.displayName ?? m.docs_someone()), at ? new Date(at).toLocaleString(getLocale(), { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
-				return row;
-			};
-			const head = who(c.author, c.createdTime);
-			const resolve = iconButton("check", m.docs_resolve(), "dp-ib dp-sm dp-yes");
-			resolve.onclick = (event) => {
-				event.stopPropagation();
-				sendComment("resolve", { comment: c.id, content: "" });
-			};
-			const acts = el("div", { class: "dp-acts" });
-			acts.append(resolve);
-			head.append(acts);
-			card.append(head);
-			if (c.quotedFileContent?.value) card.append(el("div", { class: "dp-quote" }, clip(c.quotedFileContent.value, 120)));
-			card.append(el("div", { class: "dp-comment-body" }, c.content));
-			for (const r of c.replies ?? []) {
-				if (!r.content) continue;
-				card.append(who(r.author, r.createdTime), el("div", { class: "dp-comment-body" }, r.content));
-			}
-			const form = el("form", { class: "dp-reply-row" });
-			const input = el("input", { class: "dp-reply", placeholder: m.docs_reply() });
-			form.append(input);
-			form.onsubmit = (event) => {
-				event.preventDefault();
-				if (input.value.trim()) sendComment("reply", { comment: c.id, content: input.value.trim() });
-				input.value = "";
-			};
-			card.append(form);
-			card.onmouseenter = () => hotComment(c.id, true);
-			card.onmouseleave = () => hotComment(c.id, false);
-			card.onclick = (event) => {
-				if ((event.target as HTMLElement).closest("input, button, textarea")) return;
-				gview.page.querySelector(`[data-comment="${c.id}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-			};
-			parts.push(card);
-		}
-		panel.replaceChildren(...parts);
-	}
-
-	function hotComment(id: string, on: boolean): void {
-		for (const node of gview.page.querySelectorAll<HTMLElement>(`[data-comment="${id}"]`)) node.toggleAttribute("data-hot", on);
-	}
-
-	// A click on commented words opens the comment.
-	gview.page.addEventListener("click", (event) => {
-		const id = (event.target as HTMLElement).closest<HTMLElement>("[data-comment]")?.dataset.comment;
-		if (!id) return;
-		if (ctx.view !== "comments") show("comments");
-		panel.querySelector(`[data-comment="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-	});
 
 	function hot(change: string, on: boolean): void {
 		for (const node of (isGoogle() ? gview.page : live.root).querySelectorAll<HTMLElement>(`[data-change="${change}"]`)) node.toggleAttribute("data-hot", on);
@@ -456,14 +338,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	commentsButton.onclick = () => show("comments");
 	changesButton.onclick = () => show("changes");
 
-	ctx.on("doc.gdoc", () => gview.setComments(comments));
-	ctx.on("doc.gcomments", (message) => {
-		comments = message.comments as GComment[];
-		commentsError = message.error ?? "";
-		gview.setComments(comments);
-		drawCommentsButton();
-		if (ctx.view === "comments") drawComments();
-	});
 	Object.assign(ctx.hooks, {
 		updated,
 		refresh,
@@ -472,9 +346,6 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		drawChanges: (onlyIfChanged = false) => {
 			if (!onlyIfChanged || changesDrawn !== changesKey()) drawChanges();
 		},
-		drawComments,
-		drawCommentsButton,
-		newComment,
 	} satisfies Partial<PageHooks>);
 
 	const stop = options.listen((message) => {

@@ -75,11 +75,11 @@ export interface PageHooks {
 	drawShifted(applied: readonly Splice[]): void;
 	/** `page.ts`: draw the Changes panel, or only when the list in it changed. */
 	drawChanges(onlyIfChanged?: boolean): void;
-	/** `page.ts`: draw a Doc's comments panel. */
+	/** `comments.ts`: draw a Doc's comments panel. */
 	drawComments(): void;
-	/** `page.ts`: the Comments button, shown for a Doc, with its count. */
+	/** `comments.ts`: the Comments button, shown for a Doc, with its count. */
 	drawCommentsButton(): void;
-	/** `page.ts`: start a comment on the selected words. */
+	/** `comments.ts`: start a comment on the selected words. */
 	newComment(): void;
 	/** `history.ts`: whether a kept version is shown instead of the page. */
 	isViewing(): boolean;
