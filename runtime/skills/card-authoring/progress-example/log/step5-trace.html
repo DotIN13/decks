@@ -3,16 +3,18 @@
      x = 96 + 390*s/T, width = 390*d/T. Each bar steps down 22 units; leave 10 between lanes. Ticks
      mark 0, T/4 … T. Every number carries its unit (ms here), on the ticks and on each bar. Keep the
      viewBox 600 wide so its 16-unit text reads at 14 px or more. -->
-<svg viewBox="0 0 600 170">
-	<g stroke="var(--b-border)"><line x1="96" x2="96" y1="0" y2="146"/><line x1="194" x2="194" y1="0" y2="146"/><line x1="291" x2="291" y1="0" y2="146"/><line x1="389" x2="389" y1="0" y2="146"/><line x1="486" x2="486" y1="0" y2="146"/></g>
-	<text x="96" y="164" text-anchor="middle">0 ms</text><text x="194" y="164" text-anchor="middle">88 ms</text><text x="291" y="164" text-anchor="middle">177 ms</text><text x="389" y="164" text-anchor="middle">265 ms</text><text x="486" y="164" text-anchor="middle">353 ms</text>
-	<text class="lab" x="0" y="18">Counter</text>
-	<rect x="96" y="4" width="130" height="16" rx="3" fill="hsl(210 60% 52%)"/><text x="232" y="17">read 118 ms</text>
-	<rect x="226" y="26" width="112" height="16" rx="3" fill="hsl(150 60% 45%)"/><text x="344" y="39">split 101 ms</text>
-	<rect x="338" y="48" width="72" height="16" rx="3" fill="hsl(30 70% 52%)"/><text x="416" y="61">count 65 ms</text>
-	<text class="lab" x="0" y="94">dict loop</text>
-	<rect x="96" y="80" width="134" height="16" rx="3" fill="hsl(210 60% 52%)"/><text x="236" y="93">read 121 ms</text>
-	<rect x="230" y="102" width="164" height="16" rx="3" fill="hsl(150 60% 45%)"/><text x="400" y="115">split 148 ms</text>
-	<rect x="393" y="124" width="93" height="16" rx="3" fill="hsl(30 70% 52%)"/><text x="492" y="137">count 84 ms</text>
-</svg>
-<div class="cap">time since the run started, in milliseconds: splitting costs more than counting either way</div>
+<div class="panel">
+	<svg viewBox="0 0 600 170">
+		<g stroke="var(--b-border)"><line x1="96" x2="96" y1="0" y2="146"/><line x1="194" x2="194" y1="0" y2="146"/><line x1="291" x2="291" y1="0" y2="146"/><line x1="389" x2="389" y1="0" y2="146"/><line x1="486" x2="486" y1="0" y2="146"/></g>
+		<text x="96" y="164" text-anchor="middle">0 ms</text><text x="194" y="164" text-anchor="middle">88 ms</text><text x="291" y="164" text-anchor="middle">177 ms</text><text x="389" y="164" text-anchor="middle">265 ms</text><text x="486" y="164" text-anchor="middle">353 ms</text>
+		<text class="lab" x="0" y="18">Counter</text>
+		<rect x="96" y="4" width="130" height="16" rx="3" fill="hsl(210 60% 52%)"/><text x="232" y="17">read 118 ms</text>
+		<rect x="226" y="26" width="112" height="16" rx="3" fill="hsl(150 60% 45%)"/><text x="344" y="39">split 101 ms</text>
+		<rect x="338" y="48" width="72" height="16" rx="3" fill="hsl(30 70% 52%)"/><text x="416" y="61">count 65 ms</text>
+		<text class="lab" x="0" y="94">dict loop</text>
+		<rect x="96" y="80" width="134" height="16" rx="3" fill="hsl(210 60% 52%)"/><text x="236" y="93">read 121 ms</text>
+		<rect x="230" y="102" width="164" height="16" rx="3" fill="hsl(150 60% 45%)"/><text x="400" y="115">split 148 ms</text>
+		<rect x="393" y="124" width="93" height="16" rx="3" fill="hsl(30 70% 52%)"/><text x="492" y="137">count 84 ms</text>
+	</svg>
+	<div class="cap">time since the run started, in milliseconds: splitting costs more than counting either way</div>
+</div>

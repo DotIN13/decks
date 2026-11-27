@@ -1,14 +1,16 @@
 <!-- Tally: the words (or items) a run looked at, then how many of each. Change the chips, then one row
      per item: its chip, a bar as wide as its share of the largest count, and the count. Keep a colour
      per item (hsl hue) so a chip and its bar match. -->
-<div class="words">
-	<span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(150 70% 50% / .16)">cat</span><span class="w" style="background:hsl(30 70% 50% / .16)">saw</span><span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(280 70% 50% / .16)">dog</span><span class="w" style="background:hsl(350 70% 50% / .16)">and</span><span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(280 70% 50% / .16)">dog</span><span class="w" style="background:hsl(30 70% 50% / .16)">saw</span><span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(150 70% 50% / .16)">cat</span>
+<div class="panel">
+	<div class="words">
+		<span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(150 70% 50% / .16)">cat</span><span class="w" style="background:hsl(30 70% 50% / .16)">saw</span><span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(280 70% 50% / .16)">dog</span><span class="w" style="background:hsl(350 70% 50% / .16)">and</span><span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(280 70% 50% / .16)">dog</span><span class="w" style="background:hsl(30 70% 50% / .16)">saw</span><span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="w" style="background:hsl(150 70% 50% / .16)">cat</span>
+	</div>
+	<div class="tally">
+		<span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="bar" style="width:100%;background:hsl(210 65% 50%)"></span><b>4</b>
+		<span class="w" style="background:hsl(150 70% 50% / .16)">cat</span><span class="bar" style="width:50%;background:hsl(150 65% 50%)"></span><b>2</b>
+		<span class="w" style="background:hsl(30 70% 50% / .16)">saw</span><span class="bar" style="width:50%;background:hsl(30 65% 50%)"></span><b>2</b>
+		<span class="w" style="background:hsl(280 70% 50% / .16)">dog</span><span class="bar" style="width:50%;background:hsl(280 65% 50%)"></span><b>2</b>
+		<span class="w" style="background:hsl(350 70% 50% / .16)">and</span><span class="bar" style="width:25%;background:hsl(350 65% 50%)"></span><b>1</b>
+	</div>
+	<div class="cap">times each word appears in one paragraph, counted case-blind</div>
 </div>
-<div class="tally">
-	<span class="w" style="background:hsl(210 70% 50% / .16)">the</span><span class="bar" style="width:100%;background:hsl(210 65% 50%)"></span><b>4</b>
-	<span class="w" style="background:hsl(150 70% 50% / .16)">cat</span><span class="bar" style="width:50%;background:hsl(150 65% 50%)"></span><b>2</b>
-	<span class="w" style="background:hsl(30 70% 50% / .16)">saw</span><span class="bar" style="width:50%;background:hsl(30 65% 50%)"></span><b>2</b>
-	<span class="w" style="background:hsl(280 70% 50% / .16)">dog</span><span class="bar" style="width:50%;background:hsl(280 65% 50%)"></span><b>2</b>
-	<span class="w" style="background:hsl(350 70% 50% / .16)">and</span><span class="bar" style="width:25%;background:hsl(350 65% 50%)"></span><b>1</b>
-</div>
-<div class="cap">times each word appears in one paragraph, counted case-blind</div>

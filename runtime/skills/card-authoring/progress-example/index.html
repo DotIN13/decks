@@ -78,7 +78,9 @@
 </style>
 <style>
 	/* What an entry's own HTML can use (templates/ shows each). */
-	/* An entry's own HTML brings its own look: no box around it, only room above. */
+	/* An entry's own HTML brings its own look: no box around it, only room above. A piece that needs a
+	   frame (a chart, a tally) wraps itself in .panel; one with boxes of its own (a diagram) does not. */
+	.viz .panel { background: var(--b-bg); border: 1px solid var(--b-border); border-radius: 8px; padding: 10px 12px }
 	.viz { box-sizing: border-box; max-width: 100%; min-width: 0; color: var(--b-fg); font-weight: 400; margin-top: 8px; font-size: 14px }
 	.viz .cap { color: var(--b-muted); margin-top: 6px }
 	.viz .words { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px }
