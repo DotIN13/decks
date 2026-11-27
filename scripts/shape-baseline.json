@@ -12,7 +12,7 @@
 	},
 	"sizes": {
 		"apps/server/src/runtimes/claude/accounts.ts": 1156,
-		"apps/server/src/runtimes/claude/backend.ts": 1444,
+		"apps/server/src/runtimes/claude/backend.ts": 1089,
 		"apps/web/src/panel/LeftPanel.tsx": 1049,
 		"packages/docs/src/page/gview.ts": 2091,
 		"packages/docs/src/page/live.ts": 2054,
@@ -64,7 +64,7 @@
 		"apps/server/src/apps/service.ts: Apps": 38,
 		"apps/server/src/pictures/service.ts: PictureService": 36,
 		"apps/server/src/runtimes/claude/accounts.ts: ClaudeAccounts": 47,
-		"apps/server/src/runtimes/claude/backend.ts: ClaudeBackend": 44,
+		"apps/server/src/runtimes/claude/backend.ts: ClaudeBackend": 41,
 		"packages/docs/src/page/gview.ts: GoogleView": 73,
 		"packages/docs/src/page/live.ts: LiveEditor": 47,
 		"packages/sync-client/src/sync.ts: HarnessSync": 62

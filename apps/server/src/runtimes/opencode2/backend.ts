@@ -1,5 +1,5 @@
 import { skillsDir, opencode2PluginDir } from "@decks/runtime";
-import type { AgentCapabilities, AgentMode, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentMode, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import { DEFAULT_THINKING } from "@decks/protocol";
 import type { AgentBackendContext } from "../../agents/backend.ts";
 import { agentBriefing } from "../../agents/context.ts";

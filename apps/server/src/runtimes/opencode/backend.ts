@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
-import type { AgentCapabilities, AgentMode, ModelOption, SlashCommand } from "@decks/protocol";
+import type { AgentCapabilities, AgentMode, SlashCommand } from "@decks/protocol";
 import type { AgentBackendContext } from "../../agents/backend.ts";
 import { agentBriefing } from "../../agents/context.ts";
 import { DEFAULT_THINKING } from "@decks/protocol";
