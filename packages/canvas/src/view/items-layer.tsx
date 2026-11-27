@@ -70,13 +70,13 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/*
 	 * Cards waking and sleeping together are counted together: each mark used to make a new map and so a
 	 * rebuild of the card list the engine draws (`covering.ts`), a dozen at a pan's rest. The marks of one
-	 * moment are kept and applied once, at the end of it.
+	 * frame are kept and applied once, before it is drawn: cards wake over a few frames, not in one tick.
 	 */
 	let marks: Map<string, number> | undefined;
 	const markLive = (path: string, on: boolean): void => {
 		if (!marks) {
 			marks = new Map();
-			queueMicrotask(() => {
+			requestAnimationFrame(() => {
 				const due = marks!;
 				marks = undefined;
 				setLiveCards((was) => {
