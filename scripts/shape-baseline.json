@@ -4,7 +4,7 @@
 		"functions over 150 lines": 42,
 		"classes over 30 methods": 10,
 		"server folder pairs that import each other": 12,
-		"imports across packages by relative path": 6,
+		"imports across packages by relative path": 0,
 		"\"one release\" notes": 0,
 		"server imports that point up a layer": 16,
 		"canvas package folder pairs that import each other": 3,

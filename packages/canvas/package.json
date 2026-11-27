@@ -12,6 +12,7 @@
 		"./tools": "./src/public/tools.ts",
 		"./camera": "./src/public/camera.ts",
 		"./host": "./src/public/host.ts",
+		"./headless": "./src/public/headless.ts",
 		"./card-reading": "./src/items/card-reading.ts",
 		"./card": "./src/items/card.ts",
 		"./styles.css": "./styles/surface.css",

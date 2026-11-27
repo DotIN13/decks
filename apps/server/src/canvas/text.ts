@@ -1,11 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { cardReader, fontFiles, isFallbackFamily, mathTypesetter, textNeeds, type FontFile } from "@decks/canvas/headless";
 import { join } from "node:path";
 import { estimateText, isMarkdown, isMarkdownText, type MeasureText } from "@decks/pen";
 import { fileURLToPath } from "node:url";
 import { initSync, TextMeasure } from "@decks/stage";
-import { fontFiles, isFallbackFamily, textNeeds, type FontFile } from "../../../../packages/canvas/src/look/font-files.ts";
-import { cardReader, mathTypesetter } from "../../../../packages/canvas/src/render/reader.ts";
 
 /**
  * Words measured on the server as the page measures them: the same Rust text crate as the page's

@@ -1,13 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
+import { cardReader, fontFiles, iconUrl, parseIcon, type FontNeed } from "@decks/canvas/headless";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Box } from "@decks/pen";
-import { fontFiles, type FontNeed } from "../../../../packages/canvas/src/look/font-files.ts";
-import { iconUrl, parseIcon } from "../../../../packages/canvas/src/look/icons.ts";
-import { cardReader } from "../../../../packages/canvas/src/render/reader.ts";
 import { serverText } from "./text.ts";
 
 /**
