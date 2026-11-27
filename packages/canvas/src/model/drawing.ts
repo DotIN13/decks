@@ -241,7 +241,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	 * touches are routed by the stage engine as it lays the edit out (`reroute_after`), as the server
 	 * routes them, so the page lays nothing out for them here.
 	 */
-	const applied = (prev: PenDocument, ops: unknown[]) => apply(prev, ops as Parameters<typeof apply>[1], { theme: baseTheme(prev, look()), ...(measure ? { measure } : {}) }).doc;
+	const applied = (prev: PenDocument, ops: unknown[]) => apply(prev, ops as Parameters<typeof apply>[1], { theme: baseTheme(prev, look()), share: true, ...(measure ? { measure } : {}) }).doc;
 
 	/** What made the drawing now from the one before, when known: `to` is the drawing they made. */
 	let made: (DocEdits & { to: PenDocument }) | undefined;

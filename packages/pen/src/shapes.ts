@@ -302,6 +302,21 @@ export function makeLabel(id: string, content = ""): PenNode {
  * rather than stretched from a 100 by 100 box: stretched, a wide terminator had flattened ends and a
  * wide arrow a flattened head.
  */
+/** The id of a shape's outline when `fitShapes` would change it: what a shared copy must own first (`ops.ts`, `share`). */
+export function shapesToFit(doc: PenDocument): string[] {
+	const out: string[] = [];
+	for (const node of walk(doc.children)) {
+		if (!isShape(node)) continue;
+		const outline = shapeOutline(node);
+		if (!outline || typeof node.width !== "number" || typeof node.height !== "number") continue;
+		const fitted = outline.x === 0 && outline.y === 0 && outline.width === node.width && outline.height === node.height && outline.layoutPosition === "absolute";
+		const build = shapeKind(node.metadata?.kind)?.build;
+		const drawn = !build || (outline.geometry === build(node.width, node.height, shapeRadius(node) ?? 0) && Array.isArray(outline.viewBox) && [0, 0, node.width, node.height].every((v, i) => v === (outline.viewBox as number[])[i]));
+		if (!fitted || !drawn) out.push(outline.id);
+	}
+	return out;
+}
+
 export function fitShapes(doc: PenDocument): boolean {
 	let changed = false;
 	for (const node of walk(doc.children)) {

@@ -1,7 +1,7 @@
 import { check, clone, idFor, ids, indexOf, PenError } from "./doc.ts";
 import { layout, type MeasureText, type Placed } from "./layout.ts";
 import { expand } from "./refs.ts";
-import { fitShapes } from "./shapes.ts";
+import { fitShapes, shapesToFit } from "./shapes.ts";
 import type { Box, PenDocument, PenNode, PenVariable } from "./types.ts";
 import { fillsOf, parseColor, type ThemeState } from "./values.ts";
 
@@ -46,15 +46,25 @@ interface ApplyOptions {
 	 * op was most of a batch's time. A failed op leaves it half changed, so it is only for a scratch copy.
 	 */
 	scratch?: boolean;
+	/**
+	 * Copy only what the ops change, and the items above it, and share every other item with `doc`
+	 * (`own`): for a caller that never changes a drawing in place once made (the page's drawing, its
+	 * undo steps and its edits on their way), where a whole copy per edit was 8 ms at 7,000 items and
+	 * left the diff nothing to skip.
+	 */
+	share?: boolean;
 }
 
 /** Apply `ops` to a copy of `doc` (or to `doc` itself when it is a scratch copy); returned only if every one succeeded. */
 export function apply(doc: PenDocument, ops: readonly Op[], options: ApplyOptions): { doc: PenDocument; results: OpResult[] } {
 	if (!Array.isArray(ops)) throw new PenError("Edits are a list: [{ op: \"insert\", node: { type: \"note\", content: \"…\" } }].");
-	const next = options.scratch ? doc : clone(doc);
+	const shared = !options.scratch && options.share;
+	const next = options.scratch ? doc : shared ? { ...doc, children: [...doc.children] } : clone(doc);
+	const owned = new WeakSet<object>();
 	const results: OpResult[] = [];
 	ops.forEach((op, i) => {
 		try {
+			if (shared) ownFor(next, op, owned);
 			results.push(one(next, op, options));
 		} catch (error) {
 			const why = error instanceof Error ? error.message : String(error);
@@ -62,11 +72,53 @@ export function apply(doc: PenDocument, ops: readonly Op[], options: ApplyOption
 		}
 	});
 	// A shape's outline is its frame's size, however the frame was sized (`shapes.ts`).
+	if (shared) for (const id of shapesToFit(next)) own(next, id, owned);
 	fitShapes(next);
 	check(next);
 	return { doc: next, results };
 }
 
+
+/**
+ * Make the items an op may change `doc`'s own (`share`): the op's item (or the instance an id path
+ * names), the parent it goes into, and every item above them, each copied once, with its list of
+ * children; the rest stays shared with the drawing it came from. An id not found is left for the
+ * op to refuse.
+ */
+function ownFor(doc: PenDocument, op: Op, owned: WeakSet<object>): void {
+	if (!op || typeof op !== "object") return;
+	if (op.op === "variables") {
+		if (!owned.has(doc)) {
+			owned.add(doc);
+			if (doc.variables) doc.variables = { ...doc.variables };
+		}
+		return;
+	}
+	// A copy goes beside its source unless told where: the source's parent is changed, so it is owned too.
+	const path = "id" in op && typeof op.id === "string" ? op.id : undefined;
+	if (path) own(doc, path.split("/")[0]!, owned, path.includes("/"));
+	if ("parent" in op && typeof op.parent === "string") own(doc, op.parent, owned);
+}
+
+/** Copy the item `id` and everything above it into `doc`, once each (`ownFor`); `deep` copies the item whole (an instance's overrides). */
+function own(doc: PenDocument, id: string, owned: WeakSet<object>, deep = false): void {
+	const index = indexOf(doc);
+	const chain: string[] = [];
+	for (let at = index.get(id); at; at = at.parent ? index.get(at.parent.id) : undefined) chain.unshift(at.node.id);
+	let siblings = doc.children;
+	for (const [n, step] of chain.entries()) {
+		const at = siblings.findIndex((node) => node.id === step);
+		if (at < 0) return;
+		let node = siblings[at]!;
+		if (!owned.has(node) || (deep && n === chain.length - 1)) {
+			node = deep && n === chain.length - 1 ? clone(node) : { ...node, ...(Array.isArray(node.children) ? { children: [...node.children] } : {}) };
+			siblings[at] = node;
+			owned.add(node);
+		}
+		if (!Array.isArray(node.children)) return;
+		siblings = node.children;
+	}
+}
 
 /**
  * A colour nobody can read, said rather than drawn as nothing.

@@ -70,7 +70,7 @@ export function createPending(d: PendingNeeds) {
 				continue;
 			}
 			try {
-				next = apply(next, one.ops as Parameters<typeof apply>[1], { theme: baseTheme(next, d.look()), ...(d.measure ? { measure: d.measure } : {}) }).doc;
+				next = apply(next, one.ops as Parameters<typeof apply>[1], { theme: baseTheme(next, d.look()), share: true, ...(d.measure ? { measure: d.measure } : {}) }).doc;
 				kept.push(one);
 			} catch {
 				clearTimeout(one.timer);
