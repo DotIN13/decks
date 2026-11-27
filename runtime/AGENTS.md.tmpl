@@ -45,7 +45,9 @@ These are the guidelines. Each points to where the details are: a skill (load it
    one main visual, about 120 words at rest, depth behind a click (tabs, a panel), never below the
    fold. Body text 17 px or larger, nothing under 14 px. Plain words: every term of art explained
    once, every number with its unit, nothing said twice. A card with more in it is 16:10, 1100 by
-   688. Your styles always win over Decks's (`.doc { padding: 0 }` works). Check it with
+   688. Your styles always win over Decks's (`.doc { padding: 0 }` works). Be light: a canvas runs
+   many cards, so a card's animation, 3D scene, video or large data waits for `card.active` (the
+   person selected or opened the card) and stops when it ends, with a still and a hint at rest. Check it with
    `decks canvas fit` and stop when it says "One screen". Skill: card-authoring.
 7. **Edit files in place** with your own tools. Never `sed -i` or any rename-save: the canvas stops
    watching a replaced file.

@@ -78,8 +78,15 @@ export interface CardContext {
 	elements: CustomElementRegistry;
 	/** Storage of its own: keys kept under the card's path, so two cards never read each other's. */
 	store: Pick<Storage, "getItem" | "setItem" | "removeItem">;
-	/** Hear a change of the theme or the size. */
-	on(what: "theme" | "size", listener: () => void): void;
+	/**
+	 * Whether the person is using the card now: they selected it on the canvas, or opened it whole as a
+	 * tab. False while it only sits on the canvas, and on the page that measures and pictures it. A card
+	 * with heavy work (an animation, a 3D scene, a large fetch, a video) starts it when this turns true and
+	 * stops it when it turns false; `on("active")` hears the change.
+	 */
+	active: boolean;
+	/** Hear a change of the theme, the size, or whether the card is active. */
+	on(what: "theme" | "size" | "active", listener: () => void): void;
 	/** The SDK, as this card (`CardDecks`): `await card.decks.canvas.insert(item, { beside: card.path })`. */
 	decks: CardDecks;
 	/** The card's deck path, as the canvas names it. */
@@ -97,6 +104,8 @@ interface CardSource {
 	trusted: boolean;
 	theme: "light" | "dark";
 	size: { w: number; h: number };
+	/** Whether the person is using it as it mounts (`CardContext.active`); false unless said. */
+	active?: boolean;
 	/** How its `card.decks` calls are answered (`CanvasHost.cardCall`), with this card as the caller. */
 	call?: (verb: string, args: unknown[]) => Promise<unknown>;
 }
@@ -105,6 +114,8 @@ export interface MountedCard {
 	root: ShadowRoot;
 	setTheme(theme: "light" | "dark"): void;
 	setSize(size: { w: number; h: number }): void;
+	/** The person selected the card, opened it whole, or left it (`CardContext.active`). */
+	setActive(active: boolean): void;
 	/** Hear the card's content height, in its own pixels, as it lays out and whenever it changes. */
 	onHeight(listener: (h: number) => void): void;
 	/** How the card reads now: words, smallest type, spill and cut boxes (`card-reading.ts`), for `fit`. */
@@ -657,7 +668,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	root.append(body);
 
 	const controller = new AbortController();
-	const listeners = { theme: new Set<() => void>(), size: new Set<() => void>() };
+	const listeners = { theme: new Set<() => void>(), size: new Set<() => void>(), active: new Set<() => void>() };
 	const store = {
 		getItem: (key: string) => localStorage.getItem(`decks.card:${source.path}:${key}`),
 		setItem: (key: string, value: string) => localStorage.setItem(`decks.card:${source.path}:${key}`, value),
@@ -672,6 +683,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		file: (name: string) => freshAddress(new URL(name, source.url).href),
 		theme: source.theme,
 		size: { ...source.size },
+		active: source.active === true,
 		elements: registry ?? customElements,
 		store,
 		on: (what, listener) => void listeners[what].add(listener),
@@ -733,6 +745,11 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 			if (context.size.w === size.w && context.size.h === size.h) return;
 			context.size = { ...size };
 			for (const listener of listeners.size) listener();
+		},
+		setActive(active) {
+			if (context.active === active) return;
+			context.active = active;
+			for (const listener of listeners.active) listener();
 		},
 		dispose() {
 			sizes.disconnect();

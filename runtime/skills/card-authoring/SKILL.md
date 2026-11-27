@@ -128,10 +128,44 @@ Everything that used to be a board is a card. A board file left in a deck from b
   Return a function to stop anything else you started (a timer, an animation frame).
 - `card.file(name)` is a file's address in the card's folder; `card.url` is the card's own.
   `card.theme` is "light" or "dark", and `card.on("theme", draw)` hears it change, as
-  `card.on("size", …)` hears its box change. `card.store` keeps a little data of the card's own
+  `card.on("size", …)` hears its box change and `card.on("active", …)` whether the person is using
+  the card (`card.active`, "Be light" below). `card.store` keeps a little data of the card's own
   (`getItem`, `setItem`). `card.elements` defines custom elements for this card alone.
 - The top of a module runs once for every placement of the card; what belongs to one card's view
   lives inside the function.
+
+**Be light: a canvas holds many cards**
+
+A canvas may show dozens of cards at once, on a phone too, and every one of them runs. So a card
+does at rest only what its resting look needs, and saves the heavy work for when the person uses it.
+
+- **`card.active`** is true while the person has the card selected on the canvas, or has it open whole
+  as a tab; `card.on("active", …)` hears it change. It is false while the card only sits on the
+  canvas, and on the page that measures and pictures it, so its picture is its resting look.
+- **An animation, a 3D scene, a simulation, a video**: at rest show a still (its first frame, a
+  poster picture, or a drawing of the scene) and a short hint ("Select to play"); build the heavy
+  thing on the first activation, run it while active, pause it when not.
+- **Heavy data** (a large JSON, a model, many pictures) is fetched on first activation, not on wake.
+- No `requestAnimationFrame` loop, timer or CSS animation running while the card is inactive or
+  asleep: pause CSS animations with a class (`.paused * { animation-play-state: paused }`), stop
+  loops on `active` false, and let `card.signal` stop the rest when the card sleeps.
+- Video plays only when asked (`preload="metadata"`, no `autoplay`, or `autoplay muted` set on
+  activation). A light, periodic read, like a progress card polling its JSON, may run at rest.
+
+```js
+export default function (card) {
+	let scene; // the heavy part, made only when the card is first used
+	const start = async () => {
+		scene ??= await makeScene(card.root.getElementById("stage"));
+		scene.play();
+		card.root.getElementById("hint").hidden = true;
+	};
+	const stop = () => scene?.pause();
+	if (card.active) start();
+	card.on("active", () => (card.active ? start() : stop()));
+	return () => scene?.dispose(); // when the card sleeps
+}
+```
 
 **Libraries**
 

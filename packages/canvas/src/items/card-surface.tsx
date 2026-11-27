@@ -78,6 +78,7 @@ export function CardSurface(props: CardSurfaceProps) {
 			trusted: props.trusted,
 			theme: untrack(scheme),
 			size: untrack(props.size),
+			active: untrack(() => props.selected),
 			...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
 		});
 		listen(mounted.root, fresh);
@@ -124,6 +125,11 @@ export function CardSurface(props: CardSurfaceProps) {
 	createEffect(() => {
 		const size = props.size();
 		mounted?.setSize(size);
+	});
+	// Selected on the canvas, or open whole as a tab (which passes `selected`): the card is in use (`CardContext.active`).
+	createEffect(() => {
+		const active = props.selected;
+		mounted?.setActive(active);
 	});
 	onCleanup(() => {
 		loader.stop();
