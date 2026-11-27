@@ -6,11 +6,11 @@
 			"why": "the canvas frame's root: set the --canvas-* tokens here, and read its state (data-phone)"
 		},
 		{
-			"class": "stage",
+			"class": "canvas",
 			"why": "the canvas: set the --canvas-* tokens here, and read its state (data-pen-tool, data-moving, data-engine-overlays)"
 		},
 		{
-			"class": "stage-fixed",
+			"class": "canvas-fixed",
 			"why": "the layer held to the window over the canvas, where an app places its own parts: the pill, the hold menu, the tool column"
 		}
 	]

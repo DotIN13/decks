@@ -5,12 +5,6 @@ import { CARD_W } from "@decks/deck-kit";
  */
 
 /**
- * The width a new card starts at when nobody asked for one: 1000, which is the measure a card is
- * written to and about as wide as one is read at.
- */
-export const BOARD_W = CARD_W;
-
-/**
  * The width a card is worth keeping under, and it is **guidance, not a limit**.
  *
  * There used to be a hard cap here: 1600, clamped by `cardWidth` and again by `decks.canvas.fit`,
@@ -26,7 +20,7 @@ export const BOARD_W = CARD_W;
 export const WIDE_CARD_W = 1200;
 
 /**
- * A width a card may actually be: what was asked for, or the default (`BOARD_W`), clamped.
+ * A width a card may actually be: what was asked for, or the default (`CARD_W`, deck-kit's), clamped.
  *
  * `viewport` is the room the canvas has (`decks.view.viewport()`), and `undefined` means nobody
  * is looking — a card written by an agent nobody is watching gets the default rather than a
@@ -44,7 +38,7 @@ export function cardWidth(wanted: number | undefined, viewport: number | undefin
 	// A width somebody typed is theirs, whatever it is. The default is the only thing this
 	// function decides, and an agent that means 1800 has a reason we cannot see from here.
 	if (wanted) return Math.round(wanted);
-	return Math.max(320, Math.min(BOARD_W, room));
+	return Math.max(320, Math.min(CARD_W, room));
 }
 
 /**

@@ -235,7 +235,7 @@ type ForwardedWheel = { dx: number; dy: number; mode?: number; x: number; y: num
  * the camera's zoom.
  */
 function forwardWheel(frame: HTMLIFrameElement, wheel: ForwardedWheel): void {
-	const canvas = frame.closest(".stage") ?? document.querySelector(".stage");
+	const canvas = frame.closest(".canvas") ?? document.querySelector(".canvas");
 	if (!canvas) return;
 	const box = frame.getBoundingClientRect();
 	const scale = frame.clientWidth > 0 ? box.width / frame.clientWidth : 1;

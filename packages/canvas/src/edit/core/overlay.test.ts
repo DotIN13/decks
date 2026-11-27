@@ -37,7 +37,7 @@ test("no outline round an arrow, the item typed into, or one not yet drawn; a re
 	assert.deepEqual(selectionOutlines(base({ selection: ["a"], drag: { dx: 9, dy: 9 }, resize: { id: "a", x: 10, y: 20, w: 140, h: 60 } }), scene), [{ id: "a", role: "item", x: 10, y: 20, w: 140, h: 60 }]);
 });
 
-test("boards picked up move with a board drag; the app's selected board follows a finger or its resize; the marquee is last", () => {
+test("cards picked up move with a card drag; the app's selected card follows a finger or its resize; the marquee is last", () => {
 	const drag = { paths: ["cards/one/index.html"], dx: 10, dy: 20 };
 	assert.deepEqual(selectionOutlines(base({ pagePicks: ["cards/one/index.html"], pageDrag: drag, marquee: { x1: 50, y1: 60, x2: 10, y2: 20 } }), scene), [
 		{ id: "page:cards/one/index.html", role: "page", x: 1010, y: 20, w: 400, h: 300 },
@@ -50,7 +50,7 @@ test("boards picked up move with a board drag; the app's selected board follows 
 	assert.equal(selectionOutlines(base({ selected: "cards/one/index.html", pagePicks: ["cards/one/index.html"] }), scene).length, 1);
 });
 
-test("one item gets handles; a group, an arrow, two items, a board or a marquee do not", () => {
+test("one item gets handles; a group, an arrow, two items, a card or a marquee do not", () => {
 	const one = selectionOutlines(base({ selection: ["a"] }), scene);
 	assert.equal(itemHandles(one, scene), one[0]);
 	assert.equal(itemHandles(selectionOutlines(base({ selection: ["group"] }), scene), scene), undefined);
@@ -85,7 +85,7 @@ test("the radius handle: a rectangle's corners, gone while the item is carried o
 	assert.equal(radiusInset(40, 9, 25), 25);
 });
 
-test("board handles: one board alone, resizable, not carried; all eight", () => {
+test("card handles: one card alone, resizable, not carried; all eight", () => {
 	const outlines = selectionOutlines(base({ selected: "cards/deck/index.html" }), scene);
 	assert.deepEqual(pageHandles(outlines, { resizable: true, carrying: false, cards: cards }), { id: "page:cards/deck/index.html", role: "page", x: 1600, y: 0, w: 640, h: 360, path: "cards/deck/index.html" });
 	assert.equal(pageHandles(outlines, { resizable: false, carrying: false, cards: cards }), undefined);
@@ -120,7 +120,7 @@ test("an arrow alone selected has its ends' handles, moved by the drag", () => {
 	assert.equal(arrowEnds({ selection: ["a"], pagePicks: [], drag: none }, scene), undefined);
 });
 
-test("hover: the drawn box of an item in edit mode, else the board under the pointer unless selected or busy", () => {
+test("hover: the drawn box of an item in edit mode, else the card under the pointer unless selected or busy", () => {
 	const hover = { editing: true, busy: false, cards: cards };
 	assert.deepEqual(hoverBox({ ...hover, item: "b" }, scene), { x: 198, y: 18, w: 104, h: 54, id: "b" });
 	assert.deepEqual(hoverBox({ ...hover, item: "note" }, scene), { x: 400, y: 20, w: 120, h: 120, id: "note", round: true });
@@ -146,7 +146,7 @@ test("the grip sits level with the middle of the block's first line; the drop bo
 	assert.equal(dropBox(null, scene), undefined);
 });
 
-test("handles, anchors and the insert line in stage pixels, at a screen size", () => {
+test("handles, anchors and the insert line in canvas pixels, at a screen size", () => {
 	const box = { x: 100, y: 50, w: 200, h: 80 };
 	assert.deepEqual(handleAt(box, "nw", 9), { x: 95.5, y: 45.5 });
 	assert.deepEqual(handleAt(box, "e", 9), { x: 295.5, y: 85.5 });

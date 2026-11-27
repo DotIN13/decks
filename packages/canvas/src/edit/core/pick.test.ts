@@ -24,7 +24,7 @@ const canvas = (): FakeItem[] => [
 	{ id: "line", type: "path", box: { x: 400, y: 800, w: 200, h: 2 }, line: false },
 	{ id: "line2", type: "path", box: { x: 400, y: 900, w: 200, h: 2 }, line: true },
 	{ id: "ref/inside", box: { x: 1100, y: 0, w: 50, h: 50 } },
-	{ id: "board", type: "browser", box: { x: 1200, y: 0, w: 50, h: 50 }, extra: mark("decks.card") },
+	{ id: "card-item", type: "browser", box: { x: 1200, y: 0, w: 50, h: 50 }, extra: mark("decks.card") },
 ];
 
 test("a press picks exactly what is under it: the item in a frame in a group, the frame's padding, the group's gap", () => {
@@ -96,7 +96,7 @@ test("a line is hit on its stroke only; anything else only inside its box, not i
 	assert.equal(pickAt(scene, { x: 1300, y: 1300 }), undefined);
 });
 
-test("never an instance's inside or a board; skip looks through an item; the box is a copy", () => {
+test("never an instance's inside or a card; skip looks through an item; the box is a copy", () => {
 	const scene = fakeScene(canvas());
 	assert.equal(pickAt(scene, { x: 1120, y: 20 }), undefined);
 	assert.equal(pickAt(scene, { x: 1220, y: 20 }), undefined);
@@ -125,7 +125,7 @@ test("a card's block: the one under the point, or the one level with it in the m
 	assert.equal(blockAt(scene, { x: 50, y: 570 }, "card"), undefined);
 });
 
-test("a board's picture: the last in file order, never one drawn as a page", () => {
+test("a card's picture: the last in file order, never one drawn as a page", () => {
 	const cards = [
 		{ path: "a", x: 0, y: 0, w: 100, h: 100 },
 		{ path: "b", x: 50, y: 50, w: 100, h: 100 },

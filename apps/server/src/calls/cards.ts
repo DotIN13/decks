@@ -22,13 +22,13 @@ export function cardVerbs(ctx: VerbContext): Pick<Verbs, "card" | "frame"> {
 	};
 	const needCard = (path: unknown) => {
 		if (typeof path !== "string" || !path.trim()) throw new Error('A card is named by its path, as in "canvases/plan/cards/q3/index.html": decks card list lists them.');
-		const board = service.fileCard(path);
-		if (!board) throw new Error(`There is no card ${path}. decks card list lists them.`);
-		return board;
+		const card = service.fileCard(path);
+		if (!card) throw new Error(`There is no card ${path}. decks card list lists them.`);
+		return card;
 	};
-	const asCard = (board: { path: string; title: string; lastWrittenBy?: string }) => {
-		const by = writer(board.lastWrittenBy);
-		return { path: board.path, title: board.title, ...(by ? { lastWrittenBy: by } : {}) };
+	const asCard = (card: { path: string; title: string; lastWrittenBy?: string }) => {
+		const by = writer(card.lastWrittenBy);
+		return { path: card.path, title: card.title, ...(by ? { lastWrittenBy: by } : {}) };
 	};
 
 	/** The canvas a new card is made in: the one named, or the caller's own. */

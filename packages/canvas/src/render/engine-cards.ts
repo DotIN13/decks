@@ -55,7 +55,7 @@ export class EngineCards {
 		const titles = cards.map((b) => b.title ?? "").join(" ");
 		this.of.faces.fetchFonts(
 			fontFiles([
-				{ family: "Inter", weight: 600, italic: false, text: `${titles} Card App Document Board · missing` },
+				{ family: "Inter", weight: 600, italic: false, text: `${titles} Card App Document · missing` },
 				...(cards.some((b) => b.kind === "missing") ? [{ family: "Inter", weight: 500, italic: false, text: "Studio has no copy of this card yet, and no harness of yours with it is in reach." }] : []),
 			]),
 		);

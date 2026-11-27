@@ -18,8 +18,8 @@ import { cliTokenFile, readCliToken, writeCliToken } from "./cli-token.ts";
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-gate-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
-	writeFileSync(join(deck, "boards", "a.html"), `<!doctype html><html><head><title>A</title><meta name="board" content='{"w":400,"h":300}' /></head><body></body></html>`);
+	mkdirSync(join(deck, "cards"), { recursive: true });
+	writeFileSync(join(deck, "cards", "a.html"), `<!doctype html><html><head><title>A</title><meta name="card" content='{"w":400,"h":300}' /></head><body></body></html>`);
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));

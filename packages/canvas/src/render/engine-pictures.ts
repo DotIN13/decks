@@ -22,7 +22,7 @@ const REST_MS = 250;
 const FETCHES = 6;
 
 /**
- * A card picture compressed for the GPU, as the server sends it (`apps/server/src/boards/astc.ts`):
+ * A card picture compressed for the GPU, as the server sends it (`apps/server/src/pictures/astc.ts`):
  * `DKA1`, width, height and the number of sizes, each size's length, then the sizes' ASTC blocks.
  * What `putCompressedPicture` takes: the bytes, and `[at, length, …]` of each size.
  */

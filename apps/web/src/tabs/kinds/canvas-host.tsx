@@ -49,7 +49,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 	 * the frame's tool column's "Add a file" (`frame/chrome.tsx`), which asks the page for its picker.
 	 */
 	const openFileAtMiddle = () => {
-		const canvas = document.querySelector(".stage, iframe.canvas-frame");
+		const canvas = document.querySelector(".canvas, iframe.canvas-frame");
 		if (!canvas) return;
 		void files.fileAt({ x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 }, false).then((path) => {
 			if (!path) return;
@@ -149,7 +149,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 	 */
 	const empty = () => {
 		const row = canvases().find((one) => one.name === canvasOnScreen()?.name);
-		return !!row && row.boards === 0 && !row.words.trim();
+		return !!row && row.cards === 0 && !row.words.trim();
 	};
 	const agentName = () => state.identities[state.focused ?? ""]?.name ?? m.canvas_empty_agent();
 	return (

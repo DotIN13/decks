@@ -77,7 +77,7 @@ function heardAgentList(message: Extract<Of<"agent">, { type: "agent.list" }>, h
 	for (const chat of message.chats) {
 		ensureAgent(chat.id);
 		if (chat.identity && changed(state.identities[chat.id], chat.identity)) setState("identities", chat.id, chat.identity);
-		if (changed(state.contexts[chat.id], chat.boards)) setState("contexts", chat.id, chat.boards ?? []);
+		if (changed(state.contexts[chat.id], chat.cards)) setState("contexts", chat.id, chat.cards ?? []);
 		const held = state.agents[chat.id];
 		if (changed(held?.inPlay, chat.inPlay)) setState("agents", chat.id, "inPlay", chat.inPlay ?? []);
 		if (changed(held?.model, chat.model)) setState("agents", chat.id, "model", chat.model);
@@ -203,7 +203,7 @@ export function heardAgent(message: Of<"agent">, hooks: FrameHooks): void {
 		}
 
 		case "agent.context":
-			setState("contexts", message.agentId, message.boards);
+			setState("contexts", message.agentId, message.cards);
 			ensureAgent(message.agentId);
 			setState("agents", message.agentId, "inPlay", message.inPlay);
 			return;

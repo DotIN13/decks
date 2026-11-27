@@ -53,7 +53,7 @@ const until = async (test, what, timeout = 15000) => {
 
 const link = await socket();
 const home = await until(() => link.last("agent.list")?.focused, "the greeting to name the focused agent");
-const paths = (await deckState()).boards.map((board) => board.path);
+const paths = (await deckState()).cards.map((board) => board.path);
 say("the fixture has at least two boards to be far apart", paths.length >= 2, JSON.stringify(paths));
 
 /*

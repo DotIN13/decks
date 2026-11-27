@@ -15,12 +15,12 @@ test("the server's Rust router reroutes a drawing exactly as pen's own does", ()
 			arrow("s", { from: "a", to: "b" }),
 			arrow("e", { from: { item: "a", side: "right", at: 0.25 }, to: { item: "b", side: "top" }, route: "elbow", bend: 0.3, heads: "both" }),
 			arrow("p", { from: [-200, -100], to: "b", route: "curved" }),
-			arrow("board", { from: "a", to: "boards/x.html", route: "elbow" }),
+			arrow("card", { from: "a", to: "pages/x.html", route: "elbow" }),
 			arrow("lost", { from: "a", to: "nowhere" }),
 		],
 	} as unknown as PenDocument;
 	const placed = placements(doc, { theme: baseTheme(doc, "light"), measure: estimateText });
-	const cards = (name: string) => (name === "boards/x.html" ? { x: 900, y: -300, w: 400, h: 300 } : undefined);
+	const cards = (name: string) => (name === "pages/x.html" ? { x: 900, y: -300, w: 400, h: 300 } : undefined);
 	const ts = clone(doc);
 	const rust = clone(doc);
 	assert.equal(reroute(ts, placed, cards), true);

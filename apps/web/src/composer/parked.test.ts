@@ -10,7 +10,7 @@ const memory = () => {
 const words = (text: string): Draft => [{ type: "text", text }];
 const pill = (id: string) => ({ type: "mention" as const, kind: "comment" as const, id, label: `“${id}”` });
 
-test("each agent's stage on each canvas is one page", () => {
+test("each agent's canvas on each canvas is one page", () => {
 	assert.equal(pageKey("a1", "main"), "agent:a1@main");
 	assert.equal(pageKey("a1"), "agent:a1", "before its canvas is known");
 	assert.equal(pageKey(undefined), "agent:none");

@@ -37,13 +37,13 @@ const counts = await canvas.evaluate(() => {
 say("the engine's pictures can be watched", counts);
 
 await page.mouse.move(700, 450);
-for (let i = 0; i < 12 && (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")); i++) {
+for (let i = 0; i < 12 && (await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.live === "true")); i++) {
 	await page.keyboard.down("Control");
 	await page.mouse.wheel(0, 40);
 	await page.keyboard.up("Control");
 	await settle(page, 450);
 }
-const below = await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live !== "true");
+const below = await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.live !== "true");
 say("the camera is below the live zoom", below);
 await settle(page, 1500);
 const after = await canvas.evaluate(() => ({ forgot: window.__forgot, put: window.__put }));

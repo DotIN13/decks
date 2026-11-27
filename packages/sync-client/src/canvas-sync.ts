@@ -454,7 +454,7 @@ export class CanvasSync {
 		const next: Record<string, unknown> = { ...meta, ...((fresh || !meta.title) && set.title ? { title: set.title } : {}), ...(studio ? { studio } : {}), ...(set.shared ? { shared: { ...set.shared, ...(studio ? { studio } : {}) } } : {}) };
 		if (set.othersEdit === true) next.othersEdit = true;
 		else if (set.othersEdit === false) delete next.othersEdit;
-		next.boards ??= [];
+		next.cards ??= [];
 		if (JSON.stringify(next) === JSON.stringify(meta)) return;
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, `${JSON.stringify(next, null, "\t")}\n`);

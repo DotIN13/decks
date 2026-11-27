@@ -3,7 +3,7 @@ import { measureFrame } from "./measure-page.ts";
 
 /**
  * One card (or a page), measured for `decks.canvas.fit` when no canvas has measured it
- * (`server/stage/shots.ts`).
+ * (`server/canvas/shots.ts`).
  *
  * A card is measured where it is drawn, and a card nobody is looking at is drawn nowhere: an agent
  * writing on its own canvas while the person looks at another was told "nothing has measured" on most

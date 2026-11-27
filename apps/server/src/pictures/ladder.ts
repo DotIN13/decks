@@ -86,7 +86,7 @@ export const PICTURE_LOOK = 3;
 /**
  * How cards are drawn for their pictures, as `PICTURE_LOOK` is for pages. 4: a card is pictured by the
  * web app's `measure.html` as the canvas frame draws it (`mountCard`, card.css before the card's own
- * styles), where it was a page of its own; every card's picture is taken again once. Old boards and
+ * styles), where it was a page of its own; every card's picture is taken again once. Old cards and
  * friends' pages keep `PICTURE_LOOK`, so the pictures an old deck's migration reads keep their names.
  * 5 and 6: every picture ends on a whole row (`SHRINK`, `wholeShot`), where a last row could be half transparent, drawn
  * on down to a taller box's foot as a grey bar.
@@ -154,7 +154,7 @@ export function pageClip(card: Pick<DeckPage, "w" | "h">): { width: number; heig
 /**
  * In the page: how tall the card's page is, the way `apps/web/src/pages/measure-page.ts` measures it (`documentHeight`).
  *
- * The body's own height, with the height and floor `board.js` gave it released for the read, so the
+ * The body's own height, with the height and floor `card.js` gave it released for the read, so the
  * reading is the content's. The two measurements have to agree or the picture and the card are
  * different heights; the stated height is applied as a floor by the caller.
  */
@@ -168,7 +168,7 @@ export const MEASURE = `(() => {
 	body.style.minHeight = "0";
 	// A child's margin collapsing through a plain block body is counted, as the canvas counts it.
 	if (getComputedStyle(body).display === "block") body.style.display = "flow-root";
-	// And the body's own margins (8 px on a page without board.css): the body's margin box, as the canvas takes it.
+	// And the body's own margins (8 px on a page without card.css): the body's margin box, as the canvas takes it.
 	const page = Math.max(body.scrollHeight, body.getBoundingClientRect().bottom + scrollY + (parseFloat(getComputedStyle(body).marginBottom) || 0));
 	body.style.height = held;
 	body.style.minHeight = floor;

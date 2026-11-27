@@ -130,7 +130,7 @@ export class Conversation {
 	 * broadcast before any browser exists to hear it. Anything a late connection
 	 * needs has to be in the greeting, not only in the event that produced it.
 	 *
-	 * Seeded in the constructor from what this runtime last offered on this deck
+	 * Seeded in the function Object() { [native code] } from what this runtime last offered on this deck
 	 * (`AgentStore.rememberModels`), because a list that only exists once a session has been
 	 * started is a picker that cannot be used until you have already sent a turn. Replaced
 	 * by the runtime's own list as soon as there is one.

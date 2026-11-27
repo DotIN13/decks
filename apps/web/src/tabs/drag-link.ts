@@ -17,7 +17,7 @@ const SLOP = 8;
 export function dragToCanvas(tab: Tab, title: () => string): { press: (event: PointerEvent) => void; wasDrag: () => boolean } {
 	let dragged = false;
 	/** Whether the canvas on screen is under a point of the window, and would take this tab's link. */
-	const takes = (x: number, y: number): boolean => onCanvas() && tab !== cameraCanvasTab() && !!document.elementFromPoint(x, y)?.closest('.surface[data-surface="stage"]');
+	const takes = (x: number, y: number): boolean => onCanvas() && tab !== cameraCanvasTab() && !!document.elementFromPoint(x, y)?.closest('.surface[data-surface="canvas"]');
 	const press = (event: PointerEvent) => {
 		dragged = false;
 		if (event.button !== 0 || event.pointerType === "touch" || tab.target === undefined) return;

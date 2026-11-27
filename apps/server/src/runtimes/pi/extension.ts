@@ -4,7 +4,7 @@ import type { AgentHooks } from "../../agents/hooks.ts";
 import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
 
 /**
- * `decks-stage`: what Pi needs from Decks besides the deck context.
+ * `decks-canvas`: what Pi needs from Decks besides the deck context.
  *
  * The canvas is reached with the `decks` command in the agent's shell, so this registers Pi's
  * bash again with the agent's variables in it, the Google Docs tools, and the revision hook below.
@@ -23,7 +23,7 @@ export function decksCanvas(deps: {
 	const { agent, gdocs, shell } = deps;
 
 	return {
-		name: "decks-stage",
+		name: "decks-canvas",
 		factory: (pi: ExtensionAPI) => {
 			/*
 			 * Pi's own bash, with this agent's `decks` in it.
@@ -82,7 +82,7 @@ export function decksCanvas(deps: {
 				if (!card) return;
 
 				const sha = agent.recordRevision(card);
-				if (sha) pi.appendEntry("board-rev", { path: card, sha });
+				if (sha) pi.appendEntry("card-rev", { path: card, sha });
 			});
 		},
 	};

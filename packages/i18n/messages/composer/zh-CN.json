@@ -78,7 +78,7 @@
 	"composer_mention_label": "要提及谁",
 	"composer_context_label": "上下文与费用",
 	"composer_context_dial": "上下文已用 {percent}，查看具体数字",
-	"composer_recipient_board": "一个卡片",
+	"composer_recipient_card": "一个卡片",
 	"composer_recipient_none": "无智能体",
 	"composer_recipient_to": "发给",
 	"composer_recipient_label": "谁收到这句话",

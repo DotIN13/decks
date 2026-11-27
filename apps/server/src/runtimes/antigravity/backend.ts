@@ -131,8 +131,8 @@ export class AntigravityBackend implements AgentBackend {
 			env: {
 				...process.env,
 				HOME: antigravityHomeDir(),
-				DECKS_STAGE_URL: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
-				...(this.context.agentToken ? { DECKS_STAGE_TOKEN: this.context.agentToken } : {}),
+				DECKS_CANVAS_URL: `http://127.0.0.1:${this.context.port}/api/canvas/eval`,
+				...(this.context.agentToken ? { DECKS_CANVAS_TOKEN: this.context.agentToken } : {}),
 				// The MCP child inherits this process's environment, so the identity rides
 				// in env rather than in any per-agent config file.
 				DECKS_AGENT: this.context.toolAgent.id,

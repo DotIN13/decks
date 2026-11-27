@@ -180,7 +180,7 @@ export function CanvasInk(props: CanvasInkProps) {
 	return (
 		<svg
 			ref={inkSheet.sheet}
-			class="stage-ink"
+			class="canvas-ink"
 			data-tool={inkTool()}
 			data-pencil={penSeen() ? "true" : undefined}
 			width={props.view.width}

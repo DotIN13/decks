@@ -64,7 +64,7 @@ for (let i = 0; i < 30; i++) {
 // The zoom keys glide: where the boards are is known once the camera has stopped.
 await steady();
 const clear = () => canvas.evaluate(({ w }) => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	// On a phone the stage's own surface answers for bare canvas as well as the stage.
 	const bare = (el) => el === stage || el?.classList?.contains("surface");
 	for (let y = 130; y <= 400; y += 40) for (let x = 40; x <= w - 40; x += 40) if (!bare(document.elementFromPoint(x, y))) return false;
@@ -162,7 +162,7 @@ const first = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("p-
 const props = () => page.evaluate(() => !!document.querySelector(".props-panel"));
 /* On a phone the properties are a drawer, opened from the pill's Properties button, not with every selection (`Properties.tsx`, `touch-rules.ts`). */
 const openDrawer = async () => {
-	const button = await until(() => canvas.evaluate(() => { const b = document.querySelector(".stage-fixed > .card-callout [aria-label='Properties']"); const r = b?.getBoundingClientRect(); return r && r.width ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : undefined; }), 2000);
+	const button = await until(() => canvas.evaluate(() => { const b = document.querySelector(".canvas-fixed > .card-callout [aria-label='Properties']"); const r = b?.getBoundingClientRect(); return r && r.width ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : undefined; }), 2000);
 	if (button) await page.touchscreen.tap(button.x, button.y);
 	return !!button;
 };

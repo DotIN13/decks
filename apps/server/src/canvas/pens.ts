@@ -29,7 +29,7 @@ export type ReadMore = Omit<ReadOptions, "theme" | "measure"> & { theme?: Record
  *       "x": 0, "y": 0, "width": 1000, "height": 700, "metadata": { "type": "decks.card", "path": "cards/report/index.html" } }
  *
  * pen.dev shows it as a web page; Decks draws the card itself in its place, in a shadow root of the
- * canvas's own page (`deck/layout.ts`). A `decks.board` item, left on a friend's canvas by a Decks
+ * canvas's own page (`deck/layout.ts`). A `decks.card` item, left on a friend's canvas by a Decks
  * from before cards, is no page: it is kept in the file as it is, and drawn as an item with nothing in it.
  */
 export const CARD_ITEM = "decks.card";
@@ -191,7 +191,7 @@ export class CanvasPens {
 		try {
 			if (serialize(toDisk(name, entry.doc, this.cards.adopt)) !== entry.text) this.write(name, entry.doc);
 		} catch {
-			/* a board it names cannot be copied in: left as it is, and drawn as missing */
+			/* a card it names cannot be copied in: left as it is, and drawn as missing */
 		}
 	}
 
@@ -214,8 +214,8 @@ export class CanvasPens {
 	 *
 	 * The folder is the canvas's id — agents open it, card paths run through it, and a camera is
 	 * kept under it — so it is a slug made once and never moved. The name beside it, in
-	 * `stage.json`, is whatever the person or an agent calls the canvas, spaces, capitals and all,
-	 * and changing it touches nothing else. A canvas with no `stage.json` is called by its folder.
+	 * `decks.json`, is whatever the person or an agent calls the canvas, spaces, capitals and all,
+	 * and changing it touches nothing else. A canvas with no `decks.json` is called by its folder.
 	 */
 	titleOf(name: string): string {
 		return this.naming(name).title ?? name;
@@ -226,12 +226,12 @@ export class CanvasPens {
 	 * agent's own, given at claim), and the cards it held when it was named — what an agent is
 	 * asked about when the canvas has since filled with other things (`canvas/canvas-name.ts`).
 	 */
-	naming(name: string): { title?: string; provisional: boolean; boards?: string[] } {
+	naming(name: string): { title?: string; provisional: boolean; cards?: string[] } {
 		try {
-			const parsed = JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as { title?: unknown; provisional?: unknown; boards?: unknown };
+			const parsed = JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as { title?: unknown; provisional?: unknown; cards?: unknown };
 			const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : undefined;
-			const cards = Array.isArray(parsed.boards) ? parsed.boards.filter((one): one is string => typeof one === "string") : undefined;
-			return { ...(title ? { title } : {}), provisional: parsed.provisional === true, ...(cards ? { boards: cards } : {}) };
+			const cards = Array.isArray(parsed.cards) ? parsed.cards.filter((one): one is string => typeof one === "string") : undefined;
+			return { ...(title ? { title } : {}), provisional: parsed.provisional === true, ...(cards ? { cards: cards } : {}) };
 		} catch {
 			/* no canvas.json, or one that does not parse: no name but the folder's */
 			return { provisional: false };
@@ -259,9 +259,9 @@ export class CanvasPens {
 		try {
 			cards = this.cards.cards(name).map((one) => one.path);
 		} catch {
-			/* a stage with no drawing yet holds no boards */
+			/* a canvas with no drawing yet holds no cards */
 		}
-		writeFileSync(file, `${JSON.stringify({ ...rest, title: clean, boards: cards, ...(options.provisional ? { provisional: true } : {}) }, null, "\t")}\n`);
+		writeFileSync(file, `${JSON.stringify({ ...rest, title: clean, cards, ...(options.provisional ? { provisional: true } : {}) }, null, "\t")}\n`);
 		return clean;
 	}
 
@@ -298,7 +298,7 @@ export class CanvasPens {
 
 	/** A folder name for a new canvas, from a title, not already taken by a file or by `alsoTaken`. */
 	freshName(title: string, alsoTaken: Iterable<string> = []): string {
-		const base = slug(title, 40) || "stage";
+		const base = slug(title, 40) || "canvas";
 		const taken = new Set([...this.names(), ...alsoTaken]);
 		if (!taken.has(base)) return base;
 		for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
@@ -333,7 +333,7 @@ export class CanvasPens {
 	 * Apply edits together, write the file, and say so. Nothing is written if any edit fails.
 	 *
 	 * Arrows are redrawn after the edits, so one that joins something that moved follows it
-	 * (`@decks/pen`'s `reroute`). `boards` finds a card by path, for an arrow that ends on one.
+	 * (`@decks/pen`'s `reroute`). `cards` finds a card by path, for an arrow that ends on one.
 	 */
 	edit(name: string, ops: readonly Op[], cards?: (path: string) => Frame | undefined, options?: { undoable?: boolean }): { entry: PenEntry; results: OpResult[] } {
 		this.rights.mayWrite(name);
@@ -394,7 +394,7 @@ export class CanvasPens {
 	 * The hash is the same until the drawing changes, whichever run of the harness reads it. A saved
 	 * frame or a card's content changing does not change it: the picture follows at the next edit.
 	 */
-	summary(name: string): { boards: number; rev: number; shot: string; words: string } {
+	summary(name: string): { cards: number; rev: number; shot: string; words: string } {
 		const entry = this.get(name);
 		const words: string[] = [];
 		let cards = 0;
@@ -405,10 +405,10 @@ export class CanvasPens {
 			if (typeof content === "string" && content) words.push(content);
 		}
 		entry.shot ??= entry.text === undefined ? "0" : createHash("sha1").update(entry.text).digest("hex").slice(0, 12);
-		return { boards: cards, rev: entry.rev, shot: entry.shot, words: words.join(" ").replace(/\s+/g, " ").slice(0, 600) };
+		return { cards: cards, rev: entry.rev, shot: entry.shot, words: words.join(" ").replace(/\s+/g, " ").slice(0, 600) };
 	}
 
-	/** The `stage.pen` frame for one agent looking at this canvas. */
+	/** The `decks.pen` frame for one agent looking at this canvas. */
 	/** A canvas's drawing as the page is given it (imports in place) and the folder its fills are read against, without counting as sent. */
 	drawingOf(name: string): { doc: PenDocument; base: string } {
 		return { doc: this.files.withImported(name, this.get(name).doc), base: `${fileUrl(this.folderOf(name))}/` };
@@ -432,7 +432,7 @@ export class CanvasPens {
 	read(name: string, more: ReadMore = {}) {
 		const entry = this.get(name);
 		const { theme, ...rest } = more;
-		return { stage: name, file: this.fileOf(name), ...(entry.error ? { error: entry.error } : {}), ...read(this.files.withImported(name, entry.doc), { theme: themeFrom(entry.doc, theme), measure, ...rest }) };
+		return { each: name, file: this.fileOf(name), ...(entry.error ? { error: entry.error } : {}), ...read(this.files.withImported(name, entry.doc), { theme: themeFrom(entry.doc, theme), measure, ...rest }) };
 	}
 
 	/** Write a drawing back as text it once was: the person's undo and redo (`log.ts`). */
@@ -458,7 +458,7 @@ export class CanvasPens {
 	}
 
 	/**
-	 * Notice hand edits: an agent writing `stage.pen` with its own tools, or a person saving from
+	 * Notice hand edits: an agent writing `decks.pen` with its own tools, or a person saving from
 	 * pen.dev. Debounced per canvas, and a write that matches what the server wrote is not news.
 	 */
 	watch(): void {
@@ -516,14 +516,14 @@ export class CanvasPens {
 
 	/** Every canvas that uses a saved frame, sent again with a new revision, so each copy shows the change. */
 	resendUsing(key: string, canvas?: string): void {
-		for (const [stage, entry] of this.cache) {
+		for (const [each, entry] of this.cache) {
 			if (!entry.text.includes(`"${key}`)) continue;
 			// A canvas's own frame is that canvas's; the deck's is any canvas's that has no copy of its own.
-			if (canvas ? stage !== canvas : existsSync(join(this.folderOf(stage), `${key}.pen`))) continue;
+			if (canvas ? each !== canvas : existsSync(join(this.folderOf(each), `${key}.pen`))) continue;
 			// A new revision, so the canvas takes it as news and lays the canvas out again.
 			const next = { ...entry, rev: entry.rev + 1, placed: undefined };
-			this.cache.set(stage, next);
-			this.changed(stage, next);
+			this.cache.set(each, next);
+			this.changed(each, next);
 		}
 	}
 

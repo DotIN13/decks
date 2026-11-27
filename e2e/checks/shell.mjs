@@ -28,7 +28,7 @@ for (let i = 0; i < 30 && !agentName; i++) {
 if (!agentName) throw new Error("the fixture deck has no agent to address");
 
 const hash = () => page.evaluate(() => location.hash);
-say("the app opens on the stage, at the plain root, and writes nothing into the address", (await hash()) === "" && (await page.getAttribute(".surface", "data-surface")) === "stage", `${JSON.stringify(await hash())} ${await page.getAttribute(".surface", "data-surface")}`);
+say("the app opens on the stage, at the plain root, and writes nothing into the address", (await hash()) === "" && (await page.getAttribute(".surface", "data-surface")) === "canvas", `${JSON.stringify(await hash())} ${await page.getAttribute(".surface", "data-surface")}`);
 /* The v3 top-left bar: whose canvas this is and which canvas, and a new one. With the side panel open its head has the deck's mark and the fold, so the bar has no unfold button. */
 const pill = await page.evaluate(() => ({
 	agent: document.querySelectorAll(".v3-topbar .v3-agent-chip").length,
@@ -65,7 +65,7 @@ say("the top-left bar has the agent and the canvas as its one tab, and the panel
 		};
 	});
 	say("the left panel's board rows are an icon and a name, with no picture, no document and no grid switch", rows.rows > 0 && rows.named && rows.icons === rows.rows && rows.pictures === 0 && rows.frames === 0 && rows.grid === 0, JSON.stringify(rows));
-	const board = (await deckState()).boards[0];
+	const board = (await deckState()).cards[0];
 	const again = await page.evaluate(async ({ path, rev }) => {
 		const src = `/api/thumb/${path.split("/").map(encodeURIComponent).join("/")}?v=${rev}&scheme=light&whole=1`;
 		await fetch(src);

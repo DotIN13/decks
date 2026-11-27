@@ -43,7 +43,7 @@ say("New tab on the app's pill opens it as a tab of this window, in front, named
 say("…and not the browser's tab", page.context().pages().length === pagesBefore);
 const frameEl = page.locator('.surface[data-surface="app"] iframe.app-frame');
 say("the app is in a frame of its own, sandboxed as the canvas's is", (await until(() => frameEl.count())) === 1 && !(await frameEl.getAttribute("sandbox")).includes("allow-same-origin") && (await frameEl.getAttribute("sandbox")) === (await page.locator("iframe.canvas-frame").getAttribute("sandbox")));
-say("the canvas is out of sight, and its tools with it", !(await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 0);
+say("the canvas is out of sight, and its tools with it", !(await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await page.locator(".pen-tools").count()) === 0);
 
 // The app's own page: the frame inside the tab's frame, told from the one on the canvas by what holds it.
 const appFrame = async () => {
@@ -78,7 +78,7 @@ say("a press saves through localStorage, which the page keeps under the app's na
 
 // --- behind another tab it goes on running --------------------------------------------------------------------
 await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
-say("the home chip brings the canvas forward, the app's tab still in the row", (await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) && (await chip.getAttribute("data-front")) !== "true" ? true : undefined))) === true);
+say("the home chip brings the canvas forward, the app's tab still in the row", (await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await chip.getAttribute("data-front")) !== "true" ? true : undefined))) === true);
 const behind = await (await appFrame())?.evaluate(() => {
 	document.getElementById("press").click();
 	return document.getElementById("count").textContent;
@@ -89,7 +89,7 @@ say("brought forward again, it is the same page, not loaded anew", !!(await unti
 
 // --- closed ------------------------------------------------------------------------------------------------------
 await chip.locator(".tab-chip-close").click();
-say("the ✕ closes it: its frame is gone, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="app"]').count()) === 0 && (await frameEl.count()) === 0 && (await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
+say("the ✕ closes it: its frame is gone, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="app"]').count()) === 0 && (await frameEl.count()) === 0 && (await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
 await settle(page, 200);
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));

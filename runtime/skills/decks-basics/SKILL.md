@@ -12,8 +12,7 @@ its drawing (`canvas.pen`), its cards (`cards/<card>/index.html`), its saved fra
 the pictures and files it uses (`files/`). A card you make goes in its canvas's own `cards/`
 (`decks card create --canvas <name>` does that). A card may point at its own folder, its canvas's
 folder and the deck's `assets/`, `docs/` and `apps/` (`../../files/a.png`, `../../assets/a.png`);
-never at another canvas or a hidden folder. A deck from before cards may still hold a `boards/`
-folder: plain files now, read like any other, shown on no canvas.
+never at another canvas or a hidden folder.
 
 ## Canvases friends shared with you
 

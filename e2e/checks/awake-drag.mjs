@@ -31,7 +31,7 @@ await page.reload({ waitUntil: "domcontentloaded" });
 const canvas = await canvasFrame(page);
 await canvas.waitForFunction(() => (globalThis.__decksProbes?.cards?.().length ?? 0) >= 20 && !!globalThis.__decksProbes?.rust?.camera, undefined, { timeout: 30000 });
 await canvas.evaluate(() => {
-	const stage = () => document.querySelector(".stage");
+	const stage = () => document.querySelector(".canvas");
 	const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
 	const wheel = (deltaX, deltaY, ctrlKey) => {
 		const r = stage().getBoundingClientRect();
@@ -68,7 +68,7 @@ const centreOn = async (path, zoom) => {
 	const at = await canvas.evaluate((path) => {
 		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
 		const cam = globalThis.__decksProbes.rust.camera;
-		const r = document.querySelector(".stage").getBoundingClientRect();
+		const r = document.querySelector(".canvas").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 	}, path);
 	// The item's middle at x 820 on the screen, clear of the tool column at the frame's left edge.
@@ -90,7 +90,7 @@ const drag = async (path, label) => {
 	await page.mouse.move(r.item[0] + r.item[2] / 2, r.item[1] + r.item[3] / 2);
 	await page.waitForTimeout(400);
 	r = await rects(path);
-	const probe = await canvas.evaluate(({ x, y }) => ({ under: globalThis.__decksProbes?.pictureAt?.(x, y), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path}:${n.dataset.state}`), mode: document.querySelector(".stage")?.dataset.mode }), { x: r.item[0] + r.item[2] / 2, y: r.item[1] + r.item[3] / 2 });
+	const probe = await canvas.evaluate(({ x, y }) => ({ under: globalThis.__decksProbes?.pictureAt?.(x, y), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path}:${n.dataset.state}`), mode: document.querySelector(".canvas")?.dataset.mode }), { x: r.item[0] + r.item[2] / 2, y: r.item[1] + r.item[3] / 2 });
 	say(`${label}: hovered, its node is there with a bar`, !!r.bar, `${JSON.stringify(r)} ${JSON.stringify(probe)}`);
 	const steady = await canvas.evaluate(async (path) => {
 		const seen = [];
@@ -105,7 +105,7 @@ const drag = async (path, label) => {
 	await page.mouse.move(r.bar[0] + Math.min(60, r.bar[2] / 2), r.bar[1] + r.bar[3] / 2);
 	await page.mouse.down();
 	await page.waitForTimeout(80);
-	const pressed = await canvas.evaluate(() => ({ selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path), awake: globalThis.__decksProbes?.awake?.(), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path.split("/").pop()}:${n.dataset.state}`), stage: Object.entries(document.querySelector(".stage")?.dataset ?? {}).filter(([k, v]) => v === "true").map(([k]) => k) }));
+	const pressed = await canvas.evaluate(() => ({ selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path), awake: globalThis.__decksProbes?.awake?.(), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path.split("/").pop()}:${n.dataset.state}`), stage: Object.entries(document.querySelector(".canvas")?.dataset ?? {}).filter(([k, v]) => v === "true").map(([k]) => k) }));
 	say(`${label}: pressed on the bar`, true, JSON.stringify(pressed));
 	for (let i = 1; i <= 16; i++) {
 		await page.mouse.move(r.bar[0] + 60 + 20 * i, r.bar[1] + r.bar[3] / 2 + 7.5 * i);

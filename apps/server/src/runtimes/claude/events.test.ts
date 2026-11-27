@@ -63,7 +63,7 @@ test("a tool call and its replayed result become one chip", () => {
 
 	feed({
 		type: "assistant",
-		message: { content: [{ type: "tool_use", id: "call-1", name: "read", input: { path: "boards/plan.html" } }] },
+		message: { content: [{ type: "tool_use", id: "call-1", name: "read", input: { path: "pages/plan.html" } }] },
 	});
 	let tool = items(translator).find((item) => item.kind === "tool") as Extract<ChatItem, { kind: "tool" }>;
 	assert.ok(tool, "the call opens a chip");

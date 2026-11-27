@@ -8,7 +8,7 @@ import { realPathOf } from "../deck/roots.ts";
 import { runVerb } from "../calls/run.ts";
 
 /** One of the person's calls, as a page makes it for the canvas on its screen. */
-const person = (app: App, canvas: string, verb: string, args: unknown[]) => runVerb(app, { kind: "person" }, { "x-decks-stage": canvas }, verb, [...args, { canvas }]);
+const person = (app: App, canvas: string, verb: string, args: unknown[]) => runVerb(app, { kind: "person" }, { "x-decks-canvas": canvas }, verb, [...args, { canvas }]);
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {
@@ -24,10 +24,10 @@ function put(file: string, data: string | Uint8Array): void {
  * A card joining a canvas comes at the size its own file states.
  */
 function open() {
-	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-board-size-")));
+	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-card-size-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
-	put(join(deck, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><html><head><title>Plan</title><meta name="board" content='{"w":900,"h":400}' /></head><body class="board"></body></html>`);
+	mkdirSync(join(deck, "cards"), { recursive: true });
+	put(join(deck, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><html><head><title>Plan</title><meta name="card" content='{"w":900,"h":400}' /></head><body class="card-page"></body></html>`);
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }
@@ -36,7 +36,7 @@ function open() {
 const PATH = "canvases/t/cards/plan/index.html";
 const settle = () => new Promise((done) => setTimeout(done, 250));
 
-test("a board is drawn at its stage's size, which a browser's reading does not move and a drag does", async () => {
+test("a card is drawn at its canvas's size, which a browser's reading does not move and a drag does", async () => {
 	const { app, cleanup } = open();
 	try {
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
@@ -53,8 +53,8 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		assert.equal(shown().h, 520);
 		await settle();
 		const item = app.pens.cards.cards(one.seat.canvasFolder()!).find((card) => card.path === mine);
-		assert.deepEqual([item?.w, item?.h], [900, 520], "and the stage file holds it");
-		assert.equal(app.deck.card(mine)?.h, 400, "while the board's own file is as its agent wrote it");
+		assert.deepEqual([item?.w, item?.h], [900, 520], "and the canvas file holds it");
+		assert.equal(app.deck.card(mine)?.h, 400, "while the card's own file is as its agent wrote it");
 
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
 		two.seat.newCanvas("Another canvas");
@@ -62,7 +62,7 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		two.seat.setInPlay([PATH], { place: true });
 		const theirs = app.pens.cards.copyOf(two.seat.canvasFolder()!, PATH);
 		assert.notEqual(theirs, mine, "another canvas places a copy of its own");
-		assert.equal(app.canvas.cards(two.id).find((card) => card.path === theirs)?.h, 400, "another stage takes it at its file's size");
+		assert.equal(app.canvas.cards(two.id).find((card) => card.path === theirs)?.h, 400, "another canvas takes it at its file's size");
 		assert.equal(app.canvas.cards(one.id).find((card) => card.path === mine)?.h, 520, "and the first keeps its own");
 		one.seat.setInPlay([PATH], { place: true });
 		assert.deepEqual(app.pens.cards.cards(one.seat.canvasFolder()!).map((card) => card.path), [mine], "asked for again, the canvas keeps the copy it has");
@@ -71,10 +71,10 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 	}
 });
 
-test("two agents on one stage: a save by one does not put back a size or a place the other set", async () => {
+test("two agents on one canvas: a save by one does not put back a size or a place the other set", async () => {
 	const { app, cleanup } = open();
 	try {
-		put(join(app.deck.path, "canvases", "t", "cards", "notes", "index.html"), `<!doctype html><html><head><title>Notes</title><meta name="board" content='{"w":600,"h":300}' /></head><body class="board"></body></html>`);
+		put(join(app.deck.path, "canvases", "t", "cards", "notes", "index.html"), `<!doctype html><html><head><title>Notes</title><meta name="card" content='{"w":600,"h":300}' /></head><body class="card-page"></body></html>`);
 		app.deck.refresh("canvases/t/cards/notes/index.html");
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		one.seat.setInPlay([PATH, "canvases/t/cards/notes/index.html"], { place: true });
@@ -124,7 +124,7 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 		await settle();
 		assert.deepEqual([on(first)?.x, on(first)?.y, on(first)?.h], [4000, 3000, 777], "the named canvas takes the move and the size");
 		assert.deepEqual([on(second)?.x, on(second)?.y, on(second)?.h], [before.x, before.y, before.h], "the focused agent's canvas is untouched");
-		assert.equal(app.deck.card(shown)?.h, 777, "the drag writes the board's own file, as a fit does");
+		assert.equal(app.deck.card(shown)?.h, 777, "the drag writes the card's own file, as a fit does");
 
 		await person(app, first, "card.hide", [shown]);
 		await settle();
@@ -135,7 +135,7 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 	}
 });
 
-test("a person's drag to a shorter board sends only the new height, so the canvas never draws it at the old one", async () => {
+test("a person's drag to a shorter card sends only the new height, so the canvas never draws it at the old one", async () => {
 	const { app, cleanup } = open();
 	try {
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });

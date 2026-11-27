@@ -55,7 +55,6 @@ test("a document pass names one document, for an hour, while its token works and
 
 test("a pass in the path reaches its canvas's folder and pictures, every part plain", () => {
 	assert.deepEqual(splitPathPass("/api/t/dk_cp_a.b/card/canvases/main/x.png?v=1"), { pass: "dk_cp_a.b", rest: "/api/card/canvases/main/x.png?v=1" });
-	assert.ok(!passCovers("main", "/api/board/canvases/main/cards/a/index.html"), "the old prefix reaches nothing");
 	assert.ok(passCovers("main", "/api/card/canvases/main/cards/a/index.html"));
 	assert.ok(!passCovers("main", "/api/card/canvases/other/cards/a/index.html"));
 	assert.ok(passCovers("main", "/api/thumb/canvases/main/cards/a/index.html"));
@@ -63,7 +62,7 @@ test("a pass in the path reaches its canvas's folder and pictures, every part pl
 	assert.ok(!passCovers("main", "/api/card/canvases/main/.decks/x"));
 	assert.ok(!passCovers("main", "/api/f/canvases/main/a.png"));
 	assert.ok(passCovers("shared/ana/trip", "/api/card/shared/canvases/ana/trip/a.html"));
-	assert.ok(passCovers("main", "/api/card/boards/a.html", (path) => path === "boards/a.html"), "a board placed on it from elsewhere");
+	assert.ok(passCovers("main", "/api/card/pages/a.html", (path) => path === "pages/a.html"), "a card placed on it from elsewhere");
 });
 
 test("an app pass held by a canvas works while its token works and the app is on that canvas, with no day to run out", () => {

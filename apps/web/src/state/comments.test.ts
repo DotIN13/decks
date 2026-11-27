@@ -43,10 +43,7 @@ test("cleanFrameComment cleans every text and drops what is not text", () => {
 
 test("cleanFramePills and cleanFrameInk", () => {
 	assert.deepEqual(cleanFramePills([{ kind: "card", id: "b\u200B1", label: "L\u2066" }, { kind: "evil" as "card", id: "x", label: "x" }, { kind: "item", id: "\u200B", label: "gone" }]), [{ kind: "card", id: "b1", label: "L" }]);
-	// A card's pill is a mention of kind card in the composer, as a sent message's parts name it; the old name is no pill.
-	assert.deepEqual(cleanFramePills([{ kind: "board" as "card", id: "c1", label: "C" }]), []);
 	assert.equal(cleanFrameInk({ action: "card", ids: [], canvas: "c", box: { x: 0, y: 0, w: 0, h: 0 } }).action, "card");
-	assert.equal(cleanFrameInk({ action: "board" as "card", ids: [], canvas: "c", box: { x: 0, y: 0, w: 0, h: 0 } }).action, "send", "the old name is no action");
 	const ink = cleanFrameInk({ action: "send", ids: ["a\u200B", "b".repeat(3000)], canvas: "c\u202E", box: { x: 1, y: Number.NaN, w: 3, h: 4 } });
 	assert.deepEqual(ink.ids[0], "a");
 	assert.equal(Array.from(ink.ids[1]!).length, FRAME_TEXT_LIMIT);

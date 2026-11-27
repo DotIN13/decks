@@ -14,14 +14,14 @@ import type {
 } from "./chat.ts";
 import type { DeckSettings, DeckState, Page } from "./deck.ts";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
-import type { ActBox, ActKind, StageCall, StageResult, Camera } from "./stage.ts";
+import type { ActBox, ActKind, CanvasCall, CanvasResult, Camera } from "./canvas.ts";
 
 /**
- * One stage, as the manager lists it.
+ * One canvas, as the manager lists it.
  *
- * `agents` is who has it open — the faces on its card — and `boards` how many boards are on it.
- * Both are read off the server's own records rather than the file, because a stage nobody has
- * opened is still a stage and has to be listed.
+ * `agents` is who has it open — the faces on its card — and `cards` how many cards are on it.
+ * Both are read off the server's own records rather than the file, because a canvas nobody has
+ * opened is still a canvas and has to be listed.
  */
 /**
  * The link to Decks Studio, when this harness has one: Studio's address, the account it signed in as,
@@ -94,23 +94,23 @@ export interface BackendInfo {
 	can: { agents: boolean; write: boolean; share: boolean };
 }
 
-export interface StageRow {
-	/** The folder: the stage's id, which agents open it by and never changes. */
+export interface CanvasRow {
+	/** The folder: the canvas's id, which agents open it by and never changes. */
 	name: string;
 	/** What it is called, which the person can change freely (`canvas.json` beside the drawing). */
 	title: string;
 	/** When its drawing last changed, in ms since the epoch: the manager's order and its "2 h ago". */
 	changedAt?: number;
-	boards: number;
+	cards: number;
 	rev: number;
 	/** The drawing as a short hash, which a picture of the canvas is asked for by: unlike `rev`, the same after the harness restarts. */
 	shot?: string;
 	agents: Array<{ id: string; name: string; color: string }>;
-	/** The words its boards and notes carry, for the manager's search field. */
+	/** The words its cards and notes carry, for the manager's search field. */
 	words: string;
 	/**
 	 * A friend's canvas, shared with you (`shared/canvases/<owner>/<canvas>/`): who shared it, and
-	 * whether you may change it. Its boards run sandboxed, with no token.
+	 * whether you may change it. Its cards run sandboxed, with no token.
 	 */
 	shared?: { owner: string; role: "edit" | "view" };
 	/**
@@ -164,8 +164,8 @@ export type LineClientMessage =
 	| { type: "line.token"; token: string }
 	| { type: "canvas.watch"; canvas: string; since?: number; /** The drawing whole, now, as `canvas.changed` with `doc`: for a client holding none. */ whole?: true }
 	| { type: "canvas.unwatch"; canvas: string }
-	| { type: "line.call"; id: string; verb: string; args: unknown[]; /** The caller's name for the edit this call makes, as `X-Decks-Edit`. */ edit?: string; /** For the person: the canvas on screen and the agent they are talking to, as `X-Decks-Stage` and `X-Decks-Agent`. */ stage?: string; agent?: string }
-	/** The answer to an agent's `stage.call` on a watched canvas. */
+	| { type: "line.call"; id: string; verb: string; args: unknown[]; /** The caller's name for the edit this call makes, as `X-Decks-Edit`. */ edit?: string; /** For the person: the canvas on screen and the agent they are talking to, as `X-Decks-Canvas` and `X-Decks-Agent`. */ canvas?: string; agent?: string }
+	/** The answer to an agent's `decks.call` on a watched canvas. */
 	| { type: "view.answered"; id: string; value?: unknown; error?: string }
 	/** A document item's editor's message, for a file on a watched canvas; its answers come back on this line. */
 	| DocClientMessage
@@ -197,8 +197,8 @@ export type ServerMessage =
 	 */
 	| { type: "app.changed"; name: string; title?: string; status: string; reload?: number }
 	/**
-	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
-	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the
+	 * A card's measured height changed, and nothing else: its document is the same revision. Sent in
+	 * place of the whole deck state, which on a deck of 400 cards was 400 KB and a second of the
 	 * page's time for one number.
 	 */
 	| {
@@ -214,7 +214,7 @@ export type ServerMessage =
 	 *
 	 * A row is the whole of what a browser knows about a chat, and almost every field on it
 	 * already has a message of its own: the name and colour in `agent.identity`, what it is
-	 * doing in `agent.state`, the boards in `context.changed`, the model, the account, the
+	 * doing in `agent.state`, the cards in `context.changed`, the model, the account, the
 	 * reading. Four did not — what it last said, when, whether it is still asleep, and what it
 	 * asks before acting — and the only thing that carried them was the whole list. So a prompt
 	 * and the end of a turn sent every chat on the deck to say that one of them had spoken:
@@ -243,7 +243,7 @@ export type ServerMessage =
 	| { type: "agent.report"; id: string; report?: UsageReport; error?: string; show?: true }
 	/** The messages you queued for an agent, oldest first, and whether Stop is holding them. */
 	| { type: "agent.queued"; agentId: string; items: Array<{ id: string; text: string }>; held: boolean }
-	| { type: "chat.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
+	| { type: "chat.preview"; agentId: string; entryId: string | null; cards: Record<string, string> }
 	/**
 	 * The conversation as the browser should open it: the tail, and whether there is more.
 	 *
@@ -264,19 +264,19 @@ export type ServerMessage =
 	| { type: "chat.earlier"; agentId: string; before: string; items: ChatItem[]; more: boolean }
 	/** Answering `chat.tool`: the whole output, or empty when the call is no longer anywhere. */
 	| { type: "chat.tool"; agentId: string; itemId: string; result: string }
-	/** Answering a `document.create` that carried a `request`: the new item's path on the stage (`item:<id>`). */
+	/** Answering a `document.create` that carried a `request`: the new item's path on the canvas (`item:<id>`). */
 	| { type: "doc.created"; request: string; path: string }
 	| { type: "chat.item"; agentId: string; item: ChatItem }
 	| { type: "chat.delta"; agentId: string; itemId: string; delta: string; field?: "text" | "thinking" }
 	/**
 	 * What the focused agent is holding, and what of it is on the canvas.
 	 *
-	 * Two sets, because they answer different questions: `boards` is the context — what
+	 * Two sets, because they answer different questions: `cards` is the context — what
 	 * the agent is working from, which the rail lists — and `inPlay` is the subset it has
 	 * put on the canvas for the user to look at now.
 	 */
-	| { type: "agent.context"; agentId: string; boards: string[]; inPlay: string[] }
-	| { type: "view.called"; call: StageCall }
+	| { type: "agent.context"; agentId: string; cards: string[]; inPlay: string[] }
+	| { type: "view.called"; call: CanvasCall }
 	/**
 	 * A canvas changed: the one message every client hears of it, on the line (`/api/v1/socket`) and the
 	 * event stream, once per change, whoever made it. From revision `from` as the edits that made it
@@ -293,19 +293,19 @@ export type ServerMessage =
 	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
 	| { type: "line.hello"; who: "person" | "site" | "agent" | "canvas" | "document"; canvas?: string; role?: "edit" | "view" }
 	/**
-	 * Every stage in the deck, for the canvas manager (`canvases/CanvasManager.tsx`).
+	 * Every canvas in the deck, for the canvas manager (`canvases/CanvasManager.tsx`).
 	 *
-	 * A stage is a folder — `canvases/<name>/canvas.pen` — and which one a chat is on is one field
-	 * on its record, so this is the only frame that says what stages *exist*. Sent on connect and
+	 * A canvas is a folder — `canvases/<name>/canvas.pen` — and which one a chat is on is one field
+	 * on its record, so this is the only frame that says what canvases *exist*. Sent on connect and
 	 * whenever the set or who is on it changes; `rev` is the drawing's revision, which is what
-	 * makes a stage's picture cacheable for a year and still current.
+	 * makes a canvas's picture cacheable for a year and still current.
 	 */
-	| { type: "canvas.list"; stages: StageRow[] }
+	| { type: "canvas.list"; canvases: CanvasRow[] }
 	/**
-	 * An agent acting on a board, said by the server rather than the agent: the cursor and the
+	 * An agent acting on a card, said by the server rather than the agent: the cursor and the
 	 * editing marks are drawn from it (`canvas/acts.ts`). `start` is a write or edit tool call
 	 * naming the file, with the root block when the old text was found in it; `done` is the
-	 * file landing, with the blocks whose markup changed, or a stage verb. `at` is the act's
+	 * file landing, with the blocks whose markup changed, or a canvas verb. `at` is the act's
 	 * own clock, so two of them are two.
 	 */
 	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: ActKind; ids?: string[]; boxes?: ActBox[]; label: string; color: string; at: number }

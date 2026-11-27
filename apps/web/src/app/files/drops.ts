@@ -170,7 +170,7 @@ export function createFileDrops() {
 	 * — as a file card (`asFileCards`).
 	 */
 	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }, over?: { card: string; index: number; inner: number }) => {
-		const canvas = document.querySelector(".stage, iframe.canvas-frame");
+		const canvas = document.querySelector(".canvas, iframe.canvas-frame");
 		if (!canvas || refusedOn(canvasNameOnScreen())) return;
 		// Asked first, before anything is made for them: a big file said no to leaves no card behind.
 		const files: File[] = [];
@@ -336,7 +336,7 @@ export function createFileDrops() {
 	 */
 	const paste = (files: File[]) => {
 		if (files.length === 0 || refusedOn(canvasNameOnScreen())) return;
-		const canvas = document.querySelector(".stage, iframe.canvas-frame");
+		const canvas = document.querySelector(".canvas, iframe.canvas-frame");
 		if (!canvas) return;
 		void onEmptyCanvas(files, { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 });
 	};
@@ -351,7 +351,7 @@ export function createFileDrops() {
 	 * the newest thing on the canvas rather than on whatever is in the middle of the screen.
 	 */
 	const fileAt = async (at: { x: number; y: number }, aimed = true): Promise<string | undefined> => {
-		const canvas = document.querySelector(".stage, iframe.canvas-frame");
+		const canvas = document.querySelector(".canvas, iframe.canvas-frame");
 		if (!canvas) return undefined;
 		const picked = await new Promise<string | undefined>((resolve) =>
 			setPicking({

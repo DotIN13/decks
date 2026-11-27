@@ -56,7 +56,7 @@ function paintFrame(frame: HTMLIFrameElement | null | undefined): void {
 		root.dataset.theme = scheme();
 		root.dataset.deckPainted = "true";
 	} catch {
-		// Only reachable if a board is ever served cross-origin. Then it keeps its
+		// Only reachable if a card is ever served cross-origin. Then it keeps its
 		// own scheme, which is a cosmetic loss and not worth a warning in the log.
 	}
 }

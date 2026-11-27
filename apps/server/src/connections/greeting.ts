@@ -42,7 +42,7 @@ export function greet(app: RouteDeps["app"], reply: (message: ServerMessage) => 
 	// And the shared browser, with the code the extension pairs with: the status card
 	// shows it when nothing is connected yet, and the browser is where the user reads it.
 	// Which canvases exist: the manager's list, and the name the pill shows beside the agent.
-	reply(app.stagesMessage());
+	reply(app.canvasesMessage());
 	reply({ type: "web.changed", status: app.web.status(), code: app.web.code() });
 	reply(app.settings.message());
 	reply(app.pairingMessage());

@@ -32,7 +32,7 @@ test("Delete and Backspace take the selection off, and nothing without one", () 
 	assert.deepEqual(penKey(key("Delete"), context({ selection: [] })), none);
 });
 
-test("Escape puts a tool down first, then lets go of items and boards; with nothing to let go it is not the drawing's", () => {
+test("Escape puts a tool down first, then lets go of items and cards; with nothing to let go it is not the drawing's", () => {
 	assert.deepEqual(penKey(key("Escape"), context({ tool: "rectangle" })), { handled: true, do: "escape", tool: "select" });
 	assert.deepEqual(penKey(key("Escape"), context({ tool: "rectangle", selection: [] })), { handled: true, do: "escape", tool: "select" });
 	assert.deepEqual(penKey(key("Escape"), context()), { handled: true, do: "escape", select: [], cards: [] });
@@ -59,7 +59,7 @@ test("⌘D duplicates the selection 24 down and right and selects the copies", (
 	assert.deepEqual(penKey(key("d"), context()), none);
 });
 
-test("the arrows nudge items 1 px and boards with them; Shift makes it 10", () => {
+test("the arrows nudge items 1 px and cards with them; Shift makes it 10", () => {
 	assert.deepEqual(penKey(key("ArrowRight"), context()), { handled: true, do: "nudge", ops: [{ op: "update", id: "a", set: { x: 11, y: 20 } }], cards: [] });
 	assert.deepEqual(penKey(key("ArrowUp", { shift: true }), context({ cards: ["cards/one/index.html"] })), {
 		handled: true,
@@ -83,7 +83,7 @@ test("the arrows nudge items 1 px and boards with them; Shift makes it 10", () =
 	assert.deepEqual(penKey(key("ArrowDown", { alt: true }), context()), none);
 });
 
-test("the board selected on its own moves with the arrows, alone or with the items and boards picked, once", () => {
+test("the card selected on its own moves with the arrows, alone or with the items and cards picked, once", () => {
 	assert.deepEqual(penKey(key("ArrowRight"), context({ selection: [], pageSelected: true, selectedPage: "cards/one/index.html" })), { handled: true, do: "nudge", ops: [], cards: [{ path: "cards/one/index.html", x: 1001, y: 0 }] });
 	assert.deepEqual(penKey(key("ArrowDown", { shift: true }), context({ pageSelected: true, selectedPage: "cards/one/index.html" })), {
 		handled: true,
@@ -96,7 +96,7 @@ test("the board selected on its own moves with the arrows, alone or with the ite
 	assert.deepEqual(penKey(key("ArrowLeft"), context({ selection: [], selectedPage: "cards/gone/index.html" })), { handled: true, do: "nudge", ops: [], cards: [] });
 });
 
-test("a letter arms its tool, unless a board is selected or a modifier is held", () => {
+test("a letter arms its tool, unless a card is selected or a modifier is held", () => {
 	const arms: Record<string, string> = { n: "note", s: "note", c: "card", t: "text", r: "rectangle", o: "ellipse", f: "frame", a: "arrow" };
 	for (const [letter, tool] of Object.entries(arms)) assert.deepEqual(penKey(key(letter), context({ selection: [] })), { handled: true, do: "arm", tool });
 	assert.deepEqual(penKey(key("r"), context({ pageSelected: true })), none);

@@ -25,7 +25,7 @@ import { loadConfig } from "../../config.ts";
  *   pieces the CLI needs are symlinks to the real ones and an `mcp_config.json` of its own
  *   names the canvas-tool server.
  * - The MCP child inherits the `agy` process's environment, so per-agent identity needs no
- *   per-agent config: `DECKS_STAGE_TOKEN` and `DECKS_AGENT` set on the process arrive in
+ *   per-agent config: `DECKS_CANVAS_TOKEN` and `DECKS_AGENT` set on the process arrive in
  *   the tool server, and one shared config serves every agent.
  */
 

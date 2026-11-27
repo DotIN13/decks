@@ -51,7 +51,7 @@ test("a static app is its folder's files, at its own address, and nothing outsid
 		const was = apps.state("counter").version ?? 0;
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		writeFileSync(join(deck, "apps", "counter", "app.js"), "// edited");
-		assert.ok((apps.state("counter").version ?? 0) > was, "an edited file is a new version, which the board reloads for");
+		assert.ok((apps.state("counter").version ?? 0) > was, "an edited file is a new version, which the card reloads for");
 	});
 });
 

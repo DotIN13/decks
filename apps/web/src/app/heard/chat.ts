@@ -76,7 +76,7 @@ export function heardChat(message: Of<"chat">): void {
 
 		case "chat.preview":
 			ensureAgent(message.agentId);
-			setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, cards: message.boards } : undefined);
+			setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, cards: message.cards } : undefined);
 			return;
 
 		case "chat.draft":

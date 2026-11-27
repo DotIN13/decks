@@ -46,13 +46,13 @@ test("a stale session starts fresh and covers a pending sign-in, so only one res
 	const { recovery: one, translator, notices } = recovery();
 	const said = "No conversation found with session ID: 1234";
 	// Said as the turn's failure, with nothing done in the turn.
-	translator.user("make the board");
+	translator.user("make the card");
 	one.signInMidTurn();
 	const action = one.afterTurn(said);
-	assert.deepEqual(action, { kind: "fresh", ask: "make the board" });
+	assert.deepEqual(action, { kind: "fresh", ask: "make the card" });
 	assert.match(notices.at(-1)!, /starts a fresh one and asks again/);
 	// Asked once; a second stale answer is a sentence for the person.
-	translator.user("make the board");
+	translator.user("make the card");
 	assert.equal(one.afterTurn(said), undefined);
 	assert.match(notices.at(-1)!, /cannot be asked again/);
 });

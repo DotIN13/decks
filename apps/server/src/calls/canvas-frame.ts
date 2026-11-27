@@ -78,7 +78,7 @@ export function refusedForCanvas(app: Pick<CallsHost, "canvas">, verb: string, a
  * and a canvas frame speaks only of cards on its own canvas; the person and a paired site of any.
  */
 export function cardRefusedFor(app: Pick<CallsHost, "deck" | "canvas">, principal: Principal | undefined, path: string): { status: number; error: string } | undefined {
-	if (!path || !app.deck.card(path)) return { status: 404, error: `There is no card or board at ${path || "that path"}.` };
+	if (!path || !app.deck.card(path)) return { status: 404, error: `There is no card at ${path || "that path"}.` };
 	if (actsAsPerson(principal)) return undefined;
 	if (principal?.kind === "canvas" && cardOnCanvas(app, path, principal.canvas)) return undefined;
 	return { status: 403, error: `${path} is not on this canvas.` };
@@ -102,14 +102,14 @@ export function onCanvas(app: Pick<CallsHost, "canvas" | "agents" | "documentsOn
 		return typeof path === "string" && app.documentsOn(canvas).has(path);
 	}
 	if (message.type === "view.called") {
-		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown; path?: unknown } } | undefined;
+		const call = message.call as { op?: string; agentId?: string; args?: { canvas?: unknown; path?: unknown } } | undefined;
 		// An agent moving to another canvas: the frame showing the canvas it is on now answers, which knows whether the person is using it.
 		if (call?.op === "goto") return !!call.agentId && (call.args as { person?: unknown } | undefined)?.person !== true && app.agents.get(call.agentId)?.seat.canvasFolder() === canvas;
 		if (!call || !["show", "camera", "reload", "cursor", "shot"].includes(call.op ?? "")) return false;
 		// A cursor, a reload or a card's picture names a card: the frame showing the canvas it is on answers, whoever's home that is.
 		if ((call.op === "cursor" || call.op === "reload" || call.op === "shot") && typeof call.args?.path === "string") return cardOnCanvas(app, call.args.path, canvas);
 		if (call.op === "shot") return false;
-		const named = typeof call.args?.stage === "string" ? call.args.stage : undefined;
+		const named = typeof call.args?.canvas === "string" ? call.args.canvas : undefined;
 		if (named !== undefined) return named === canvas;
 		return !!call.agentId && app.agents.get(call.agentId)?.seat.canvasFolder() === canvas;
 	}

@@ -6,9 +6,9 @@
 	/*
 	 * The pill over a selected card (`ui/Callout.tsx`): the comment popup's card
 	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
-	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.
+	 * things that float over a card look alike and follow the theme; a toolbar's row of icons.
 	 */
-	.stage-fixed > .card-callout {
+	.canvas-fixed > .card-callout {
 	position: absolute;
 	z-index: 6;
 	display: flex;
@@ -25,16 +25,16 @@
 	pointer-events: auto;
 	animation: card-callout-in 90ms ease-out;
 }
-	.stage-fixed > .card-callout[data-below="true"] {
+	.canvas-fixed > .card-callout[data-below="true"] {
 	transform: translate(-50%, 0);
 	animation-name: card-callout-in-below;
 }
-	/* Gone at once while the camera or the board moves, and back with a fade when it rests. */
-	.stage-fixed > .card-callout:not([data-hidden]) {
+	/* Gone at once while the camera or the card moves, and back with a fade when it rests. */
+	.canvas-fixed > .card-callout:not([data-hidden]) {
 	transition: opacity 90ms ease-out;
 }
 	/* The menu a hold opens on a touch screen (`ui/HoldMenu.tsx`): at the finger, glass, a preview on top, rows a finger's height. */
-	.stage-fixed > .hold-menu {
+	.canvas-fixed > .hold-menu {
 	position: absolute;
 	z-index: 8;
 	padding: 6px;
@@ -54,7 +54,7 @@
 		transform: scale(0.94);
 	}
 }
-	.stage-fixed > .hold-menu > .hold-preview {
+	.canvas-fixed > .hold-menu > .hold-preview {
 	margin: 2px 4px 8px;
 	padding: 8px 10px;
 	border-radius: 10px;
@@ -67,7 +67,7 @@
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
 }
-	.stage-fixed > .hold-menu > .hold-item {
+	.canvas-fixed > .hold-menu > .hold-item {
 	display: flex;
 	width: 100%;
 	height: 44px;
@@ -83,33 +83,33 @@
 	text-align: left;
 	cursor: pointer;
 }
-	.stage-fixed > .hold-menu > .hold-item:active {
+	.canvas-fixed > .hold-menu > .hold-item:active {
 	background: var(--fill);
 }
-	.stage-fixed > .hold-menu > .hold-item[data-danger] {
+	.canvas-fixed > .hold-menu > .hold-item[data-danger] {
 	color: var(--color-danger);
 }
-	.stage-fixed > .hold-menu > .hold-item > small {
+	.canvas-fixed > .hold-menu > .hold-item > small {
 	color: var(--muted);
 	font-size: 13px;
 }
-	.stage-fixed > .card-callout[data-hidden] {
+	.canvas-fixed > .card-callout[data-hidden] {
 	visibility: hidden;
 	opacity: 0;
 }
-	.stage-fixed > .card-callout > a.icon-button {
+	.canvas-fixed > .card-callout > a.icon-button {
 	color: var(--muted);
 	text-decoration: none;
 }
-	/* A hairline before Hide: the one action that takes the board away. */
-	.stage-fixed > .card-callout > .callout-rule {
+	/* A hairline before Hide: the one action that takes the card away. */
+	.canvas-fixed > .card-callout > .callout-rule {
 	width: 1px;
 	height: 16px;
 	margin: 0 2px;
 	background: var(--line-strong);
 }
-	/* Ink's own actions, first and in words (`BoardCallout`'s `ink`): what an agent can make of a sketch. */
-	.stage-fixed > .card-callout > .callout-word {
+	/* Ink's own actions, first and in words (`CardCallout`'s `ink`): what an agent can make of a sketch. */
+	.canvas-fixed > .card-callout > .callout-word {
 	display: flex;
 	flex: none;
 	align-items: center;
@@ -126,26 +126,26 @@
 	font-weight: 500;
 	white-space: nowrap;
 }
-	.stage-fixed > .card-callout > .callout-word > svg {
+	.canvas-fixed > .card-callout > .callout-word > svg {
 	color: var(--muted);
 }
-	.stage-fixed > .card-callout > .callout-word:hover {
+	.canvas-fixed > .card-callout > .callout-word:hover {
 	background: var(--fill);
 }
-	.stage-fixed > .card-callout > .callout-ask > svg {
+	.canvas-fixed > .card-callout > .callout-ask > svg {
 	color: var(--color-accent);
 }
 	/* Delete, on drawn items: the one action that cannot be put back with Show. */
-	.stage-fixed > .card-callout > .icon-button.callout-danger {
+	.canvas-fixed > .card-callout > .icon-button.callout-danger {
 	color: var(--color-danger);
 }
 	/* ⋯ pressed: held down while its menu is open. */
-	.stage-fixed > .card-callout > .icon-button[data-on] {
+	.canvas-fixed > .card-callout > .icon-button[data-on] {
 	background: var(--fill);
 	color: var(--fg);
 }
 	/* A card's ⋯ menu (`ui/Callout.tsx`): the pill's own card, hanging down from the ⋯ button (placed there, `placeMenu`), rows in words. */
-	.stage-fixed > .card-callout > .callout-more {
+	.canvas-fixed > .card-callout > .callout-more {
 	position: absolute;
 	top: calc(100% + 6px);
 	z-index: 1;
@@ -159,7 +159,7 @@
 	box-shadow: var(--shadow-menu);
 	animation: callout-more-in 90ms ease-out;
 }
-	.stage-fixed > .card-callout > .callout-more > .callout-more-item {
+	.canvas-fixed > .card-callout > .callout-more > .callout-more-item {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -175,17 +175,17 @@
 	text-align: left;
 	white-space: nowrap;
 }
-	.stage-fixed > .card-callout > .callout-more > .callout-more-item > svg {
+	.canvas-fixed > .card-callout > .callout-more > .callout-more-item > svg {
 	color: var(--muted);
 }
-	.stage-fixed > .card-callout > .callout-more > .callout-more-item:hover {
+	.canvas-fixed > .card-callout > .callout-more > .callout-more-item:hover {
 	background: var(--fill);
 }
-	.stage-fixed > .card-callout > .callout-more > .callout-more-danger,
-	.stage-fixed > .card-callout > .callout-more > .callout-more-danger > svg {
+	.canvas-fixed > .card-callout > .callout-more > .callout-more-danger,
+	.canvas-fixed > .card-callout > .callout-more > .callout-more-danger > svg {
 	color: var(--color-danger);
 }
-	.stage-fixed > .card-callout > .callout-more > .callout-more-rule {
+	.canvas-fixed > .card-callout > .callout-more > .callout-more-rule {
 	height: 1px;
 	margin: 4px 6px;
 	background: var(--line-strong);

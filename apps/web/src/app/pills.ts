@@ -40,7 +40,7 @@ export function createPills({ canvasPen, editorHandle, setPenSelected, playAndFr
 		}
 		untrack(editorHandle)?.select([item.id]);
 		setPenSelected([item.id]);
-		const canvas = document.querySelector(".stage, iframe.canvas-frame");
+		const canvas = document.querySelector(".canvas, iframe.canvas-frame");
 		if (!canvas || item.box.w <= 0) return;
 		const view = { width: canvas.clientWidth, height: canvas.clientHeight };
 		const region = canvasBox(view);

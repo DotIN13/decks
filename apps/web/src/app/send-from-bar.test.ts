@@ -48,7 +48,7 @@ test("an @ inside a word, as in an email address, is not a mention", () => {
 });
 
 test("without a mention, the line goes to the focused agent, unnamed", () => {
-	assert.deepEqual(destination("build the board", canvas), { kind: "prompt", id: "s1", name: "Sable", named: false });
+	assert.deepEqual(destination("build the card", canvas), { kind: "prompt", id: "s1", name: "Sable", named: false });
 	assert.deepEqual(destination("@unknown hi", canvas), { kind: "prompt", id: "s1", name: "Sable", named: false });
 });
 

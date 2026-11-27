@@ -27,8 +27,7 @@ export function cleanParts(raw: unknown): MessagePart[] | undefined {
 			if (text) out.push({ type: "text", text });
 			continue;
 		}
-		// A pill kept before cards says "board": it is a card's.
-		const kind = value.kind === "board" ? "card" : value.kind;
+		const kind = value.kind;
 		if (value.type !== "mention" || !KINDS.includes(kind as string)) continue;
 		const id = str(value.id);
 		if (!id) continue;

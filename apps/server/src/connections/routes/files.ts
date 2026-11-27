@@ -4,7 +4,7 @@ import { LIB_FOREVER, libVersion, splitLibVersion } from "../../deck/lib-version
 import { basename, join, relative, resolve, sep } from "node:path";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, NotFound, resolveFileRequest, resolveInDeck, resolveServed } from "../../deck/roots.ts";
-import { canvasFolder, canvasNameOk, libName } from "@decks/hub/layout";
+import { canvasFolder, canvasNameOk } from "@decks/hub/layout";
 import { browse } from "../../files/browse.ts";
 import { filePreview, previewKind } from "../../files/preview.ts";
 import { cardHeaders, quarantine } from "../../files/serve.ts";
@@ -25,8 +25,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 		"/lib/*path",
 		asyncRoute(async (req, res) => {
 			const versioned = splitLibVersion(wildcard(req));
-			// A page written before cards asks for board.css and board.js: they are card.css and card.js.
-			const target = resolveServed(app.deck.path, join("lib", libName(versioned?.file ?? wildcard(req))));
+			// A page written before cards asks for card.css and card.js: they are card.css and card.js.
+			const target = resolveServed(app.deck.path, join("lib", versioned?.file ?? wildcard(req)));
 			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(wildcard(req));
 			cardHeaders(res);
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);

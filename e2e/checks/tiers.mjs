@@ -8,7 +8,7 @@
 import { canvasFrame, deckState, emptyCanvas, freshAgent, nameOf, open, openPanel, pressCardAction, say, selectCard, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
-const paths = deck.boards.map((board) => board.path).sort();
+const paths = deck.cards.map((board) => board.path).sort();
 
 const { browser, page, errors } = await open({ width: 1600, height: 1000, panelTab: "canvas" });
 /*
@@ -52,7 +52,7 @@ await page.mouse.move(800, 500);
  */
 const made = await freshAgent(page, "tiers-fresh");
 await emptyCanvas(page);
-say("an agent holding nothing puts nothing on its stage", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
+say("an agent holding nothing puts nothing on its canvas", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
 await openPanel(page);
 await page.waitForFunction(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item').length === 0, null, { timeout: 4000 }).catch(() => {});
 say("…and the panel's Canvas tab lists nothing", (await panelBoards()) === 0, `${await panelBoards()} rows`);
@@ -99,7 +99,7 @@ const first = (await onCanvas()).find((path) => base(path) === twoNames[0]) ?? t
 await selectCard(page, first);
 await pressCardAction(page, "Hide");
 await (await canvasFrame(page)).waitForFunction((wanted) => !(window.__decksProbes?.cards?.() ?? []).some((board) => board.path === wanted), first, { timeout: 8000 });
-say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
+say("the hide button takes a board off the canvas", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*
  * And the agent still holds it: hiding takes a board off the stage and deliberately does not
  * detach it (`calls/person-table.ts`, `card.play`'s note), so it stays in the agent's context and out
@@ -116,8 +116,8 @@ const told = async () => {
 const context = await told();
 say(
 	"…without dropping it from the agent's context: it is held, not shown",
-	Boolean(context) && context.boards.some((path) => base(path) === base(first)) && !context.inPlay.some((path) => base(path) === base(first)),
-	JSON.stringify(context && { boards: context.boards, inPlay: context.inPlay }),
+	Boolean(context) && context.cards.some((path) => base(path) === base(first)) && !context.inPlay.some((path) => base(path) === base(first)),
+	JSON.stringify(context && { cards: context.cards, inPlay: context.inPlay }),
 );
 await page.mouse.move(800, 500);
 

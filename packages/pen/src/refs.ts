@@ -17,7 +17,7 @@ import { IMPORTED, type PenDocument, type PenNode } from "./types.ts";
  * - `"name:id"` is the item `id` in the file this one `imports` as `name` (the server hands those
  *   over, `IMPORTED`); inside such a copy, a plain id means that file's item first;
  * - `"frames/<name>"` is the frame saved in the deck's `frames/<name>.pen`, which the server hands
- *   over by that name with nothing declared, as a board is placed by its path;
+ *   over by that name with nothing declared, as a card is placed by its path;
  * - a `slot` frame takes its children from the instance (`descendants: { slotId: { children } }`),
  *   and refs among them are expanded like any other.
  *

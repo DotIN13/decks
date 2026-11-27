@@ -69,10 +69,9 @@ test("the SDK has every verb in the table, groups nested", () => {
 	assert.equal(typeof decks.apps.build, "function");
 	// The names from before cards are gone, and so is the old decks.stage.
 	assert.equal(decks.newBoard, undefined);
-	assert.equal(decks.board, undefined);
 	assert.equal(decks.pen, undefined);
 	assert.equal(decks.stage, undefined);
-	assert.ok(TABLE.every((verb) => !/^(board\.|newBoard$|boards$|pen\.)/.test(verb.name) && !("alias" in verb)), "no old name in the table");
+	assert.ok(TABLE.every((verb) => !/^pen\./.test(verb.name) && !("alias" in verb)), "no old name in the table");
 });
 
 test("a verb posts its arguments with the caller's token, and answers with the value; notes go where asked", async () => {
@@ -166,8 +165,7 @@ test("the decks command turns words, flags and JSON into the verb's arguments", 
 	assert.deepEqual(of(["card", "create", "--title", "Q3"]), ["card.create", [{ title: "Q3" }]]);
 	assert.deepEqual(of(["view", "reload", "--card", "cards/a/index.html"]), ["view.reload", [{ card: "cards/a/index.html" }]]);
 	// The names from before cards are not commands now, and the old flag is refused.
-	for (const old of [["board", "create"], ["new-board"], ["move"], ["hide"], ["show"], ["pen", "edit"], ["camera"], ["send"]]) assert.equal(verbOf(old), undefined, old.join(" "));
-	assert.throws(() => of(["view", "reload", "--board", "boards/a.html"]), /has no flag --board/);
+	for (const old of [["move"], ["hide"], ["show"], ["pen", "edit"], ["camera"], ["send"]]) assert.equal(verbOf(old), undefined, old.join(" "));
 	assert.deepEqual(of(["canvas", "move", "n1", "--at.x1", "10", "--at.y1", "20"]), ["canvas.move", ["n1", { at: { x1: 10, y1: 20 } }]]);
 	assert.deepEqual(of(["canvas", "delete", "n1"]), ["canvas.delete", ["n1"]]);
 	// A list of cards is several words or one JSON list, for every call that takes one.
@@ -200,13 +198,12 @@ test("the decks command prints the value to stdout and notes to stderr, and fail
 		await assert.rejects(run(BIN, ["canvas", "fit", "canvases/plan/cards/x/index.html"], { env }), (error) => error.code === 1 && /not on the canvas/.test(error.stderr));
 		// An old name is no command now: refused with exit 1, pointing at the list, and nothing is sent.
 		const calls = fake.seen.length;
-		await assert.rejects(run(BIN, ["new-board", "--title", "Q3 revenue"], { env }), (error) => error.code === 1 && /no command "new-board --title"\. decks --help lists them/.test(error.stderr));
-		await assert.rejects(run(BIN, ["board", "create", "--title", "Q3"], { env }), (error) => error.code === 1 && /no command "board create"/.test(error.stderr));
+		await assert.rejects(run(BIN, ["frobnicate", "--title", "Q3 revenue"], { env }), (error) => error.code === 1 && /no command "frobnicate --title"\. decks --help lists them/.test(error.stderr));
 		assert.equal(fake.seen.length, calls, "no call reached Decks");
 		const help = await run(BIN, ["--help"], { env });
 		assert.match(help.stdout, /canvas insert +Add an item to the canvas\./);
 		assert.match(help.stdout, /\ncard:\n  card list /, "the card group");
-		assert.doesNotMatch(help.stdout, /old name|new-board|\bboard create/i, "no old name is listed");
+		assert.doesNotMatch(help.stdout, /old name/i, "no old name is listed");
 	} finally {
 		await fake.close();
 	}
@@ -232,7 +229,7 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		assert.deepEqual(Object.keys(init.result.capabilities).sort(), ["prompts", "resources", "tools"]);
 		assert.equal(list.result.tools.length, TABLE.length, "every call");
 		assert.ok(list.result.tools.some((tool) => tool.name === "decks_canvas_insert"));
-		assert.ok(!list.result.tools.some((tool) => /^decks_(pen|board)_|^decks_new_board$/.test(tool.name)), "no old name");
+		assert.ok(!list.result.tools.some((tool) => /^decks_pen_/.test(tool.name)), "no old name");
 		const insert = list.result.tools.find((tool) => tool.name === "decks_canvas_insert");
 		assert.deepEqual(insert.inputSchema.required, ["item"]);
 		assert.equal(call.result.isError, false);
@@ -278,7 +275,7 @@ test("the MCP server's short list reaches every call, and offers the deck to rea
 	}
 });
 
-test("DECKS_TOOLS narrows the tools to groups; board, the card group's old name, is no group now", async () => {
+test("DECKS_TOOLS narrows the tools to groups", async () => {
 	const listed = async (groups) => {
 		const child = execFile(process.execPath, [MCP], { env: { ...process.env, DECKS_URL: "http://127.0.0.1:1", DECKS_TOKEN: "dk_h_x", DECKS_TOOLS: groups } });
 		let output = "";
@@ -291,7 +288,6 @@ test("DECKS_TOOLS narrows the tools to groups; board, the card group's old name,
 	const cards = TABLE.filter((verb) => verb.group === "card").map((verb) => `decks_${verb.name.replace(/\./g, "_")}`).sort();
 	assert.ok(cards.includes("decks_card_create"));
 	assert.deepEqual(await listed("card"), cards);
-	assert.deepEqual(await listed("board"), [], "the old group name names nothing");
 });
 
 /** A fetch that records each request and answers from `answer(url, init)`, for the doors that are not verbs. */

@@ -3,9 +3,9 @@ name: canvas-authoring
 description: A canvas is a native pen.dev .pen file — its cards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, canvas calls and boxes, beside and below, canvases, and patterns for arranging cards. Read before your first decks canvas insert or batch.
 ---
 
-# Drawing on the stage
+# Drawing on the canvas
 
-Your stage is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format**: it opens in pen.dev
+Your canvas is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format**: it opens in pen.dev
 as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
 - **Cards**: the HTML pieces you write (the card-authoring skill), each a folder in the canvas's own
@@ -123,7 +123,7 @@ const file = await decks.canvas.file();               // "canvases/<name>/canvas
 - **`beside` and `below`** take an item's id or a card's path and aim the item 160 px clear of
   that item's box: `beside` to its right with the tops aligned, `below` under it with the lefts
   aligned. When that spot is taken it goes on the same way, right or down, until it is 160 px
-  clear of everything, and a warning says so. They work for any item, a note under a card or a card
+  clear of everything, and a warning says so. They work for any item, a note under a card
   beside a note. With no place given it aims beside the newest item and goes on right the same
   way. **`at`** is kept exactly, even over something; a warning names what it covers. Every time an item lands anywhere but where you asked, the answer starts a note with "Warning:": read it.
 - Each call answers with the item as it now is, box included; `batch` with one per op. A note says
@@ -183,7 +183,7 @@ no field for: `{ type: "…", … }`).
 | `note` | a sticky note | `content`; `fill` for its colour; `width` (240 when left out); height follows the words |
 | `frame` + `metadata: { type: "decks.card" }` | a **card**: white, with an edge, a column of markdown blocks and pictures (see Cards) | `layout: "vertical"`, `gap: 16`, `padding: 20`, `width` (320 reads well), `children`; height follows what it holds |
 | `text` + `metadata: { type: "decks.markdown" }` | words in markdown: a block of a card, or on their own as the text tool makes them | `content`, `fontSize`, `textGrowth: "fixed-width"`, `width` (`"fill_container"` in a card) |
-| `text` | words on the stage | `content`, `fontSize`, `fontWeight` ("400"…"700"), `fontFamily`, `textAlign`, `lineHeight` (× size), `fill` (the colour), `textGrowth` |
+| `text` | words on the canvas | `content`, `fontSize`, `fontWeight` ("400"…"700"), `fontFamily`, `textAlign`, `lineHeight` (× size), `fill` (the colour), `textGrowth` |
 | `rectangle` | a box | `fill`, `stroke`, `strokeWidth`, `cornerRadius` |
 | `ellipse` | a circle or oval, in its box | `fill`, `stroke`; `innerRadius` 0–1 for a ring; `startAngle`, `sweepAngle` for an arc |
 | `polygon` | a regular polygon in its box | `polygonCount`, `fill`, `stroke`, `cornerRadius` |
@@ -202,7 +202,7 @@ pen.dev draws the line solid).
 **Text.** `textGrowth` decides the size: `"auto"` (the default) is one line as long as the words,
 and ignores `width`; `"fixed-width"` wraps at `width` and grows down; `"fixed-width-height"` is the
 box you give it. A text given a box with a width is switched to `"fixed-width"` for you. Write
-text at 18 or larger: the stage is read zoomed out.
+text at 18 or larger: the canvas is read zoomed out.
 
 **Cards.** A card is the drawing's way to say something with structure: a heading, a few points,
 a table, a link. Its words are **Obsidian's markdown**, so a card opens as it is in Obsidian:
@@ -212,7 +212,7 @@ fenced code with its language coloured (` ```ts `), tables with `:--:` alignment
 footnotes (`[^1]` and `[^1]: …`), and inside a line `**bold**`, `*italic*`, `~~struck~~`,
 `` `code` ``, `==highlighted==` (or in a colour: `==🔴…==` `==🟠…==` `==🟡…==` `==🟢…==` `==🔵…==`
 `==🟣…==`), `[words](url)` (a web address, or something in the deck by its address: `[the budget](#app/budget)`), `[[a note]]`, bare `https://` links and `:emoji:` shortcodes. A picture is
-`![alt](url)` or `![alt|240](url)` for its width (a path beside the stage file or a web address); a
+`![alt](url)` or `![alt|240](url)` for its width (a path beside the canvas file or a web address); a
 file shown where it sits is `![[name.pdf]]` on its own line. `%%hidden%%` is a comment nobody sees
 on the canvas.
 
@@ -254,7 +254,7 @@ heading or a list. Keep it short: a note is read on the canvas, and a long docum
 **Colour.** `fill` and `stroke` take `"#RRGGBB"` or `"#RRGGBBAA"`, a variable `"$name"`, or a list
 of fills drawn in order (`{ type: "color", color }`, `{ type: "gradient", gradientType: "linear",
 colors: [{ color, position }], rotation }`, `{ type: "image", url: "./pic.png", mode: "fill" }`).
-The stage is light or dark with the app, and a hex is the same in both, so **use Decks's
+The canvas is light or dark with the app, and a hex is the same in both, so **use Decks's
 adaptive colours**, `$decks-<role>`: text for words (`"$decks-text"`), line for arrows and edges
 (`"$decks-line"`), surface for paper (`"$decks-surface"`), fill for areas (`"$decks-fill-blue"`),
 accent for emphasis (`"$decks-accent-red"`). An edit defines any it uses. Your own colour:
@@ -286,7 +286,7 @@ deck's old `frames/` placed on a canvas is copied in. Two ways in:
 
 - `decks.frame.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
   `frames/ui/agent-card.pen` with that frame as its one reusable item;
-- `decks.canvas.save("<item id>", "frames/ui/agent-card")` saves something already on your stage there, and
+- `decks.canvas.save("<item id>", "frames/ui/agent-card")` saves something already on your canvas there, and
   puts a ref to it where the item was.
 
 Your canvas places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
@@ -298,7 +298,7 @@ with nothing to declare. To change the frame itself, give the canvas item calls 
 shows the change. A frame holds drawn items, never a card, and a call names a canvas or a frame, not both.
 
 Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.pen" }` at the top of
-the stage file names it (relative to the stage file, inside the deck), and `ref: "kit:<id>"` places a
+the canvas file names it (relative to the canvas file, inside the deck), and `ref: "kit:<id>"` places a
 copy; that file's variables come with it.
 
 ## Shapes
@@ -348,7 +348,7 @@ await decks.canvas.batch([
 ]);
 ```
 
-`from` and `to` are an item's id, a card's path, or a point on the stage as `[x, y]`: an end
+`from` and `to` are an item's id, a card's path, or a point on the canvas as `[x, y]`: an end
 that stops on bare canvas, which the person makes by letting an arrow go there. An end can also
 keep to one side of what it joins — `{ item: "check", side: "right" }`, with `"top"`, `"right"`,
 `"bottom"` or `"left"` — and then leaves the middle of that side, square to it, however things
@@ -356,7 +356,7 @@ move; a flowchart reads best that way (out of a decision's right and bottom, int
 top or left). A sided end can sit elsewhere on its side with `at`, from 0 (the side's top or left
 end) to 1: `{ item: "check", side: "right", at: 0.25 }`. An end with no side meets whichever edge
 faces the other end. A point end stays
-where it is on the stage, so to move such an arrow shift its points in `metadata` along with its
+where it is on the canvas, so to move such an arrow shift its points in `metadata` along with its
 `x` and `y`, or the next redraw puts it back.
 
 Its style is three more `metadata` fields, each optional: `route` is `"straight"` (the default),
@@ -364,7 +364,7 @@ Its style is three more `metadata` fields, each optional: `route` is `"straight"
 `"end"` (the default), `"both"` or `"none"`, for a plain connector; and `dash: true` dashes the
 line. `bend` moves an arrow off its automatic route and is kept when things move: on an elbow, where
 its turn sits from start (0) to end (1), `bend: 0.3`; on a curve, how far its middle is pulled in
-stage pixels, `bend: [0, -40]`. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
+canvas pixels, `bend: [0, -40]`. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
 the path is redrawn for you. Set `stroke` and `strokeWidth` if you want a colour or weight other
 than the grey default (`$decks-line`). Words on the line — "yes", "no", "then" — are `label` in its metadata,
 drawn on the middle of the line.
@@ -389,7 +389,7 @@ The person can drag an item **into the composer** to talk about it, and it arriv
 message as `@item:<id>` — the id to look up in `read()`.
 
 ```ts
-await decks.canvas.screenshot();                               // the whole stage
+await decks.canvas.screenshot();                               // the whole canvas
 await decks.canvas.screenshot({ of: "summary" });             // one item, with a margin
 await decks.canvas.screenshot({ of: [plan, "then"] });
 await decks.canvas.screenshot({ of: { x1: 0, y1: 0, x2: 1200, y2: 800 }, scale: 2 });
@@ -398,7 +398,7 @@ await decks.canvas.screenshot({ format: "pdf", to: "exports/plan.pdf" });   // a
 
 ## Ink
 
-What the person draws with the brush is on the stage too: one `path` per stroke, drawn as it
+What the person draws with the brush is on the canvas too: one `path` per stroke, drawn as it
 looks, with what was drawn in its `metadata`:
 
 ```json

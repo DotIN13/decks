@@ -57,7 +57,7 @@ const shots = process.env.AWAKE_SHOTS;
 if (shots) await page.screenshot({ path: `${shots}/awake-opening.png` });
 
 await canvas.evaluate(() => {
-	const stage = () => document.querySelector(".stage");
+	const stage = () => document.querySelector(".canvas");
 	const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
 	const wheel = (deltaX, deltaY, ctrlKey) => {
 		const r = stage().getBoundingClientRect();
@@ -108,13 +108,13 @@ const rest = (ms = 900, cap = 12000) =>
 				const c = globalThis.__decksProbes?.rust?.camera;
 				return c ? [Math.round(c.x), Math.round(c.y), Math.round(c.zoom * 1000)] : null;
 			};
-			const snap = () => JSON.stringify([globalThis.__t.state(), document.querySelector(".stage")?.dataset.moving, cam()]);
+			const snap = () => JSON.stringify([globalThis.__t.state(), document.querySelector(".canvas")?.dataset.moving, cam()]);
 			let last = snap();
 			let at = performance.now();
 			while (performance.now() - t0 < cap) {
 				await new Promise((done) => setTimeout(done, 100));
 				const now = snap();
-				if (now !== last || document.querySelector(".stage")?.dataset.moving === "true") {
+				if (now !== last || document.querySelector(".canvas")?.dataset.moving === "true") {
 					last = now;
 					at = performance.now();
 				} else if (performance.now() - at >= ms) return true;
@@ -153,7 +153,7 @@ if (shots) {
 	const doc = await canvas.evaluate((path) => {
 		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
 		const cam = globalThis.__decksProbes.rust.camera;
-		const r = document.querySelector(".stage").getBoundingClientRect();
+		const r = document.querySelector(".canvas").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 	}, docPaths[0]);
 	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.3, y - 900 / 2 / 0.3), doc);
@@ -169,7 +169,7 @@ await rest();
 await until(async () => (await canvas.evaluate(() => globalThis.__t.state())).apps.length >= 2, 8000);
 state = await canvas.evaluate(() => globalThis.__t.state());
 const nearApps = await canvas.evaluate(() => {
-	const r = document.querySelector(".stage").getBoundingClientRect();
+	const r = document.querySelector(".canvas").getBoundingClientRect();
 	const mx = r.width / 2;
 	const my = r.height / 2;
 	const far = (c) => Math.hypot(Math.max(c.rect.left - r.left - mx, 0, mx - (c.rect.right - r.left)), Math.max(c.rect.top - r.top - my, 0, my - (c.rect.bottom - r.top)));
@@ -212,7 +212,7 @@ at("third app");
 const third = await canvas.evaluate((path) => {
 	const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
 	const cam = globalThis.__decksProbes.rust.camera;
-	const r = document.querySelector(".stage").getBoundingClientRect();
+	const r = document.querySelector(".canvas").getBoundingClientRect();
 	// World point of the third app's middle, from its screen rect.
 	return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 }, nearApps[2]);
@@ -250,7 +250,7 @@ const frameBox = await page.locator("iframe.canvas-frame").boundingBox();
 const rectNow = () =>
 	canvas.evaluate(() => {
 		const r = document.querySelector('.card-node[data-state="live"] .app-surface[data-live]')?.closest(".card-node")?.getBoundingClientRect();
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const c = globalThis.__decksProbes?.rust?.camera;
 		return r ? { x: r.x, y: r.y, width: r.width, height: r.height, scroll: [stage?.scrollLeft, stage?.scrollTop], camera: c && [Math.round(c.x), Math.round(c.y), c.zoom] } : undefined;
 	});
@@ -258,7 +258,7 @@ const rectNow = () =>
 const centre = await canvas.evaluate(() => {
 	const r = document.querySelector('.card-node[data-state="live"] .app-surface[data-live]')?.closest(".card-node")?.getBoundingClientRect();
 	const cam = globalThis.__decksProbes.rust.camera;
-	const stage = document.querySelector(".stage").getBoundingClientRect();
+	const stage = document.querySelector(".canvas").getBoundingClientRect();
 	return { x: cam.x + (r.x - stage.x + r.width / 2) / cam.zoom, y: cam.y + (r.y - stage.y + r.height / 2) / cam.zoom };
 });
 await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), centre);
@@ -282,7 +282,7 @@ at("pill new tab");
 	const middle = await canvas.evaluate((path) => {
 		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
 		const cam = globalThis.__decksProbes.rust.camera;
-		const st = document.querySelector(".stage").getBoundingClientRect();
+		const st = document.querySelector(".canvas").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - st.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - st.top + c.rect.height / 2) / cam.zoom };
 	}, cardPaths[0]);
 	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), middle);
@@ -305,7 +305,7 @@ at("pill new tab");
 		say("…and New tab opens the card in a tab of its own", !!tab, tab ? "" : "no tab opened");
 		// Closed again: the canvas is back as it was, for what follows.
 		await chip.locator(".tab-chip-close").click().catch(() => {});
-		await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined), 4000);
+		await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) ? true : undefined), 4000);
 	}
 }
 
@@ -339,7 +339,7 @@ at("document press");
 const docCentre = await canvas.evaluate((path) => {
 	const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
 	const cam = globalThis.__decksProbes.rust.camera;
-	const r = document.querySelector(".stage").getBoundingClientRect();
+	const r = document.querySelector(".canvas").getBoundingClientRect();
 	return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 }, docPaths[0]);
 await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), docCentre);
@@ -375,7 +375,7 @@ const pressPicture = async (path, label) => {
 	const centre = await canvas.evaluate((path) => {
 		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
 		const cam = globalThis.__decksProbes.rust.camera;
-		const r = document.querySelector(".stage").getBoundingClientRect();
+		const r = document.querySelector(".canvas").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 	}, path);
 	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.3, y - 900 / 2 / 0.3), centre);

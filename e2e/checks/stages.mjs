@@ -69,28 +69,28 @@ const openManager = async () => {
 	const chip = page.locator(".v3-topbar .tab-chip[data-camera='true'] .tab-chip-name").first();
 	const all = page.locator(".popover [role=menuitem]", { hasText: /^\s*All canvases\s*$/ }).first();
 	await chip.click({ timeout: 3000 });
-	const up = await Promise.race([all.waitFor({ timeout: 4000 }).then(() => "menu"), page.waitForSelector(".stage-manager", { timeout: 4000 }).then(() => "manager")]).catch(() => undefined);
+	const up = await Promise.race([all.waitFor({ timeout: 4000 }).then(() => "menu"), page.waitForSelector(".canvas-manager", { timeout: 4000 }).then(() => "manager")]).catch(() => undefined);
 	if (up === "menu") await all.click({ timeout: 3000 });
-	await page.waitForSelector(".stage-manager", { timeout: 6000 });
+	await page.waitForSelector(".canvas-manager", { timeout: 6000 });
 };
 await openManager();
 const cards = () =>
 	page.evaluate(() =>
-		[...document.querySelectorAll(".stage-card")].map((card) => ({
+		[...document.querySelectorAll(".canvas-card")].map((card) => ({
 			name: card.dataset.name,
 			title: card.querySelector(".row-label")?.textContent?.trim() ?? null,
 			here: card.dataset.here ?? null,
 			// The harness's address: the page reads it with its token and shows it from memory (`lib/authed.tsx`).
-			shot: card.querySelector(".stage-shot")?.getAttribute("data-src") ?? card.querySelector(".stage-shot")?.getAttribute("src") ?? null,
-			empty: !!card.querySelector(".stage-empty"),
+			shot: card.querySelector(".canvas-shot")?.getAttribute("data-src") ?? card.querySelector(".canvas-shot")?.getAttribute("src") ?? null,
+			empty: !!card.querySelector(".canvas-manager-empty"),
 		})),
 	);
 const wall = await cards();
-say("pressing it opens a panel with a card per stage", wall.length === (listed ?? []).length && wall.length >= 2, JSON.stringify(wall.map((one) => one.name)));
+say("pressing it opens a panel with a card per canvas", wall.length === (listed ?? []).length && wall.length >= 2, JSON.stringify(wall.map((one) => one.name)));
 say("…and the card of the stage you are on is the marked one", wall.filter((one) => one.here).length === 1 && wall.find((one) => one.here)?.title === mine, JSON.stringify(wall.map((one) => [one.name, one.title, one.here])));
 /* The picture is the server's, taken once per drawing — the `v`, the drawing's hash, is what makes that cacheable. */
-// An empty canvas has nothing for the server to draw: its card says "Empty canvas" instead (`CanvasManager`, `.stage-empty`).
-say("…each card with boards asks for the stage's own picture, by the drawing's hash, and an empty one says it is empty", wall.every((one) => /^\/api\/stage-thumb\/.+[?&]v=[0-9a-f]{12}/.test(one.shot ?? "") || one.empty) && wall.some((one) => (one.shot ?? "").startsWith("/api/stage-thumb/")), JSON.stringify(wall.map((one) => one.shot?.slice(0, 60) ?? (one.empty ? "empty" : null))));
+// An empty canvas has nothing for the server to draw: its card says "Empty canvas" instead (`CanvasManager`, `.canvas-manager-empty`).
+say("…each card with boards asks for the stage's own picture, by the drawing's hash, and an empty one says it is empty", wall.every((one) => /^\/api\/canvas-thumb\/.+[?&]v=[0-9a-f]{12}/.test(one.shot ?? "") || one.empty) && wall.some((one) => (one.shot ?? "").startsWith("/api/canvas-thumb/")), JSON.stringify(wall.map((one) => one.shot?.slice(0, 60) ?? (one.empty ? "empty" : null))));
 
 // --- the field filters the wall to what matches -------------------------------------------------
 
@@ -99,7 +99,7 @@ say("…each card with boards asks for the stage's own picture, by the drawing's
 const wanted = (wall.find((one) => !one.here && !wall.some((other) => other !== one && other.name.includes(one.name))) ?? wall.find((one) => !one.here))?.name ?? "";
 /* The pill says a stage's name as the person reads it (`canvas.json`); the folder is the card's id. */
 const wantedTitle = wall.find((one) => one.name === wanted)?.title ?? wanted;
-await page.fill(".stage-manager input", wanted);
+await page.fill(".canvas-manager input", wanted);
 await settle(page, 400);
 const searched = await cards();
 say("a search leaves only the canvases that match", searched.length === 1 && searched[0]?.name === wanted, JSON.stringify(searched.map((one) => one.name)));
@@ -107,16 +107,16 @@ say("a search leaves only the canvases that match", searched.length === 1 && sea
 
 // --- a click moves this agent, and lands the camera ---------------------------------------------
 
-await page.locator(`.stage-card[data-name="${wanted}"]`).click();
+await page.locator(`.canvas-card[data-name="${wanted}"]`).click();
 await settle(page, 2500);
 const sent = link.received.filter((m) => m.type === "canvas.list").at(-1)?.stages ?? [];
-say("the panel closes on a pick", await page.evaluate(() => !document.querySelector(".stage-manager")));
+say("the panel closes on a pick", await page.evaluate(() => !document.querySelector(".canvas-manager")));
 say("…the agent you are talking to is on that stage now", (await pillStage()) === wantedTitle, `${mine} → ${await pillStage()}`);
 say("…and the server says so too", sent.find((one) => one.name === wanted)?.agents.some((agent) => agent.id === focused) === true, JSON.stringify(sent.map((one) => [one.name, one.agents.length])));
 /*
  * Landed at the arriving zoom, which is the same one every time (`camera.STAGE_ZOOM`).
  *
- * A looking scale rather than a working one: what an arrival answers is "what is on this stage",
+ * A looking scale rather than a working one: what an arrival answers is "what is on this canvas",
  * several boards at once. Pinned here as well as in the unit test because the number that matters
  * is the one that comes out of the whole round trip — the pick, the boards arriving, the camera.
  */
@@ -131,7 +131,7 @@ await openManager();
 await page.keyboard.press("Escape");
 await settle(page, 500);
 {
-	const gone = await page.evaluate(() => !document.querySelector(".stage-manager"));
+	const gone = await page.evaluate(() => !document.querySelector(".canvas-manager"));
 	const now = await pillStage();
 	say("Escape closes it, and the stage is the one it was", gone && now === wantedTitle, JSON.stringify({ gone, now, wantedTitle }));
 }

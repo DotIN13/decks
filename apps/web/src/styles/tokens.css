@@ -21,7 +21,7 @@
 	--color-bg: var(--bg);
 	--color-bg-deep: var(--bg-deep);
 	--color-panel: var(--panel);
-	--color-stage: var(--stage);
+	--color-ground: var(--ground);
 	--color-fg: var(--fg);
 	--color-muted: var(--muted);
 	--color-faint: var(--faint);
@@ -66,8 +66,8 @@
 /*
  * The app's own tokens.
  *
- * The same ramp `card-host/lib/card.css` uses, so a board on the stage and the
- * chrome around it are visibly one piece of software. Boards cannot import this —
+ * The same ramp `card-host/lib/card.css` uses, so a card on the canvas and the
+ * chrome around it are visibly one piece of software. Cards cannot import this —
  * they are standalone documents — so the two files carry the same values on
  * purpose, and the comment in each says so.
  */
@@ -172,10 +172,10 @@
 	 * Opaque, where it used to be 88% over a blur.
 	 *
 	 * Frosted chrome is the fashion and it was the wrong call here: every panel floats over
-	 * a *canvas*, and a canvas is not a wallpaper — it is boards with text on them, at
+	 * a *canvas*, and a canvas is not a wallpaper — it is cards with text on them, at
 	 * whatever zoom the camera happens to be at. Whatever showed through was words at 40%
 	 * behind words at 100%, which reads as grime rather than as depth, and it moved when the
-	 * camera did. A panel that covers the boards is honest about covering them.
+	 * camera did. A panel that covers the cards is honest about covering them.
 	 */
 	--panel: var(--color-grey-50);
 	--fg: var(--color-grey-1100);
@@ -200,8 +200,8 @@
 	 * Solid, and off the app's own ramp, so a chip is the same chip wherever it is put.
 	 */
 	--fill: var(--color-grey-400);
-	/* The board's own `--b-shadow`: 12px of reach, not 24. A float in the shell is drawn with
-	   the same weight as a card on a board, so the two read as one program. */
+	/* The card's own `--b-shadow`: 12px of reach, not 24. A float in the shell is drawn with
+	   the same weight as a card on a card, so the two read as one program. */
 	--shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 18px rgb(0 0 0 / 6%);
 	/*
 	 * The same shadow, sized for a row rather than a panel — see `.chat-float .fsroll`.
@@ -219,8 +219,8 @@
 	 * to say "higher" without a border.
 	 */
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 6%), 0 4px 10px rgb(0 0 0 / 10%), 0 16px 36px rgb(0 0 0 / 12%);
-	/* A step below white, so the white floats (`--layer`) and the white boards read as things on it. */
-	--stage: #f1f1f3;
+	/* A step below white, so the white floats (`--layer`) and the white cards read as things on it. */
+	--ground: #f1f1f3;
 	/*
 	 * The type scale: ten sizes with names, because thirteen sizes without them is what the
 	 * app had.
@@ -265,8 +265,8 @@
 	 * own order, and a panel's resize handle (1) is above its own panel and nothing else — both
 	 * are specific to one element, so both stay literals next to the thing they order.
 	 */
-	--z-board-edit: 2; /* a field opened on a board: the source editor, a rename */
-	--z-over-board: 5; /* just over the boards: the focus view's exit, an agent landing */
+	--z-card-edit: 2; /* a field opened on a card: the source editor, a rename */
+	--z-over-card: 5; /* just over the cards: the focus view's exit, an agent landing */
 	--z-conversation: 9; /* the conversation column */
 	--z-chrome: 10; /* the rail and the dock: the chrome you work in */
 	--z-backdrop: 20; /* a dialog's backdrop */
@@ -292,7 +292,7 @@
 	--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
 	--shadow-row: 0 1px 2px rgb(0 0 0 / 45%), 0 3px 12px rgb(0 0 0 / 38%);
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 50%), 0 4px 12px rgb(0 0 0 / 55%), 0 18px 44px rgb(0 0 0 / 50%);
-	--stage: #101010;
+	--ground: #101010;
 	color-scheme: dark;
 }
 
@@ -330,11 +330,11 @@
 
 /*
  * The canvas surface's tokens (`@decks/canvas`, `surface-tokens.css`), from this app's own: the surface reads
- * only these, so this is the whole of how the Decks app themes the canvas. On `.stage`, where `v3.css` sets the
+ * only these, so this is the whole of how the Decks app themes the canvas. On `.canvas`, where `v3.css` sets the
  * canvas's own look back, so each resolves to what the surface drew with before it had tokens of its own.
  */
 @layer components {
-	.stage {
+	.canvas {
 		--canvas-accent: var(--color-accent);
 		--canvas-accent-soft: var(--color-accent-soft);
 		--canvas-warn: var(--color-warn);
@@ -346,7 +346,7 @@
 		--canvas-panel: var(--panel);
 		--canvas-bg: var(--bg);
 		--canvas-bg-deep: var(--bg-deep);
-		--canvas-stage: var(--stage);
+		--canvas-ground: var(--ground);
 		--canvas-shadow: var(--shadow);
 		--canvas-radius: var(--radius-panel);
 		--canvas-radius-thumb: var(--radius-thumb);

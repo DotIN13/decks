@@ -5,7 +5,7 @@ import { IMPORTED, type Fill, type Fills, type LegacyStroke, type PenDocument, t
  *
  * A `.pen` value may be `$name`, bound to a document variable whose value can differ by theme:
  * `{ "--card": { type: "color", value: [{ value: "#fff" }, { value: "#1c1c1e", theme: { Mode: "Dark" } }] } }`.
- * The theme in force is the nearest `theme` on the item or its ancestors, over the stage's own
+ * The theme in force is the nearest `theme` on the item or its ancestors, over the canvas's own
  * (light or dark, from the app), over the first value of each axis.
  */
 

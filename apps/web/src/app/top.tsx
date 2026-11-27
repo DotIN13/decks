@@ -86,7 +86,7 @@ export function Top(props: { parts: Parts }) {
 			/>
 
 			{/*
-				The stage manager: every stage in the deck, over the canvas.
+				The canvas manager: every canvas in the deck, over the canvas.
 
 				Here rather than inside the pill, because it covers the canvas and the pill is a
 				cluster of controls 40px tall. The pill owns the button; this owns the surface.

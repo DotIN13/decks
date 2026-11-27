@@ -18,13 +18,13 @@ export function agentVerbs(ctx: VerbContext): Pick<Verbs, "agent" | "here"> {
 		kind: other.kind,
 		...(other.workspace ? { workspace: other.workspace } : {}),
 		tags: other.tags,
-		...(other.stage ? { canvas: other.stage } : {}),
+		...(other.canvas ? { canvas: other.canvas } : {}),
 		state: other.state,
 		queued: other.queued ?? 0,
 		...(other.avatar ? { avatar: other.avatar } : {}),
 		...(other.outside ? { outside: other.outside } : {}),
 	});
-	const asMessage = (item: ReturnType<typeof agent.queue>[number]) => ({ from: item.fromName, task: item.task, cards: item.boards, at: item.at, ...(item.reply ? { reply: true } : {}) });
+	const asMessage = (item: ReturnType<typeof agent.queue>[number]) => ({ from: item.fromName, task: item.task, cards: item.cards, at: item.at, ...(item.reply ? { reply: true } : {}) });
 	const find = (name: unknown) => {
 		const asked = typeof name === "string" ? name.trim() : "";
 		if (!asked) throw new Error("Name an agent by its id (a name works too, but names change): decks agent list lists them.");
@@ -100,10 +100,10 @@ export function agentVerbs(ctx: VerbContext): Pick<Verbs, "agent" | "here"> {
 				const cards = namedCards(message);
 				if (!agent.deliver) {
 					// A caller with no way to deliver (a test host) queues, and says so.
-					const queued = agent.send(to.id, { task: message.task, ...(cards ? { boards: cards } : {}) });
+					const queued = agent.send(to.id, { task: message.task, ...(cards ? { cards: cards } : {}) });
 					return { delivered: false, turn: "queued" as const, position: queued.position, note: "This caller cannot deliver at once, so the work was queued." };
 				}
-				const answer = agent.deliver(to.id, { task: message.task, ...(cards ? { boards: cards } : {}) });
+				const answer = agent.deliver(to.id, { task: message.task, ...(cards ? { cards: cards } : {}) });
 				if (answer.note) notes.push(answer.note);
 				return answer;
 			},
@@ -119,7 +119,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Verbs, "agent" | "here"> {
 				if (!work?.task?.trim()) throw new Error("Queued work needs a task: what to do.");
 				const to = find(name);
 				const cards = namedCards(work);
-				const { queued, position } = agent.send(to.id, { task: work.task, ...(cards ? { boards: cards } : {}), ...(work.reply ? { reply: true } : {}) });
+				const { queued, position } = agent.send(to.id, { task: work.task, ...(cards ? { cards: cards } : {}), ...(work.reply ? { reply: true } : {}) });
 				return { queued, position };
 			},
 			create: async (spec: { name: string; kind?: string; model?: string; thinking?: string; mode?: string; workspace?: string; tags?: string[]; canvas?: string }) => {

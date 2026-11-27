@@ -82,7 +82,7 @@ export function createFingerPress(d: FingerPressNeeds) {
 			d.outer.el().setPointerCapture(event.pointerId);
 		} catch {
 			// Capture is per-pointer and can be refused; the listeners above still carry
-			// the gesture for as long as the finger stays over the stage.
+			// the gesture for as long as the finger stays over the canvas.
 		}
 	};
 

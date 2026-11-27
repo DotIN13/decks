@@ -501,8 +501,8 @@ export function AgentPill(props: {
 			<span class="pill-sep" aria-hidden="true" />
 
 			{/*
-			 * The agent whose stage this is: its face and its name, as one button. Pressing it
-			 * opens the agent list, and picking a row goes to that agent's stage.
+			 * The agent whose canvas this is: its face and its name, as one button. Pressing it
+			 * opens the agent list, and picking a row goes to that agent's canvas.
 			 *
 			 * The name stops at 160px.
 			 */}
@@ -538,9 +538,9 @@ export function AgentPill(props: {
 			<NewAgentButton onNew={props.onNew} />
 
 			{/*
-				The stage: what this agent's work is kept in, and the button that opens the manager.
+				The canvas: what this agent's work is kept in, and the button that opens the manager.
 
-				It had never been on screen at all, so two stages looked like one canvas that had
+				It had never been on screen at all, so two canvases looked like one canvas that had
 				changed. The name goes where it is read with the agent — this pill is already the
 				answer to "whose work am I looking at" — and pressing it is the answer to "what else
 				is there" (`canvases/CanvasManager.tsx`).
@@ -551,16 +551,16 @@ export function AgentPill(props: {
 						<span class="pill-sep" aria-hidden="true" />
 						<button
 							type="button"
-							class="chip-button pill-agent pill-stage"
+							class="chip-button pill-agent pill-canvas"
 							data-on={props.canvasesOpen ? "soft" : undefined}
 							aria-haspopup="dialog"
 							aria-expanded={props.canvasesOpen ?? false}
-							title={props.canvas ? m.agents_stage_title({ name: props.canvas }) : m.agents_stages()}
-							aria-label={props.canvas ? m.agents_stage_label({ name: props.canvas }) : m.agents_stage_none()}
+							title={props.canvas ? m.agents_canvas_title({ name: props.canvas }) : m.agents_canvases()}
+							aria-label={props.canvas ? m.agents_canvas_label({ name: props.canvas }) : m.agents_canvas_none()}
 							onClick={() => props.onCanvases?.()}
 						>
-							{/* The app's own mark, not a drawing of it: a stage is what the mark is a picture of. */}
-							<span class="pill-stage-glyph" aria-hidden="true">
+							{/* The app's own mark, not a drawing of it: a canvas is what the mark is a picture of. */}
+							<span class="pill-canvas-glyph" aria-hidden="true">
 								<DecksMark size={15} />
 							</span>
 							<Show when={props.canvas}>{(name) => <span class="pill-agent-name">{name()}</span>}</Show>
@@ -587,8 +587,8 @@ export function AgentPill(props: {
 
 			{/*
 				The two modes, as one set, and first after the agent because they change what every
-				press on the canvas means: browse (the cursor) reads the boards and moves the drawing,
-				draw (the brush) puts the pen on the stage. A board's own page is never edited from
+				press on the canvas means: browse (the cursor) reads the cards and moves the drawing,
+				draw (the brush) puts the pen on the canvas. A card's own page is never edited from
 				here. The one in force is pressed, in the accent, as a tool picked from a set is.
 
 				No confirmation. A single press is right for something this reversible, and what guards

@@ -64,7 +64,7 @@ const place = async () => {
 const select = async (box) => {
 	await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.6);
 	const canvas = await canvasFrame(page);
-	await until(() => canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").count());
+	await until(() => canvas.locator(".canvas-fixed > .card-callout:not([data-hidden])").count());
 	await settle(page, 300);
 	return canvas;
 };
@@ -77,9 +77,9 @@ const shot = async (name) => process.env.LOOK_SHOTS && (await page.screenshot({ 
 	say("the app's window is on the canvas and on screen", !!id && !!box, JSON.stringify(box));
 	const canvas = await select(box);
 	await shot("app-pill");
-	const labels = await canvas.locator(".stage-fixed > .card-callout:not([data-hidden]) [aria-label]").evaluateAll((all) => all.map((one) => one.getAttribute("aria-label")));
+	const labels = await canvas.locator(".canvas-fixed > .card-callout:not([data-hidden]) [aria-label]").evaluateAll((all) => all.map((one) => one.getAttribute("aria-label")));
 	say("its pill is Fit, New tab, Reload, Comment, ✕ and ⋯", JSON.stringify(labels) === '["Fit","New tab","Reload","Comment","Hide","More"]', JSON.stringify(labels));
-	await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
+	await canvas.locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
 	say("the pill's ✕ takes the window off the canvas", (await gone(id)) === true, JSON.stringify((await windows()).map((one) => one.id)));
 	say("…and the app stays in the deck", await inDeck());
 }
@@ -88,13 +88,13 @@ const shot = async (name) => process.env.LOOK_SHOTS && (await page.screenshot({ 
 {
 	const { id, box } = await place();
 	const canvas = await select(box);
-	await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="More"]').click();
+	await canvas.locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="More"]').click();
 	await settle(page, 400);
 	await shot("app-pill-more");
 	const menu = await canvas.locator(".callout-more [role=menuitem]").evaluateAll((all) => all.map((one) => one.getAttribute("aria-label")));
 	say("⋯ has Reload and Copy path: no Delete, and no export of a running app", JSON.stringify(menu) === '["Reload","Copy path"]', JSON.stringify(menu));
 	await page.keyboard.press("Escape");
-	await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
+	await canvas.locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
 	await gone(id);
 }
 
@@ -110,9 +110,9 @@ const shot = async (name) => process.env.LOOK_SHOTS && (await page.screenshot({ 
 		// Its title above it selects it; a press inside is the editor's.
 		await page.mouse.click(box.x + 30, box.y - 9);
 		const canvas = await canvasFrame(page);
-		await until(() => canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").count());
+		await until(() => canvas.locator(".canvas-fixed > .card-callout:not([data-hidden])").count());
 		await settle(page, 300);
-		await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
+		await canvas.locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').click();
 		say("a document's ✕ takes it off the canvas too", (await gone(placed.id)) === true);
 	}
 }
@@ -121,7 +121,7 @@ const shot = async (name) => process.env.LOOK_SHOTS && (await page.screenshot({ 
 const row = () => page.locator(".v3-topbar .tab-chip[data-tab]").evaluateAll((all) => all.map((one) => `${one.dataset.kind}${one.dataset.front ? "*" : ""}`));
 const toCanvas = async () => {
 	await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
-	await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined));
+	await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) ? true : undefined));
 	await settle(page, 400);
 };
 /** A light's button, once the pointer is on the window's bar: a window nobody points at has no slot on the page. */
@@ -132,7 +132,7 @@ const light = async (box, kind) => {
 	await until(() => button.count());
 	return button;
 };
-const pills = async () => (await canvasFrame(page)).locator(".stage-fixed > .card-callout:not([data-hidden])").count();
+const pills = async () => (await canvasFrame(page)).locator(".canvas-fixed > .card-callout:not([data-hidden])").count();
 {
 	const { id, box } = await place();
 	const zoom = box.width / 1100;

@@ -15,7 +15,7 @@ import { join } from "node:path";
  * is not a thing a server process can be given a little of.
  *
  * **The list is written by the question, not by the panel.** The person's verbs (`calls/person-table.ts`) raise the
- * question the first time a card asks to run; the answer "Always allow this board" is what
+ * question the first time a card asks to run; the answer "Always allow this card" is what
  * calls `allow`. Nothing here decides anything.
  */
 export class AppTrust {
@@ -23,7 +23,7 @@ export class AppTrust {
 	private readonly allowed: Set<string>;
 
 	constructor(private readonly dataDir: string) {
-		this.file = join(dataDir, "board-eval.json");
+		this.file = join(dataDir, "app-trust.json");
 		this.allowed = new Set(this.read());
 	}
 
@@ -44,7 +44,7 @@ export class AppTrust {
 			mkdirSync(this.dataDir, { recursive: true });
 			writeFileSync(this.file, `${JSON.stringify({ allowed: this.list() }, null, "\t")}\n`);
 		} catch (error) {
-			console.warn("[board-eval] could not write the trust list:", error);
+			console.warn("[app-trust] could not write the trust list:", error);
 		}
 	}
 

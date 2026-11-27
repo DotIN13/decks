@@ -13,10 +13,10 @@ export default tool({
   description: spec.description,
   args: Object.fromEntries(Object.entries(spec.parameters).map(([key, about]) => [key, tool.schema.string().describe(about)])),
   async execute(args, context) {
-    const url = process.env.DECKS_STAGE_URL
+    const url = process.env.DECKS_CANVAS_URL
     const token = process.env.DECKS_OPENCODE_SECRET
     if (!url || !token) throw new Error("This opencode session was not started by Decks, so there is no Google Docs to reach.")
-    const response = await fetch(url.replace(/\/stage\/eval$/, "/gdocs/call"), {
+    const response = await fetch(url.replace(/\/canvas\/eval$/, "/gdocs/call"), {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({ tool: "gdocs_read", args, sessionID: context.sessionID }),

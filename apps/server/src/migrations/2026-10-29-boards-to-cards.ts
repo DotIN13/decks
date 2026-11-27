@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, posix } from "node:path";
 import { revisionOf } from "../deck/loader.ts";
 import { SMALL_TAKEN, smallName, thumbName, webpSize } from "../pictures/ladder.ts";
-import { BOARD_W } from "../cards/size.ts";
+import { CARD_W as BOARD_W } from "@decks/deck-kit";
 
 /**
  * 2026-10-29: every board on a canvas becomes a card.

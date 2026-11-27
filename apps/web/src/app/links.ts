@@ -23,7 +23,7 @@ import { call, warnIfFailed } from "../state/socket.ts";
  */
 export const flyToPages = (cards: Page[], options?: { animate?: boolean }) => {
 	if (cards.length === 0) return;
-	const canvas = document.querySelector(".stage, iframe.canvas-frame");
+	const canvas = document.querySelector(".canvas, iframe.canvas-frame");
 	if (!canvas) return;
 	const view = { width: canvas.clientWidth, height: canvas.clientHeight };
 	moveCamera(fitInto(cards.map(boxOf), view, canvasBox(view)), options);

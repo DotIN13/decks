@@ -72,7 +72,7 @@ export interface DrawingOptions {
 	depth?: number;
 	/**
 	 * How words are measured to lay an edit out, as the host's server measures them: the canvas
-	 * engine's (`stage/measure.ts`), so a card sized by its words and the arrows joined to it come
+	 * engine's (`view/measure.ts`), so a card sized by its words and the arrows joined to it come
 	 * out where the server's drawing will have them. Default: pen's estimate.
 	 */
 	measure?: MeasureText;

@@ -9,10 +9,10 @@ import { buildBundle } from "./bundle.ts";
 import { zip } from "./zip.ts";
 
 test("a zip written here is read back by the browser's reader, stored and deflated alike", async () => {
-	const text = "a board ".repeat(500);
+	const text = "a card ".repeat(500);
 	const random = crypto.getRandomValues(new Uint8Array(2048));
-	const files = readZip(new Uint8Array(zip([{ name: "deck/boards/é.html", data: Buffer.from(text) }, { name: "pictures/x.webp", data: random }])).buffer);
-	assert.deepEqual(files.map((one) => one.name), ["deck/boards/é.html", "pictures/x.webp"]);
+	const files = readZip(new Uint8Array(zip([{ name: "deck/pages/é.html", data: Buffer.from(text) }, { name: "pictures/x.webp", data: random }])).buffer);
+	assert.deepEqual(files.map((one) => one.name), ["deck/pages/é.html", "pictures/x.webp"]);
 	assert.equal(new TextDecoder().decode(await files[0]!.bytes()), text);
 	assert.deepEqual(await files[1]!.bytes(), random);
 });
@@ -52,8 +52,8 @@ test("a bundle carries the canvas, its cards, what they name, lib, and pictures,
 		assert.ok(names.includes(wanted), `${wanted} is in the bundle`);
 	}
 	assert.ok(!names.includes("deck/canvases/other/cards/o/index.html"), "a card of another canvas that is only linked to stays out");
-	assert.deepEqual(manifest.boards.map(({ path, x, y }) => ({ path, x, y })), [{ path: A, x: 10, y: 20 }, { path: B, x: 1200, y: 20 }]);
-	const first = manifest.boards[0]!;
+	assert.deepEqual(manifest.cards.map(({ path, x, y }) => ({ path, x, y })), [{ path: A, x: 10, y: 20 }, { path: B, x: 1200, y: 20 }]);
+	const first = manifest.cards[0]!;
 	assert.ok(first.lastWrittenBy === undefined && first.namedAt === undefined && (first.seenAt ?? 0) > 0, "a card arrives read, with nobody's byline");
 	assert.equal(manifest.pen.base, "canvases/plan/");
 	assert.deepEqual(manifest.pictures, { [A]: { light: `pictures/light/${A}.webp` } });

@@ -632,7 +632,7 @@ export function Composer(props: {
 						</Show>
 					</p>
 				</Show>
-				{/* The controls row. `dockrow` is only the two control sizes the board fixes
+				{/* The controls row. `dockrow` is only the two control sizes the card fixes
 				    for this row (26px, 34 under a finger); the layout is here. */}
 				<div class="dock-row mt-2 flex items-center gap-1.5">
 					<Show

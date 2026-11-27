@@ -81,7 +81,7 @@ for (const run of RUNS) {
 		const at = await canvas.evaluate(() => {
 			const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform?.() ?? "");
 			if (!m) return null;
-			const stage = document.querySelector(".stage");
+			const stage = document.querySelector(".canvas");
 			const rect = stage.getBoundingClientRect();
 			const zoom = Number(m[3]);
 			const boards = (window.__decksProbes?.cards?.() ?? []).map((b) => b.rect);
@@ -115,7 +115,7 @@ for (const run of RUNS) {
 		const wide = await canvas.evaluate(() => Math.min(360, innerWidth * 0.45));
 		if (!b || b.width >= wide) break;
 		await canvas.evaluate((b) => {
-			const stage = document.querySelector(".stage");
+			const stage = document.querySelector(".canvas");
 			stage.dispatchEvent(new WheelEvent("wheel", { deltaY: -60, ctrlKey: true, clientX: b.x + b.width / 2, clientY: b.y + b.height / 2, bubbles: true, cancelable: true }));
 		}, b);
 		await settle(page, 120);

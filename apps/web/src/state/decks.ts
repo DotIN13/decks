@@ -40,7 +40,7 @@ let clientBase: string | undefined;
 function decks(): Decks {
 	const base = `${location.origin}${apiBase().replace(/\/api$/, "")}`;
 	if (!client || clientBase !== base) {
-		client = connect({ url: base, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: authHeaders() });
+		client = connect({ url: base, canvas: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: authHeaders() });
 		clientBase = base;
 	}
 	return client;
@@ -67,7 +67,7 @@ export async function act<T = unknown>(verb: string, args: unknown[], agent?: st
 async function sendDrawingEdit(agentId: string, ops: unknown[], edit?: string): Promise<boolean> {
 	let done: unknown;
 	try {
-		const connection = edit ? connect({ url: decks().address, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: { ...authHeaders(), "x-decks-edit": edit } }) : decks();
+		const connection = edit ? connect({ url: decks().address, canvas: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: { ...authHeaders(), "x-decks-edit": edit } }) : decks();
 		done = (await connection.call("canvas.batch", [ops])).value;
 	} catch (error) {
 		notice("warn", error instanceof DecksError || error instanceof Error ? error.message : String(error));

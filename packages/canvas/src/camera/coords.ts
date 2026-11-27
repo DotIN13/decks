@@ -39,7 +39,7 @@ export type Delta<S extends string> = { dx: number; dy: number } & In<S>;
  * A pointer event's position, in canvas pixels — **which is the event's own `clientX`.**
  *
  * The canvas element is the viewport, and that is a property of the stylesheet rather than a
- * hope: `#root` has `margin: 0`, `.app` is `position: relative`, and `.work` and `.stage` are
+ * hope: `#root` has `margin: 0`, `.app` is `position: relative`, and `.work` and `.canvas` are
  * both `position: absolute; inset: 0`, with no transform on any ancestor (the only transforms
  * in the app are on `.dock`, `.side` and a palette button, none of them above the canvas).
  *
@@ -64,7 +64,7 @@ export function checkCanvasOrigin(canvas: Element): void {
 	const rect = canvas.getBoundingClientRect();
 	if (Math.abs(rect.left) < 0.5 && Math.abs(rect.top) < 0.5) return;
 	console.warn(
-		`The stage is at (${Math.round(rect.left)}, ${Math.round(rect.top)}), not the viewport's origin. ` +
+		`The canvas is at (${Math.round(rect.left)}, ${Math.round(rect.top)}), not the viewport's origin. ` +
 			"Every pointer position on the canvas is now off by that much — see `viewPoint` in camera/coords.ts.",
 	);
 }

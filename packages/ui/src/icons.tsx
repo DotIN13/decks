@@ -50,9 +50,9 @@ export function Icon(props: { of: LucideIcon; size?: number; class?: string }) {
 }
 
 /**
- * The app's own mark: boards of unequal size laid out on a canvas, the drawing the favicon
+ * The app's own mark: cards of unequal size laid out on a canvas, the drawing the favicon
  * is cut from (`public/favicon.svg`, which says why the asymmetry matters). Ink is
- * `currentColor`, so it takes the colour of the text beside it; the two fainter boards are
+ * `currentColor`, so it takes the colour of the text beside it; the two fainter cards are
  * opacities of that ink, which is fine here where the ground is known.
  */
 export function DecksMark(props: { size?: number; class?: string }) {

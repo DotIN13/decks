@@ -38,7 +38,7 @@ const agentId = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!agentId);
 
 // --- an edit from the wire: a note, and an arrow from it to a board --------------------------------
-const firstCard = deck.boards[0].path;
+const firstCard = deck.cards[0].path;
 /*
  * On disk a card item's `url` and `metadata.path` are relative to the canvas folder: the canvas's
  * card `canvases/<canvas>/cards/x/index.html` is `cards/x/index.html` in its own file.
@@ -47,7 +47,7 @@ const inFolder = (path) => path.replace(/^canvases\/[^/]+\//, "");
 // On empty canvas the page shows, so the hand edit below lands on the note and not on a board.
 const middle = await (async () => {
 	const { found, m } = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const t = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		const out = [];
@@ -89,8 +89,8 @@ say("its version is pen's", typeof doc.version === "string" && /^\d+\.\d+$/.test
 
 // --- cards are browser items in it ---------------------------------------------------------------
 const cardItems = () => onDisk().children.filter((n) => n.type === "browser" && n.metadata?.type === "decks.card");
-const shownPaths = (await until(() => cardItems().length >= deck.boards.length && cardItems())) || cardItems();
-say("every card on the stage is a browser item in the file", deck.boards.every((b) => shownPaths.some((n) => n.metadata.path === inFolder(b.path))), `${shownPaths.length} of ${deck.boards.length}`);
+const shownPaths = (await until(() => cardItems().length >= deck.cards.length && cardItems())) || cardItems();
+say("every card on the stage is a browser item in the file", deck.cards.every((b) => shownPaths.some((n) => n.metadata.path === inFolder(b.path))), `${shownPaths.length} of ${deck.cards.length}`);
 const item = shownPaths.find((n) => n.metadata.path === inFolder(firstCard));
 say("a card item points at the card's file, relative to the stage", item?.url === inFolder(firstCard), item?.url);
 
@@ -117,20 +117,20 @@ const drawn = await until(() => canvas.evaluate(() => {
 	// In the canvas frame `__decksProbes.engine` can be an engine made before the one on screen: the sheet's own count says a frame was drawn.
 	if ((globalThis.__decksProbes?.sheet?.shown ?? 0) > 0 && globalThis.__decksProbes?.rust?.placed?.has("e2e-note")) return true;
 	// The stage's one sheet, painted in a worker: shown, and sized from the frame it was handed.
-	const canvas = document.querySelector(".stage-sheet");
+	const canvas = document.querySelector(".canvas-sheet");
 	return !!canvas && !canvas.hidden && parseFloat(canvas.style.width) > 1;
 }), 15000);
 say("the drawing layer is on screen", !!drawn, JSON.stringify(await canvas.evaluate(() => globalThis.__decksProbes?.engine?.stats?.())));
 
 // --- a picture of the stage, taken by the server's own Chromium --------------------------------------
 const shotAt = Date.now();
-const shot = await fetch(`${API}/api/stage-shot?agent=${agentId}&of=e2e-note&format=png`, { headers: await asPerson() });
+const shot = await fetch(`${API}/api/canvas-shot?agent=${agentId}&of=e2e-note&format=png`, { headers: await asPerson() });
 const png = Buffer.from(await shot.arrayBuffer());
 const pngSize = png.length > 24 && png.readUInt32BE(0) === 0x89504e47 ? { w: png.readUInt32BE(16), h: png.readUInt32BE(20) } : undefined;
-say("the server takes a PNG of an item on the stage", shot.status === 200 && !!pngSize, `${shot.status} ${JSON.stringify(pngSize)} in ${Date.now() - shotAt} ms`);
+say("the server takes a PNG of an item on the canvas", shot.status === 200 && !!pngSize, `${shot.status} ${JSON.stringify(pngSize)} in ${Date.now() - shotAt} ms`);
 // The note is 240 wide and framed with 24 on each side, at scale 2.
 say("…framed on the item with a margin, at twice the pixels", pngSize?.w === (240 + 48) * 2, JSON.stringify(pngSize));
-const whole = await fetch(`${API}/api/stage-shot?agent=${agentId}&format=pdf`, { headers: await asPerson() });
+const whole = await fetch(`${API}/api/canvas-shot?agent=${agentId}&format=pdf`, { headers: await asPerson() });
 say("…and the whole stage as a PDF", whole.status === 200 && Buffer.from(await whole.arrayBuffer()).subarray(0, 4).toString() === "%PDF", String(whole.status));
 
 // --- a hand edit of the file reaches the browser ----------------------------------------------------
@@ -179,7 +179,7 @@ if (inView) {
 	await rest(page);
 }
 const spots = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	// A board out of live zoom is a picture on the stage's canvas, not an element: ask the stage where they are.
 	const boards = (window.__decksProbes?.cards?.() ?? []).map((b) => b.rect);
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage && boards.every((r) => x < r.left - 8 || x > r.right + 8 || y < r.top - 8 || y > r.bottom + 8);
@@ -208,7 +208,7 @@ let cardId;
 if (spot) {
 	await page.mouse.click(spot.x + 150, spot.y + 100);
 	await page.keyboard.press("r");
-	const armed = await canvas.evaluate(() => document.querySelector(".stage").dataset.penTool);
+	const armed = await canvas.evaluate(() => document.querySelector(".canvas").dataset.penTool);
 	say("R arms the rectangle tool", armed === "rectangle", armed);
 	const had = new Set(onDisk().children.map((n) => n.id));
 	await page.mouse.move(spot.x, spot.y);
@@ -302,7 +302,7 @@ if (spot) {
 	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
 	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };
 	// The selection's action pill and its shadow are not the item: kept out of the pixels that place it.
-	const quiet = await canvas.addStyleTag({ content: ".stage-fixed > .card-callout { display: none !important }" });
+	const quiet = await canvas.addStyleTag({ content: ".canvas-fixed > .card-callout { display: none !important }" });
 	const parked = await paintedAt(area);
 
 	// Dragging the radius handle along the diagonal rounds every corner, in the file.

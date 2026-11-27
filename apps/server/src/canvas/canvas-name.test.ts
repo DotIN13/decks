@@ -33,7 +33,7 @@ test("an empty canvas is not asked about, whatever it is called", () => {
 	}
 });
 
-test("a canvas with boards and only its agent's name is asked to be named, until it is", () => {
+test("a canvas with cards and only its agent's name is asked to be named, until it is", () => {
 	const { root, pens, put } = setup();
 	try {
 		const canvas = pens.claim("Agent 3", { provisional: true });
@@ -47,7 +47,7 @@ test("a canvas with boards and only its agent's name is asked to be named, until
 	}
 });
 
-test("a named canvas that now holds mostly other boards is asked whether the name still fits, and saying it again ends that", () => {
+test("a named canvas that now holds mostly other cards is asked whether the name still fits, and saying it again ends that", () => {
 	const { root, pens, put } = setup();
 	try {
 		const canvas = pens.claim("Pricing study");

@@ -139,7 +139,7 @@ at("reloading onto it");
 if (QUERY) await page.goto(`${page.url().split("?")[0]}?${QUERY}`, { waitUntil: "domcontentloaded" });
 else await page.reload({ waitUntil: "domcontentloaded" });
 let canvas = await canvasFrame(page, { timeout: 90000 }).catch((error) => {
-	say("the canvas frame shows its stage", false, `${error.message}; page errors: ${errors.join(" | ")}; frames: ${page.frames().map((f) => f.url().slice(0, 60)).join(", ")}`);
+	say("the canvas frame shows its canvas", false, `${error.message}; page errors: ${errors.join(" | ")}; frames: ${page.frames().map((f) => f.url().slice(0, 60)).join(", ")}`);
 	process.exit(1);
 });
 at("waiting for 112 items");
@@ -194,7 +194,7 @@ if (PANEL === "closed") {
 }
 
 await canvas.evaluate(() => {
-	const stage = () => document.querySelector(".stage");
+	const stage = () => document.querySelector(".canvas");
 	const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
 	const wheel = (deltaX, deltaY, ctrlKey) => {
 		const r = stage().getBoundingClientRect();
@@ -273,7 +273,7 @@ const quiet = (ms = 1200, cap = 15000) =>
 			while (performance.now() - t0 < cap) {
 				await new Promise((done) => setTimeout(done, 100));
 				const now = JSON.stringify([globalThis.__decksProbes?.sheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length, pictures()]);
-				const d = document.querySelector(".stage")?.dataset;
+				const d = document.querySelector(".canvas")?.dataset;
 				if (now !== last || d?.moving === "true" || d?.gliding === "true") {
 					last = now;
 					at = performance.now();

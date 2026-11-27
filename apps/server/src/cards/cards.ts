@@ -71,7 +71,7 @@ const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "
 
 /**
  * A card as a page of its own: for a tab, and for the picture the server's Chrome takes of it. The
- * piece goes in the body as it is, under board.css, and its scripts are called with a card whose
+ * piece goes in the body as it is, under card.css, and its scripts are called with a card whose
  * root is this page's own document.
  */
 export { cardModules };
@@ -86,13 +86,13 @@ export function cardPage(input: { path: string; source: string; title: string; w
 <head>
 	<meta charset="utf-8" />
 	<title>${escapeHtml(input.title)}</title>
-	<meta name="board" content='${JSON.stringify({ w: input.w })}' />
+	<meta name="card" content='${JSON.stringify({ w: input.w })}' />
 	<link rel="stylesheet" href="../../lib/card.css" />
 	<script type="importmap">
 ${withDeckImports(input.deckImports)}
 	</script>
 </head>
-<body class="board" style="width:${input.w}px">
+<body class="card-page" style="width:${input.w}px">
 <div class="card-body" id="decks-card">${html}</div>
 <script type="module">
 	// The card as the canvas hands it to its scripts (\`@decks/canvas\`, \`items/card.ts\`, CardContext), on this page of its own.

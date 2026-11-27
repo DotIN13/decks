@@ -30,7 +30,7 @@ export function heardDeck(message: Of<"deck"> | Of<"card"> | Of<"doc"> | Of<"can
 			 * as new objects. `reconcile` keyed on the path updates the cards that
 			 * changed and leaves the rest — and their documents — alone.
 			 */
-			setState("pages", reconcile(message.deck.boards, { key: "path", merge: false }));
+			setState("pages", reconcile(message.deck.cards, { key: "path", merge: false }));
 			hooks.landed();
 			return;
 		case "card.changed": {

@@ -197,7 +197,7 @@ test("in the harness: Sign in to Studio answers an address to open; Studio's but
 	const studio = await fakeStudio();
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-studio-login-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));

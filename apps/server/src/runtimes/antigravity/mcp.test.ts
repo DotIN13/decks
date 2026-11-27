@@ -29,7 +29,7 @@ async function canvasServer(answer: { text: string; isError?: boolean }) {
 	});
 	await new Promise<void>((accept) => server.listen(0, "127.0.0.1", accept));
 	const port = (server.address() as { port: number }).port;
-	return { url: `http://127.0.0.1:${port}/api/stage/eval`, seen, close: () => server.close() };
+	return { url: `http://127.0.0.1:${port}/api/canvas/eval`, seen, close: () => server.close() };
 }
 
 interface McpClient {
@@ -41,7 +41,7 @@ interface McpClient {
 /** Spawn the MCP server, and return a client that maps request id to answer. */
 async function mcpClient(url: string): Promise<McpClient> {
 	const child = spawn(process.execPath, [mcpServerPath()], {
-		env: { ...process.env, DECKS_STAGE_URL: url, DECKS_STAGE_TOKEN: "test-token" },
+		env: { ...process.env, DECKS_CANVAS_URL: url, DECKS_CANVAS_TOKEN: "test-token" },
 		stdio: ["pipe", "pipe", "pipe"],
 	});
 	const waiter = new Map<number, { accept: (value: unknown) => void }>();
@@ -121,9 +121,9 @@ test("the old canvas tool is an unknown tool, said as a failed call", { skip: fa
 	const client = await mcpClient(canvas.url);
 	try {
 		await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } });
-		const outcome = (await client.call("tools/call", { name: "stage_eval", arguments: { code: "x" } })) as { isError?: boolean; content?: Array<{ text?: string }> };
+		const outcome = (await client.call("tools/call", { name: "canvas_eval", arguments: { code: "x" } })) as { isError?: boolean; content?: Array<{ text?: string }> };
 		assert.equal(outcome.isError, true);
-		assert.match(outcome.content?.[0]?.text ?? "", /Unknown tool: stage_eval/);
+		assert.match(outcome.content?.[0]?.text ?? "", /Unknown tool: canvas_eval/);
 	} finally {
 		client.close();
 		canvas.close();

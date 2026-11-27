@@ -79,7 +79,7 @@ export function createCardLinks(d: CardLinksNeeds) {
 	};
 
 	/** Whether a deck path is one the canvas opens beside a card: another card. */
-	const opensBeside = (path: string) => /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path) || /(?:^|\/)boards\/.+\.html?$/i.test(path);
+	const opensBeside = (path: string) => /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path);
 
 	return {
 		followLink,

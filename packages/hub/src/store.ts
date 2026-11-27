@@ -56,7 +56,7 @@ export interface HubStore {
 	 * reads and merges again, so two processes editing one canvas never keep a drawing made on an old one.
 	 */
 	commitCanvas(id: string, pen: PenDocument, edits: PenEdit[], by: string, onto?: number): Maybe<number>;
-	/** A canvas's files, by their path in its folder (`boards/a.html`). */
+	/** A canvas's files, by their path in its folder (`cards/a.html`). */
 	canvasFiles(id: string): Maybe<SyncFile[]>;
 	canvasFile(id: string, path: string): Maybe<SyncFile | undefined>;
 	/** Keep a file's bytes; `base` is the version the writer replaced, and a stale one is kept as a version only. */

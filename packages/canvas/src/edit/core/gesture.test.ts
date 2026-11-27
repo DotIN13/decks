@@ -225,7 +225,7 @@ test("a marquee picks what is wholly inside it as it goes, and Shift adds that t
 	assert.deepEqual(round.selection.cards, ["cards/one/index.html"]);
 });
 
-test("a board pressed is the app's selected board, and a drag carries it, moves it on the lift, and holds it there until it lands", () => {
+test("a card pressed is the app's selected card, and a drag carries it, moves it on the lift, and holds it there until it lands", () => {
 	const { state, steps } = run(withSelection(initialState("edit"), { items: ["a"] }), [
 		{ type: "press-card", path: "cards/one/index.html", ...at(1100, 100) },
 		{ type: "move", ...at(1150, 160) },
@@ -252,7 +252,7 @@ test("a board pressed is the app's selected board, and a drag carries it, moves 
 	assert.equal(shift.state.gesture, undefined);
 });
 
-test("a board selected by a press, then Shift and a press on another: both are picked, and a drag by either carries both", () => {
+test("a card selected by a press, then Shift and a press on another: both are picked, and a drag by either carries both", () => {
 	const two = fakeScene([], [
 		{ path: "cards/one/index.html", x: 0, y: 0, w: 400, h: 300 },
 		{ path: "cards/two/index.html", x: 900, y: 0, w: 400, h: 300 },
@@ -278,7 +278,7 @@ test("a board selected by a press, then Shift and a press on another: both are p
 	assert.deepEqual(gone.selection.cards, ["cards/two/index.html"]);
 });
 
-test("a board dragged near another settles 160 from it, the reading gap, and says so", () => {
+test("a card dragged near another settles 160 from it, the reading gap, and says so", () => {
 	const two = fakeScene([], [
 		{ path: "cards/one/index.html", x: 0, y: 0, w: 400, h: 300 },
 		{ path: "cards/two/index.html", x: 900, y: 0, w: 400, h: 300 },
@@ -359,7 +359,7 @@ test("two presses on a frame's top handle hug it again; slower, or on another ha
 	assert.deepEqual(slow.steps[3]!.ops, []);
 });
 
-test("a board's handle sizes it with Shift keeping its shape; the box is held until the board is at it", () => {
+test("a card's handle sizes it with Shift keeping its shape; the box is held until the card is at it", () => {
 	const box = { path: "cards/one/index.html", x: 1000, y: 0, w: 400, h: 300 };
 	const { state, steps } = run(initialState("edit"), [
 		{ type: "press-card-handle", handle: "se", box, ...at(1400, 300) },

@@ -266,7 +266,7 @@ export function OverlayLayer(
 						)}
 					</For>
 				</svg>
-				{/* A gap that says its size: the reading gap between two boards. */}
+				{/* A gap that says its size: the reading gap between two cards. */}
 				<For each={o().guides.filter((guide) => guide.label)}>
 					{(guide) => (
 						<div class="pen-measure-tag" data-guide="gap" style={{ left: `${(guide.x1 + guide.x2) / 2}px`, top: `${(guide.y1 + guide.y2) / 2}px`, transform: `scale(${1 / props.zoom}) translate(-50%, -50%)` }}>

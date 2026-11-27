@@ -91,11 +91,11 @@ export interface AgentRecord {
 	/** The workspace the agent works in, as a slug (`workspaces.ts`). Its own fact, kept across restarts. */
 	workspace?: string;
 	/**
-	 * The folder its canvas drawing lives in, `stages/<stage>/stage.pen` (`canvas/pens.ts`).
+	 * The folder its canvas drawing lives in, `canvases/<canvas>/canvas.pen` (`canvas/pens.ts`).
 	 *
 	 * Named once, when the canvas is first drawn on, and kept: the folder does not follow a rename.
 	 */
-	stage?: string;
+	canvas?: string;
 	createdAt: number;
 	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
 	model?: AgentModel;
@@ -153,7 +153,7 @@ interface OutsideMail {
 	from: string;
 	fromName: string;
 	task: string;
-	boards: string[];
+	cards: string[];
 	at: number;
 	reply?: boolean;
 	person?: true;
@@ -190,7 +190,7 @@ export class AgentStore {
 		} catch {
 			/*
 			 * A deck on a read-only volume, or a disk that is full. Losing the chat list is
-			 * not worth taking the deck down for — the boards are the artifact, and they
+			 * not worth taking the deck down for — the cards are the artifact, and they
 			 * have their own error paths.
 			 */
 		}
@@ -488,7 +488,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 	/*
 	 * And the canvas's own arrangement, read back for the same reason.
 	 *
-	 * This is the field the whole per-stage change is *for*: without it, every restart puts every
+	 * This is the field the whole per-canvas change is *for*: without it, every restart puts every
 	 * conversation back to the deck's auto-layout, and the one thing that had to keep working — a card
 	 * you dragged staying where you dragged it — does not. Validated here rather than trusted, because
 	 * it arrives from a file and is fed to `Deck.arrange` as coordinates.
@@ -516,10 +516,10 @@ function validate(raw: unknown, id: string): AgentRecord {
 		context: strings(source.context),
 		inPlay: strings(source.inPlay),
 		...(positions ? { positions } : {}),
-		...(typeof source.canvas === "string" && source.canvas ? { fromCanvas: source.canvas } : {}),
+		...(typeof source.fromCanvas === "string" && source.fromCanvas ? { fromCanvas: source.fromCanvas } : {}),
 		...(source.role === "dispatcher" ? { wasDispatcher: true as const } : {}),
 		...(typeof source.workspace === "string" && source.workspace ? { workspace: source.workspace } : {}),
-		...(typeof source.stage === "string" && /^[^/\\.][^/\\]*$/.test(source.stage) ? { stage: source.stage } : {}),
+		...(typeof source.canvas === "string" && /^[^/\\.][^/\\]*$/.test(source.canvas) ? { canvas: source.canvas } : {}),
 		createdAt: created,
 		...(model ? { model } : {}),
 		...(usage ? { usage } : {}),
@@ -549,7 +549,7 @@ function outsideOf(raw: unknown): AgentRecord["outside"] | undefined {
 	if (typeof source.key !== "string" || !source.key) return undefined;
 	const inbox = (Array.isArray(source.inbox) ? source.inbox : [])
 		.filter((one): one is OutsideMail => !!one && typeof one === "object" && typeof (one as OutsideMail).task === "string" && typeof (one as OutsideMail).fromName === "string")
-		.map((one) => ({ from: String(one.from ?? ""), fromName: one.fromName, task: one.task, boards: Array.isArray(one.boards) ? one.boards.filter((path) => typeof path === "string") : [], at: Number(one.at) || 0, ...(one.reply ? { reply: true } : {}), ...(one.person ? { person: true as const } : {}) }));
+		.map((one) => ({ from: String(one.from ?? ""), fromName: one.fromName, task: one.task, cards: Array.isArray(one.cards) ? one.cards.filter((path) => typeof path === "string") : [], at: Number(one.at) || 0, ...(one.reply ? { reply: true } : {}), ...(one.person ? { person: true as const } : {}) }));
 	return { key: source.key, client: typeof source.client === "string" && source.client ? source.client : "an MCP client", seen: Number(source.seen) || 0, inbox };
 }
 

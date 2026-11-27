@@ -52,7 +52,7 @@ export function cardHeaders(res: Response): void {
  *
  * Cards get the app's origin because the app edits them. An asset has no such
  * claim, and since the user can now drop one in, `assets/` holds files nobody in
- * this codebase wrote: an uploaded `evil.html` served under `/api/board/` with
+ * this codebase wrote: an uploaded `evil.html` served under `/api/card/` with
  * card headers would be a stored cross-site script *on the app's own origin*, and
  * `data-embed="../assets/evil.html"` puts the URL in a card file where somebody
  * will eventually open it in a tab. So anything a browser *runs* gets the same

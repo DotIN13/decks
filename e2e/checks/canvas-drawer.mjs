@@ -35,13 +35,13 @@ for (const scheme of OUT ? ["light", "dark"] : ["light"]) {
 	const shot = async (name) => {
 		if (!OUT) return;
 		// With the canvas's own picture in its row, which the server takes on first ask.
-		await until(() => page.locator(".stage-shot[data-loaded]").count());
+		await until(() => page.locator(".canvas-shot[data-loaded]").count());
 		await settle(page, 450);
 		await page.screenshot({ path: `${OUT}/${scheme}-${name}.png` });
 	};
 	const chip = page.locator(".v3-topbar .v3-canvas-chip");
-	const manager = page.locator(".stage-manager");
-	const box = page.locator(".stage-manager .stage-box");
+	const manager = page.locator(".canvas-manager");
+	const box = page.locator(".canvas-manager .canvas-box");
 	/** Up and still: the drawer open, its slide over. */
 	const up = () =>
 		until(async () => {
@@ -56,68 +56,68 @@ for (const scheme of OUT ? ["light", "dark"] : ["light"]) {
 	say(`${scheme}: the bar's title opens the canvases as a drawer`, (await manager.getAttribute("data-form")) === "drawer" && !!at, JSON.stringify(at));
 	say("…the screen's width, standing on its foot, with the canvas showing above it", !!at && Math.abs(at.x) < 0.5 && Math.abs(at.width - view.width) < 0.5 && at.y > 56 && at.y < view.height * 0.4, JSON.stringify([at, view]));
 	const rows = await page.evaluate(() => {
-		const wall = document.querySelector(".stage-wall").getBoundingClientRect();
-		return [...document.querySelectorAll(".stage-card")].map((card) => {
+		const wall = document.querySelector(".canvas-wall").getBoundingClientRect();
+		return [...document.querySelectorAll(".canvas-card")].map((card) => {
 			const row = card.getBoundingClientRect();
-			const parts = [...card.querySelectorAll(".stage-open, .stage-foot, .stage-acts, .stage-acts .stage-icon")].map((one) => one.getBoundingClientRect());
+			const parts = [...card.querySelectorAll(".canvas-open, .canvas-foot, .canvas-acts, .canvas-acts .canvas-icon")].map((one) => one.getBoundingClientRect());
 			const label = card.querySelector(".row-label");
 			return { h: row.height, inView: row.top >= wall.top - 1 && row.bottom <= wall.bottom + 1, inside: parts.every((part) => part.left >= -0.5 && part.right <= innerWidth + 0.5 && part.width > 1), name: label?.textContent ?? "", cut: !!label && (label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1) };
 		});
 	});
 	say("the canvases are a list: every row short, and at least six on the screen at once", rows.length >= 7 && rows.every((row) => row.h <= 80) && rows.filter((row) => row.inView).length >= 6, JSON.stringify(rows.map((row) => [Math.round(row.h), row.inView])));
 	say("…each with its picture, name, rename and delete inside the screen, and its name whole", rows.every((row) => row.inside && !row.cut), JSON.stringify(rows.filter((row) => !row.inside || row.cut)));
-	const targets = await page.evaluate(() => [...document.querySelectorAll(".stage-acts .stage-icon, .stage-new, .stage-sort > button")].map((one) => Math.round(one.getBoundingClientRect().height)));
+	const targets = await page.evaluate(() => [...document.querySelectorAll(".canvas-acts .canvas-icon, .canvas-new, .canvas-sort > button")].map((one) => Math.round(one.getBoundingClientRect().height)));
 	say("…and every control at least 34 px tall, for a finger", targets.length > 0 && targets.every((height) => height >= 34), JSON.stringify(targets));
 	// One centre line a row: the picture, the name over its line, the faces of who is on it, rename and delete.
 	const lines = await page.evaluate(() =>
-		[...document.querySelectorAll(".stage-card")].map((card) => {
+		[...document.querySelectorAll(".canvas-card")].map((card) => {
 			const mid = (one) => {
 				const box = one.getBoundingClientRect();
 				return box.top + box.height / 2;
 			};
 			const row = mid(card);
 			const label = card.querySelector(".row-label").getBoundingClientRect();
-			const meta = card.querySelector(".stage-meta").getBoundingClientRect();
-			const marks = [...card.querySelectorAll(".stage-open, .stage-faces .agent-face, .stage-acts .stage-icon")].map((one) => Math.round((mid(one) - row) * 10) / 10);
-			return { marks, words: Math.round(((label.top + meta.bottom) / 2 - row) * 10) / 10, left: Math.round((label.left - meta.left) * 10) / 10, faces: card.querySelectorAll(".stage-faces .agent-face").length };
+			const meta = card.querySelector(".canvas-meta").getBoundingClientRect();
+			const marks = [...card.querySelectorAll(".canvas-open, .canvas-faces .agent-face, .canvas-acts .canvas-icon")].map((one) => Math.round((mid(one) - row) * 10) / 10);
+			return { marks, words: Math.round(((label.top + meta.bottom) / 2 - row) * 10) / 10, left: Math.round((label.left - meta.left) * 10) / 10, faces: card.querySelectorAll(".canvas-faces .agent-face").length };
 		}),
 	);
 	say("each row keeps one centre line: its picture, its words, the faces on it, rename and delete", lines.some((line) => line.faces > 0) && lines.every((line) => line.marks.every((off) => Math.abs(off) <= 1) && Math.abs(line.words) <= 1.5 && Math.abs(line.left) <= 0.5), JSON.stringify(lines));
 	const edges = await page.evaluate(() => {
 		const left = (selector) => [...document.querySelectorAll(selector)].map((one) => Math.round(one.getBoundingClientRect().left * 10) / 10);
 		const right = (selector) => [...document.querySelectorAll(selector)].map((one) => Math.round(one.getBoundingClientRect().right * 10) / 10);
-		return { pictures: left(".stage-open"), names: left(".row-label"), bins: right(".stage-acts"), head: [left(".stage-title")[0], left(".stage-search")[0]], headRight: [right(".stage-title-row .stage-new")[0], right(".stage-sort")[0]] };
+		return { pictures: left(".canvas-open"), names: left(".row-label"), bins: right(".canvas-acts"), head: [left(".canvas-title")[0], left(".canvas-search")[0]], headRight: [right(".canvas-title-row .canvas-new")[0], right(".canvas-sort")[0]] };
 	});
 	const same = (list) => list.every((one) => Math.abs(one - list[0]) <= 0.5);
 	say("…and the rows share their edges: pictures, names, and rename and delete each in a column, under the head's own edges", same(edges.pictures) && same(edges.names) && same(edges.bins) && same([...edges.head, edges.pictures[0]]) && same(edges.headRight), JSON.stringify(edges));
 	await shot("canvases-drawer");
 
 	// --- renaming and deleting keep the row's line ---------------------------------------------------------------
-	const second = page.locator(".stage-card").nth(1);
+	const second = page.locator(".canvas-card").nth(1);
 	const state = () =>
 		second.evaluate((card) => {
 			const mid = (one) => {
 				const box = one.getBoundingClientRect();
 				return box.top + box.height / 2;
 			};
-			const parts = [...card.querySelectorAll(".stage-rename, .stage-acts > *")];
-			return { h: Math.round(card.getBoundingClientRect().height), off: parts.map((one) => Math.round((mid(one) - mid(card.querySelector(".stage-open"))) * 10) / 10), inside: parts.every((one) => one.getBoundingClientRect().left >= 0 && one.getBoundingClientRect().right <= innerWidth), words: !!card.querySelector(".stage-rename") || card.querySelector(".stage-foot").getBoundingClientRect().width };
+			const parts = [...card.querySelectorAll(".canvas-rename, .canvas-acts > *")];
+			return { h: Math.round(card.getBoundingClientRect().height), off: parts.map((one) => Math.round((mid(one) - mid(card.querySelector(".canvas-open"))) * 10) / 10), inside: parts.every((one) => one.getBoundingClientRect().left >= 0 && one.getBoundingClientRect().right <= innerWidth), words: !!card.querySelector(".canvas-rename") || card.querySelector(".canvas-foot").getBoundingClientRect().width };
 		});
 	const rowHeight = (await state()).h;
 	await second.locator('[title="Delete"]').tap();
-	await until(() => second.locator(".stage-confirm").count());
+	await until(() => second.locator(".canvas-confirm").count());
 	const asking = await state();
 	say("Delete asks in the row: its two buttons inside the screen, on the row's line, the row no taller, its name still showing", asking.inside && asking.off.every((off) => Math.abs(off) <= 1) && asking.h === rowHeight && asking.words > 60, JSON.stringify(asking));
 	await shot("canvases-drawer-delete");
 	await second.locator('[aria-label="Keep it"]').tap();
 	await second.locator('[title="Rename"]').tap();
-	await until(() => second.locator(".stage-rename").count());
+	await until(() => second.locator(".canvas-rename").count());
 	const naming = await state();
 	const renameAt = await second.evaluate((card) => {
-		const field = card.querySelector(".stage-rename").getBoundingClientRect();
-		const meta = card.querySelector(".stage-meta").getBoundingClientRect();
-		const acts = card.querySelector(".stage-acts").getBoundingClientRect();
-		const style = getComputedStyle(card.querySelector(".stage-rename"));
+		const field = card.querySelector(".canvas-rename").getBoundingClientRect();
+		const meta = card.querySelector(".canvas-meta").getBoundingClientRect();
+		const acts = card.querySelector(".canvas-acts").getBoundingClientRect();
+		const style = getComputedStyle(card.querySelector(".canvas-rename"));
 		return { letters: Math.round(field.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) - meta.left), gap: Math.round(acts.left - field.right), over: field.bottom > meta.top + 1 };
 	});
 	say("Rename edits the name where it is: its letters where they were, the field clear of rename and delete and over its line, the row no taller", naming.inside && naming.h === rowHeight && Math.abs(renameAt.letters) <= 1 && renameAt.gap >= 4 && !renameAt.over, JSON.stringify([naming, renameAt, rowHeight]));
@@ -125,20 +125,20 @@ for (const scheme of OUT ? ["light", "dark"] : ["light"]) {
 	await page.keyboard.press("Escape");
 
 	// --- naming a new canvas fits the drawer's head -----------------------------------------------------------
-	await page.locator(".stage-new").first().tap();
-	const form = await until(() => page.locator(".stage-new-form").boundingBox());
+	await page.locator(".canvas-new").first().tap();
+	const form = await until(() => page.locator(".canvas-new-form").boundingBox());
 	const field = await page.evaluate(() => {
-		const one = document.querySelector(".stage-new-field");
-		const submit = document.querySelector(".stage-new-form .stage-new").getBoundingClientRect();
+		const one = document.querySelector(".canvas-new-field");
+		const submit = document.querySelector(".canvas-new-form .canvas-new").getBoundingClientRect();
 		return { size: parseFloat(getComputedStyle(one).fontSize), w: one.getBoundingClientRect().width, right: submit.right };
 	});
 	say("New canvas names it in the head, the field wide and its Create inside the screen", !!form && form.x >= 0 && form.x + form.width <= view.width + 0.5 && field.w > 150 && field.right <= view.width, JSON.stringify([form, field]));
 	say("…in type iOS does not zoom the page for", field.size >= 16, String(field.size));
 	await shot("canvases-drawer-new");
-	await page.locator('.stage-new-form [aria-label="Cancel"]').tap();
+	await page.locator('.canvas-new-form [aria-label="Cancel"]').tap();
 
 	// --- the head is the handle ----------------------------------------------------------------------------------
-	const title = await page.locator(".stage-title").boundingBox();
+	const title = await page.locator(".canvas-title").boundingBox();
 	const drag = async (by) => {
 		const x = title.x + title.width / 2;
 		const y = title.y + title.height / 2;
@@ -167,7 +167,7 @@ for (const scheme of OUT ? ["light", "dark"] : ["light"]) {
 	say("a press above it puts it away, and it stays away", (await gone()) === true && (await settle(page, 500), (await manager.count()) === 0));
 	await chip.tap();
 	await up();
-	await page.locator('.stage-card:has-text("Pricing page") .stage-open').tap();
+	await page.locator('.canvas-card:has-text("Pricing page") .canvas-open').tap();
 	say("a row opens its canvas, and the drawer goes", (await gone()) === true && (await until(async () => (await chip.innerText()).includes("Pricing page"))) === true, await chip.innerText());
 
 	say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));

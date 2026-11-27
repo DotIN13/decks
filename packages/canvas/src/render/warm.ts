@@ -1,5 +1,5 @@
 import type { ToWorker } from "./types.ts";
-import { detect, type Detected, type StageModule } from "./backends/detect.ts";
+import { detect, type Detected, type EngineModule } from "./backends/detect.ts";
 
 /**
  * The engine, started before there is a canvas to draw: its worker made and its script loaded, the
@@ -14,20 +14,20 @@ import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 export interface Warm {
 	worker: Worker;
 	detected: Detected;
-	stage: StageModule;
+	wasm: EngineModule;
 }
 
 let warm: Promise<Warm | undefined> | undefined;
 
 /** Start warming, once: `startWorker` and `moduleOf` are the engine's own (`engine.ts`), given so this file holds no second way to do either. */
-export function warmEngine(startWorker: () => Worker, moduleOf: (stage: StageModule) => WebAssembly.Module | undefined): void {
+export function warmEngine(startWorker: () => Worker, moduleOf: (wasm: EngineModule) => WebAssembly.Module | undefined): void {
 	warm ??= (async () => {
 		const worker = startWorker();
 		try {
 			const detected = await detect();
-			const stage = await detected.backend.load();
-			worker.postMessage({ type: "boot", backend: detected.backend.name, lowMemory: detected.lowMemory, module: moduleOf(stage) } satisfies ToWorker);
-			return { worker, detected, stage };
+			const wasm = await detected.backend.load();
+			worker.postMessage({ type: "boot", backend: detected.backend.name, lowMemory: detected.lowMemory, module: moduleOf(wasm) } satisfies ToWorker);
+			return { worker, detected, wasm };
 		} catch {
 			// Not to be had (no backend, a module that would not load): the engine that comes finds out for itself, and says so.
 			worker.terminate();

@@ -79,7 +79,7 @@
 	"composer_mention_label": "Who to name",
 	"composer_context_label": "Context and cost",
 	"composer_context_dial": "Context {percent} full — the numbers behind it",
-	"composer_recipient_board": "a board",
+	"composer_recipient_card": "a card",
 	"composer_recipient_none": "No agent",
 	"composer_recipient_to": "To",
 	"composer_recipient_label": "Who gets the line",
@@ -91,7 +91,7 @@
 	"composer_mode_ask": "Ask first",
 	"composer_mode_ask_note": "Ask before anything it judges worth asking about.",
 	"composer_mode_edit": "Edit freely",
-	"composer_mode_edit_note": "Stop asking about board edits. Commands still ask.",
+	"composer_mode_edit_note": "Stop asking about card edits. Commands still ask.",
 	"composer_mode_plan": "Plan only",
 	"composer_mode_plan_note": "Change nothing at all: read, think, and propose a plan to approve.",
 	"composer_mode_auto": "Auto",
@@ -125,5 +125,5 @@
 	"composer_pill_yours_in": "Your comment, #{component}",
 	"composer_pill_file": "File, in the deck as {path}",
 	"composer_pill_item": "On the canvas, a drawn item",
-	"composer_pill_card": "On the canvas, a board or card: {path}"
+	"composer_pill_card": "On the canvas, a card: {path}"
 }

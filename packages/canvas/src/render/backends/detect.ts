@@ -21,7 +21,7 @@ import * as webgl from "./webgl.ts";
 type BackendName = "webgpu" | "webgl2";
 
 /** The engine's module, either build: they have the same calls. */
-export type StageModule = typeof import("@decks/stage");
+export type EngineModule = typeof import("@decks/stage");
 
 /** Starts the engine again when its device goes, and stops watching when the canvas goes. */
 type Watch = (canvas: EventTarget, on: { lost: () => void; restored: () => void; isLost: () => boolean }) => () => void;
@@ -30,7 +30,7 @@ type Watch = (canvas: EventTarget, on: { lost: () => void; restored: () => void;
 export interface Backend {
 	name: BackendName;
 	/** The engine's module for this backend, initialised: from `compiled` when given (the page's, posted to its worker), else fetched and compiled. */
-	load: (compiled?: WebAssembly.Module) => Promise<StageModule>;
+	load: (compiled?: WebAssembly.Module) => Promise<EngineModule>;
 	watch: Watch;
 }
 
@@ -52,7 +52,7 @@ export class NoBackend extends Error {
 const BACKENDS: Record<BackendName, Backend> = {
 	webgpu: { name: "webgpu", load: (compiled) => import("@decks/stage").then((module) => started(module, compiled, webgpuWasm)), watch: webgpu.watch },
 	// The same calls; only the wasm's own exports (`InitOutput`) differ between the builds.
-	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled, webglWasm)), watch: webgl.watch },
+	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as EngineModule, compiled, webglWasm)), watch: webgl.watch },
 };
 
 /**
@@ -60,7 +60,7 @@ const BACKENDS: Record<BackendName, Backend> = {
  * this is a frame whose page does (`@decks/frame`, `kept.ts`: a frame has no cache, and the module
  * is megabytes); else fetched and compiled as it streams in, as before.
  */
-async function started(module: StageModule, compiled: WebAssembly.Module | undefined, address: string): Promise<StageModule> {
+async function started(module: EngineModule, compiled: WebAssembly.Module | undefined, address: string): Promise<EngineModule> {
 	if (compiled) {
 		await module.default({ module_or_path: compiled });
 		return module;

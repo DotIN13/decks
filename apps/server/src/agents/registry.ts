@@ -155,7 +155,7 @@ export class Registry {
 	 * than needing a second shape for the same fact. `undefined` for an agent in none, which is
 	 * the absence the panel draws one section for.
 	 */
-	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number; stage: string | undefined; avatar?: string; outside?: { client: string; seen: number; waiting: number } }> {
+	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number; canvas: string | undefined; avatar?: string; outside?: { client: string; seen: number; waiting: number } }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
@@ -177,7 +177,7 @@ export class Registry {
 				workspace: agent.workspace,
 				queued: agent.turns.queued,
 				// The canvas it has open, so `decks.canvas.list()` can say who is on each (`canvas/pens.ts`).
-				stage: agent.seat.canvasFolder(),
+				canvas: agent.seat.canvasFolder(),
 				// The picture it drew, `/api/avatar/<id>?rev=…`, for another front end's agent rows (Studio).
 				...(chat.avatar ? { avatar: chat.avatar } : {}),
 				// An agent that works outside Decks: its app, when it last called, what waits for it.
@@ -406,7 +406,7 @@ export class Registry {
 					...(record.userTags ? { userTags: record.userTags } : {}),
 					...(record.outside ? { outside: record.outside } : {}),
 					...(record.workspace ? { workspace: record.workspace } : {}),
-					...(record.stage ? { stage: record.stage } : {}),
+					...(record.canvas ? { canvas: record.canvas } : {}),
 				},
 			});
 		}
@@ -458,7 +458,7 @@ export class Registry {
 	 * `focused()` mints an agent on demand because a deck nobody has spoken to should still have a
 	 * row to speak *in* — right when somebody is about to talk to it, wrong for a read that only
 	 * wants to know where that conversation put its cards. A broadcast must not start a runtime as
-	 * a side effect of being sent, and "no stage" is a real answer: the deck's own auto-layout.
+	 * a side effect of being sent, and "no canvas" is a real answer: the deck's own auto-layout.
 	 *
 	 * `undefined` after a dispose and before the first agent on a fresh deck.
 	 */
@@ -545,7 +545,7 @@ export class Registry {
 	}
 
 	/**
-	 * Make an agent with no task, for a `send` to follow — `stage.create`.
+	 * Make an agent with no task, for a `send` to follow — `decks.create`.
 	 *
 	 * A peer rather than a child: it has no parent to report to and is not counted against
 	 * `MAX_CHILDREN`, because the one making it is not going to wait for it. It opens on the
@@ -638,12 +638,12 @@ export class Registry {
 	 * message mid-turn, as a turn of its own when it is idle, and into its queue when it is busy on
 	 * a runtime that cannot be steered. The answer says which.
 	 */
-	deliver(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
+	deliver(fromId: string, target: string, spec: { task: string; cards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
 		const from = this.sender(fromId);
 		const to = this.resolve(target);
-		const handed = (spec.boards ?? []).filter((path) => this.deck.card(path));
+		const handed = (spec.cards ?? []).filter((path) => this.deck.card(path));
 		to.waits.asked();
-		const answer = to.turns.deliver({ ...from, task: spec.task.trim(), boards: handed, at: Date.now() });
+		const answer = to.turns.deliver({ ...from, task: spec.task.trim(), cards: handed, at: Date.now() });
 		this.publish();
 		return answer;
 	}
@@ -674,12 +674,12 @@ export class Registry {
 		// Only cards that exist, and no context change on the receiver: what it is holding is
 		// its own decision, and a sender that could rewrite it would be a sender that can take
 		// somebody's canvas away. The source rides in the briefing instead.
-		const handed = (spec.boards ?? []).filter((path) => this.deck.card(path));
+		const handed = (spec.cards ?? []).filter((path) => this.deck.card(path));
 		to.waits.asked();
 		const position = to.turns.enqueue({
 			...from,
 			task: spec.task.trim(),
-			boards: handed,
+			cards: handed,
 			at: Date.now(),
 			// Nobody waits on a report from work the person sent: they read the chat.
 			...(spec.reply && !from.person ? { reply: true } : {}),

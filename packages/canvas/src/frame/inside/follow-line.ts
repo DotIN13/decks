@@ -7,7 +7,7 @@ import type { Accessor, Setter } from "solid-js";
 import type { PenDocument } from "@decks/pen";
 import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
-import type { Page, StageCall } from "@decks/protocol";
+import type { Page, CanvasCall } from "@decks/protocol";
 import type { FrameContext } from "./boot.ts";
 
 /** What `followLine` reads of `wireFrame` (`events.ts`), each read when it is used. */
@@ -18,7 +18,7 @@ export interface FollowLineNeeds {
 	readonly first: { doc: PenDocument; base: string; rev: number; by?: string; cards: Page[]; harness?: string; };
 	readonly ctx: FrameContext;
 	readonly backend: Backend;
-	readonly viewCall: (call: StageCall) => undefined;
+	readonly viewCall: (call: CanvasCall) => undefined;
 	readonly pages: Accessor<FramePage[]>;
 	readonly setPages: Setter<FramePage[]>;
 	readonly follower: { at(next: number): void; rev: () => number; hear(message: Heard): void; };

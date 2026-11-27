@@ -209,7 +209,7 @@ export class PiBackend implements AgentBackend {
 	/**
 	 * A one-line extension whose only job is to hold on to `pi.getCommands`.
 	 *
-	 * Inline for the same reason `decks-stage` is: a factory is handed `ExtensionAPI` and
+	 * Inline for the same reason `decks-canvas` is: a factory is handed `ExtensionAPI` and
 	 * nothing else, so this is the only place the accessor exists. It registers nothing
 	 * and answers nothing — it closes over a function and returns.
 	 */
@@ -427,7 +427,7 @@ export class PiBackend implements AgentBackend {
 	}
 
 	/**
-	 * What each card looked like at that point, from the `board-rev` entries.
+	 * What each card looked like at that point, from the `card-rev` entries.
 	 *
 	 * Walks the branch forwards and keeps the last revision seen per card before the
 	 * given entry — so a card written three turns ago and untouched since resolves to
@@ -436,7 +436,7 @@ export class PiBackend implements AgentBackend {
 	revisionsAt(entryId: string): Record<string, string> {
 		const at: Record<string, string> = {};
 		for (const entry of this.session?.sessionManager.getBranch() ?? []) {
-			if (entry.type === "custom" && entry.customType === "board-rev") {
+			if (entry.type === "custom" && entry.customType === "card-rev") {
 				const data = entry.data as { path?: unknown; sha?: unknown } | undefined;
 				if (typeof data?.path === "string" && typeof data.sha === "string") at[data.path] = data.sha;
 			}

@@ -270,11 +270,11 @@ let booted: ReturnType<typeof boot> | undefined;
 function boot(message: { backend?: string; lowMemory?: boolean; module?: WebAssembly.Module }) {
 	const opening = (async () => {
 		const chosen = backendNamed(message.backend);
-		const stage = await chosen.load(message.module);
-		const size = stage.WorkerEngine.tileSize();
+		const wasm = await chosen.load(message.module);
+		const size = wasm.WorkerEngine.tileSize();
 		const canvas = new OffscreenCanvas(size, size);
-		const gpu = await stage.openOffscreen(canvas, size, size, chosen.name, message.lowMemory);
-		return { chosen, stage, canvas, gpu };
+		const gpu = await wasm.openOffscreen(canvas, size, size, chosen.name, message.lowMemory);
+		return { chosen, wasm, canvas, gpu };
 	})();
 	// Said when the drawing comes (`start`), which the page is listening for.
 	opening.catch(() => {});
@@ -283,13 +283,13 @@ function boot(message: { backend?: string; lowMemory?: boolean; module?: WebAsse
 
 async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void> {
 	// A page that sent no `boot` (one from before it) says the backend here.
-	const { chosen, stage, canvas, gpu } = await (booted ??= boot(message));
+	const { chosen, wasm, canvas, gpu } = await (booted ??= boot(message));
 	const backend = gpu.backend();
 	maxPicture = gpu.maxPictureSize();
 	gpuBackend = backend;
 	pixels = !!message.pixels && backend === "webgpu";
 	// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
-	engine = new stage.WorkerEngine(EMPTY, message.dark);
+	engine = new wasm.WorkerEngine(EMPTY, message.dark);
 	engine.setGpu(gpu, canvas);
 	// A lost device or context: the page starts the worker again, with a new canvas.
 	chosen.watch(canvas, { lost: () => scope.postMessage({ type: "lost" }), restored: () => {}, isLost: () => engine?.lost() ?? false });

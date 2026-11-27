@@ -86,7 +86,7 @@ export type CanvasViewProps = {
 	 * This chat's canvas drawing: its `.pen` document and the folder URL its image fills are read
 	 * against (`render/engine.ts`). Drawn under the cards, with the same camera. `edits`, when the
 	 * host has them: what made this drawing from the one it gave before, applied by the engines in
-	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
+	 * place of finding what changed (`view/engine.ts`, `setDoc`).
 	 */
 	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter; /** The person's own edit or step, drawn by their hand already: nothing to glide. */ own?: true };
 	/**
@@ -402,7 +402,7 @@ export function CanvasView(props: CanvasViewProps) {
 	);
 	return (
 		<div
-			class="stage"
+			class="canvas"
 			/*
 			 * Focusable, and focused when a press lands outside a card.
 			 *
@@ -440,32 +440,32 @@ export function CanvasView(props: CanvasViewProps) {
 			onDblClick={editor.onDblClick}
 			style={{ cursor: grabbing() ? "grab" : overLink() ? "pointer" : undefined }}
 		>
-			{/* The scrolled content: the world in it, and over it the stage's own chrome held to the window (`camera/scroll-area.ts`). */}
-			<div class="stage-content">
+			{/* The scrolled content: the world in it, and over it the canvas's own chrome held to the window (`camera/scroll-area.ts`). */}
+			<div class="canvas-content">
 			<div class="world" data-sizing={items.sizingPaths().size > 0 ? "true" : undefined} ref={worldEl}>
 				{/*
-				 * A place for every board on the canvas, in file order, filled while it is within reach.
+				 * A place for every card on the canvas, in file order, filled while it is within reach.
 				 *
-				 * A list of only the boards in reach was reconciled as boards came and went, and the
+				 * A list of only the cards in reach was reconciled as cards came and went, and the
 				 * reconciler kept the order by moving nodes: **moving an iframe reloads its page**, and
-				 * zooming out from 60 to 40% reloaded six loaded boards of twenty-three. Even a list that
-				 * only gains boards in the middle is diffed with moves. So each board has a slot of its own
-				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
-				 * is within reach: only a slot's inside changes, and boards still stack in file order.
+				 * zooming out from 60 to 40% reloaded six loaded cards of twenty-three. Even a list that
+				 * only gains cards in the middle is diffed with moves. So each card has a slot of its own
+				 * that never moves (`display: contents`, so it lays nothing out), filled while the card
+				 * is within reach: only a slot's inside changes, and cards still stack in file order.
 				 */}
 				{items.slots()}
 				{/*
-				 * The stage's one sheet — the drawing, and each board's picture or a hole over its
-				 * document — and the invisible shapes that catch clicks on the drawing: after the boards,
-				 * so over them; a click goes through to a board wherever nothing drawn is in the way. See
+				 * The canvas's one sheet — the drawing, and each card's picture or a hole over its
+				 * document — and the invisible shapes that catch clicks on the drawing: after the cards,
+				 * so over them; a click goes through to a card wherever nothing drawn is in the way. See
 				 * `render/engine.ts`.
 				 */}
 				{items.fileNodes()}
 				{/* The host's layer for what is someone else's (their selection's outline): before the engine's canvas, so under every outline and handle it paints. */}
 				{hostLayer(() => props.worldUnder, "world-host world-host-under")}
-				{/* The engine's canvas over the slots (`stage/engine.ts`): the pictures of boards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}
+				{/* The engine's canvas over the slots (`view/engine.ts`): the pictures of cards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}
 				<canvas
-					class="stage-engine stage-engine-over"
+					class="canvas-engine canvas-engine-over"
 					aria-hidden="true"
 					ref={(canvas) => {
 						penLayer.attachCanvas(canvas);
@@ -492,11 +492,11 @@ export function CanvasView(props: CanvasViewProps) {
 				{/* The host's layer over everything in the world (others' cursors, what agents just drew). */}
 				{hostLayer(() => props.world, "world-host")}
 			</div>
-			<div class="stage-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
-			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
+			<div class="canvas-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
+			{/* The canvas engine could not start (`penLayer.failed`): why, over the canvas, where the drawing would be. */}
 			<Show when={engineNotice()}>
 				{(notice) => (
-					<div class="stage-notice" role="alert">
+					<div class="canvas-notice" role="alert">
 						{notice()}
 					</div>
 				)}
@@ -514,7 +514,7 @@ export function CanvasView(props: CanvasViewProps) {
 								{ label: m.canvas_props_panel(), hint: m.canvas_hold_drawer(), run: () => setPropsOpen(true) },
 								{ label: m.canvas_pill_duplicate(), run: () => selection.penDuplicate() },
 								{ label: m.canvas_hold_to_front(), run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
-								...(props.onComment ? [{ label: m.canvas_hold_ask(), hint: "→", run: () => props.onComment?.({ path: props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? m.canvas_hold_an_item(), anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
+								...(props.onComment ? [{ label: m.canvas_hold_ask(), hint: "→", run: () => props.onComment?.({ path: props.canvasName ? `canvases/${props.canvasName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? m.canvas_hold_an_item(), anchor: () => document.querySelector(".canvas-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
 								{ label: m.canvas_pill_delete(), danger: true, run: () => selection.penDeleteSelected() },
 							]
 						: [

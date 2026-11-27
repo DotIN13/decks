@@ -63,21 +63,21 @@ test("an agent in no workspace is in no group", () => {
 	assert.deepEqual(list[0]?.agents.map((one) => one.id), ["a"]);
 });
 
-test("boards: the ones most members hold come first, ties by path", () => {
+test("cards: the ones most members hold come first, ties by path", () => {
 	const list = roster([
-		entry("a", "p", ["boards/plan.html", "boards/risk.html"]),
-		entry("b", "p", ["boards/plan.html"]),
-		entry("c", "other", ["boards/plan.html"]),
+		entry("a", "p", ["pages/plan.html", "pages/risk.html"]),
+		entry("b", "p", ["pages/plan.html"]),
+		entry("c", "other", ["pages/plan.html"]),
 	]);
 	// `plan` is held by two of the three, `risk` by one — and the workspace's own list is the
 	// union, not the intersection, because a card one member is working from is still the
 	// workspace's card.
-	assert.deepEqual(list[0]?.boards, ["boards/plan.html", "boards/risk.html"]);
+	assert.deepEqual(list[0]?.cards, ["pages/plan.html", "pages/risk.html"]);
 });
 
-test("…and a member holding the same board twice is one member", () => {
-	const list = roster([entry("a", "p", ["boards/plan.html", "boards/plan.html"]), entry("b", "p", [])]);
-	assert.deepEqual(list[0]?.boards, ["boards/plan.html"]);
+test("…and a member holding the same card twice is one member", () => {
+	const list = roster([entry("a", "p", ["pages/plan.html", "pages/plan.html"]), entry("b", "p", [])]);
+	assert.deepEqual(list[0]?.cards, ["pages/plan.html"]);
 });
 
 test("two workspaces of one member each break on the name, not on the input order", () => {

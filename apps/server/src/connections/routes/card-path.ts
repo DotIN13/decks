@@ -38,8 +38,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			if (isSharedCanvas(canvasOfPath(asked)?.name ?? "")) sharedHeaders(res);
 			/*
 			 * A card's page is ours and keeps the app's origin. Anything else is an asset, which sandboxes
-			 * whatever a browser would run: a board file left from before cards among them, whose
-			 * `../lib/board.css|js` land on card.css and card.js (`libName`).
+			 * whatever a browser would run.
 			 */
 			if (isCardPath(requested)) cardHeaders(res);
 			else assetHeaders(res, target);

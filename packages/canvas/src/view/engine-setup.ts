@@ -15,7 +15,7 @@ export interface EngineNeeds {
 
 export function createEngine(d: EngineNeeds) {
 	/*
-	 * The canvas's engine (`stage/engine.ts`): the drawing and the cards' pictures, drawn with WebGPU
+	 * The canvas's engine (`view/engine.ts`): the drawing and the cards' pictures, drawn with WebGPU
 	 * on two canvases, one under the item slots and one over them, in the same call that moves the
 	 * slots (`writeTransform`). The document, the window's size and the colour scheme reach it here.
 	 */
@@ -23,7 +23,7 @@ export function createEngine(d: EngineNeeds) {
 
 	d.props.onEngine?.(penLayer);
 
-	/* An engine that cannot start says so over the canvas (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
+	/* An engine that cannot start says so over the canvas (`view/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
 	const [engineNotice, setEngineNotice] = createSignal<string>();
 
 	penLayer.failed = (notice) => setEngineNotice(notice);

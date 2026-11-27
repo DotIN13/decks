@@ -240,7 +240,7 @@ async function run(engine, { all }) {
 	const properties = async () => page.locator(".props-panel").first().waitFor({ timeout: 3000 });
 	/** A button on the selection's pill, pressed with the commit armed. */
 	const pillButton = async (label, arm) => {
-		const button = (await cv()).locator(`.stage-fixed > .card-callout:not([data-hidden]) [aria-label="${label}"]`).first();
+		const button = (await cv()).locator(`.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="${label}"]`).first();
 		await button.waitFor({ timeout: 3000 });
 		const r = await button.boundingBox();
 		await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
@@ -317,10 +317,10 @@ async function run(engine, { all }) {
 				setup: async () => {
 					const grip = await pictureSpot(board.path);
 					await page.mouse.click(grip.x, grip.y);
-					await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
+					await (await cv()).locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
 				},
 				commit: async (arm) => {
-					const r = await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
+					const r = await (await cv()).locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
 					await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 					await arm();
 					await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
@@ -472,7 +472,7 @@ async function run(engine, { all }) {
 			await drawn("ew-pilldel");
 			await clickOn("ew-pilldel");
 			// Delete sits in the pill's ⋯ menu, opened where it is, as the pill's other buttons are pressed.
-			const more = (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="More"]').first();
+			const more = (await cv()).locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="More"]').first();
 			await more.waitFor({ timeout: 3000 });
 			await settle(page, 300);
 			const m = await more.boundingBox();
@@ -812,7 +812,7 @@ async function run(engine, { all }) {
 		prepare: async () => {
 			await remember();
 			await page.click('.v3-tool[data-tool="pen"]');
-			await (await cv()).waitForSelector(".stage-ink");
+			await (await cv()).waitForSelector(".canvas-ink");
 			await page.click('.v3-tray [aria-label^="Pen"]');
 			await drag({ x: 600, y: 420 }, { x: 820, y: 470 }, 14);
 		},
@@ -825,7 +825,7 @@ async function run(engine, { all }) {
 		probe: { count: true },
 		setup: async () => {
 			await page.click('.v3-tool[data-tool="pen"]');
-			await (await cv()).waitForSelector(".stage-ink");
+			await (await cv()).waitForSelector(".canvas-ink");
 		},
 		prepare: async () => {
 			await page.click('.v3-tray [aria-label^="Eraser"]');

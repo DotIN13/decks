@@ -1,7 +1,7 @@
 /**
  * What a set of fingers on the canvas means, and nothing about where they are.
  *
- * The camera's touch gestures have two sources — the canvas's own finger pool (`stage/input.ts`)
+ * The camera's touch gestures have two sources — the canvas's own finger pool (`view/input.ts`)
  * and the controller's (`camera/controller.ts`) — and the mistake to avoid is writing
  * them twice. What both places need is the same reduction: fingers arrive and leave,
  * one of them moves, and the answer is either "pan by this much" or "here is one step
@@ -35,7 +35,7 @@
  * and keeps the grabbing cursor, and a card can no longer be dragged because the drag
  * gives way to what it takes for a second finger.
  *
- * So the sources release what they hold (`stage/input.ts` on teardown, `CanvasView` when
+ * So the sources release what they hold (`view/input.ts` on teardown, `CanvasView` when
  * the window loses focus), and this file is the net under them, because a source that
  * has died cannot release anything:
  *

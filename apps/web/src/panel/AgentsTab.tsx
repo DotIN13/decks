@@ -131,7 +131,7 @@ export function AgentsTab(props: {
 							by `data-lines`), which `.agent-list` in `panel.css` supplies.
 
 							Re-implementing it instead is how two lists in one panel come to nearly
-							match: the board rows above are the same object.
+							match: the card rows above are the same object.
 						*/}
 						{/* Folded by its height (`styles/v3.css`), so the rows slide shut rather than vanish. */}
 						<div class="v3-folder-body" data-open={folded().has(section.id) ? "false" : "true"} aria-hidden={folded().has(section.id)}>
@@ -146,7 +146,7 @@ export function AgentsTab(props: {
 				<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label={m.panel_new_agent()} class="v3-new-agent" size={15} text={m.panel_new_agent()} />
 			</Show>
 
-			{/* The same shape of empty state the boards list has, and the same reasoning:
+			{/* The same shape of empty state the cards list has, and the same reasoning:
 			    a panel that is blank for a good reason still looks broken without it. */}
 			<Show when={props.sections.length === 0}>
 				<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{props.agentCount === 0 ? m.panel_no_agents_start() : m.panel_no_agent_matches({ query: props.query.trim() })}</p>

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { CanvasPens } from "./pens.ts";
 import { CanvasShots, isThumbOf, shotBox, shotTarget } from "./shots.ts";
 
-test("a picture frames what it names with a margin: an item, a board, several, everything, or a box", () => {
+test("a picture frames what it names with a margin: an item, a card, several, everything, or a box", () => {
 	const dir = mkdtempSync(join(tmpdir(), "shots-"));
 	const pens = new CanvasPens(dir, () => {});
 	try {
@@ -21,7 +21,7 @@ test("a picture frames what it names with a margin: an item, a board, several, e
 		assert.deepEqual(shotBox(pens, name, "canvases/s/cards/doc/index.html"), { x1: -524, y1: -24, x2: -76, y2: 324 });
 		assert.deepEqual(shotBox(pens, name, undefined), { x1: -524, y1: -24, x2: 344, y2: 324 });
 		assert.deepEqual(shotBox(pens, name, { x1: 1, y1: 2, x2: 3, y2: 4 }), { x1: 1, y1: 2, x2: 3, y2: 4 });
-		assert.throws(() => shotBox(pens, name, "nope"), /not an item or a board/);
+		assert.throws(() => shotBox(pens, name, "nope"), /not an item or a card/);
 		assert.throws(() => shotBox(pens, name, { x1: 5, y1: 0, x2: 1, y2: 9 }), /x2 right of x1/);
 	} finally {
 		pens.close();
@@ -84,7 +84,7 @@ test("a canvas's picture is kept by its drawing's hash: taken once, taken again 
 			writeFileSync(join(dir, request.to), String(taken));
 			return {};
 		};
-		const folder = join(dir, ".decks", "thumbs", "stages");
+		const folder = join(dir, ".decks", "thumbs", "canvases");
 		mkdirSync(folder, { recursive: true });
 		// Left by earlier runs: this canvas's picture by an old revision number, and those of a canvas whose name begins with this one's.
 		for (const old of ["plan-1-dark.jpg", "plan-1-light.jpg", "plan-b-1-dark.jpg", "plan-b-0123456789ab-dark.jpg"]) writeFileSync(join(folder, old), "old");

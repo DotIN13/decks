@@ -57,7 +57,7 @@ import { deckImportPaths } from "./cards/cards.ts";
  * opened and followed, and the pages told what changed.
  *
  * It holds no logic of its own that a part could own. What an agent is lives in `agents/`, a canvas
- * in `stage/`, a call in `calls/`, the ways in under `connections/`; here they are wired, started
+ * in `view/`, a call in `calls/`, the ways in under `connections/`; here they are wired, started
  * and stopped.
  */
 export class App {
@@ -72,7 +72,7 @@ export class App {
 	readonly apps: Apps;
 	/** What each agent is doing to which card, said to the browsers as it happens (`agents/acts.ts`). */
 	readonly acts: Acts;
-	/** The card files: writing, revisioning, editing, deleting (`boards/service.ts`). */
+	/** The card files: writing, revisioning, editing, deleting (`cards/service.ts`). */
 	readonly cards: CardService;
 	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
@@ -241,7 +241,7 @@ export class App {
 
 				agent.seat.setPosition(path, x, y);
 
-				return this.canvasState(agent).boards.find((card) => card.path === path);
+				return this.canvasState(agent).cards.find((card) => card.path === path);
 
 			},
 
@@ -254,7 +254,7 @@ export class App {
 			 * No id is an app running its own code, which acts for a conversation on a canvas
 			 * showing it (`calls/app-caller.ts`), so that case keeps the old answer.
 			 */
-			cards: (agentId?: string) => this.canvasState(agentId ? this.agents.get(agentId) : undefined).boards,
+			cards: (agentId?: string) => this.canvasState(agentId ? this.agents.get(agentId) : undefined).cards,
 
 			writeCard: (path, html) => this.cards.writeCard(path, html),
 			deleteCard: (path) => {
@@ -280,7 +280,7 @@ export class App {
 			// A tab on the socket, or a canvas frame following its canvas's stream (`/api/v1/events`).
 			connected: () => this.pages.connected,
 			broadcast: (message) => this.send(message),
-			stagesChanged: () => this.publishStages(),
+			canvasesChanged: () => this.publishCanvases(),
 			wrote: (path, who) => this.cards.wrote(path, who),
 			retitle: (name, title) => titleCanvas({ deck: this.deck, pens: this.pens, agents: this.agents.all() }, name, title),
 			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.canvasFolder()),
@@ -423,7 +423,7 @@ export class App {
 		this.canvas.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
 		this.canvas.cardPicture = async (path, scheme) => {
 			const card = deck.card(path);
-			if (!card) throw new Error(`There is no board ${path}.`);
+			if (!card) throw new Error(`There is no card ${path}.`);
 			return readFileSync(await this.thumbs.get(card, scheme, () => false));
 		};
 		this.canvas.pairCode = () => {
@@ -510,7 +510,7 @@ export class App {
 	static open(config: Config): App {
 		// A deck kept in an older shape is moved to this one before anything reads it (`migrations/`).
 		for (const line of runAtOpen(config.deck, { dataDir: config.dataDir })) console.log(`[decks] ${line}`);
-		const existing = existsSync(join(config.deck, "deck.json")) || existsSync(join(config.deck, "boards"));
+		const existing = existsSync(join(config.deck, "deck.json"));
 		const deck = existing ? Deck.open(config.deck) : Deck.create(config.deck, App.runtimeLib);
 		// A deck this build did not create has whichever `lib/` created it, so every
 		// start brings the primitives forward. `Deck.create` has just done it for a new
@@ -610,7 +610,7 @@ export class App {
 		const deckPath = join(path, DECK_DIR);
 		// A deck kept in an older shape is moved to this one before anything reads it, as at start-up (`migrations/`).
 		for (const line of runAtOpen(deckPath, { dataDir: path })) console.log(`[decks] ${line}`);
-		const existing = existsSync(join(deckPath, "deck.json")) || existsSync(join(deckPath, "boards"));
+		const existing = existsSync(join(deckPath, "deck.json"));
 		this.deck = existing ? Deck.open(deckPath) : Deck.create(deckPath, App.runtimeLib);
 		if (existing) App.refreshLib(this.deck);
 		this.canvas.setDeck(this.deck);
@@ -670,7 +670,7 @@ export class App {
 	 * at the origin for everybody, because the loader's cards have no place of their own any more.
 	 */
 	private placed(card: Page): Page {
-		return this.canvasState().boards.find((one) => one.path === card.path) ?? card;
+		return this.canvasState().cards.find((one) => one.path === card.path) ?? card;
 	}
 
 	/** Apps the person let call verbs with "Allow once": remembered until the server restarts (`calls/caller.ts`). */
@@ -699,16 +699,16 @@ export class App {
 		// What changed, not the whole drawing: a client that missed a revision asks for it whole.
 		this.send(this.pens.log.changes(name));
 		// The manager lists what each canvas holds, and this is the moment that changed.
-		this.publishStages();
+		this.publishCanvases();
 	}
 
 	/** Every canvas and who is on it, for the pages' list (`canvas/canvas-list.ts`). */
-	stagesMessage(): ServerMessage {
+	canvasesMessage(): ServerMessage {
 		return canvasListMessage(this.pens, this.agents?.all() ?? []);
 	}
 
-	publishStages(): void {
-		this.send(this.stagesMessage());
+	publishCanvases(): void {
+		this.send(this.canvasesMessage());
 	}
 
 	dispose(): void {

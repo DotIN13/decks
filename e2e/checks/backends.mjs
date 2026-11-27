@@ -50,9 +50,9 @@ for (const target of TARGETS) {
 	{
 		const { browser, page } = await open({ ...target.open, cards: false, init: noGpuNoWebgl });
 		const canvas = await canvasFrame(page);
-		const shown = await canvas.waitForSelector(".stage-notice", { timeout: 30000 }).then(() => true, () => false);
-		const text = shown ? await canvas.locator(".stage-notice").textContent() : "";
-		const visible = shown && (await canvas.locator(".stage-notice").isVisible());
+		const shown = await canvas.waitForSelector(".canvas-notice", { timeout: 30000 }).then(() => true, () => false);
+		const text = shown ? await canvas.locator(".canvas-notice").textContent() : "";
+		const visible = shown && (await canvas.locator(".canvas-notice").isVisible());
 		say(`${name}: no WebGPU and no WebGL 2, the notice is shown`, visible && text?.trim() === NOTICE_TEXT, JSON.stringify(text));
 		await shot(page, `step4-${target.slug}-notice.png`);
 		await browser.close();

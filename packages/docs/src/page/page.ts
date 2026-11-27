@@ -32,7 +32,7 @@ import { mountUpdates } from "./updates.ts";
  * any kept version as it read, with what differs from now highlighted, and restores it.
  *
  * It needs a way to send a message and a way to hear one, and nothing else: in Decks that is the
- * app's socket, relayed into the board by `postMessage`.
+ * app's socket, relayed into the card by `postMessage`.
  *
  * This file only wires the page together. Each part is a panel in a file of its own, mounted with
  * the `PageContext` they share (`context.ts`) and answering what tears it down: the bar (`bar.ts`),
@@ -139,7 +139,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		if (message.type === "doc.patched") ctx.hooks.refresh();
 	});
 	/*
-	 * Asked again until answered: the board's script runs before the app has wired the frame, so
+	 * Asked again until answered: the card's script runs before the app has wired the frame, so
 	 * the first `doc.open` can go out before anyone is listening for it. Opening twice is harmless.
 	 */
 	const ticker = setInterval(() => {

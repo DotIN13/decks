@@ -85,11 +85,11 @@ const CONTENT = /content\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 /**
  * An attribute value as the browser would see it.
  *
- * A new board writes this tag single-quoted, so the JSON inside keeps its own
- * double quotes and needs nothing doing to it. But a board written by hand — or by an
+ * A new card writes this tag single-quoted, so the JSON inside keeps its own
+ * double quotes and needs nothing doing to it. But a card written by hand — or by an
  * editor that normalises quotes — arrives double-quoted, and then the only legal way to
  * carry `{"w":800}` is `content="{&quot;w&quot;:800}"`. That parsed as invalid JSON and was
- * swallowed by the `catch` below, so the board silently rendered at the default size and
+ * swallowed by the `catch` below, so the card silently rendered at the default size and
  * the file looked correct to anyone reading it.
  *
  * Five entities, because those are the five a serialiser may produce in an attribute.
@@ -128,12 +128,12 @@ export function cardHead(html: string): CardHead {
 			meta.poster = value;
 			continue;
 		}
-		// A card says its size in `<meta name="card">`, a board in `<meta name="board">`: the same JSON.
-		if (name !== "board" && name !== "card") continue;
+		// A card says its size in `<meta name="card">`.
+		if (name !== "card") continue;
 
-		// `content` is JSON so a board can grow a field without a new meta tag.
+		// `content` is JSON so a card can grow a field without a new meta tag.
 		// Written by hand as often as by an agent, so a broken one is ignored
-		// rather than fatal — the board still renders at the default size.
+		// rather than fatal — the card still renders at the default size.
 		try {
 			const parsed = JSON.parse(unescapeAttribute(value)) as { w?: unknown; h?: unknown; bg?: unknown };
 			if (Number.isFinite(Number(parsed.w))) meta.w = Number(parsed.w);
@@ -159,8 +159,8 @@ export function withCardSize(source: string, size: { w?: number; h?: number }): 
 }
 
 /**
- * Whether `after` is `before` with only the size in its `<meta name="board">` tag changed: the write a
- * fit or a person's resize makes. A page showing the board already has it, or is given it, so it is
+ * Whether `after` is `before` with only the size in its `<meta name="card">` tag changed: the write a
+ * fit or a person's resize makes. A page showing the card already has it, or is given it, so it is
  * not reloaded for it (`card.changed`'s `sized`).
  */
 export function onlySizeChanged(before: string, after: string): boolean {
@@ -170,7 +170,7 @@ export function onlySizeChanged(before: string, after: string): boolean {
 	return withCardSize(before, { ...(w === undefined ? {} : { w }), ...(h === undefined ? {} : { h }) }) === after;
 }
 
-/** The HTML half: one number, in the one `<meta name="board">` tag. */
+/** The HTML half: one number, in the one `<meta name="card">` tag. */
 function withTagSize(html: string, size: { w?: number; h?: number }, fallback: number): string {
 	const meta = cardHead(html);
 	// The same default the loader uses, and it has to be the same one: a file that says nothing
@@ -180,13 +180,13 @@ function withTagSize(html: string, size: { w?: number; h?: number }, fallback: n
 	 * A height nobody gave is **left out** rather than invented.
 	 *
 	 * It used to fall back to 800 and be written like any other number, which was wrong in the
-	 * one case that matters: a document board's tag is `{"w":760,"bg":"plain"}` — the width is the
+	 * one case that matters: a document card's tag is `{"w":760,"bg":"plain"}` — the width is the
 	 * only size it declares, because its height is its content and the browser measures it. A drag
-	 * on the width of that board therefore wrote an `h` into the file that said nothing, had never
+	 * on the width of that card therefore wrote an `h` into the file that said nothing, had never
 	 * been asked for, and would have to be kept in step with a measurement that overwrites it.
 	 * Caught by `e2e/checks/geometry.mjs`, which asserts that the rest of the tag is untouched.
 	 *
-	 * Nothing is lost by omitting it: the loader has its own starting height for a board that
+	 * Nothing is lost by omitting it: the loader has its own starting height for a card that
 	 * declares none, and the browser replaces that with the content's as soon as anybody looks.
 	 */
 	const h = size.h !== undefined ? Math.max(1, Math.round(size.h)) : meta.h !== undefined ? Math.max(1, Math.round(meta.h)) : undefined;
@@ -194,7 +194,7 @@ function withTagSize(html: string, size: { w?: number; h?: number }, fallback: n
 
 	META.lastIndex = 0;
 	for (let tag = META.exec(html); tag; tag = META.exec(html)) {
-		if (tag[1]?.toLowerCase() !== "board" && tag[1]?.toLowerCase() !== "card") continue;
+		if (tag[1]?.toLowerCase() !== "card") continue;
 		const content = CONTENT.exec(tag[0]);
 		let rest: Record<string, unknown> = {};
 		if (content) {

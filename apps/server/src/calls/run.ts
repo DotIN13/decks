@@ -18,7 +18,7 @@ import type { CallResult } from "./tool.ts";
  *
  * Who is calling is the request's token (`auth/guard.ts`), and nothing else. The person, in a Decks
  * tab or a terminal, and a paired front end acting for them (Studio) may say what they are acting
- * on, as parameters and not as who they are: `X-Decks-Stage`, the canvas on screen, and
+ * on, as parameters and not as who they are: `X-Decks-Canvas`, the canvas on screen, and
  * `X-Decks-Agent`, the agent they are talking to; `X-Decks-Edit` names an edit to the drawing, which
  * comes back in the `made` of the revision that has it. An agent's token calls as that agent, an
  * app's pass as that app, and a canvas pass as the person on its one canvas (`caller.ts`). Naming
@@ -32,7 +32,7 @@ interface VerbAnswer extends CallResult {}
  * One verb called for a principal, as `POST /api/v1/<verb>` and the line's `call` both run it: the verb
  * looked up, its arguments checked against the table, a canvas frame held to its canvas, the caller's
  * tool found for the token, and the answer as the SDK reads it, with the status a request would get.
- * `headers` carry what the caller says it acts on (`X-Decks-Stage`, `X-Decks-Agent`, `X-Decks-Edit`).
+ * `headers` carry what the caller says it acts on (`X-Decks-Canvas`, `X-Decks-Agent`, `X-Decks-Edit`).
  */
 export async function runVerb(app: CallsHost & PersonHost, principal: Principal | undefined, headers: Record<string, string | string[] | undefined>, name: string, rawArgs: unknown, remoteAddress?: string, asked?: Partial<Pick<PersonCall, "tell" | "view" | "tokenId">>): Promise<{ status: number; answer: VerbAnswer }> {
 	const refuse = (status: number, error: string) => ({ status, answer: { ok: false, error, notes: [] } satisfies VerbAnswer });
@@ -51,7 +51,7 @@ export async function runVerb(app: CallsHost & PersonHost, principal: Principal 
 		};
 		const notes: string[] = [];
 		const tell = asked?.tell ?? ((message: ServerMessage) => notes.push(JSON.stringify(message)));
-		const on = { ...(header("x-decks-stage") ? { stage: header("x-decks-stage") } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent") } : {}), ...(header("x-decks-edit") ? { edit: header("x-decks-edit")!.slice(0, 80) } : {}) };
+		const on = { ...(header("x-decks-canvas") ? { canvas: header("x-decks-canvas") } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent") } : {}), ...(header("x-decks-edit") ? { edit: header("x-decks-edit")!.slice(0, 80) } : {}) };
 		try {
 			const value = await personTable(app)[name]!(args, { tell, ...(asked?.view ? { view: asked.view } : {}), ...(asked?.tokenId ? { tokenId: asked.tokenId } : {}), on });
 			return { status: 200, answer: { ok: true, ...(value !== undefined ? { value } : {}), notes } };

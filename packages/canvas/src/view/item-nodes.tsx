@@ -39,14 +39,14 @@ export function createItemNodes(d: ItemNodesNeeds) {
 		<>
 
 				{/*
-				 * A place for every board on the canvas, in file order, filled while it is within reach.
+				 * A place for every card on the canvas, in file order, filled while it is within reach.
 				 *
-				 * A list of only the boards in reach was reconciled as boards came and went, and the
+				 * A list of only the cards in reach was reconciled as cards came and went, and the
 				 * reconciler kept the order by moving nodes: **moving an iframe reloads its page**, and
-				 * zooming out from 60 to 40% reloaded six loaded boards of twenty-three. Even a list that
-				 * only gains boards in the middle is diffed with moves. So each board has a slot of its own
-				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
-				 * is within reach: only a slot's inside changes, and boards still stack in file order.
+				 * zooming out from 60 to 40% reloaded six loaded cards of twenty-three. Even a list that
+				 * only gains cards in the middle is diffed with moves. So each card has a slot of its own
+				 * that never moves (`display: contents`, so it lays nothing out), filled while the card
+				 * is within reach: only a slot's inside changes, and cards still stack in file order.
 				 */}
 				<For each={d.props.cards} fallback={null}>
 					{(card) => (
@@ -62,7 +62,7 @@ export function createItemNodes(d: ItemNodesNeeds) {
 	const fileNodes = () => (
 		<>
 
-				{/* Files shown live, under the sheet's holes for them (`liveFiles`): after the boards, so over them, as the drawing is. */}
+				{/* Files shown live, under the sheet's holes for them (`liveFiles`): after the cards, so over them, as the drawing is. */}
 				<For each={d.liveFiles()}>
 					{(file) => {
 						const box = () => d.liveBox(file.id);
@@ -93,7 +93,7 @@ export function createItemNodes(d: ItemNodesNeeds) {
 					 * The one player, laid over the item it belongs to.
 					 *
 					 * A real element because nothing else can play: the canvas draws in a worker and there
-					 * is no browser in there. It is the same bargain a board makes — a picture until you
+					 * is no browser in there. It is the same bargain a card makes — a picture until you
 					 * are close and have asked — and it is one element, never a wall of them.
 					 */}
 					<Show when={d.playingBox()?.id} keyed>

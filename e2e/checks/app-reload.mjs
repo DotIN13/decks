@@ -82,19 +82,19 @@ write("Version 2");
 await call("apps.reload", ["e2e-reload"]);
 say("apps.reload loads it again in its window and in its tab, both", (await says({ window: "Version 2", tab: "Version 2" })) === true, JSON.stringify(await headings()));
 await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
-await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined));
+await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) ? true : undefined));
 await settle(page, 500);
 
 // --- the person's Reload, on the window's pill -----------------------------------------------------------------------------
 write("Version 3");
 await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.6);
 const canvas = await canvasFrame(page);
-await until(() => canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").count());
+await until(() => canvas.locator(".canvas-fixed > .card-callout:not([data-hidden])").count());
 await settle(page, 300);
-await canvas.locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Reload"]').click();
+await canvas.locator('.canvas-fixed > .card-callout:not([data-hidden]) [aria-label="Reload"]').click();
 say("the pill's Reload loads that window again, and that window alone", (await says({ window: "Version 3", tab: "Version 2" })) === true, JSON.stringify(await headings()));
 if (process.env.LOOK_SHOTS) await page.screenshot({ path: `${process.env.LOOK_SHOTS}/app-pill-reload.png` });
-say("…and the window is still selected, with its pill", (await canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").count()) === 1);
+say("…and the window is still selected, with its pill", (await canvas.locator(".canvas-fixed > .card-callout:not([data-hidden])").count()) === 1);
 
 // --- Reload in the Apps tab ------------------------------------------------------------------------------------------------
 write("Version 4");

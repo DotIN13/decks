@@ -5,9 +5,9 @@ import { canvasFolder, referenceFor, resolveReference, urlFor } from "@decks/hub
 /**
  * A canvas's drawing as it is on disk, and as the harness holds it.
  *
- * On disk a card item names its card from the canvas's own folder (`"boards/plan.html"`), so the
+ * On disk a card item names its card from the canvas's own folder (`"cards/plan.html"`), so the
  * folder can be copied anywhere whole (`deck/layout.ts`). Inside the harness every card is named by
- * its deck path (`"canvases/plan/boards/plan.html"`), as every record, picture, route and page always
+ * its deck path (`"canvases/plan/cards/plan/index.html"`), as every record, picture, route and page always
  * named it. `toMemory` turns the one into the other as a drawing is read, and `toDisk` back as it is
  * written. Nothing else in the harness sees the difference.
  *

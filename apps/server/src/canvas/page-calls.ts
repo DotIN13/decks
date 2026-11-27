@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ServerMessage, StageCall } from "@decks/protocol";
+import type { ServerMessage, CanvasCall } from "@decks/protocol";
 
 /**
  * What an agent asks the pages to do to a canvas (`decks view …`, a picture of a card as a browser
@@ -37,7 +37,7 @@ export class PageCalls {
 	 * answers times out into a result rather than leaving the agent's tool call
 	 * hanging on a tab that was closed mid-gesture.
 	 */
-	ask(call: Omit<StageCall, "id">, timeoutMs = 5000): Promise<unknown> {
+	ask(call: Omit<CanvasCall, "id">, timeoutMs = 5000): Promise<unknown> {
 		const id = randomUUID();
 		return new Promise((resolve) => {
 			const timer = setTimeout(() => {
@@ -53,7 +53,7 @@ export class PageCalls {
 	 * Ask every browser, and wait for each to answer or for the time to run out: for a call whose
 	 * answer is a count over all of them (`view.reload`). The answers that came are what it resolves with.
 	 */
-	askAll(call: Omit<StageCall, "id">, timeoutMs = 1500): Promise<unknown[]> {
+	askAll(call: Omit<CanvasCall, "id">, timeoutMs = 1500): Promise<unknown[]> {
 		const id = randomUUID();
 		// Every front end may answer: pages and canvas frames on the line. A line that
 		// answers nothing (a script's, or a page leaving the call to its frame) only makes the wait run to its end.

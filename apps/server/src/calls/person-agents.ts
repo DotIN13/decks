@@ -18,7 +18,7 @@ export interface AgentTableHost {
 	readonly acts: Acts;
 	readonly accountList: AccountList;
 	/** The canvas list again, to every page: an agent's home canvas changed. */
-	publishStages(): void;
+	publishCanvases(): void;
 	/** The deck as this agent's canvas arranges it, for the screen that focused it. */
 	canvasState(agent?: DeckAgent): DeckState;
 	runtimes(): RuntimeInfo[];
@@ -52,7 +52,7 @@ export function agentTable(host: AgentTableHost): PersonVerbs {
 				/* a name clash or a canvas gone meanwhile: the agent still works, on a canvas of its own once it needs one */
 			}
 			void host.accountList.publish();
-			host.publishStages();
+			host.publishCanvases();
 			return { id: agent.id };
 		},
 		"agent.attach": async ([spec]) => {
@@ -68,7 +68,7 @@ export function agentTable(host: AgentTableHost): PersonVerbs {
 				} catch {
 					/* a canvas gone meanwhile: it has one once it draws */
 				}
-				host.publishStages();
+				host.publishCanvases();
 			}
 			const canvas = agent.seat.canvasFolder();
 			return { id: agent.id, name: agent.chat().name, token, made, ...(canvas ? { canvas } : {}) };

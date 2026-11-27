@@ -18,47 +18,47 @@ const dir = () => mkdtempSync(join(tmpdir(), "decks-eval-trust-"));
 
 test("nothing is trusted until it is allowed", () => {
 	const trust = new AppTrust(dir());
-	assert.equal(trust.allows("boards/plan.html"), false);
+	assert.equal(trust.allows("pages/plan.html"), false);
 	assert.deepEqual(trust.list(), []);
 });
 
 test("allowing writes the path, and reading it back agrees", () => {
 	const where = dir();
 	const trust = new AppTrust(where);
-	trust.allow("boards/plan.html");
+	trust.allow("pages/plan.html");
 
-	assert.equal(trust.allows("boards/plan.html"), true);
-	assert.deepEqual(JSON.parse(readFileSync(join(where, "board-eval.json"), "utf8")), { allowed: ["boards/plan.html"] });
-	assert.equal(new AppTrust(where).allows("boards/plan.html"), true, "and it survives a reopen");
+	assert.equal(trust.allows("pages/plan.html"), true);
+	assert.deepEqual(JSON.parse(readFileSync(join(where, "app-trust.json"), "utf8")), { allowed: ["pages/plan.html"] });
+	assert.equal(new AppTrust(where).allows("pages/plan.html"), true, "and it survives a reopen");
 });
 
 test("forgetting takes it back out", () => {
 	const where = dir();
 	const trust = new AppTrust(where);
-	trust.allow("boards/a.html");
-	trust.allow("boards/b.html");
-	trust.forget("boards/a.html");
+	trust.allow("pages/a.html");
+	trust.allow("pages/b.html");
+	trust.forget("pages/a.html");
 
-	assert.deepEqual(trust.list(), ["boards/b.html"]);
-	assert.equal(new AppTrust(where).allows("boards/a.html"), false);
+	assert.deepEqual(trust.list(), ["pages/b.html"]);
+	assert.equal(new AppTrust(where).allows("pages/a.html"), false);
 });
 
 test("a broken file trusts nothing", () => {
 	const where = dir();
-	writeFileSync(join(where, "board-eval.json"), "{ not json");
+	writeFileSync(join(where, "app-trust.json"), "{ not json");
 	assert.deepEqual(new AppTrust(where).list(), []);
-	assert.equal(new AppTrust(where).allows("boards/plan.html"), false);
+	assert.equal(new AppTrust(where).allows("pages/plan.html"), false);
 });
 
 test("a file whose shape is wrong trusts nothing either", () => {
 	const where = dir();
-	writeFileSync(join(where, "board-eval.json"), JSON.stringify({ allowed: ["boards/ok.html", 42, null] }));
-	assert.deepEqual(new AppTrust(where).list(), ["boards/ok.html"], "only the strings are paths");
+	writeFileSync(join(where, "app-trust.json"), JSON.stringify({ allowed: ["pages/ok.html", 42, null] }));
+	assert.deepEqual(new AppTrust(where).list(), ["pages/ok.html"], "only the strings are paths");
 });
 
 test("allowing twice is one entry", () => {
 	const trust = new AppTrust(dir());
-	trust.allow("boards/plan.html");
-	trust.allow("boards/plan.html");
-	assert.deepEqual(trust.list(), ["boards/plan.html"]);
+	trust.allow("pages/plan.html");
+	trust.allow("pages/plan.html");
+	assert.deepEqual(trust.list(), ["pages/plan.html"]);
 });

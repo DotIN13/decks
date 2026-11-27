@@ -81,7 +81,7 @@ export async function exportPage(asked: ExportRequest): Promise<{ file: string; 
 		icons: (library, name, weight) => icons.get(`${library}|${name}|${weight}`),
 		// An address with a scheme (https:, data:) or from the root stays; a relative one is read from the page's folder.
 		url: (url) => (/^[a-z][\w+.-]*:/i.test(url) || url.startsWith("/") ? url : fromPage(request.page, isAbsolute(url) ? url : resolve(request.folder, url))),
-		board: (node) => {
+		card: (node) => {
 			const path = request.cardOf(node);
 			return path ? fromPage(request.page, resolve(request.deck, path)) : undefined;
 		},

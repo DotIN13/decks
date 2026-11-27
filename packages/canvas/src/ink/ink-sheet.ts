@@ -46,7 +46,7 @@ export function mountInkSheet(d: MountInkSheetNeeds) {
 		 * pencil (and a mouse) is caught on its way down instead, on the canvas it now lands on, and
 		 * the stylus's touches are still kept from scrolling it there.
 		 */
-		const canvas = (sheet.closest(".stage") ?? sheet.parentElement ?? sheet) as HTMLElement;
+		const canvas = (sheet.closest(".canvas") ?? sheet.parentElement ?? sheet) as HTMLElement;
 		const onGlass = (event: Event) => event.target instanceof Node && !!sheet?.contains(event.target);
 		const caught = (event: PointerEvent) => {
 			if (!penSeen() || onGlass(event)) return;

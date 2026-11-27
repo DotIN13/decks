@@ -157,8 +157,8 @@ It is not part of `npm run build` and has to be built once on each machine:
 sudo -u decks -H bash -c "cd /srv/decks/app/packages/stage && cargo build --release -p stage-shot"
 ```
 
-- The server looks for `packages/stage/target/release/stage-shot`, or the path in
-  `DECKS_STAGE_SHOT`. It keeps one process running and stops it after 10 minutes idle.
+- The server looks for `packages/stage/target/release/canvas-shot`, or the path in
+  `DECKS_CANVAS_SHOT`. It keeps one process running and stops it after 10 minutes idle.
 - **It draws with Metal only, so today it works on a Mac.** On Linux, or with no binary, or
   no graphics card, every picture falls back to Chromium (below), which is correct, only slower.
 - A picture also goes to Chromium when it holds math, a picture or icon that cannot be loaded,

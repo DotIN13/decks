@@ -16,7 +16,7 @@ export async function moveHome(ctx: VerbContext, name: string, keep = false): Pr
 	if (!may.apply) return { moved: false, onScreen: true, ...(may.offered ? { offered: may.offered } : {}) };
 	agent.setHome(name);
 	// Who is on which canvas is in every browser's canvas list: the screen follows the conversation on it there.
-	service.stagesChanged();
+	service.canvasesChanged();
 	return { moved: true, onScreen: may.onScreen };
 }
 

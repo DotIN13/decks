@@ -58,7 +58,7 @@ say("New tab on the card's pill opens it as a tab of this window, in front", (aw
 say("…and not the browser's tab", (context ?? page.context()).pages().length === pagesBefore);
 const frameEl = page.locator('.surface[data-surface="card"] iframe.card-frame');
 say("the card is in a frame of its own, sandboxed as the canvas's is", (await until(() => frameEl.count())) === 1 && !(await frameEl.getAttribute("sandbox")).includes("allow-same-origin") && (await frameEl.getAttribute("sandbox")) === (await page.locator("iframe.canvas-frame").getAttribute("sandbox")));
-say("the canvas is out of sight, and its tools with it", !(await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 0);
+say("the canvas is out of sight, and its tools with it", !(await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await page.locator(".pen-tools").count()) === 0);
 // The card's frame is the second frame of the canvas-frame page: found by what it shows.
 const inCard = async (run, arg) => {
 	for (const one of page.frames()) {
@@ -98,7 +98,7 @@ if (deck) {
 
 // --- closed, the canvas is as it was -------------------------------------------------------------------------
 await chip.locator(".tab-chip-close").click();
-say("the ✕ closes it, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="card"]').count()) === 0 && (await page.locator('.surface[data-surface="stage"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
+say("the ✕ closes it, and the canvas is back with its tools", (await until(async () => ((await page.locator('.tab-chip[data-kind="card"]').count()) === 0 && (await page.locator('.surface[data-surface="canvas"]').isVisible()) && (await page.locator(".pen-tools").count()) === 1 ? true : undefined))) === true);
 const canvas = await canvasFrame(page);
 say("…the same canvas frame, not one made anew", (await canvas.evaluate(() => (globalThis.__decksProbes?.frameDrawn?.().children ?? []).length)) > 0);
 

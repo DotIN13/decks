@@ -21,7 +21,7 @@ export class PictureSync {
 	/** Canvases whose drawing changed since their picture was last taken, and when each was taken. */
 	private due = new Set<string>();
 	private takenAt = new Map<string, number>();
-	/** Which canvas a board picture in `.decks/thumbs` belongs to, by its file name's prefix. */
+	/** Which canvas a card picture in `.decks/thumbs` belongs to, by its file name's prefix. */
 	private thumbOwner = new Map<string, string>();
 
 	constructor(

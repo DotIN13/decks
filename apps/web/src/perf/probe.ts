@@ -95,7 +95,7 @@ if (target) {
 	let last = performance.now();
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.e-]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(String(probes()?.cameraTransform?.() ?? ""));
-		const canvas = document.querySelector<HTMLElement>(".stage");
+		const canvas = document.querySelector<HTMLElement>(".canvas");
 		return { zoom: m ? Number(m[3]) : 0, x: canvas?.scrollLeft ?? 0, y: canvas?.scrollTop ?? 0 };
 	};
 	const tick = (t: number) => {
@@ -119,7 +119,7 @@ if (target) {
 		const el = node instanceof Element ? node : null;
 		if (!el) return String(node?.constructor?.name ?? "?");
 		const card = el.closest(".card-node");
-		return `${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 2).join(".")}${card ? " in board" : ""}${el.isConnected ? "" : " DETACHED"}`;
+		return `${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 2).join(".")}${card ? " in card" : ""}${el.isConnected ? "" : " DETACHED"}`;
 	};
 	const seen = new WeakMap<Event, number>();
 	window.addEventListener("wheel", (event) => {
@@ -145,7 +145,7 @@ if (target) {
 	window.addEventListener("pointercancel", (event) => inputs.push({ t: Math.round(performance.now()), kind: `pointercancel ${event.pointerType}` }), { passive: true, capture: true });
 	window.addEventListener("message", (event) => {
 		const m = event.data as { t?: string; phase?: string } | null;
-		if (m?.t === "decks:touch" && m.phase !== "move") inputs.push({ t: Math.round(performance.now()), kind: `board finger ${m.phase}` });
+		if (m?.t === "decks:touch" && m.phase !== "move") inputs.push({ t: Math.round(performance.now()), kind: `card finger ${m.phase}` });
 	});
 	window.addEventListener("gesturechange", note("gesturechange"), { passive: true, capture: true });
 	/** Sent only to an address; `probe=1` keeps the gestures for an inspector and sends nothing. */
@@ -172,7 +172,7 @@ if (target) {
 	{
 		const frame = () => new Promise<number>((done) => requestAnimationFrame(done));
 		const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
-		const canvas = () => document.querySelector<HTMLElement>(".stage")!;
+		const canvas = () => document.querySelector<HTMLElement>(".canvas")!;
 		const mark = (name: string, ms?: number) => marks.push({ t: Math.round(performance.now()), mark: name, ...(ms !== undefined ? { ms: Math.round(ms) } : {}) });
 		const gesture = (type: string, scale: number) => {
 			const event = new Event(type, { bubbles: true, cancelable: true });

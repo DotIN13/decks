@@ -98,7 +98,7 @@ export function LeftPanel(props: {
 	ask?: { tab: PanelTab; at: number };
 	/** Every card there is. The list is all of them, in three sections. */
 	cards: Page[];
-	/** The `.pen` files in `boards/` and `frames/`, listed after the cards; a press places one on the canvas. */
+	/** The `.pen` files in `cards/` and `frames/`, listed after the cards; a press places one on the canvas. */
 	pens?: DeckPen[];
 	onPlacePen?: (pen: DeckPen) => void;
 	/**

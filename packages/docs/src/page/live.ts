@@ -1684,7 +1684,7 @@ export class LiveEditor {
 	}
 
 	private keydown(event: KeyboardEvent): void {
-		// The page owns the keyboard while it has the caret: the board around it must not take ⌘Z or Backspace too.
+		// The page owns the keyboard while it has the caret: the card around it must not take ⌘Z or Backspace too.
 		if (event.key !== "Escape") event.stopPropagation();
 		if (event.isComposing || this.composing) return;
 		const mod = event.metaKey || event.ctrlKey;

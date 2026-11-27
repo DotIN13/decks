@@ -37,6 +37,34 @@ export const agents_browse_title: ((inputs?: Agents_Browse_TitleInputs, options?
 /**
 * | output |
 * | --- |
+* | "Canvases, currently {name}" |
+*
+*/
+export const agents_canvas_label: ((inputs: Agents_Canvas_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Canvas_LabelInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Canvases, this chat is on none" |
+*
+*/
+export const agents_canvas_none: ((inputs?: Agents_Canvas_NoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Canvas_NoneInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Canvas: {name}" |
+*
+*/
+export const agents_canvas_title: ((inputs: Agents_Canvas_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Canvas_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "Canvases" |
+*
+*/
+export const agents_canvases: ((inputs?: Agents_CanvasesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_CanvasesInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Close {name}" |
 *
 */
@@ -529,34 +557,6 @@ export const agents_stack_more: ((inputs: Agents_Stack_MoreInputs, options?: { l
 *
 */
 export const agents_stack_switch: ((inputs: Agents_Stack_SwitchInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Stack_SwitchInputs, { locale?: "en" | "zh-CN" }, {}>;
-/**
-* | output |
-* | --- |
-* | "Canvases, currently {name}" |
-*
-*/
-export const agents_stage_label: ((inputs: Agents_Stage_LabelInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Stage_LabelInputs, { locale?: "en" | "zh-CN" }, {}>;
-/**
-* | output |
-* | --- |
-* | "Canvases, this chat is on none" |
-*
-*/
-export const agents_stage_none: ((inputs?: Agents_Stage_NoneInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Stage_NoneInputs, { locale?: "en" | "zh-CN" }, {}>;
-/**
-* | output |
-* | --- |
-* | "Canvas: {name}" |
-*
-*/
-export const agents_stage_title: ((inputs: Agents_Stage_TitleInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_Stage_TitleInputs, { locale?: "en" | "zh-CN" }, {}>;
-/**
-* | output |
-* | --- |
-* | "Canvases" |
-*
-*/
-export const agents_stages: ((inputs?: Agents_StagesInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Agents_StagesInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
 * | --- |
@@ -1582,6 +1582,13 @@ export const canvas_empty_title: ((inputs?: Canvas_Empty_TitleInputs, options?: 
 /**
 * | output |
 * | --- |
+* | "The canvas could not start: {why}" |
+*
+*/
+export const canvas_engine_failed: ((inputs: Canvas_Engine_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Engine_FailedInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
 * | "Canvas" |
 *
 */
@@ -1929,6 +1936,13 @@ export const canvas_media_seek: ((inputs?: Canvas_Media_SeekInputs, options?: { 
 *
 */
 export const canvas_media_unmute: ((inputs?: Canvas_Media_UnmuteInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Media_UnmuteInputs, { locale?: "en" | "zh-CN" }, {}>;
+/**
+* | output |
+* | --- |
+* | "This browser can't draw the canvas: it needs WebGPU or WebGL 2." |
+*
+*/
+export const canvas_no_backend: ((inputs?: Canvas_No_BackendInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_No_BackendInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
 * | --- |
@@ -3440,20 +3454,6 @@ export const canvas_shape_triangle: ((inputs?: Canvas_Shape_TriangleInputs, opti
 /**
 * | output |
 * | --- |
-* | "The stage could not start: {why}" |
-*
-*/
-export const canvas_stage_failed: ((inputs: Canvas_Stage_FailedInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Stage_FailedInputs, { locale?: "en" | "zh-CN" }, {}>;
-/**
-* | output |
-* | --- |
-* | "This browser can't draw the stage: it needs WebGPU or WebGL 2." |
-*
-*/
-export const canvas_stage_no_backend: ((inputs?: Canvas_Stage_No_BackendInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Canvas_Stage_No_BackendInputs, { locale?: "en" | "zh-CN" }, {}>;
-/**
-* | output |
-* | --- |
 * | "Arrow: drag from one thing to another and it stays joined" |
 *
 */
@@ -4730,7 +4730,7 @@ export const chat_tm_restore: ((inputs?: Chat_Tm_RestoreInputs, options?: { loca
 /**
 * | output |
 * | --- |
-* | "Write the boards back to how they were here. The conversation stays where it is." |
+* | "Write the cards back to how they were here. The conversation stays where it is." |
 *
 */
 export const chat_tm_restore_note: ((inputs?: Chat_Tm_Restore_NoteInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Chat_Tm_Restore_NoteInputs, { locale?: "en" | "zh-CN" }, {}>;
@@ -5314,7 +5314,7 @@ export const composer_mode_edit: ((inputs?: Composer_Mode_EditInputs, options?: 
 /**
 * | output |
 * | --- |
-* | "Stop asking about board edits. Commands still ask." |
+* | "Stop asking about card edits. Commands still ask." |
 *
 */
 export const composer_mode_edit_note: ((inputs?: Composer_Mode_Edit_NoteInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Composer_Mode_Edit_NoteInputs, { locale?: "en" | "zh-CN" }, {}>;
@@ -5426,7 +5426,7 @@ export const composer_pill_canvas_on: ((inputs: Composer_Pill_Canvas_OnInputs, o
 /**
 * | output |
 * | --- |
-* | "On the canvas, a board or card: {path}" |
+* | "On the canvas, a card: {path}" |
 *
 */
 export const composer_pill_card: ((inputs: Composer_Pill_CardInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Composer_Pill_CardInputs, { locale?: "en" | "zh-CN" }, {}>;
@@ -5588,10 +5588,10 @@ export const composer_queue_title: ((inputs: Composer_Queue_TitleInputs, options
 /**
 * | output |
 * | --- |
-* | "a board" |
+* | "a card" |
 *
 */
-export const composer_recipient_board: ((inputs?: Composer_Recipient_BoardInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Composer_Recipient_BoardInputs, { locale?: "en" | "zh-CN" }, {}>;
+export const composer_recipient_card: ((inputs?: Composer_Recipient_CardInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Composer_Recipient_CardInputs, { locale?: "en" | "zh-CN" }, {}>;
 /**
 * | output |
 * | --- |
@@ -7297,7 +7297,7 @@ export const files_cancelled: ((inputs?: Files_CancelledInputs, options?: { loca
 /**
 * | output |
 * | --- |
-* | "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a board." |
+* | "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a card." |
 *
 */
 export const files_canvas_sub: ((inputs?: Files_Canvas_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Files_Canvas_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
@@ -7368,7 +7368,7 @@ export const files_done: ((inputs?: Files_DoneInputs, options?: { locale?: "en" 
 /**
 * | output |
 * | --- |
-* | "It is shown on the board, where it is." |
+* | "It is shown on the card, where it is." |
 *
 */
 export const files_embed_sub: ((inputs?: Files_Embed_SubInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Files_Embed_SubInputs, { locale?: "en" | "zh-CN" }, {}>;
@@ -11000,6 +11000,10 @@ export type Agents_Add_TitleInputs = { label: NonNullable<unknown> };
 export type Agents_AgentsInputs = {};
 export type Agents_Browse_LabelInputs = {};
 export type Agents_Browse_TitleInputs = {};
+export type Agents_Canvas_LabelInputs = { name: NonNullable<unknown> };
+export type Agents_Canvas_NoneInputs = {};
+export type Agents_Canvas_TitleInputs = { name: NonNullable<unknown> };
+export type Agents_CanvasesInputs = {};
 export type Agents_CloseInputs = { name: NonNullable<unknown> };
 export type Agents_Close_Ask_BodyInputs = { name: NonNullable<unknown> };
 export type Agents_Close_Ask_TitleInputs = { name: NonNullable<unknown> };
@@ -11070,10 +11074,6 @@ export type Agents_Side_Panel_TitleInputs = {};
 export type Agents_Stack_LabelInputs = {};
 export type Agents_Stack_MoreInputs = { count: NonNullable<unknown>, shown: NonNullable<unknown> };
 export type Agents_Stack_SwitchInputs = { name: NonNullable<unknown>, status: NonNullable<unknown> };
-export type Agents_Stage_LabelInputs = { name: NonNullable<unknown> };
-export type Agents_Stage_NoneInputs = {};
-export type Agents_Stage_TitleInputs = { name: NonNullable<unknown> };
-export type Agents_StagesInputs = {};
 export type Agents_Status_DoneInputs = {};
 export type Agents_Status_IdleInputs = {};
 export type Agents_Status_ThinkingInputs = {};
@@ -11220,6 +11220,7 @@ export type Canvas_Document_Needs_FrameInputs = {};
 export type Canvas_Empty_AgentInputs = {};
 export type Canvas_Empty_BodyInputs = { agent: NonNullable<unknown> };
 export type Canvas_Empty_TitleInputs = {};
+export type Canvas_Engine_FailedInputs = { why: NonNullable<unknown> };
 export type Canvas_Frame_TitleInputs = {};
 export type Canvas_Handle_Arrow_BendInputs = {};
 export type Canvas_Handle_Arrow_JoinInputs = {};
@@ -11270,6 +11271,7 @@ export type Canvas_Media_PauseInputs = {};
 export type Canvas_Media_PlayInputs = {};
 export type Canvas_Media_SeekInputs = {};
 export type Canvas_Media_UnmuteInputs = {};
+export type Canvas_No_BackendInputs = {};
 export type Canvas_Paste_Kind_CardInputs = {};
 export type Canvas_Paste_Kind_DocumentInputs = {};
 export type Canvas_Paste_Kind_FileInputs = {};
@@ -11485,8 +11487,6 @@ export type Canvas_Shape_StarInputs = {};
 export type Canvas_Shape_TerminatorInputs = {};
 export type Canvas_Shape_TrapezoidInputs = {};
 export type Canvas_Shape_TriangleInputs = {};
-export type Canvas_Stage_FailedInputs = { why: NonNullable<unknown> };
-export type Canvas_Stage_No_BackendInputs = {};
 export type Canvas_Tool_ArrowInputs = {};
 export type Canvas_Tool_CardInputs = {};
 export type Canvas_Tool_FileInputs = {};
@@ -11791,7 +11791,7 @@ export type Composer_Queue_Send_NowInputs = {};
 export type Composer_Queue_Send_Now_TitleInputs = {};
 export type Composer_Queue_ShowInputs = {};
 export type Composer_Queue_TitleInputs = { count: NonNullable<unknown>, name: NonNullable<unknown> };
-export type Composer_Recipient_BoardInputs = {};
+export type Composer_Recipient_CardInputs = {};
 export type Composer_Recipient_ChipInputs = { label: NonNullable<unknown> };
 export type Composer_Recipient_LabelInputs = {};
 export type Composer_Recipient_NoneInputs = {};

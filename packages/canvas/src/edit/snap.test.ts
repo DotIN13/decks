@@ -49,7 +49,7 @@ test("an alignment marks every point on it that lines up: each box's corners and
 	]);
 });
 
-test("a board keeps the reading gap: 160 beside, above or below another, marked with its size", () => {
+test("a card keeps the reading gap: 160 beside, above or below another, marked with its size", () => {
 	const card = { x: 0, y: 0, w: 400, h: 300 };
 	// 3 short of 160 to the right of it: it settles at 560.
 	const right = snapMove({ x: 557, y: 40, w: 400, h: 300 }, [], 5, [card]);

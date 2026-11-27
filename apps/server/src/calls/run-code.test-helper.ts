@@ -24,7 +24,7 @@ export async function runCode(tool: DecksTool, code: string): Promise<{ text: st
 	const parts: string[] = [];
 	let isError = false;
 	try {
-		const value = await new AsyncFunction("stage", code)(verbs([]));
+		const value = await new AsyncFunction("decks", code)(verbs([]));
 		parts.push(value === undefined ? "(done)" : JSON.stringify(value, null, 2));
 	} catch (error) {
 		isError = true;

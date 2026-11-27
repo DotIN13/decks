@@ -1,5 +1,5 @@
 import { formatAgo, m } from "@decks/i18n";
-import type { StageRow } from "@decks/protocol";
+import type { CanvasRow } from "@decks/protocol";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
@@ -24,15 +24,15 @@ const RECENT = 5;
  * not throw up the keyboard over it.
  */
 /** What the switcher lists: the canvases matching the words typed, or the latest, the one you are on first. */
-function listedCanvases(canvases: StageRow[], here: string | undefined, typed: string): StageRow[] {
+function listedCanvases(canvases: CanvasRow[], here: string | undefined, typed: string): CanvasRow[] {
 	const q = typed.trim();
 	if (q) return searchCanvases(canvases, q).filter((one) => one.hit).map((one) => one.canvas).slice(0, 8);
-	const at = (one: StageRow) => (one.name === here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
+	const at = (one: CanvasRow) => (one.name === here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
 	return [...canvases].sort((a, b) => at(b) - at(a)).slice(0, RECENT);
 }
 
 export function CanvasSwitcher(props: {
-	canvases: StageRow[];
+	canvases: CanvasRow[];
 	here: string | undefined;
 	scheme: "light" | "dark";
 	onPick: (name: string) => void;
@@ -81,8 +81,8 @@ export function CanvasSwitcher(props: {
 					{(canvas) => (
 						<button type="button" role="menuitem" data-row data-flat="true" class="switcher-canvas" data-current={canvas.name === props.here ? "true" : undefined} onClick={() => pick(() => props.onPick(canvas.name))}>
 							<span class="switcher-thumb" aria-hidden="true">
-								<Show when={canvas.boards > 0}>
-									<AuthedImg alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(canvas.name)}?v=${canvas.shot ?? canvas.rev}&scheme=${props.scheme}`)} />
+								<Show when={canvas.cards > 0}>
+									<AuthedImg alt="" loading="lazy" src={api(`/canvas-thumb/${encodeURIComponent(canvas.name)}?v=${canvas.shot ?? canvas.rev}&scheme=${props.scheme}`)} />
 								</Show>
 							</span>
 							<span class="row-label min-w-0 flex-1 truncate">{canvas.title}</span>

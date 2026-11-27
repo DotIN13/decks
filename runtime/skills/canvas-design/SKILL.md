@@ -1,6 +1,6 @@
 ---
 name: canvas-design
-description: Design an app screen, a web page, a slide, a dashboard or a component as real pen frames on the canvas, editable by hand, openable in pen.dev and exportable as HTML. Use when someone asks for a design, a UI, a layout or a visual to look at and change; an interactive mockup or a demo is an HTML board instead. Read canvas-authoring first for the canvas calls; schema.md beside this skill lists every item type and field.
+description: Design an app screen, a web page, a slide, a dashboard or a component as real pen frames on the canvas, editable by hand, openable in pen.dev and exportable as HTML. Use when someone asks for a design, a UI, a layout or a visual to look at and change; an interactive mockup or a demo is an HTML card instead. Read canvas-authoring first for the canvas calls; schema.md beside this skill lists every item type and field.
 ---
 
 # Designing on the canvas

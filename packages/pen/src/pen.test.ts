@@ -151,7 +151,7 @@ test("an arc is measured where it is drawn, not out to its radii", () => {
 	assert.ok(grown.x === 0 && Math.abs(grown.y + 10) < 1e-9 && Math.abs(grown.w - 20) < 1e-9 && Math.abs(grown.h - 10) < 1e-9, JSON.stringify(grown));
 });
 
-test("edits: insert with a stage box inside a free frame writes pen's relative numbers", () => {
+test("edits: insert with a canvas box inside a free frame writes pen's relative numbers", () => {
 	const doc: PenDocument = { ...emptyDocument(), children: [{ type: "frame", id: "sec", x: -40, y: -120, width: 1340, height: 1320, layout: "none", children: [] }] };
 	const { doc: next, results } = apply(doc, [{ op: "insert", parent: "sec", node: { type: "note", id: "restart", content: "Restart first" }, box: { x1: 620, y1: 0, x2: 860, y2: 90 } }], light);
 	const note = next.children[0]!.children![0]!;
@@ -204,28 +204,28 @@ test("an arrow is redrawn between the facing edges of its ends, and follows them
 		{ type: "rectangle", id: "a", x: 0, y: 0, width: 100, height: 50 },
 		{ type: "rectangle", id: "b", x: 300, y: 0, width: 100, height: 50 },
 		{ type: "path", id: "ab", metadata: { type: "decks.arrow", from: "a", to: "b" } },
-		{ type: "path", id: "toBoard", metadata: { type: "decks.arrow", from: "a", to: "boards/x.html", route: "elbow" } },
+		{ type: "path", id: "toCard", metadata: { type: "decks.arrow", from: "a", to: "cards/x/index.html", route: "elbow" } },
 	] }));
 	const placed = layout(doc, expand(doc), light);
-	const board = { x: 0, y: 400, w: 200, h: 100 };
-	assert.equal(reroute(doc, placed, (name) => (name === "boards/x.html" ? board : undefined)), true);
+	const card = { x: 0, y: 400, w: 200, h: 100 };
+	assert.equal(reroute(doc, placed, (name) => (name === "cards/x/index.html" ? card : undefined)), true);
 	const ab = doc.children[2]!;
 	// From a's right edge (100, 25) to b's left edge (300, 25), with the head inside the box.
 	assert.equal(ab.x! <= 100 && ab.x! + (ab.width as number) >= 300, true);
 	assert.match(ab.geometry!, /^M[\d.]+ [\d.]+ L[\d.]+ [\d.]+ M/);
 	assert.equal(ab.stroke, "#8a8f98");
-	// Going down to the board: from a's bottom edge.
+	// Going down to the card: from a's bottom edge.
 	const down = doc.children[3]!;
 	assert.equal(down.y! <= 50 && down.y! + (down.height as number) >= 400, true);
 	// Moving b moves the arrow; nothing moving changes nothing.
 	const again = layout(doc, expand(doc), light);
-	assert.equal(reroute(doc, again, (name) => (name === "boards/x.html" ? board : undefined)), false);
+	assert.equal(reroute(doc, again, (name) => (name === "cards/x/index.html" ? card : undefined)), false);
 	doc.children[1]!.x = 600;
-	assert.equal(reroute(doc, layout(doc, expand(doc), light), () => board), true);
+	assert.equal(reroute(doc, layout(doc, expand(doc), light), () => card), true);
 	assert.equal((ab.x as number) + (ab.width as number) >= 600, true);
 });
 
-test("an arrow end can be a point on the stage, which a move shifts and a joined end ignores", () => {
+test("an arrow end can be a point on the canvas, which a move shifts and a joined end ignores", () => {
 	const doc = parse(JSON.stringify({ version: "2.14", children: [
 		{ type: "rectangle", id: "a", x: 0, y: 0, width: 100, height: 50 },
 		{ type: "path", id: "half", metadata: { type: "decks.arrow", from: "a", to: [400, 25] } },

@@ -1,6 +1,6 @@
 import { life } from "./life.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Page, Presence, PresenceBy, StageCall, ChangeAuthor } from "@decks/protocol";
+import type { Page, Presence, PresenceBy, CanvasCall, ChangeAuthor } from "@decks/protocol";
 import type { CardShot } from "../../items/card-snapshot.ts";
 import { openLine, type LineClient } from "./line.ts";
 
@@ -23,7 +23,7 @@ export interface Backend {
 	frame: string;
 	/** One of the frame's own messages on the line (`doc`, `card-seen`, `card-extent`): sent, and answered `ok` at once. */
 	post(route: string, body: unknown): Promise<Record<string, unknown>>;
-	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
+	/** The answer to an agent's call on this canvas (`decks.call`), as a tab answers it on the socket. */
 	answer(id: string, value: unknown): void;
 	/** Where this frame is on its canvas, for the others on it (`presence.set`): only what changed. */
 	presence(presence: Presence): void;
@@ -45,7 +45,7 @@ export type Heard =
 	/** Someone else on this canvas moved, selected, looked elsewhere or left (`presence.ts`). */
 	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: { x: number; y: number; zoom: number } | null }
 	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
-	| { type: "view.called"; call: StageCall }
+	| { type: "view.called"; call: CanvasCall }
 	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
 	| { type: `doc.${string}`; path?: string; [key: string]: unknown }
 	/** The line is back after a drop and nothing says what was missed: the drawing is read again. */
@@ -83,7 +83,7 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 
 	return {
 		async drawing() {
-			const response = await fetch(`${base}/stage-pen/${encodeURIComponent(canvas)}`, { headers: headers(), cache: "no-store" });
+			const response = await fetch(`${base}/canvas-pen/${encodeURIComponent(canvas)}`, { headers: headers(), cache: "no-store" });
 			if (!response.ok) throw new Error(`The canvas ${canvas} did not load: ${response.status} ${await response.text().catch(() => "")}`.trim());
 			return (await response.json()) as { doc: PenDocument; base: string; rev: number; by?: string; cards: Page[]; harness?: string };
 		},

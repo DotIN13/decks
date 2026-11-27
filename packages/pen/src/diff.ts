@@ -2,7 +2,7 @@ import type { PenDocument, PenNode } from "./types.ts";
 
 /**
  * What changed between two versions of a drawing, as small edits: what the server sends instead of
- * the whole file (`canvas.changed`), and what the stage's engines and the app's own copy apply.
+ * the whole file (`canvas.changed`), and what the canvas's engines and the app's own copy apply.
  *
  * Worked out from the two documents, not from the ops that made the change, because a drawing also
  * changes by arrows rerouting after an edit, by undo putting back an older text, and by a person or
@@ -255,7 +255,7 @@ export function applyEdits(doc: PenDocument, edits: readonly PenEdit[]): PenDocu
  * Apply edits as `applyEdits` does, but share what they do not reach: the answer is a new document
  * whose untouched items are the very objects of `doc`, and only the items edited, the lists they sit
  * in and the items above them are copies. `doc` is not changed. For a reader that treats documents
- * as values and is handed one per change (the stage): a copy through JSON of a 2,000-item drawing
+ * as values and is handed one per change (the canvas): a copy through JSON of a 2,000-item drawing
  * was most of the time from an agent's edit to its frame.
  *
  * The answer shares items with `doc`, so neither may be changed in place afterwards.

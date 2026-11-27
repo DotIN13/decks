@@ -51,7 +51,7 @@ export function createCalloutSide(d: CalloutSideNeeds) {
 			const y = canvas.top + (slot.from + slot.to) / 2;
 			return [x - half + 8, x, x + half - 8].some((at) => {
 				const hit = document.elementFromPoint(canvas.left + at, y);
-				return !!hit && !hit.closest(".stage");
+				return !!hit && !hit.closest(".canvas");
 			});
 		};
 		const slots = [

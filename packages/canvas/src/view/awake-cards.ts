@@ -60,7 +60,7 @@ export function createAwakeCards(d: AwakeCardsNeeds) {
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
 
-	/** The placed items as the chooser sees them: the same order as `props.boards` and `pageIndex`, each with its kind. */
+	/** The placed items as the chooser sees them: the same order as `props.cards` and `pageIndex`, each with its kind. */
 	// A card its host has no copy of (`base/missing.ts`) is never woken: its page would be blank paper, and the sheet paints why.
 	const awakeItems = createMemo<readonly AwakeItem[]>(() => d.props.cards.map((card) => ({ path: card.path, x: card.x, y: card.y, w: card.w, h: card.h, kind: card.card ? (missing().has(card.path) ? undefined : "card") : card.item })));
 

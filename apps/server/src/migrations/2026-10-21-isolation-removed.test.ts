@@ -62,7 +62,7 @@ test("isolated agents become ordinary and their canvases stay where they are, af
 test("a deck that never used isolated mode is only recorded, with no backup", () => {
 	const deck = join(mkdtempSync(join(tmpdir(), "decks-isolation-removed-")), "decks");
 	write(deck, "canvases/a/canvas.pen", JSON.stringify({ version: "2.14", children: [] }));
-	write(deck, ".decks/agents/x/meta.json", JSON.stringify({ id: "x", stage: "a" }, null, 2));
+	write(deck, ".decks/agents/x/meta.json", JSON.stringify({ id: "x" }, null, 2));
 	write(deck, ".decks/migrations.json", JSON.stringify({ "2026-10-20-standalone-canvases": { at: "then" } }));
 	const said = runAtOpen(deck);
 	assert.deepEqual(said, []);

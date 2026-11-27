@@ -196,7 +196,7 @@ export class Line {
 				state.watched.delete(message.canvas);
 				return;
 			case "line.call": {
-				const headers = { ...state.headers, ...(message.edit ? { "x-decks-edit": message.edit } : {}), ...(message.stage ? { "x-decks-stage": message.stage } : {}), ...(message.agent ? { "x-decks-agent": message.agent } : {}) };
+				const headers = { ...state.headers, ...(message.edit ? { "x-decks-edit": message.edit } : {}), ...(message.canvas ? { "x-decks-canvas": message.canvas } : {}), ...(message.agent ? { "x-decks-agent": message.agent } : {}) };
 				const { answer } = await runVerb(this.app, principal, headers, String(message.verb ?? ""), message.args, state.remote, { tell: (said) => send(socket, said), ...(state.view ? { view: state.view } : {}), ...(state.tokenId ? { tokenId: state.tokenId } : {}) });
 				send(socket, { type: "call.answered", id: String(message.id), ok: answer.ok, ...(answer.value !== undefined ? { value: answer.value } : {}), ...(answer.error ? { error: answer.error } : {}), ...(answer.notes?.length ? { notes: answer.notes } : {}) });
 				return;

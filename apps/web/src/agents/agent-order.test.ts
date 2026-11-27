@@ -20,7 +20,7 @@ function chat(id: string, state: AgentState, lastAt?: number): AgentChat {
 		unread: 0,
 		kind: "claude",
 		identity: { name: id, color: "#000" },
-		boards: [],
+		cards: [],
 		inPlay: [],
 		lastAt,
 	};

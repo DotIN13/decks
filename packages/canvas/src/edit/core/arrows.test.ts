@@ -37,7 +37,7 @@ test("a point on a box's edge is on the nearest side, top first on a tie", () =>
 	assert.equal(onSide(box, { x: 0, y: 0 }), "top");
 });
 
-test("an end joins the item picked there, else the board, never an arrow or the arrow itself", () => {
+test("an end joins the item picked there, else the card, never an arrow or the arrow itself", () => {
 	const s = scene();
 	assert.deepEqual(joinAt(s, { x: 99, y: 26 }, { zoom: 1 }), { name: "a", box, side: "right" });
 	assert.deepEqual(joinAt(s, { x: 40, y: 30 }, { zoom: 1 }), { name: "a", box });

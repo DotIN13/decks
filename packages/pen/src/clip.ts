@@ -26,7 +26,7 @@ export interface Clip {
 /** The clipboard type a clip is written as. */
 export const CLIP_TYPE = "application/x-decks-clip";
 
-/** A page item's path (a card's, a board's, a document's): what an arrow's end may name instead of an id. */
+/** A page item's path (a card's, a card's, a document's): what an arrow's end may name instead of an id. */
 const pathOf = (node: PenNode): string | undefined => {
 	const path = (node.metadata as { path?: unknown } | undefined)?.path;
 	return node.type === "browser" && typeof path === "string" ? path : undefined;
@@ -126,7 +126,7 @@ export function pastedItems(items: readonly PenNode[], taken: Set<string>, optio
 	return { items: copies, ids };
 }
 
-/** The words of clipped items, for an app that takes only text: notes' and texts' words, and cards' and boards' titles. */
+/** The words of clipped items, for an app that takes only text: notes' and texts' words, and cards' and cards' titles. */
 export function clipText(items: readonly PenNode[]): string {
 	const lines: string[] = [];
 	for (const one of walk(items)) {

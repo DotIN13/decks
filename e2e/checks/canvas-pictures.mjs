@@ -56,7 +56,7 @@ const withCards = async () => (await rows()).filter((one) => one.asked);
 
 const loaded = await until(async () => ((await withCards()).length >= 2 && (await withCards()).every((one) => one.loaded) ? await withCards() : undefined));
 say("each canvas with cards shows a picture in the list, and it loaded", !!loaded, JSON.stringify(await rows()));
-say("…asked for by the drawing's hash, not by a revision number", (loaded ?? []).every((one) => /^\/api\/stage-thumb\/[^?]+\?v=[0-9a-f]{12}&scheme=(light|dark)$/.test(one.asked)), JSON.stringify((loaded ?? []).map((one) => one.asked)));
+say("…asked for by the drawing's hash, not by a revision number", (loaded ?? []).every((one) => /^\/api\/canvas-thumb\/[^?]+\?v=[0-9a-f]{12}&scheme=(light|dark)$/.test(one.asked)), JSON.stringify((loaded ?? []).map((one) => one.asked)));
 say("…and it fills its small box", (loaded ?? []).every((one) => one.drawn && one.drawn[0] === one.box[0] && one.drawn[1] === one.box[1] && one.box[0] === 34 && one.box[1] === 24), JSON.stringify((loaded ?? []).map((one) => [one.box, one.drawn])));
 if (OUT) await page.screenshot({ path: join(OUT, "canvas-list.png"), clip: { x: 0, y: 0, width: 700, height: 420 } });
 
@@ -64,7 +64,7 @@ const mine = await row("Picture check");
 const kept = await fetch(`${API}${mine?.asked}`, { headers: person });
 const bytes = Buffer.from(await kept.arrayBuffer());
 say("the harness answers that address with a JPEG it lets the browser keep for a year", kept.status === 200 && bytes[0] === 0xff && bytes[1] === 0xd8 && /immutable/.test(kept.headers.get("cache-control") ?? ""), `${kept.status} ${kept.headers.get("cache-control")} ${bytes.length} bytes`);
-const stale = await fetch(`${API}/api/stage-thumb/${made}?v=1&scheme=light`, { headers: person });
+const stale = await fetch(`${API}/api/canvas-thumb/${made}?v=1&scheme=light`, { headers: person });
 const staleBytes = Buffer.from(await stale.arrayBuffer());
 say("an address by revision number gets today's picture, not the one an earlier run kept as revision 1, and is not kept", stale.status === 200 && staleBytes[0] === 0xff && staleBytes.length > 100 && /no-cache/.test(stale.headers.get("cache-control") ?? ""), `${stale.status} ${stale.headers.get("cache-control")} ${staleBytes.length} bytes`);
 say("…and the earlier run's file is gone once today's is taken", !existsSync(join(folder, `${made}-1-light.jpg`)) && readdirSync(folder).some((file) => file.startsWith(`${made}-`) && file.endsWith("-light.jpg")), JSON.stringify(readdirSync(folder)));

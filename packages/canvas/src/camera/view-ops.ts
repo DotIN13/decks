@@ -1,4 +1,4 @@
-import type { Page, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, CanvasCall } from "@decks/protocol";
 import { m } from "@decks/i18n";
 import { cssEscape } from "@decks/ui";
 import { boxOf, fit } from "./camera.ts";
@@ -64,7 +64,7 @@ export interface ViewOpsHost {
  * it to you when you open that chat. Returns the sentence to put in the agent's result, or
  * nothing when the agent asking is the one on screen and the op should simply happen.
  */
-function defer(call: StageCall, host: ViewOpsHost, camera: Camera, selected?: string, what: "card" | "view" = "view"): { deferred: string } | undefined {
+function defer(call: CanvasCall, host: ViewOpsHost, camera: Camera, selected?: string, what: "card" | "view" = "view"): { deferred: string } | undefined {
 	/*
 	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
 	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
@@ -79,13 +79,13 @@ function defer(call: StageCall, host: ViewOpsHost, camera: Camera, selected?: st
 	return { deferred: "you are not the conversation on screen, so this view is waiting in your chat rather than moving the canvas" };
 }
 
-export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
+export function runViewCall(call: CanvasCall, host: ViewOpsHost): unknown {
 	const args = (call.args ?? {}) as Record<string, unknown>;
 
 	switch (call.op) {
 		case "show": {
 			// A canvas named (`view.focus`) that is not the one on this screen: nothing here to move to.
-			if (typeof args.stage === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.stage) {
+			if (typeof args.canvas === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.canvas) {
 				return { shown: [], deferred: "the person's screen shows another canvas; decks view goto brings it to this one first" };
 			}
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
@@ -132,7 +132,7 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 			if (typeof args.path !== "string") return { error: "reload needs a path" };
 			// Counted (`view.reload`): this page reloads the card only if its canvas shows it.
 			if (args.count === true) {
-				if (typeof args.stage === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.stage) return { pages: 0 };
+				if (typeof args.canvas === "string" && host.canvasOnScreen && host.canvasOnScreen() !== args.canvas) return { pages: 0 };
 				if (!host.cards().some((card) => card.path === args.path)) return { pages: 0 };
 				host.reload(args.path);
 				return { reloaded: args.path, pages: 1 };
@@ -148,7 +148,7 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 		 * (`onScreen`), unless the person is using the canvas, who is offered a button instead.
 		 */
 		case "goto": {
-			const canvas = args.stage;
+			const canvas = args.canvas;
 			if (typeof canvas !== "string" || !canvas) return { error: "goto needs a canvas" };
 			if (!call.agentId || call.agentId !== host.focused()) return { apply: true };
 			// The person moving it themselves (a call with their own token): nobody to ask.
@@ -180,7 +180,7 @@ export function runViewCall(call: StageCall, host: ViewOpsHost): unknown {
 		}
 
 		default:
-			return { error: `unknown stage operation: ${call.op}` };
+			return { error: `unknown canvas operation: ${call.op}` };
 	}
 }
 

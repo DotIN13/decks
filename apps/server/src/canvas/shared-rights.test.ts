@@ -28,7 +28,7 @@ function sharedCanvas(deck: string, role: "edit" | "view") {
 	const folder = join(deck, "shared", "canvases", "ada", "fetcher");
 	mkdirSync(join(folder, "assets"), { recursive: true });
 	mkdirSync(join(folder, "files"), { recursive: true });
-	put(join(folder, "canvas.json"), JSON.stringify({ title: "Fetcher", studio: "c1", shared: { owner: "u1", ownerName: "Ada", role, studio: "c1" }, boards: [] }));
+	put(join(folder, "canvas.json"), JSON.stringify({ title: "Fetcher", studio: "c1", shared: { owner: "u1", ownerName: "Ada", role, studio: "c1" }, cards: [] }));
 	put(join(folder, "assets", "logo.png"), PNG);
 	put(join(folder, "files", "own.png"), PNG);
 	put(
@@ -99,7 +99,7 @@ test("a file dropped on a friend's canvas you may edit goes into its own files/,
 	}
 });
 
-test("a friend's canvas shared with you to view refuses a drop, an edit, a board and a rename, each saying how to make a copy", async () => {
+test("a friend's canvas shared with you to view refuses a drop, an edit, a card and a rename, each saying how to make a copy", async () => {
 	const { folder, upload, verb, cleanup } = await open("view");
 	try {
 		const put = await upload(`name=photo.png&canvas=${encodeURIComponent("shared/ada/fetcher")}`);
@@ -154,14 +154,14 @@ test("a copy of a friend's canvas is a canvas of yours, standing alone, with the
 });
 
 test("the copy's plan puts mirrored deck files in files/ without taking a place the canvas's own file has", () => {
-	const plan = copyPlan(["cards/a/index.html", "cards/a/chart.js", "boards/old.html", "files/x.png", "assets/x.png", "assets/y.png", "docs/n.md", "canvas.pen"]);
+	const plan = copyPlan(["cards/a/index.html", "cards/a/chart.js", "pages/old.html", "files/x.png", "assets/x.png", "assets/y.png", "docs/n.md", "canvas.pen"]);
 	assert.equal(plan.get("files/x.png"), "files/x.png");
 	assert.equal(plan.get("assets/x.png"), "files/assets/x.png");
 	assert.equal(plan.get("assets/y.png"), "files/y.png");
 	assert.equal(plan.get("docs/n.md"), "files/docs/n.md");
 	assert.equal(plan.has("canvas.pen"), false);
 	assert.equal(plan.get("cards/a/chart.js"), "cards/a/chart.js", "a card's whole folder comes along");
-	assert.equal(plan.has("boards/old.html"), false, "a board file from before cards is left behind");
+	assert.equal(plan.has("pages/old.html"), false, "a card file from before cards is left behind");
 	assert.equal(relinked(`<img src="../../assets/y.png"><a href="../../docs/n.md">n</a>`, "cards/a/index.html", "cards/a/index.html", plan), `<img src="../../files/y.png"><a href="../../files/docs/n.md">n</a>`);
 	assert.deepEqual(relinkDrawing({ fill: { url: "assets/y.png" }, other: "https://x/assets/y.png" }, plan), { fill: { url: "files/y.png" }, other: "https://x/assets/y.png" });
 });

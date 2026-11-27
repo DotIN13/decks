@@ -66,7 +66,7 @@ export function cardCalls(deps: CardCallDeps): (verb: string, args: unknown[], c
 				// A labelled dot is an agent's; a card draws its own pointer.
 				return undefined;
 			case "here":
-				return { name: deps.canvas, title: deps.canvas, open: [], cards: 0, boards: 0 };
+				return { name: deps.canvas, title: deps.canvas, open: [], cards: 0 };
 			case "now": {
 				const now = new Date();
 				return { iso: now.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, words: now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" }), epoch: now.getTime() };

@@ -22,7 +22,7 @@ import { SharedServer, type ServerChild, type SpawnServer } from "../shared-serv
 interface Opencode2ServerSpec {
 	/** The server's working directory: the deck. */
 	cwd: string;
-	/** Where Decks' tools call back: Decks' own `/api/stage/eval`. */
+	/** Where Decks' tools call back: Decks' own `/api/canvas/eval`. */
 	decksUrl: string;
 	/** Decks' own port, for the `decks` command in every session's shell. */
 	decksPort?: number;
@@ -99,7 +99,7 @@ export class Opencode2Manager extends SharedServer<Opencode2ServerSpec> {
 			// Decks decides which OpenCode 2 runs; an update in the background would change it
 			// under a running deck.
 			OPENCODE_DISABLE_AUTOUPDATE: "1",
-			DECKS_STAGE_URL: spec.decksUrl,
+			DECKS_CANVAS_URL: spec.decksUrl,
 			DECKS_OPENCODE_SECRET: secret,
 			// The `decks` command and where Decks is, for every session's shell; the plugin trades the
 			// session for its agent's token (`runtimes/decks-env.ts`).

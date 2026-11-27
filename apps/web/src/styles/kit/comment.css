@@ -100,7 +100,7 @@
 	}
 
 	/*
-	 * What goes with the message, as a pill in the words: a comment, a board or card, a drawn item, a
+	 * What goes with the message, as a pill in the words: a comment, a card, a drawn item, a
 	 * file. Picone's pill (its `markdown.css`), in this app's colours: one object, selected whole or not
 	 * at all, never broken across two lines, and sized by the sentence it sits in. The same pill in the
 	 * input bar and in a message you sent (`.stream-bubble`), and a press on either opens its card.
@@ -134,7 +134,7 @@
 
 	/*
 	 * A colour per kind, so pills in one sentence are told apart before they are read: amber for a
-	 * comment, the app's own blue for a card, violet for something drawn on the stage, a plainer
+	 * comment, the app's own blue for a card, violet for something drawn on the canvas, a plainer
 	 * blue for a file. The icon in front of each says the same thing again, for anyone who cannot use
 	 * the difference in colour.
 	 */

@@ -76,7 +76,7 @@ export function ownInput(target: EventTarget, host: HTMLElement, input: OwnInput
 	for (const type of ["keydown", "keyup", "keypress"])
 		target.addEventListener(type, (event) => {
 			const key = event as KeyboardEvent;
-			// The canvas's zoom, wherever the focus is (`stage/input.ts`).
+			// The canvas's zoom, wherever the focus is (`view/input.ts`).
 			if (zoomKey(key)) return;
 			event.stopPropagation();
 			if (type === "keydown" && key.key === "Escape") {
@@ -88,7 +88,7 @@ export function ownInput(target: EventTarget, host: HTMLElement, input: OwnInput
 
 /** Out of the item: the focus back on the canvas it sits on, the item still selected. */
 function leave(host: HTMLElement): void {
-	const canvas = host.closest<HTMLElement>(".stage");
+	const canvas = host.closest<HTMLElement>(".canvas");
 	if (canvas) canvas.focus({ preventScroll: true });
 	else (document.activeElement as HTMLElement | null)?.blur?.();
 }

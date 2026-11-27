@@ -160,7 +160,7 @@ export function Popover(props: {
 		}
 		// Two frames: one for the card to exist, one for fonts to have settled its height.
 		/*
-		 * And again whenever the card changes size: a row that fills in after it opens (the board
+		 * And again whenever the card changes size: a row that fills in after it opens (the card
 		 * pictures' progress in the ⋯ menu) widened the card past the edge it was lined up with.
 		 */
 		let sized: ResizeObserver | undefined;

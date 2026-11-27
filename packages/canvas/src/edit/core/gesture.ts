@@ -71,7 +71,7 @@ export type Gesture =
 export type Input =
 	/** A press on the drawing or bare canvas with the select tool: an item picked up, or a marquee. */
 	| ({ type: "press-canvas" } & PointerInput)
-	/** A press on a board (its node or its picture): it moves with whatever else is picked up. */
+	/** A press on a card (its node or its picture): it moves with whatever else is picked up. */
 	| ({ type: "press-card"; path: string } & PointerInput)
 	/** A press on a card block's grip: the block alone, carried. */
 	| ({ type: "press-block"; id: string } & PointerInput)

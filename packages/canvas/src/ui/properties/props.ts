@@ -4,6 +4,6 @@ import type { PenDocument } from "@decks/pen";
 export interface PropertiesProps {
 	doc: PenDocument | undefined;
 	onEdit: (ops: unknown[]) => void;
-	/** Download a picture of these items, taken by the server (`server/stage/shots.ts`). */
+	/** Download a picture of these items, taken by the server (`server/canvas/shots.ts`). */
 	onExport: (ids: string[]) => void;
 }

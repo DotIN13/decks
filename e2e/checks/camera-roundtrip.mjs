@@ -31,16 +31,16 @@ const camera = async () =>
 
 const wallName = (wall, title) => wall.find((one) => one.title === title)?.name ?? wall.find((one) => !one.here)?.name ?? "";
 const pillStage = () => page.evaluate(() => document.querySelector(".v3-topbar .tab-chip[data-camera='true']")?.textContent?.trim() ?? null);
-const cards = () => page.evaluate(() => [...document.querySelectorAll(".stage-card")].map((card) => ({ name: card.dataset.name, title: card.querySelector(".row-label")?.textContent?.trim() ?? null, here: card.dataset.here ?? null })));
+const cards = () => page.evaluate(() => [...document.querySelectorAll(".canvas-card")].map((card) => ({ name: card.dataset.name, title: card.querySelector(".row-label")?.textContent?.trim() ?? null, here: card.dataset.here ?? null })));
 /* The pill opens the canvas switcher (`canvas/CanvasSwitcher.tsx`); its All canvases row opens the manager. */
 const openManager = async () => {
 	await page.locator(".v3-topbar .tab-chip[data-camera='true'] .tab-chip-name").click();
 	await page.getByRole("menuitem", { name: "All canvases" }).click();
-	await page.waitForSelector(".stage-manager", { timeout: 6000 });
+	await page.waitForSelector(".canvas-manager", { timeout: 6000 });
 };
 const pick = async (name) => {
 	await openManager();
-	await page.locator(`.stage-card[data-name="${name}"]`).click();
+	await page.locator(`.canvas-card[data-name="${name}"]`).click();
 	await settle(page, 2500);
 };
 
@@ -73,9 +73,9 @@ say("the person sets a camera on A, zoomed in to read", !!mine && mine.zoom > 1,
  * empty canvas never satisfies it. Making one opens it, which is the switch.
  */
 await openManager();
-await page.locator(".stage-new").first().click();
-await page.fill(".stage-new-field", "Second canvas");
-await page.locator(".stage-new-form button[type=submit]").click();
+await page.locator(".canvas-new").first().click();
+await page.fill(".canvas-new-field", "Second canvas");
+await page.locator(".canvas-new-form button[type=submit]").click();
 /*
  * Barely any wait. The poller gives up after 1.2 s and then acts whatever it finds, so the window
  * to be inside is that one — a quick there-and-back, which is what a person does when they switch
@@ -89,7 +89,7 @@ say("a new, empty canvas opens as B", onB !== onA, JSON.stringify({ onA, onB }))
 // Back to A at once — inside the window the poller is still waiting in.
 await openManager();
 const backTo = wallName(await cards(), onA);
-await page.locator(`.stage-card[data-name="${backTo}"]`).click();
+await page.locator(`.canvas-card[data-name="${backTo}"]`).click();
 await settle(page, 400);
 say("the pill says A again", (await pillStage()) === onA, `${await pillStage()}`);
 const back = await camera();

@@ -82,7 +82,7 @@ export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
 	const card = ids.length === 1 ? /(?:^|\/)cards\/([^/]+)\//.exec(ids[0] ?? "")?.[1] : undefined;
 	void (async () => {
 		try {
-			const response = await fetch(api(`/stage-shot?${new URLSearchParams({ canvas, agent: agentId, of: ids.join(","), format, scheme: scheme() })}`), { headers: authHeaders() });
+			const response = await fetch(api(`/canvas-shot?${new URLSearchParams({ canvas, agent: agentId, of: ids.join(","), format, scheme: scheme() })}`), { headers: authHeaders() });
 			if (!response.ok) throw new Error((await response.text().catch(() => "")) || m.app_server_answered({ status: String(response.status) }));
 			const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1];
 			const local = URL.createObjectURL(await response.blob());

@@ -64,7 +64,7 @@ let spot;
 // Where the canvas lands may be all boards: after a few looks, the view is moved aside to bare canvas.
 for (let look = 0, deadline = Date.now() + 15000; !spot && Date.now() < deadline; look++) {
 	const places = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		const out = [];

@@ -16,7 +16,7 @@ import { createSignal, onCleanup } from "solid-js";
  * ### What is deliberately *not* an inset
  *
  * The floating conversation. It is a column of cards over the cards with click-through
- * gaps, and a card is allowed to sit under it — see `boards/the-conversation-panel-drawn`.
+ * gaps, and a card is allowed to sit under it — see `cards/the-conversation-panel-drawn`.
  *
  * The inspector, which used to be the `"right"` in that list. The rule was *a surface that
  * arrives on its own must be subtracted; a surface you summoned may overlap*, and on that

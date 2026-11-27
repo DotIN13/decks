@@ -100,7 +100,7 @@ export function isPublic(method: string, path: string): boolean {
  * picture (`pictures/service.ts`, `canvas/shots.ts`): what its own pass reaches (`passes.ts`, made for no
  * canvas by the harness), GETs alone. No one else reads any of these without a pass or a token.
  */
-const OWN_READS = /^\/api\/(?:(?:card|f|thumb|stage-thumb|stage-pen|avatar|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;
+const OWN_READS = /^\/api\/(?:(?:card|f|thumb|canvas-thumb|canvas-pen|avatar|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;
 
 export function harnessReads(method: string, path: string): boolean {
 	return (method === "GET" || method === "HEAD") && OWN_READS.test(path);
@@ -123,7 +123,7 @@ export function refusal(reason: Refusal | "none"): string {
 /**
  * What a canvas pass may ask for (`passes.ts`): the verbs (`POST /api/v1/<verb>`, which the router keeps
  * to that canvas's own calls, `calls/canvas-frame.ts`), their list, the canvas's stream (`/api/v1/events`,
- * kept to that canvas), its drawing (`/api/stage-pen/<canvas>`), whether it still works, its files and
+ * kept to that canvas), its drawing (`/api/canvas-pen/<canvas>`), whether it still works, its files and
  * pictures (`passCovers`), and what an app item on it shows of its app (`/api/apps/<name>`). Nothing
  * of the person's, no other canvas, nothing passed on.
  */
@@ -131,7 +131,7 @@ export function canvasMay(method: string, path: string, canvas: string, placed: 
 	const read = method === "GET" || method === "HEAD";
 	if (method === "POST" && /^\/api\/v1\/[^/]+$/.test(path)) return path !== "/api/v1/events";
 	if (read && (path === "/api/v1" || path === "/api/v1/events")) return true;
-	if (read && path.startsWith("/api/stage-pen/")) return decodedSegment(path.slice("/api/stage-pen/".length)) === canvas;
+	if (read && path.startsWith("/api/canvas-pen/")) return decodedSegment(path.slice("/api/canvas-pen/".length)) === canvas;
 	if (path === "/api/session") return true;
 	// A card on its canvas written out for the harness's Chrome to draw (`/api/snapshot`, which checks the card is on it).
 	if (method === "POST" && path === "/api/snapshot") return true;
@@ -194,7 +194,7 @@ export function guard(gate: Gate) {
 			if (origin) {
 				res.setHeader("Vary", "Origin");
 				res.setHeader("Access-Control-Allow-Origin", origin);
-				res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Person, X-Decks-Stage, X-Decks-Edit");
+				res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Person, X-Decks-Canvas, X-Decks-Edit");
 				res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 				res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
 				if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");

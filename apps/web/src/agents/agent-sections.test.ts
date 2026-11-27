@@ -17,7 +17,7 @@ const chat = (id: string, name: string, state: AgentState, lastAt: number, extra
 	unread: 0,
 	kind: "claude",
 	identity: { name, color: "#000" },
-	boards: [],
+	cards: [],
 	inPlay: [],
 	...extra,
 });

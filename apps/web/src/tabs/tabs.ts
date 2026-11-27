@@ -1,4 +1,4 @@
-import type { StageRow } from "@decks/protocol";
+import type { CanvasRow } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { canvasOf, canvases } from "../state/canvases.ts";
 import { state } from "../state/deck.ts";
@@ -49,7 +49,7 @@ let moveCamera: (agent: string, canvas: string, forward?: boolean) => void = () 
 export const setCameraMover = (move: (agent: string, canvas: string, forward?: boolean) => void): void => void (moveCamera = move);
 
 /** The canvas the camera of the chat on screen is on: what is on screen, or held behind a card, a document or an app. */
-export const canvasOnScreen = (): StageRow | undefined => canvasOf(state.focused);
+export const canvasOnScreen = (): CanvasRow | undefined => canvasOf(state.focused);
 
 /** The tabs opened in the row whose target is still there: a canvas tab whose canvas is gone (deleted, or renamed away) is not one of them. */
 const kept = (): Tab[] => opened().filter((tab) => tab.kind !== "canvas" || canvases().length === 0 || canvases().some((one) => one.name === tab.target));

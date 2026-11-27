@@ -37,9 +37,9 @@ const { Translator } = await import("../apps/server/src/agents/translator.ts");
 const { CanvasBridge } = await import("../apps/server/src/canvas/bridge.ts");
 const { Opencode2Backend } = await import("../apps/server/src/runtimes/opencode2/backend.ts");
 
-// The canvas: a stand-in for Decks' /api/stage/eval, routed through the real bridge.
+// The canvas: a stand-in for Decks' /api/canvas/eval, routed through the real bridge.
 const bridge = new CanvasBridge();
-const tool = { name: "stage_eval", guidelines: [], webShared: () => false, run: async (code: string) => ({ text: `stage ran: ${code}`, isError: false }) };
+const tool = { name: "canvas_eval", guidelines: [], webShared: () => false, run: async (code: string) => ({ text: `stage ran: ${code}`, isError: false }) };
 const server = http.createServer(async (req, res) => {
 	let body = "";
 	for await (const chunk of req) body += chunk;
@@ -107,8 +107,8 @@ check("the server password is not there", /PW=unset/.test(envLine) || (!/PW=/.te
 check("OpenCode 2's config folder setting is not there", /CFG=unset/.test(envLine), envLine);
 
 // 4. the canvas tool reaches Decks through the bridge.
-await turn(a, "Call the stage_eval tool once with code: return 41 + 1");
-check("the canvas tool ran through Decks", toolResults(t1).some((line) => /^stage_eval:done:stage ran: return 41 \+ 1/.test(line)), toolResults(t1).filter((l) => l.startsWith("stage_eval")).join(" | "));
+await turn(a, "Call the canvas_eval tool once with code: return 41 + 1");
+check("the canvas tool ran through Decks", toolResults(t1).some((line) => /^canvas_eval:done:stage ran: return 41 \+ 1/.test(line)), toolResults(t1).filter((l) => l.startsWith("canvas_eval")).join(" | "));
 
 // 5. skills: Decks' and the person's own.
 const skills = ((await (a as any).client.skill.list({ location: { directory: deckDir } })) as any).data?.map((s: any) => s.name ?? s.id) ?? [];

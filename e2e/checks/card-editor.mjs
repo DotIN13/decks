@@ -89,7 +89,7 @@ for (let i = 0; i < 30; i++) {
 // well as what is under the pointer: a board drawn as its picture takes no hits, and one that goes live
 // grows to its page's height, so a board anywhere in the card's columns is in the way.
 const clear = () => canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	for (let y = 150; y <= 700; y += 50) for (let x = 420; x <= 820; x += 50) if (document.elementFromPoint(x, y) !== stage) return false;
 	return (window.__decksProbes?.cards?.() ?? []).every(({ rect }) => rect.right < 400 || rect.left > 840);
 });
@@ -122,7 +122,7 @@ say("a card in Obsidian's markdown is drawn", !!box && box.height > 300, JSON.st
 
 /** The camera at rest: a selection made while it moves keeps the style bar hidden, and the bar's menus with it. */
 const still = () => canvas.waitForFunction(() => {
-	const d = document.querySelector(".stage")?.dataset ?? {};
+	const d = document.querySelector(".canvas")?.dataset ?? {};
 	return d.moving !== "true" && d.gliding !== "true" && d.sliding !== "true";
 }, null, { timeout: 5000, polling: 50 }).catch(() => {});
 const openCard = async () => {
@@ -214,7 +214,7 @@ say("a selection gets the style bar", !!bar);
 // It goes while the camera moves, and comes back over the words once the camera rests, as the board pill does.
 // Over bare canvas or a board's edge band: a live board's page takes a wheel over it for itself, and the camera stays.
 const bare = await canvas.evaluate(() => {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".canvas");
 	const points = [];
 	for (let y = 820; y >= 100; y -= 10) for (let x = 1260; x >= 300; x -= 10) points.push({ x, y, at: document.elementFromPoint(x, y) });
 	return [points.find((p) => p.at === stage), points.find((p) => p.at?.classList?.contains("card-edge"))].filter(Boolean).map(({ x, y }) => ({ x, y }))[0];

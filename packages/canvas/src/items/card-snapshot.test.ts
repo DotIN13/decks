@@ -55,7 +55,7 @@ async function shoot(markup: string, act: string): Promise<{ html: string; w: nu
 			scripted.replaceSync(".made-by-script { color: rgb(1, 2, 3) }");
 			root.adoptedStyleSheets = [shared, scripted];
 			const body = document.createElement("div");
-			body.className = "card-body board";
+			body.className = "card-body card";
 			body.innerHTML = markup;
 			root.append(body);
 			// eslint-disable-next-line no-new-func
@@ -83,12 +83,12 @@ describe("snapshotOfCard", () => {
 		assert.doesNotMatch(html, /<script/);
 	});
 
-	it("is a card's page: card.css, body.board at the card's width, the card in #decks-card, the scheme", async (t) => {
+	it("is a card's page: card.css, body.card-page at the card's width, the card in #decks-card, the scheme", async (t) => {
 		if (!page) return t.skip(why);
 		const { html, w, h } = await shoot(`<p>hello</p>`, ``);
 		assert.match(html, /<link rel="stylesheet" href="..\/..\/lib\/card.css"/);
 		assert.match(html, /<html lang="en" data-theme="dark">/);
-		assert.match(html, /<body class="board" style="width:400px">/);
+		assert.match(html, /<body class="card-page" style="width:400px">/);
 		assert.match(html, /<div class="card-body" id="decks-card"><p>hello<\/p><\/div>/);
 		assert.equal(w, 400);
 		assert.equal(h, 300);

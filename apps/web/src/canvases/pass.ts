@@ -100,7 +100,7 @@ export async function cardAgentCall(call: { verb: string; args: unknown[]; card:
 		const yes = await ask({ title: m.canvases_ask_title(), body: asking(call.args, call.card), yes: m.canvases_ask_allow(), no: m.canvases_ask_deny() });
 		if (!yes) throw new Error(`You did not let ${call.card} ${call.verb === "agent.create" ? "start an agent" : "message an agent"}.`);
 	}
-	const answer = await connect({ url: deckAddress(), stage: () => canvasNameOnScreen(), notes: () => {}, headers: authHeaders() }).call(call.verb, call.args);
+	const answer = await connect({ url: deckAddress(), canvas: () => canvasNameOnScreen(), notes: () => {}, headers: authHeaders() }).call(call.verb, call.args);
 	return inlineAvatars(answer.value);
 }
 

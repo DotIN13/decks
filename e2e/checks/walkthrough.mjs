@@ -59,9 +59,9 @@ frame = await canvasFrame(page);
 const pen = page.locator('.v3-tool[data-tool="pen"]:visible').first();
 if (await pen.count()) await pen.click();
 else await page.locator('[data-tool="pen"]:visible').first().click().catch(() => {});
-await frame.waitForSelector(".stage-ink", { timeout: 10000 }).catch(() => {});
+await frame.waitForSelector(".canvas-ink", { timeout: 10000 }).catch(() => {});
 const frameBox = await (await frame.frameElement()).boundingBox();
-const r = await frame.evaluate(() => document.querySelector(".stage-ink")?.getBoundingClientRect().toJSON());
+const r = await frame.evaluate(() => document.querySelector(".canvas-ink")?.getBoundingClientRect().toJSON());
 if (r && frameBox) {
 	const x0 = frameBox.x + r.x + r.width * 0.45;
 	const y0 = frameBox.y + r.y + r.height * 0.4;

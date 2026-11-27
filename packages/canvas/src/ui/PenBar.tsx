@@ -51,7 +51,7 @@ export function PenBar(props: {
 	onArm: (tool: PenTool) => void;
 	/** Make the tools column a float: dragged by `grip`, put away behind either edge (`App.tsx`). */
 	onFloat?: (tools: HTMLElement, grip: HTMLElement) => { unstow: () => void };
-	/** Download a picture of these items, taken by the server (`server/stage/shots.ts`). */
+	/** Download a picture of these items, taken by the server (`server/canvas/shots.ts`). */
 	onExport: (ids: string[]) => void;
 	/** A file chosen in the file picker and put in the middle of the view, placed by what it is. */
 	onOpenFile?: () => void;

@@ -40,7 +40,7 @@ interface CardHooks {
  *
  * - **A card write and its revision are one act.** Every path that writes a card also
  *   records it — `writeCard` — and the one
- *   place that got it wrong (`boards.restore`, which wrote without recording) was the bug
+ *   place that got it wrong (`cards.restore`, which wrote without recording) was the bug
  *   the split made visible.
  * - **The extent bookkeeping is a browser fact, not a deck fact.** What a frame measured is
  *   kept here so `decks.canvas.fit` can await it, and it is deliberately not in the deck record: a
@@ -96,7 +96,7 @@ export class CardService {
 		if (card.lastWrittenBy === who && card.namedAt === now && !changed) return;
 		card.lastWrittenBy = who;
 		card.namedAt = now;
-		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? card;
+		const placed = this.hooks.state().cards.find((one) => one.path === path) ?? card;
 		this.hooks.send({ type: "card.changed", path, rev: card.rev, card: { ...placed, lastWrittenBy: who, namedAt: now } });
 	}
 
@@ -120,7 +120,7 @@ export class CardService {
 		const at = Math.max(now, last);
 		this.seenAt.set(path, at);
 		card.seenAt = at;
-		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? card;
+		const placed = this.hooks.state().cards.find((one) => one.path === path) ?? card;
 		this.hooks.send({ type: "card.changed", path, rev: card.rev, card: { ...placed, seenAt: at } });
 	}
 
@@ -158,7 +158,7 @@ export class CardService {
 	}
 
 	private placed(card: Page): Page {
-		return this.hooks.state().boards.find((one) => one.path === card.path) ?? card;
+		return this.hooks.state().cards.find((one) => one.path === card.path) ?? card;
 	}
 
 	/**
@@ -209,7 +209,7 @@ export class CardService {
 	/**
 	 * Wait for a frame to report this revision, giving up quietly.
 	 *
-	 * `undefined` rather than a rejection: "nobody is looking at that board" is an answer,
+	 * `undefined` rather than a rejection: "nobody is looking at that card" is an answer,
 	 * and the caller (`decks.canvas.fit`) turns it into a sentence that says what to do about it.
 	 */
 	awaitExtent(path: string, rev: number, ms: number, at?: number): Promise<{ w: number; h: number; page?: number } | undefined> {
@@ -256,7 +256,7 @@ export class CardService {
 	 */
 	resize(path: string, size: { w?: number; h?: number }): Page {
 		const card = this.deck.card(path);
-		if (!card) throw new Error(`No such board: ${path}`);
+		if (!card) throw new Error(`No such card: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
 		return this.writeCard(path, withCardSize(html, size));
@@ -297,7 +297,7 @@ export class CardService {
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
 		const card = this.deck.refresh(path);
-		if (!card) throw new Error(`No such board: ${path}`);
+		if (!card) throw new Error(`No such card: ${path}`);
 		// Only the size in its tag: the surfaces showing it keep their document (`items/card-surface.tsx`, `sized`).
 		const sized = before !== undefined && heard && onlySizeChanged(before, html);
 		this.hooks.send({ type: "card.changed", path, rev: card.rev, card: this.placed(card), ...(sized ? { sized: true as const } : {}) });
@@ -327,7 +327,7 @@ export class CardService {
 	 */
 	deleteCard(path: string, reply: (message: ServerMessage) => void): void {
 		if (!this.deck.card(path)) {
-			reply({ type: "harness.notice", level: "warn", text: `There is no board at ${path} to delete.` });
+			reply({ type: "harness.notice", level: "warn", text: `There is no card at ${path} to delete.` });
 			return;
 		}
 		const refused = this.viewOnly(path);
@@ -375,7 +375,7 @@ export class CardService {
 	/**
 	 * Which revision each card was at, at a point in a conversation.
 	 *
-	 * The session's `board-rev` entries answer this for cards the conversation has
+	 * The session's `card-rev` entries answer this for cards the conversation has
 	 * touched. For the rest, the store answers by time: the newest version that
 	 * already existed when that message was sent. A card created later resolves to
 	 * its first version rather than "did not exist" — a real past state, and closer to

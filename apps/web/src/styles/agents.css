@@ -72,7 +72,7 @@
 	 * The tokens and nothing else: `--color-accent` for working, `--color-ok` for done,
 	 * `--color-warn` for waiting. A second green is how a palette starts drifting — and two
 	 * of these are worth knowing about. `--color-warn` is gold rather than the orange the
-	 * board's prose calls it, and working blue *is* the accent, so a selected board, the
+	 * card's prose calls it, and working blue *is* the accent, so a selected card, the
 	 * send button and a busy agent share a token. Both are palette decisions rather than
 	 * corner ones, and both are this one line if they are ever to change.
 	 */
@@ -239,7 +239,7 @@
 	 *
 	 * `-2px` on everything after the first, and the z-indexes descend, so the urgent face —
 	 * which `agentOrder` puts first — is the one on top with its circle whole. Three faces
-	 * plus the chip take 106px of the pill, which is the room the board budgeted for them.
+	 * plus the chip take 106px of the pill, which is the room the card budgeted for them.
 	 */
 	/*
 	 * 26px faces in the corner, not 24.

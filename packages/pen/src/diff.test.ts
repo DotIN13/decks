@@ -50,7 +50,7 @@ test("random shuffles and edits", () => {
 	for (let round = 0; round < 200; round++) check(make(3 + Math.floor(rand() * 12)), make(3 + Math.floor(rand() * 12)));
 });
 
-test("every saved stage against every other version of itself", () => {
+test("every saved canvas against every other version of itself", () => {
 	const root = process.env.STAGE_FIXTURES;
 	if (!root || !existsSync(root)) return;
 	const docs = readdirSync(root).flatMap((name) => {

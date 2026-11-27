@@ -110,7 +110,7 @@ async function fromServer(entry, rest, request) {
 	}
 	const headers = new Headers();
 	// And what the page is acting on: the canvas, the agent. Never its token.
-	for (const name of ["Accept", "Content-Type", "Range", "X-Decks-Stage", "X-Decks-Agent"]) {
+	for (const name of ["Accept", "Content-Type", "Range", "X-Decks-Canvas", "X-Decks-Agent"]) {
 		const value = request.headers.get(name);
 		if (value) headers.set(name, value);
 	}
@@ -201,7 +201,7 @@ async function fromBundle(id, rest) {
 		const picture = pictures[scheme] ?? pictures.light ?? pictures.dark;
 		return picture ? entryOf(id, picture) : plain(404, "No picture of this board came with the canvas.");
 	}
-	if (path.startsWith("/api/stage-pen/")) {
+	if (path.startsWith("/api/canvas-pen/")) {
 		return Response.json({ doc: manifest.pen.doc, base: `/c/${id}/api/f/${manifest.pen.base}`, boards: manifest.boards.map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
 	}
 	return plain(404, "A canvas opened from a file can only be read.");

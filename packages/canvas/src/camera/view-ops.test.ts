@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Page, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, CanvasCall } from "@decks/protocol";
 import { runViewCall, type ViewOpsHost } from "./view-ops.ts";
 
 /*
@@ -42,7 +42,7 @@ function host(focused: string | undefined, hands = false) {
 	return { api, moved, animated, remembered, selected, offered };
 }
 
-const call = (agentId: string, op: StageCall["op"], args: unknown): StageCall => ({ id: "c1", agentId, op, args });
+const call = (agentId: string, op: CanvasCall["op"], args: unknown): CanvasCall => ({ id: "c1", agentId, op, args });
 
 test("the conversation on screen moves the canvas, as it always did", () => {
 	const { api, moved, remembered, selected } = host("A");
@@ -51,7 +51,7 @@ test("the conversation on screen moves the canvas, as it always did", () => {
 	assert.deepEqual(result.shown, ["cards/risks/index.html"]);
 	assert.equal(result.deferred, undefined, "nothing is waiting: it happened");
 	assert.equal(moved.length, 1, "the camera moved");
-	assert.deepEqual(selected, ["cards/risks/index.html"], "and the board it framed is selected");
+	assert.deepEqual(selected, ["cards/risks/index.html"], "and the card it framed is selected");
 	assert.deepEqual(remembered, [], "nothing to remember");
 });
 
@@ -61,7 +61,7 @@ test("an agent you are not reading does not move it", () => {
 
 	assert.equal(moved.length, 0, "your canvas stayed where it was");
 	assert.deepEqual(selected, [], "and so did your selection");
-	assert.deepEqual(result.shown, ["cards/risks/index.html"], "the boards are in play either way");
+	assert.deepEqual(result.shown, ["cards/risks/index.html"], "the cards are in play either way");
 	assert.ok(result.deferred, "and it is told, rather than left to assume it worked");
 });
 
@@ -152,17 +152,17 @@ test("a remembered view is not animated, whatever it asked for", () => {
  */
 const ITEM = { id: "plan-note", box: { x: 2000, y: 400, w: 300, h: 200 } };
 
-test("an item is framed by the box that came with it, and selects no board", () => {
+test("an item is framed by the box that came with it, and selects no card", () => {
 	const { api, moved, selected } = host("A");
 	const result = runViewCall(call("A", "show", { paths: [], items: [ITEM] }), api) as { shown: string[] };
 
 	assert.deepEqual(result.shown, ["plan-note"]);
 	assert.equal(moved.length, 1, "the camera moved to it");
 	assert.ok(Math.abs(moved[0]!.x - 2150) < 1 && Math.abs(moved[0]!.y - 500) < 1, `the middle of the item: ${JSON.stringify(moved[0])}`);
-	assert.deepEqual(selected, [], "an item is not a board, and selecting boards is what select means here");
+	assert.deepEqual(selected, [], "an item is not a card, and selecting cards is what select means here");
 });
 
-test("an item named with a board frames both", () => {
+test("an item named with a card frames both", () => {
 	const { api, moved } = host("A");
 	const result = runViewCall(call("A", "show", { paths: ["cards/plan/index.html"], items: [ITEM] }), api) as { shown: string[] };
 
@@ -217,7 +217,7 @@ function gotoHost(focused: string | undefined, hands: boolean) {
 	};
 	return { api, offers };
 }
-const goto = (agentId: string, canvas: string, extra: Record<string, unknown> = {}): StageCall => ({ id: "g", op: "goto", agentId, args: { stage: canvas, ...extra } });
+const goto = (agentId: string, canvas: string, extra: Record<string, unknown> = {}): CanvasCall => ({ id: "g", op: "goto", agentId, args: { canvas, ...extra } });
 
 test("an agent in the background just moves to another canvas: nothing on screen changes and nobody is asked", () => {
 	const { api, offers } = gotoHost("A", true);

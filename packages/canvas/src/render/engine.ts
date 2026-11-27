@@ -20,7 +20,7 @@ import { cardReader, mathTypesetter } from "./reader.ts";
 import { setCanvasWords } from "./measure.ts";
 import type { DocEdits } from "../model/drawing.ts";
 import type { FromWorker, ToWorker } from "./types.ts";
-import { detect, type Detected, type StageModule } from "./backends/detect.ts";
+import { detect, type Detected, type EngineModule } from "./backends/detect.ts";
 import { takeWarm, warmEngine } from "./warm.ts";
 import { PICTURES, readGpuClass } from "./device.ts";
 import { noticeFor } from "./backends/notice.ts";
@@ -78,8 +78,8 @@ const ZOOM_RATE_MS = 100;
 const FAST_HOLD_MS = 250;
 
 /** The engine's compiled module, for the worker to start from (`boot`). */
-function moduleOf(stage: StageModule): WebAssembly.Module | undefined {
-	const module: unknown = stage.engineModule();
+function moduleOf(wasm: EngineModule): WebAssembly.Module | undefined {
+	const module: unknown = wasm.engineModule();
 	return module instanceof WebAssembly.Module ? module : undefined;
 }
 
@@ -199,17 +199,17 @@ export class CanvasEngine {
 	recover(error: unknown, where: string): void {
 		const message = String((error as Error)?.message ?? error);
 		if (this.recovery.note() === "stop") {
-			console.error(`stage engine: ${where} failed again (${message}); stopped`);
+			console.error(`canvas engine: ${where} failed again (${message}); stopped`);
 			this.lose();
-			this.fail(new Error(`The stage kept failing (${message}). Reload the page to draw it again.`));
+			this.fail(new Error(`The canvas kept failing (${message}). Reload the page to draw it again.`));
 			return;
 		}
-		console.error(`stage engine: ${where} failed (${message}); starting the engines again`);
+		console.error(`canvas engine: ${where} failed (${message}); starting the engines again`);
 		void this.restart();
 	}
 
 	private fail(error: unknown): void {
-		console.error(`stage engine: ${String((error as Error)?.message ?? error)}`);
+		console.error(`canvas engine: ${String((error as Error)?.message ?? error)}`);
 		this.failed?.(noticeFor(error));
 	}
 
@@ -242,12 +242,12 @@ export class CanvasEngine {
 		this.tiles.postedContent = 0;
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
 		const found = (this.detected ??= warmed?.detected ?? (await detect()));
-		const stage = warmed?.stage ?? (await found.backend.load());
+		const wasm = warmed?.wasm ?? (await found.backend.load());
 		if (this.disposed) return;
-		this.stageModule = stage;
-		if (!warmed) this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(stage) });
+		this.wasmModule = wasm;
+		if (!warmed) this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(wasm) });
 		this.fitCanvases();
-		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
+		const gpu = await wasm.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
 		this.lowMemory = !!found.lowMemory;
 		// Fonts already handed to an engine before (this is a restart) are read from their files again.
 		await Promise.all(this.faces.fonts.map(async (font) => (font.bytes ??= new Uint8Array(await font.blob.arrayBuffer()))));
@@ -269,7 +269,7 @@ export class CanvasEngine {
 			},
 		};
 		// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
-		this.page = new stage.PageEngine(EMPTY, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
+		this.page = new wasm.PageEngine(EMPTY, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
 		this.tiles.warmed = false;
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
@@ -730,14 +730,14 @@ export class CanvasEngine {
 		const half = this.zooming && knobs.halfZoom;
 		const sent = { zoom, dpr: half ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming, fast: this.fastZoom };
 		this.post({ type: "camera", x, y, width, height, ...sent });
-		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
+		const want = this.wasmModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
 		if (want !== undefined && want !== this.tiles.wantScale) {
 			this.tiles.wantScale = want;
 			this.tiles.dropUnwanted();
 		}
 	}
 	/** The engine's module, for `scaleFor`. */
-	private stageModule: StageModule | undefined;
+	private wasmModule: EngineModule | undefined;
 
 
 	lowMemory = false;

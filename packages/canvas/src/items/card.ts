@@ -17,7 +17,7 @@ import { freshAddress, passless } from "../base/host.ts";
  * ### A card's scripts
  *
  * Each inline script is a module, served at its own address beside the card (`sales.html.m0.js`,
- * the server's `boards/cards.ts`), so `import "./sales.js"` resolves from the card's folder and the
+ * the server's `cards/cards.ts`), so `import "./sales.js"` resolves from the card's folder and the
  * page's import map names the shared libraries. A module runs once per address; its default export
  * is called for each placement of the card each time it wakes, with the card (`CardContext`), and
  * what it returns is called when the card sleeps or goes.
@@ -248,13 +248,13 @@ function cssInDeck(css: string, base: string): boolean {
 
 /*
  * card.css for a shadow root: the card tokens and parts, with `:root` and the page's `html` and
- * `body.board` turned into the card's own host and element, and the fonts declared once in the page
+ * `body.card` turned into the card's own host and element, and the fonts declared once in the page
  * itself, since a shadow root's `@font-face` is not used.
  *
  * Its rules sit in the cascade layer `decks`, so any rule of the card's own wins whatever its
  * specificity. It goes in each root as a `<style>` before the card's own (`data-card-sheet`), not as an adopted
  * sheet: adopted sheets cascade after every sheet in the tree, so card.css's `h1 { font-size: 30px }`
- * beat a card's own `h1 { font-size: 23px }`, and `.board .doc`'s padding a card's `.board .doc`,
+ * beat a card's own `h1 { font-size: 23px }`, and `.card .doc`'s padding a card's `.card .doc`,
  * where on a page of its own (and in every picture and screenshot of it) the card's own rule, written
  * later, wins. The browser parses the same text once for every root that holds it.
  */
@@ -296,9 +296,9 @@ function cardSheet(lib: string): Promise<string | undefined> {
 				.replace(/html:not\(\[data-theme="light"\]\)/g, ':host(:not([data-theme="light"]))')
 				.replace(/(^|[\s,}])\[data-theme="dark"\]/g, '$1:host([data-theme="dark"])')
 				.replace(/:root\b/g, ":host")
-				.replace(/html:has\(> body\.board\)/g, ":host")
+				.replace(/html:has\(> body\.card-page\)/g, ":host")
 				.replace(/html\[data-decks-focus\]\s*/g, ":host([data-decks-focus]) ")
-				.replace(/body\.board/g, ".card-body")
+				.replace(/body\.card-page/g, ".card-body")
 				.replace(/(^|[\s,}])html,\s*body\s*\{/g, "$1.card-body {")
 				// The card is as wide as its box, and as tall as the box at least: card.css sizes a card's body by its meta.
 				/*
@@ -718,8 +718,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 
 	const { fragment, scripts } = readFragment(source);
 	const body = document.createElement("div");
-	// Also `card`, so a card's own `.board .doc` rules match a card made from it.
-	body.className = "card-body board";
+	// Also `card-page`, so a card's own `.card-page .doc` rules match.
+	body.className = "card-body card-page";
 	// Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`items/input.ts`).
 	body.tabIndex = -1;
 	body.style.outline = "none";

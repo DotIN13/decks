@@ -35,7 +35,7 @@ export function createToolsFloat({ workBox, mountFloat }: Floats, phone: () => b
 		let again: ReturnType<typeof setTimeout> | undefined;
 		const measure = () => {
 			// The frame fills the canvas's layer, which is there before the frame is.
-			const frame = (document.querySelector("iframe.canvas-frame") ?? document.querySelector(".surface-layer[data-layer='stage']"))?.getBoundingClientRect() ?? { left: 0, top: 0 };
+			const frame = (document.querySelector("iframe.canvas-frame") ?? document.querySelector(".surface-layer[data-layer='canvas']"))?.getBoundingClientRect() ?? { left: 0, top: 0 };
 			const at = tools.getBoundingClientRect();
 			setPenToolsAt(!at.width || tools.hasAttribute("data-stowed") ? undefined : { left: at.left - frame.left, top: at.top - frame.top, right: at.right - frame.left, bottom: at.bottom - frame.top });
 		};

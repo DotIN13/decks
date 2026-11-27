@@ -8,7 +8,7 @@ import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import LayoutDashboard from "lucide-solid/icons/layout-dashboard";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import type { StageRow } from "@decks/protocol";
+import type { CanvasRow } from "@decks/protocol";
 import { Icon } from "@decks/ui";
 import { searchCanvases } from "../state/canvases.ts";
 import { AgentFace } from "../agents/AgentPill.tsx";
@@ -41,7 +41,7 @@ import { AuthedImg } from "../lib/authed.tsx";
  *
  * ### The card
  *
- * A picture of the whole canvas, taken by the server once per revision (`/api/stage-thumb`), on the
+ * A picture of the whole canvas, taken by the server once per revision (`/api/canvas-thumb`), on the
  * canvas's own ground; an empty canvas says so instead of showing a blank tile. Under it the name
  * with the faces of whoever is on it, and a quieter line with how many cards and when it last
  * changed. Rename and delete float on the picture's corner, shown on hover or focus, so a wall of
@@ -64,7 +64,7 @@ const PULL_SHUT = 110;
 
 
 export function CanvasManager(props: {
-	canvases: StageRow[];
+	canvases: CanvasRow[];
 	/** The canvas the conversation on screen is on, so its card is marked. */
 	here: string | undefined;
 	open: boolean;
@@ -124,11 +124,11 @@ export function CanvasManager(props: {
 
 	/* The canvas dims behind the panel by a mark on the body (`canvases.css`). A `body:has()` rule
 	   did the same, and made the browser restyle the whole app on every step of a zoom: 2,300
-	   elements a step on a 400-board canvas, for a panel that was closed. */
+	   elements a step on a 400-card canvas, for a panel that was closed. */
 	createEffect(() => {
 		if (!shown()) return;
-		document.body.dataset.stageManager = "";
-		onCleanup(() => delete document.body.dataset.stageManager);
+		document.body.dataset.canvasManager = "";
+		onCleanup(() => delete document.body.dataset.canvasManager);
 	});
 
 	/* Escape closes it wherever the keyboard is, not only from the field: a tap on a card's gap
@@ -186,7 +186,7 @@ export function CanvasManager(props: {
 	const ordered = createMemo(() => {
 		const list = rows().filter((one) => one.hit);
 		if (sort() === "az") return list.sort((a, b) => a.canvas.title.localeCompare(b.canvas.title));
-		const at = (one: StageRow) => (one.name === props.here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
+		const at = (one: CanvasRow) => (one.name === props.here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
 		return list.sort((a, b) => at(b.canvas) - at(a.canvas) || a.canvas.title.localeCompare(b.canvas.title));
 	});
 
@@ -212,7 +212,7 @@ export function CanvasManager(props: {
 				quieter. A press on it closes, which is the other half of Escape.
 			*/}
 			<div
-				class="stage-manager"
+				class="canvas-manager"
 				role="dialog"
 				aria-label={m.canvases_canvases()}
 				data-open={shown() ? "true" : undefined}
@@ -221,26 +221,26 @@ export function CanvasManager(props: {
 				/* Under a finger the press is taken whole, as a click: closed on the way down, its click went on to whatever was under the shade, and on the bar's title that opened the canvases again. */
 				onClick={(event) => props.drawer && event.target === event.currentTarget && props.onClose()}
 			>
-				<div class="stage-box" style={pull() === undefined ? undefined : { transform: `translateY(${pull()}px)`, transition: "none" }}>
-					<div class="stage-head" onPointerDown={grab}>
+				<div class="canvas-box" style={pull() === undefined ? undefined : { transform: `translateY(${pull()}px)`, transition: "none" }}>
+					<div class="canvas-head" onPointerDown={grab}>
 						<Show when={props.drawer}>
-							<span class="stage-grab" aria-hidden="true" />
+							<span class="canvas-grab" aria-hidden="true" />
 						</Show>
-						<div class="stage-title-row">
-							<h2 class="stage-title">
+						<div class="canvas-title-row">
+							<h2 class="canvas-title">
 								{m.canvases_canvases()}
 							</h2>
 							<Show
 								when={naming()}
 								fallback={
-									<button type="button" class="stage-new" onClick={() => setNaming(true)}>
+									<button type="button" class="canvas-new" onClick={() => setNaming(true)}>
 										<Icon of={Plus} size={14} />
 										{m.canvases_new()}
 									</button>
 								}
 							>
 								<form
-									class="stage-new-form"
+									class="canvas-new-form"
 									onSubmit={(event) => {
 										event.preventDefault();
 										create();
@@ -251,7 +251,7 @@ export function CanvasManager(props: {
 											nameField = element;
 											queueMicrotask(() => element.focus());
 										}}
-										class="stage-new-field"
+										class="canvas-new-field"
 										placeholder={m.canvases_name_new()}
 										spellcheck={false}
 										onKeyDown={(event) => {
@@ -262,15 +262,15 @@ export function CanvasManager(props: {
 											field?.focus();
 										}}
 									/>
-									<button type="submit" class="stage-new">{m.canvases_create()}</button>
-									<button type="button" class="stage-icon" aria-label={m.canvases_cancel()} onClick={() => setNaming(false)}>
+									<button type="submit" class="canvas-new">{m.canvases_create()}</button>
+									<button type="button" class="canvas-icon" aria-label={m.canvases_cancel()} onClick={() => setNaming(false)}>
 										<Icon of={X} size={14} />
 									</button>
 								</form>
 							</Show>
 						</div>
-						<div class="stage-tools">
-						<label class="stage-search">
+						<div class="canvas-manager-tools">
+						<label class="canvas-search">
 							<Icon of={Search} class="flex-none text-faint" size={15} />
 							<input
 								ref={field}
@@ -294,10 +294,10 @@ export function CanvasManager(props: {
 								}}
 							/>
 							<Show when={searching() && found() > 0}>
-								<kbd class="stage-kbd">↵</kbd>
+								<kbd class="canvas-kbd">↵</kbd>
 							</Show>
 						</label>
-						<div class="segmented stage-sort" role="radiogroup" aria-label={m.canvases_order()}>
+						<div class="segmented canvas-sort" role="radiogroup" aria-label={m.canvases_order()}>
 							<button type="button" role="radio" aria-checked={sort() === "recent"} data-on={sort() === "recent"} onClick={() => setSort("recent")}>
 								{m.canvases_recent()}
 							</button>
@@ -308,7 +308,7 @@ export function CanvasManager(props: {
 						</div>
 					</div>
 
-					<div class="stage-wall">
+					<div class="canvas-wall">
 						<For each={ordered()}>
 							{(row) => (
 								<CanvasCard
@@ -324,7 +324,7 @@ export function CanvasManager(props: {
 							)}
 						</For>
 						<Show when={searching() && found() === 0}>
-							<p class="stage-none">{m.canvases_find_none_query({ query: query().trim() })}</p>
+							<p class="canvas-none">{m.canvases_find_none_query({ query: query().trim() })}</p>
 						</Show>
 					</div>
 
@@ -346,7 +346,7 @@ function since(at: number | undefined, now = Date.now()): string | undefined {
  * once in its own place before it does anything.
  */
 function CanvasCard(props: {
-	row: { canvas: StageRow; hit: boolean };
+	row: { canvas: CanvasRow; hit: boolean };
 	here: string | undefined;
 	searching: boolean;
 	scheme: "light" | "dark";
@@ -379,7 +379,7 @@ function CanvasCard(props: {
 	};
 
 	const here = () => canvas().name === props.here;
-	const cards = () => canvas().boards;
+	const cards = () => canvas().cards;
 	// A friend's canvas says whose it is, and whether you may change it (`shared/canvases/<owner>/<canvas>`).
 	const sharedBy = () => (canvas().shared ? (canvas().shared!.role === "view" ? m.canvases_shared_by_view({ owner: canvas().shared!.owner }) : m.canvases_shared_by({ owner: canvas().shared!.owner })) : undefined);
 	const meta = () => [sharedBy(), cards() === 0 ? m.canvases_meta_empty() : m.canvases_meta_cards({ count: cards(), shown: formatNumber(cards()) }), since(canvas().changedAt)].filter(Boolean).join(" · ");
@@ -387,7 +387,7 @@ function CanvasCard(props: {
 
 	return (
 		<div
-			class="stage-card"
+			class="canvas-card"
 			data-name={canvas().name}
 			data-here={here() ? "true" : undefined}
 			title={here() ? m.canvases_card_title_here({ title: canvas().title, meta: meta() }) : canvas().agents.length === 0 ? m.canvases_card_title_nobody({ title: canvas().title, meta: meta() }) : m.canvases_card_title({ title: canvas().title, meta: meta() })}
@@ -400,19 +400,19 @@ function CanvasCard(props: {
 				unchanged canvas is never redrawn, and a changed one cannot show yesterday. An empty canvas,
 				or one with no picture to be had, says what it is rather than showing a blank tile.
 			*/}
-			<button type="button" class="stage-open" aria-label={m.canvases_open({ title: canvas().title })}>
+			<button type="button" class="canvas-open" aria-label={m.canvases_open({ title: canvas().title })}>
 				<Show
 					when={cards() > 0 && !broken()}
 					fallback={
-						<span class="stage-empty">
+						<span class="canvas-manager-empty">
 							<Icon of={LayoutDashboard} size={22} />
 							<span>{cards() > 0 ? m.canvases_no_picture() : m.canvases_empty()}</span>
 						</span>
 					}
 				>
 					<AuthedImg
-						class="stage-shot"
-						src={api(`/stage-thumb/${encodeURIComponent(canvas().name)}?v=${canvas().shot ?? canvas().rev}&scheme=${props.scheme}`)}
+						class="canvas-shot"
+						src={api(`/canvas-thumb/${encodeURIComponent(canvas().name)}?v=${canvas().shot ?? canvas().rev}&scheme=${props.scheme}`)}
 						alt=""
 						loading="lazy"
 						onError={() => setBroken(true)}
@@ -423,34 +423,34 @@ function CanvasCard(props: {
 					<span class="sr-only">{m.canvases_current()}</span>
 				</Show>
 			</button>
-			<span class="stage-acts" data-confirming={confirming() ? "true" : undefined} onClick={(event) => event.stopPropagation()}>
+			<span class="canvas-acts" data-confirming={confirming() ? "true" : undefined} onClick={(event) => event.stopPropagation()}>
 				<Show
 					when={confirming()}
 					fallback={
 						<>
 							{/* A friend's canvas: your own copy of it, which you can change (to view, the only way to). */}
 							<Show when={canvas().shared && props.onCopy}>
-								<button type="button" class="stage-icon" title={m.canvases_copy()} aria-label={m.canvases_copy_label({ title: canvas().title })} onClick={() => props.onCopy?.(canvas().name)}>
+								<button type="button" class="canvas-icon" title={m.canvases_copy()} aria-label={m.canvases_copy_label({ title: canvas().title })} onClick={() => props.onCopy?.(canvas().name)}>
 									<Icon of={Copy} size={13} />
 								</button>
 							</Show>
 							<Show when={canvas().shared?.role !== "view"}>
-								<button type="button" class="stage-icon" title={m.canvases_rename()} aria-label={m.canvases_rename_label({ title: canvas().title })} onClick={startEditing}>
+								<button type="button" class="canvas-icon" title={m.canvases_rename()} aria-label={m.canvases_rename_label({ title: canvas().title })} onClick={startEditing}>
 									<Icon of={Pencil} size={13} />
 								</button>
 							</Show>
-							<button type="button" class="stage-icon" title={m.canvases_delete()} aria-label={m.canvases_delete_label({ title: canvas().title })} onClick={() => setConfirming(true)}>
+							<button type="button" class="canvas-icon" title={m.canvases_delete()} aria-label={m.canvases_delete_label({ title: canvas().title })} onClick={() => setConfirming(true)}>
 								<Icon of={Trash} size={13} />
 							</button>
 						</>
 					}
 				>
-					<button type="button" class="stage-icon" aria-label={m.canvases_keep()} onClick={() => setConfirming(false)}>
+					<button type="button" class="canvas-icon" aria-label={m.canvases_keep()} onClick={() => setConfirming(false)}>
 						<Icon of={X} size={13} />
 					</button>
 					<button
 						type="button"
-						class="stage-confirm"
+						class="canvas-confirm"
 						title={m.canvases_delete_title()}
 						onClick={() => {
 							setConfirming(false);
@@ -461,8 +461,8 @@ function CanvasCard(props: {
 					</button>
 				</Show>
 			</span>
-			<span class="stage-foot">
-				<span class="stage-name-row">
+			<span class="canvas-foot">
+				<span class="canvas-name-row">
 					<Show when={editing()} fallback={<span class="row-label">{canvas().title}</span>}>
 						<input
 							ref={(element) => {
@@ -472,7 +472,7 @@ function CanvasCard(props: {
 									element.select();
 								});
 							}}
-							class="stage-rename"
+							class="canvas-rename"
 							value={canvas().title}
 							spellcheck={false}
 							aria-label={m.canvases_new_name({ title: canvas().title })}
@@ -491,13 +491,13 @@ function CanvasCard(props: {
 							onBlur={commit}
 						/>
 					</Show>
-					<span class="stage-faces">
+					<span class="canvas-faces">
 						<For each={canvas().agents}>
 							{(agent) => <AgentFace chat={{ id: agent.id, name: agent.name, kind: "claude", state: "idle" } as never} identity={{ name: agent.name, color: agent.color }} size={18} ring={0} />}
 						</For>
 					</span>
 				</span>
-				<span class="stage-meta">{meta()}</span>
+				<span class="canvas-meta">{meta()}</span>
 			</span>
 		</div>
 	);

@@ -16,7 +16,7 @@ const canvas = await canvasFrame(page);
 /** The board the pill is over, by its file name, or nothing. */
 const selected = async () =>
 	nameOf(await canvas.evaluate(() => {
-		const pill = document.querySelector(".stage-fixed > .card-callout");
+		const pill = document.querySelector(".canvas-fixed > .card-callout");
 		const link = pill?.querySelector('a[aria-label="New tab"]')?.getAttribute("href") ?? "";
 		return pill && link ? decodeURIComponent(link) : "";
 	}));

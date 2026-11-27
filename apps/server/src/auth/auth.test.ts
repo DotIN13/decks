@@ -24,7 +24,7 @@ test("a harness token is one kind whoever its subject, is kept only as its hash,
 	assert.match(site.token, /^dk_h_/);
 	assert.match(tokens.issue({ kind: "agent", id: "a1" }).token, /^dk_h_/);
 	assert.throws(() => tokens.issue({ kind: "app", name: "notes" }), /holds a pass/);
-	assert.throws(() => tokens.issue({ kind: "board", path: "boards/a.html" } as never), "a board has no token any more");
+	assert.throws(() => tokens.issue({ kind: "card", path: "pages/a.html" } as never), "a card has no token any more");
 	const text = readFileSync(file, "utf8");
 	assert.ok(!text.includes(person.token) && !text.includes(site.token), "no token in the clear");
 	assert.equal(statSync(file).mode & 0o777, 0o600);
@@ -131,13 +131,13 @@ test("revoke takes one token back by id, revokeWhere every token of a principal"
 	assert.ok(!tokens.revoke(site.id), "gone already");
 });
 
-test("a board's token from before is dropped: nothing asks for one any more", () => {
-	const dir = mkdtempSync(join(tmpdir(), "decks-boards-gone-"));
+test("a card's token from before is dropped: nothing asks for one any more", () => {
+	const dir = mkdtempSync(join(tmpdir(), "decks-old-tokens-"));
 	const file = join(dir, ".decks", "tokens.json");
 	mkdirSync(join(dir, ".decks"), { recursive: true });
 	const now = Date.now();
 	const hash = createHash("sha256").update("dk_b_old").digest("hex");
-	writeFileSync(file, JSON.stringify({ v: 2, tokens: [{ id: hash.slice(0, 10), hash, principal: { kind: "board", path: "boards/a.html" }, at: now, last: now, idle: DAY }] }));
+	writeFileSync(file, JSON.stringify({ v: 2, tokens: [{ id: hash.slice(0, 10), hash, principal: { kind: "card", path: "pages/a.html" }, at: now, last: now, idle: DAY }] }));
 	assert.deepEqual(new TokenStore(file).verify("dk_b_old"), { ok: false, reason: "unknown" });
 });
 
@@ -195,17 +195,16 @@ test("the gate's open list: the doors and the Decks page and its files; no comma
 	for (const path of ["/api/studio/connect", "/api/v1/now", "/api/tokens", "/api/passes", "/api/tickets", "/api/harness", "/api/person-key"]) assert.ok(!isDoor(path), path);
 	assert.ok(isPublic("GET", "/"));
 	assert.ok(isPublic("GET", "/assets/index-abc.js"));
-	assert.ok(isPublic("GET", "/api/lib/board.css"));
+	assert.ok(isPublic("GET", "/api/lib/card.css"));
 	assert.ok(isPublic("GET", "/api/sdk/decks.mjs"));
 	assert.ok(!isPublic("POST", "/"));
 	assert.ok(!isPublic("GET", "/api/deck"));
 	assert.ok(!isPublic("GET", "/api/v1/events"));
-	for (const path of ["/api/card/boards/a.html", "/api/board/boards/a.html", "/api/thumb/boards/a.html", "/api/f/x.png", "/api/avatar/a1", "/api/stage-thumb/plan", "/c/abc123/api/card/boards/a.html"]) assert.ok(!isPublic("GET", path), path);
+	for (const path of ["/api/card/pages/a.html", "/api/thumb/pages/a.html", "/api/f/x.png", "/api/avatar/a1", "/api/canvas-thumb/plan", "/c/abc123/api/card/pages/a.html"]) assert.ok(!isPublic("GET", path), path);
 	// What the harness's own Chromium reads, on its own pass: reads alone.
-	assert.ok(harnessReads("GET", "/api/card/boards/a.html"));
-	assert.ok(!harnessReads("GET", "/api/board/boards/a.html"), "the old prefix is gone");
-	assert.ok(harnessReads("GET", "/api/stage-pen/x"));
-	assert.ok(!harnessReads("POST", "/api/card/boards/a.html"));
+	assert.ok(harnessReads("GET", "/api/card/pages/a.html"));
+	assert.ok(harnessReads("GET", "/api/canvas-pen/x"));
+	assert.ok(!harnessReads("POST", "/api/card/pages/a.html"));
 	assert.ok(!harnessReads("GET", "/api/agents/a1/history"));
 	assert.ok(!harnessReads("GET", "/api/harness"));
 });

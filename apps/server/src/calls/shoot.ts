@@ -10,7 +10,7 @@ import type { VerbContext } from "./context.ts";
 export async function shootOn(ctx: VerbContext, canvas: string, options?: { of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark"; live?: boolean }) {
 	const { service, agent, images } = ctx;
 	const onIt = () => (service.pens ? service.pens.cards.cards(canvas) : []);
-	if (!service.shots) throw new Error("This server cannot take pictures of a stage.");
+	if (!service.shots) throw new Error("This server cannot take pictures of a canvas.");
 	const { of, scale, format, to, scheme, live } = options ?? {};
 	/*
 	 * One card, by its path: as the person's browser has it now, so the picture shows what
@@ -28,10 +28,10 @@ export async function shootOn(ctx: VerbContext, canvas: string, options?: { of?:
 			mime = seen.mime;
 			note = seen.how === "canvas" ? "As the person's browser shows it now, drawn there by HTML-in-Canvas: it includes what they did on the page." : "As the person's browser has it now, from a snapshot of the page: it includes what they did on the page, such as tabs pressed, text typed and boxes scrolled.";
 		} else {
-			if (!service.cardPicture) throw new Error("This server cannot take pictures of a board.");
+			if (!service.cardPicture) throw new Error("This server cannot take pictures of a card.");
 			bytes = await service.cardPicture(of, scheme === "dark" ? "dark" : "light");
 			mime = imageKind(bytes)?.mime ?? "image/jpeg";
-			note = `Taken by the server from the board's file, because ${seen.why}. It does not show anything the person did on the page (tabs pressed, text typed, boxes scrolled); ask them to open the board if that matters.`;
+			note = `Taken by the server from the card's file, because ${seen.why}. It does not show anything the person did on the page (tabs pressed, text typed, boxes scrolled); ask them to open the card if that matters.`;
 		}
 		// What the bytes are, not what they were said to be: the snapshot and the card's whole picture are WebP.
 		if ((format === "png" || format === "jpeg") && imageKind(bytes)?.format !== format) bytes = await service.shots.convert(bytes, format);
@@ -41,7 +41,7 @@ export async function shootOn(ctx: VerbContext, canvas: string, options?: { of?:
 		const file = service.shots.keepCard(of, bytes, kind?.ext ?? (mime === "image/jpeg" ? "jpg" : "png"), to);
 		images.push({ data: bytes.toString("base64"), mimeType: mime });
 		const at = onIt().find((card) => card.path === of)!;
-		note += " Only the board: the drawing around it (arrows, labels, notes touching it) is not in this picture; pass its box as `of` to see that too.";
+		note += " Only the card: the drawing around it (arrows, labels, notes touching it) is not in this picture; pass its box as `of` to see that too.";
 		return { file, width: size.width, height: size.height, box: { x1: at.x, y1: at.y, x2: at.x + at.w, y2: at.y + at.h }, how: seen.how === "none" ? ("server" as const) : seen.how, note };
 	}
 	/*
@@ -59,7 +59,7 @@ export async function shootOn(ctx: VerbContext, canvas: string, options?: { of?:
 		}
 	};
 	const file = penFileOf(of);
-	const shot = await service.shots.take({ stage: canvas, ...(file ? { file } : { of }), ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}), ...(live ? { live: true } : {}) });
+	const shot = await service.shots.take({ canvas: canvas, ...(file ? { file } : { of }), ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}), ...(live ? { live: true } : {}) });
 	if (shot.format !== "pdf") images.push({ data: shot.bytes.toString("base64"), mimeType: shot.format === "jpeg" ? "image/jpeg" : "image/png" });
 	return { file: shot.file, width: shot.width, height: shot.height, box: shot.box, how: shot.how };
 }

@@ -65,7 +65,7 @@ export interface Workspace {
 	 * members are working from is the workspace's, where a card one of them has open is that
 	 * agent's. Ties break on the path, so the answer is stable between calls.
 	 */
-	boards: string[];
+	cards: string[];
 }
 
 /**
@@ -76,25 +76,25 @@ export interface Workspace {
  * two workspaces of the same size do not swap places between renders.
  */
 export function roster(entries: RosterEntry[]): Workspace[] {
-	const groups = new Map<string, { members: RosterEntry[]; boards: Map<string, number> }>();
+	const groups = new Map<string, { members: RosterEntry[]; cards: Map<string, number> }>();
 	for (const entry of entries) {
 		const name = entry.workspace;
 		if (!name) continue;
 		let group = groups.get(name);
 		if (!group) {
-			group = { members: [], boards: new Map() };
+			group = { members: [], cards: new Map() };
 			groups.set(name, group);
 		}
 		group.members.push(entry);
 		// Once per member, not once per card: two agents holding the same card twice each is
 		// still two out of two, and `Set` is what says so.
-		for (const path of new Set(entry.context)) group.boards.set(path, (group.boards.get(path) ?? 0) + 1);
+		for (const path of new Set(entry.context)) group.cards.set(path, (group.cards.get(path) ?? 0) + 1);
 	}
 	return [...groups.entries()]
 		.sort(([left, a], [right, b]) => b.members.length - a.members.length || left.localeCompare(right))
 		.map(([name, group]) => ({
 			name,
 			agents: group.members.map((member) => ({ id: member.id, name: member.name, state: member.state, tags: member.tags })),
-			boards: [...group.boards.entries()].sort(([left, a], [right, b]) => b - a || left.localeCompare(right)).map(([path]) => path),
+			cards: [...group.cards.entries()].sort(([left, a], [right, b]) => b - a || left.localeCompare(right)).map(([path]) => path),
 		}));
 }

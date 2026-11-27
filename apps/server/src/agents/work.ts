@@ -18,7 +18,7 @@ import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@dec
 export interface SendSpec {
 	task: string;
 	/** Cards handed over: the receiver is given their source when the item runs. */
-	boards?: string[];
+	cards?: string[];
 	/**
 	 * Tell the sender when the work is done.
 	 *
@@ -33,7 +33,7 @@ export interface SendSpec {
 }
 
 /**
- * A new agent made with no task, for a `send` to follow — `stage.create`.
+ * A new agent made with no task, for a `send` to follow — `decks.create`.
  *
  * `delegate` makes an agent *and waits for it*, which is wrong for something that has to
  * hand work over and stop; `send` needs an agent that already exists. This is the gap
@@ -66,7 +66,7 @@ export interface QueuedWork {
 	from: string;
 	fromName: string;
 	task: string;
-	boards: string[];
+	cards: string[];
 	at: number;
 	/** The sender asked for the report back — see `SendSpec.reply`. */
 	reply?: boolean;

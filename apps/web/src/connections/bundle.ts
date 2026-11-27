@@ -110,15 +110,15 @@ export function greeting(id: string, manifest: BundleManifest): ServerMessage[] 
 		unread: 0,
 		kind: "claude",
 		identity,
-		boards: paths,
+		cards: paths,
 		inPlay: paths,
 	} as unknown as AgentChat;
 	return [
 		{ type: "harness.hello", backend: { name: manifest.canvas.title, can: { agents: false, write: false, share: false } } },
 		{ type: "harness.runtimes", list: [] },
-		{ type: "deck.changed", deck: { path: `bundle:${id}`, name: manifest.from, boards: manifest.cards, roots: [] } },
+		{ type: "deck.changed", deck: { path: `bundle:${id}`, name: manifest.from, cards: manifest.cards, roots: [] } },
 		{ type: "agent.list", chats: [reader], focused: READER, defaultKind: "claude" },
-		{ type: "canvas.list", stages: [{ name: manifest.canvas.name, title: manifest.canvas.title, boards: manifest.cards.length, rev: manifest.canvas.rev, agents: [], words: "" }] },
+		{ type: "canvas.list", canvases: [{ name: manifest.canvas.name, title: manifest.canvas.title, cards: manifest.cards.length, rev: manifest.canvas.rev, agents: [], words: "" }] },
 		{ type: "harness.settings", settings: {}, machineZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
 		{ type: "harness.paired", paired: [] },
 	];

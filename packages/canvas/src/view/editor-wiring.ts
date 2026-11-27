@@ -89,7 +89,7 @@ export function wireEditor(d: WireEditorNeeds) {
 				if (!d.props.onPencil) return false;
 				d.props.onPencil();
 				// The ink sheet is there now (the pen is on): the press is given to it, as a Pencil's own.
-				const sheet = d.element.querySelector("svg.stage-ink");
+				const sheet = d.element.querySelector("svg.canvas-ink");
 				if (!sheet) return false;
 				sheet.dispatchEvent(
 					new PointerEvent("pointerdown", {

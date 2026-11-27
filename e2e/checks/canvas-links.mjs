@@ -94,7 +94,7 @@ const row = () => page.locator(".v3-topbar .tab-chip[data-tab]").evaluateAll((al
 const cameraName = async () => (await page.locator('.v3-topbar .tab-chip[data-camera="true"]').innerText()).trim();
 const toCanvas = async () => {
 	await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
-	await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined));
+	await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) ? true : undefined));
 	await settle(page, 300);
 };
 const firstTitle = await cameraName();
@@ -182,7 +182,7 @@ await until(async () => ((await selected()) === 0 ? true : undefined), 3000);
 await page.mouse.click(at.x, at.y);
 say("a click on a chip opens what it points at, as a tab, in front", JSON.stringify(await until(async () => ((await row()).includes("app*") ? row() : undefined))) === '["canvas","card","canvas","app*"]' && (await page.evaluate(() => location.hash)) === "#app/budget", JSON.stringify(await row()));
 await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
-await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined));
+await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) ? true : undefined));
 await settle(page, 400);
 say("…and back on the canvas the chip is not left selected", (await selected()) === 0, String(await selected()));
 // --- adding one by hand: the tool column's "Link to…", and a pasted address ------------------------------------------
@@ -221,7 +221,7 @@ await page.mouse.click((other.x + at.x) / 2, Math.min(other.y, at.y) - 90);
 at = await whole(chip.id);
 await page.mouse.move(at.x - 3, at.y);
 await page.mouse.move(at.x, at.y, { steps: 3 });
-const cursor = () => canvasFrame(page).then((frame) => frame.evaluate(() => getComputedStyle(document.querySelector(".stage")).cursor));
+const cursor = () => canvasFrame(page).then((frame) => frame.evaluate(() => getComputedStyle(document.querySelector(".canvas")).cursor));
 say("over a chip the pointer is a link's", (await until(async () => ((await cursor()) === "pointer" ? true : undefined), 2000)) === true, await cursor());
 await page.mouse.click(at.x, at.y);
 say("a chip to a canvas takes the camera there", (await until(async () => ((await cameraName()) === "Tab two" ? true : undefined))) === true, await cameraName());
@@ -266,7 +266,7 @@ const pressIn = async (n) => {
 await pressIn(0);
 say("a link in a card's own HTML to an app opens the app's tab", (await until(async () => ((await row()).includes("app*") ? true : undefined))) === true && (await page.evaluate(() => location.hash)) === "#app/budget", JSON.stringify(await row()));
 await page.locator('.v3-topbar .tab-chip[data-camera="true"] .tab-chip-name').click();
-await until(async () => ((await page.locator('.surface[data-surface="stage"]').isVisible()) ? true : undefined));
+await until(async () => ((await page.locator('.surface[data-surface="canvas"]').isVisible()) ? true : undefined));
 await pressIn(1);
 say("…and one to a canvas takes the camera there", (await until(async () => ((await cameraName()) === "Tab two" ? true : undefined))) === true, await cameraName());
 

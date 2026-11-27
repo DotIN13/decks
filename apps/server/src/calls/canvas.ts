@@ -158,7 +158,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 
 	/** An item's id, or a card's path on this document turned into its item's id. */
 	const idIn = (doc: PenDocument, ref: unknown, what = "id"): string => {
-		if (typeof ref !== "string" || !ref.trim()) throw new Error(`${what} names an item: its id from decks canvas read, or a board's path.`);
+		if (typeof ref !== "string" || !ref.trim()) throw new Error(`${what} names an item: its id from decks canvas read, or a card's path.`);
 		const own = ownOn(ref);
 		for (const node of walk(doc.children)) if (cardOf(node) === ref || cardOf(node) === own) return node.id;
 		return ref;
@@ -183,7 +183,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 			// A folder of its own, `cards/<title>/index.html`, for what the card keeps beside it.
 			let path = `${canvasFolder(onCanvas)}/cards/${base}/index.html`;
 			for (let n = 2; service.fileCard(path) || existsIn(path); n++) path = `${canvasFolder(onCanvas)}/cards/${base}-${n}/index.html`;
-			const head = [/<title>/i.test(html) ? "" : `<title>${title.replace(/</g, "&lt;")}</title>`, /<meta\s+name=["'](?:card|board)["']/i.test(html) ? "" : `<meta name="card" content='${JSON.stringify(size)}' />`].filter(Boolean).join("\n");
+			const head = [/<title>/i.test(html) ? "" : `<title>${title.replace(/</g, "&lt;")}</title>`, /<meta\s+name=["']card["']/i.test(html) ? "" : `<meta name="card" content='${JSON.stringify(size)}' />`].filter(Boolean).join("\n");
 			service.writeCard(path, `${head}${head ? "\n" : ""}${html.trim()}\n`);
 			item = { ...others, type: "card", card: path, ...(typeof width === "number" ? { width } : {}), ...(typeof height === "number" ? { height } : {}) };
 		}
@@ -214,7 +214,6 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 			const meta = item.metadata as { path: string };
 			item = { ...item, metadata: { ...meta, path: documentPath(meta.path.trim()) } };
 		}
-		if (item.type === "board") throw new Error("Boards are from before cards, and a canvas no longer takes one: decks card create makes a card, and decks file read reads an old board's file.");
 		// What a read adds and no file keeps (`read.ts`), so an item read and written back is the item.
 		const { box: _box, clipped: _clipped, childCount: _childCount, outline: _outline, inside: _inside, children: kids, ...rest } = item;
 		const children = Array.isArray(kids) ? kids.map((one) => fromItem(one, taken, frame)) : undefined;
@@ -293,7 +292,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 					const given = { ...raw } as Record<string, unknown>;
 					if (typeof given.id === "string") given.id = idIn(doc, given.id);
 					if (typeof given.parent === "string") given.parent = idIn(doc, given.parent, "parent");
-					if (given.node && ["card", "app", "document", "board"].includes(String((given.node as { type?: unknown }).type))) given.node = fromItem(given.node, ids(doc), frame);
+					if (given.node && ["card", "app", "document"].includes(String((given.node as { type?: unknown }).type))) given.node = fromItem(given.node, ids(doc), frame);
 					pen = given as unknown as Op;
 					warn(pen);
 					doc = apply(doc, [pen], { theme, measure, scratch: true }).doc;
@@ -381,7 +380,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 					case "copy": {
 						const id = idIn(doc, op.id);
 						const node = [...walk(doc.children)].find((one) => one.id === id);
-						if (node && cardOf(node)) throw new Error(`${op.id} is a board, and a canvas holds a board once: make another board, or copy its file.`);
+						if (node && cardOf(node)) throw new Error(`${op.id} is a card, and a canvas holds a card once: make another card, or copy its file.`);
 						const box = cornerOf(op.at);
 						pen = { op: "copy", id, ...(op.as !== undefined ? { as: op.as } : {}), ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(box ? { box } : {}) };
 						break;
@@ -482,13 +481,13 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 					...(theme ? { theme } : {}),
 				};
 				if (target.frame !== undefined) {
-					const { file, children, ...rest } = pens.files.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; stage?: string; variables?: unknown; themes?: unknown };
+					const { file, children, ...rest } = pens.files.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; canvas?: string; variables?: unknown; themes?: unknown };
 					delete rest.ref;
-					delete rest.stage;
+					delete rest.canvas;
 					return { frame: target.frame, file, ...rest, ...withValues(rest), items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 				}
 				const name = target.canvas;
-				const { stage: _canvas, file: _file, children, ...rest } = pens.read(name, more);
+				const { each: _canvas, file: _file, children, ...rest } = pens.read(name, more);
 				return { canvas: name, title: pens.titleOf(name), rev: pens.get(name).rev, ...rest, ...withValues(rest), items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 			},
 			space: async (size: { w: number; h: number }, options?: On & { near?: string; around?: { x: number; y: number }; side?: Side; margin?: number }) => {
@@ -621,7 +620,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 			fit: async (card: string, options?: { canvas?: string; margin?: number }) => {
 				// The canvas named; else, for an agent, the one the card's own path names (a card says where it is); the person's fit is where they are looking.
 				const name = canvasOf(options?.canvas ?? (!ctx.agent.person && typeof card === "string" ? canvasOfPath(card) : undefined));
-				const { board: sized, canvas, said } = await fitOn(ctx, card, name, options?.margin);
+				const { card: sized, canvas, said } = await fitOn(ctx, card, name, options?.margin);
 				return { card: sized.path, canvas, w: sized.w, h: sized.h, notes: said };
 			},
 			save: async (id: string, frame: string, options?: { canvas?: string; replace?: boolean }) => {
@@ -637,7 +636,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 			rename: async (title: string, options?: { canvas?: string }) => {
 				if (typeof title !== "string" || !title.trim()) throw new Error('rename takes the canvas\'s new name, as in decks canvas rename "Launch plan".');
 				const folder = service.retitle(canvasOf(options?.canvas), title);
-				service.stagesChanged();
+				service.canvasesChanged();
 				return canvasRow(folder);
 			},
 			file: async (options?: { canvas?: string }) => canvasFile(canvasOf(options?.canvas)),
@@ -647,7 +646,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 				const pens = needPens();
 				const from = canvasOf(options?.canvas);
 				const name = copySharedCanvas(service.deckPath(), pens, from, options?.title);
-				service.stagesChanged();
+				service.canvasesChanged();
 				notes.push(`${name} is your own copy of ${pens.titleOf(from)}: change it as you like, it syncs as your canvas and never changes theirs. decks view goto ${name} moves you there.`);
 				return canvasRow(name);
 			},
@@ -655,7 +654,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Verbs, "canvas"> {
 				if (typeof title !== "string" || !title.trim()) throw new Error('canvas create takes a title, as in decks canvas create "Launch plan".');
 				const pens = needPens();
 				const name = pens.claim(title.trim());
-				service.stagesChanged();
+				service.canvasesChanged();
 				notes.push(`${name} is made and empty. Nobody is on it yet: decks view goto ${name} moves you there, and the person's screen with you when your chat is on screen.`);
 				return canvasRow(name);
 			},

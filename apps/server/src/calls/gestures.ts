@@ -14,7 +14,7 @@ export interface Gestures {
 	hide(path: string | string[]): Promise<unknown>;
 	edit(ops: readonly unknown[]): Promise<unknown>;
 	open(name: string): Promise<unknown>;
-	newStage(title: string): Promise<unknown>;
+	newCanvas(title: string): Promise<unknown>;
 }
 
 export function gestures(ctx: VerbContext): Gestures {
@@ -77,12 +77,12 @@ export function gestures(ctx: VerbContext): Gestures {
 				const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
 				return { ...result, ...(box ? { box } : {}) };
 			});
-			const touched = answered.filter((result) => result.box && !result.id.startsWith("board:"));
+			const touched = answered.filter((result) => result.box);
 			if (touched.length > 0) agent.drew?.(needCanvas(), touched.map((result) => result.id), touched.map((result) => result.box!));
 			return { rev: entry.rev, results: answered };
 		},
 
-		/** Put the conversation on another canvas, picked in the canvas manager (`agent.stage`): by its folder or its title. */
+		/** Put the conversation on another canvas, picked in the canvas manager (`agent.canvas`): by its folder or its title. */
 		open: async (name: string) => {
 			if (typeof name !== "string" || !name.trim()) throw new Error("Name a canvas to open.");
 			if (!agent.openCanvas) throw new Error("This conversation cannot change canvases.");
@@ -90,17 +90,17 @@ export function gestures(ctx: VerbContext): Gestures {
 			const asked = name.trim();
 			const folder = pens && !pens.names().includes(asked) ? (pens.names().find((one) => pens.titleOf(one).toLowerCase() === asked.toLowerCase()) ?? asked) : asked;
 			agent.openCanvas(folder);
-			service.stagesChanged();
-			return { stage: folder };
+			service.canvasesChanged();
+			return { canvas: folder };
 		},
 
-		/** A new, empty canvas named from a title, opened for the conversation at once (`stage.new`). */
-		newStage: async (title: string) => {
+		/** A new, empty canvas named from a title, opened for the conversation at once (`decks.new`). */
+		newCanvas: async (title: string) => {
 			if (typeof title !== "string" || !title.trim()) throw new Error("A new canvas needs a title.");
 			if (!agent.newCanvas) throw new Error("This conversation cannot make canvases.");
 			const made = agent.newCanvas(title.trim());
-			service.stagesChanged();
-			return { stage: made };
+			service.canvasesChanged();
+			return { canvas: made };
 		},
 	};
 }

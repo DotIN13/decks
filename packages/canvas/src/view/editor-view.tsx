@@ -77,7 +77,7 @@ export function createEditorView(d: EditorViewNeeds) {
 			d.setSelected(path);
 			d.options.onSelect?.(path);
 			/* A press on bare canvas takes the focus, which is how an edit in a note or a card ends (as in the Decks app). */
-			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
+			if (!path) document.querySelector<HTMLElement>(".decks-canvas .canvas, .canvas")?.focus();
 			}}
 			onMove={d.movePage}
 			frame={(slot) => <ItemSlot {...slot} reload={d.reloads()[slot.card.path]} page={d.options.pages?.page?.(slot.card.path)} {...(d.options.pages?.cardScripts && !d.options.pages.cardScripts(slot.card.path) ? { cardScripts: false, ...(d.options.pages.onScriptsOn && d.editable && !slot.card.path.startsWith("shared/") ? { onScriptsOn: () => d.options.pages!.onScriptsOn!(slot.card.path) } : {}) } : {})} />}
@@ -96,8 +96,8 @@ export function createEditorView(d: EditorViewNeeds) {
 	const root = () => (
 		<div class="decks-canvas app" data-mode={d.mode()}>
 			<div class="work">
-				<div class="surface" data-surface="stage">
-					<div class="surface-layer" data-layer="stage">
+				<div class="surface" data-surface="canvas">
+					<div class="surface-layer" data-layer="canvas">
 						{viewNode()}
 					</div>
 				</div>

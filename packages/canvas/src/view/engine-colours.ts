@@ -28,7 +28,7 @@ export function createEngineColours(d: EngineColoursNeeds) {
 		if (colours?.dark === dark && colourProbe?.isConnected) return colours;
 		if (!colourProbe?.isConnected) {
 			colourProbe = document.createElement("span");
-			colourProbe.className = "stage-colour-probe";
+			colourProbe.className = "canvas-colour-probe";
 			colourProbe.style.display = "none";
 			canvas.append(colourProbe);
 		}

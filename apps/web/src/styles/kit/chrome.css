@@ -37,7 +37,7 @@
 	 * capsule. 22px around buttons of 16px, a 6px inset apart, so the two curves stay concentric.
 	 */
 	@media (pointer: coarse) {
-		:is(.float.pill, .pen-tools, .stage-fixed > .card-callout, .notices, .popover) {
+		:is(.float.pill, .pen-tools, .canvas-fixed > .card-callout, .notices, .popover) {
 			--radius-panel: 22px;
 			--control-radius: 16px;
 		}
@@ -492,7 +492,7 @@
 	 * That disagreement had been patched seven times, one `font-normal` at a time — the
 	 * zoom stops, the two zoom steps, the tools menu, undo, and both "new agent" rows. Seven
 	 * opt-outs from a default is the default being wrong, so it is stated once here and the
-	 * utilities are gone. `.row-list` keeps 600 throughout: the panel's boards, the settings
+	 * utilities are gone. `.row-list` keeps 600 throughout: the panel's cards, the settings
 	 * groups and the dialog's options are lists you read, not lists you pick from.
 	 */
 	.popover [data-row]:not(:has(> .row-note)) > .row-label {
@@ -977,7 +977,7 @@
 	 * they must name a runtime identically, which is the whole reason this is one class.
 	 *
 	 * A word rather than a badge on the avatar, which was the option it beat: agents draw
-	 * their own faces (`stage.me.setAvatar`), so a badge would be a third mark on a 22px
+	 * their own faces (`decks.me.setAvatar`), so a badge would be a third mark on a 22px
 	 * circle that already carries a status ring and an unread dot, sitting on top of artwork
 	 * nobody controls. A word cannot collide with any of that, and it is readable aloud.
 	 */

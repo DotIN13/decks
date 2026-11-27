@@ -80,7 +80,7 @@ export class Broadcast<Agent extends { id: string }> {
 				return { ...message, deck: this.of.stateFor(own) };
 			case "card.changed": {
 				if (!message.card) return message;
-				const placed = this.of.stateFor(own).boards.find((one) => one.path === message.path);
+				const placed = this.of.stateFor(own).cards.find((one) => one.path === message.path);
 				return placed ? { ...message, card: { ...message.card, x: placed.x, y: placed.y, w: placed.w, h: placed.h } } : message;
 			}
 			default:

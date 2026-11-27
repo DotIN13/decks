@@ -106,14 +106,14 @@ test("reasoning goes to the thinking block, not the reply", () => {
 
 test("a tool call opens once and closes with its result", () => {
 	const t = transcript();
-	const part = (state: unknown) => ({ type: "message.part.updated", properties: { sessionID: "ses_1", part: { id: "p1", messageID: "m1", type: "tool", callID: "c1", tool: "stage_eval", state } } });
+	const part = (state: unknown) => ({ type: "message.part.updated", properties: { sessionID: "ses_1", part: { id: "p1", messageID: "m1", type: "tool", callID: "c1", tool: "canvas_eval", state } } });
 	t.feed(part({ status: "pending", input: { code: "1" } }));
-	t.feed(part({ status: "running", input: { code: "1" }, title: "stage_eval" }));
-	t.feed(part({ status: "completed", input: { code: "1" }, output: "4", title: "stage_eval" }));
+	t.feed(part({ status: "running", input: { code: "1" }, title: "canvas_eval" }));
+	t.feed(part({ status: "completed", input: { code: "1" }, output: "4", title: "canvas_eval" }));
 	t.feed({ type: "session.idle", properties: { sessionID: "ses_1" } });
 	const calls = tools(t.translator);
 	assert.equal(calls.length, 1, "pending then running must not be two chips");
-	assert.equal(calls[0]!.name, "stage_eval");
+	assert.equal(calls[0]!.name, "canvas_eval");
 	assert.equal(calls[0]!.state, "done");
 	assert.equal(calls[0]!.result, "4");
 });
@@ -193,11 +193,11 @@ test("a permission request is handed to the backend, not merely noticed", () => 
 	 * answered and must not reach the backend pretending it can.
 	 */
 	const t = transcript();
-	t.feed({ type: "permission.updated", properties: { sessionID: "ses_1", id: "per_1", type: "external_directory", title: "Read /tmp/board.png" } });
+	t.feed({ type: "permission.updated", properties: { sessionID: "ses_1", id: "per_1", type: "external_directory", title: "Read /tmp/card.png" } });
 	t.feed({ type: "permission.updated", properties: { sessionID: "ses_1", id: "per_2", type: "bash", title: "Run a command" } });
 	t.feed({ type: "permission.updated", properties: { sessionID: "ses_1", title: "nameless" } });
 	assert.deepEqual(t.asked(), [
-		{ id: "per_1", kind: "external_directory", title: "Read /tmp/board.png" },
+		{ id: "per_1", kind: "external_directory", title: "Read /tmp/card.png" },
 		{ id: "per_2", kind: "bash", title: "Run a command" },
 	]);
 });

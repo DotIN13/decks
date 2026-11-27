@@ -23,8 +23,8 @@ export const canvasKind: TabKind = {
 	// Kept while a tab of another kind is in front, out of sight: its frame, its canvas and where it was looking are as they were when it comes back. Hidden, not taken out of the layout: a frame with no size moves its view to keep its middle, and draws again when it has one.
 	view: (tab, parts) => (
 		<>
-			<div class="surface" data-surface="stage" style={{ visibility: tab() ? undefined : "hidden", "pointer-events": tab() ? undefined : "none" }}>
-				<div class="surface-layer" data-layer="stage">
+			<div class="surface" data-surface="canvas" style={{ visibility: tab() ? undefined : "hidden", "pointer-events": tab() ? undefined : "none" }}>
+				<div class="surface-layer" data-layer="canvas">
 					<CanvasHost host={parts.canvasHost} />
 				</div>
 			</div>

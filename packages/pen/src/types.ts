@@ -1,7 +1,7 @@
 /**
  * The `.pen` document, as pen.dev defines it.
  *
- * A stage is saved as a native `.pen` file so pen.dev opens it as it is, which makes this the
+ * A canvas is saved as a native `.pen` file so pen.dev opens it as it is, which makes this the
  * one vocabulary: nothing here renames a pen field to one of ours. The types follow pen.dev's
  * published format (docs.pencil.dev, "The .pen format"), and they are deliberately loose in one
  * way — every item keeps fields it does not know. A file written by a newer pen.dev, or by an
@@ -264,7 +264,7 @@ export interface PenDocument {
 	[key: string]: unknown;
 }
 
-/** A box on the stage, both corners, so a reader never adds a width to find an edge. */
+/** A box on the canvas, both corners, so a reader never adds a width to find an edge. */
 export interface Box {
 	x1: number;
 	y1: number;

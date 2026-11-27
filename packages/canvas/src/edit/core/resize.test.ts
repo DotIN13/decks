@@ -103,7 +103,7 @@ test("two presses on a frame's top or bottom handle hug again, with the floor it
 	assert.equal(hugAgainOp("f", undefined, "s"), undefined);
 });
 
-test("a board stops at 320 × 200 at the edge being dragged; the other stays put", () => {
+test("a card stops at 320 × 200 at the edge being dragged; the other stays put", () => {
 	assert.deepEqual(PAGE_MIN, { w: 320, h: 200 });
 	const start = { x: 0, y: 0, w: 800, h: 600 };
 	assert.deepEqual(pageResizeStep(start, "w", { x: 700, y: 0 }, {}, none).box, { x: 480, y: 0, w: 320, h: 600 });
@@ -115,7 +115,7 @@ test("a board stops at 320 × 200 at the edge being dragged; the other stays put
 	assert.equal(snapped.guides.length, 1);
 });
 
-test("a board's lift moves it only when its corner moved, and sizes it only when its size changed", () => {
+test("a card's lift moves it only when its corner moved, and sizes it only when its size changed", () => {
 	const start = { x: 0, y: 0, w: 800, h: 600 };
 	assert.deepEqual(pageResizeEnd(start, start), {});
 	assert.deepEqual(pageResizeEnd(start, { x: 0, y: 0, w: 900, h: 600 }), { size: { w: 900, h: 600 } });
@@ -168,7 +168,7 @@ test("a card is never narrower than 48, its least height, and the edge not dragg
 	assert.deepEqual(resizeStep(box, "e", { x: -150, y: 0 }, {}, none).box, { x: -50, y: 0, w: 50, h: 50 });
 });
 
-test("Shift on a board with no size to keep does not divide by it", () => {
+test("Shift on a card with no size to keep does not divide by it", () => {
 	const flat = { x: 0, y: 0, w: 0, h: 0 };
 	const step = pageResizeStep(flat, "se", { x: 500, y: 300 }, { shift: true }, none);
 	assert.deepEqual(step.box, { x: 0, y: 0, w: 500, h: 300 });

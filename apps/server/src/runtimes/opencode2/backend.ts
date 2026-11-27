@@ -189,7 +189,7 @@ export class Opencode2Backend extends SharedServerBackend {
 
 		const handle = await opencode2Manager.acquire({
 			cwd: this.directory,
-			decksUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
+			decksUrl: `http://127.0.0.1:${this.context.port}/api/canvas/eval`,
 			decksPort: this.context.port,
 			config: { plugins: [opencode2PluginDir()], skills: [skillsDir()] },
 		});

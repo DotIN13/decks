@@ -69,7 +69,7 @@ let spot;
 // Where the canvas lands may be all boards: after a few looks, the view is moved aside to bare canvas.
 for (let look = 0, deadline = Date.now() + 15000; !spot && Date.now() < deadline; look++) {
 	const places = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		const out = [];
@@ -160,7 +160,7 @@ if (spot) {
 		await settle(page, 150);
 		await page.mouse.up();
 		const loose = await until(() => (parentOf("f-note") === null ? true : undefined));
-		say("dragging it clear of the frame puts it back on the stage", !!loose, `parent ${parentOf("f-note")}`);
+		say("dragging it clear of the frame puts it back on the canvas", !!loose, `parent ${parentOf("f-note")}`);
 		const after = await until(async () => {
 			const box = await boxOf("f-note");
 			return box && box.width > 0 && Math.abs(box.x + box.width / 2 - out.x) < 24 ? box : undefined;
@@ -210,9 +210,9 @@ if (spot) {
 	await page.click('.v3-tool[data-tool="shape"]');
 	await page.click('.v3-menu-row:has-text("Frame")');
 	// Picked on the page, armed in the frame a message later: the press below waits for it, as a hand cannot help doing.
-	await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.penTool === "frame", undefined, { timeout: 5000 }).catch(() => {});
+	await canvas.waitForFunction(() => document.querySelector(".canvas")?.dataset.penTool === "frame", undefined, { timeout: 5000 }).catch(() => {});
 	const room = await canvas.evaluate(() => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		for (let y = 200; y < 680; y += 40) for (let x = 420; x < 1150; x += 40) if (empty(x, y) && empty(x + 240, y + 200) && empty(x + 420, y + 60)) return { at: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a } };

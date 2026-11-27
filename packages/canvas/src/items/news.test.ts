@@ -10,7 +10,7 @@ function card(path: string, over: Partial<Page> = {}): Page {
 	return { path, title: path, x: 0, y: 0, w: 800, h: 600, rev: 1, inContext: [], ...over };
 }
 
-test("a board is news until the person reads it, and again once it is named after that", () => {
+test("a card is news until the person reads it, and again once it is named after that", () => {
 	const written = card("cards/plan/index.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "a1" });
 	assert.equal(isNews(written, NOW), true);
 	assert.equal(isNews({ ...written, seenAt: NOW - HOUR }, NOW), false, "read at the moment it was written");
@@ -24,7 +24,7 @@ test("a board is news until the person reads it, and again once it is named afte
  * before `namedAt` the most common thing an agent does left no trace at all, while a person's own
  * drag was marked as news.
  */
-test("an act names a board as news even though no file moved", () => {
+test("an act names a card as news even though no file moved", () => {
 	const reported = card("cards/plan/index.html", { modifiedAt: NOW - 3 * HOUR, lastWrittenBy: "a1", namedAt: NOW - 60_000 });
 	assert.equal(isNews(reported, NOW), true);
 	assert.equal(isNews({ ...reported, seenAt: NOW - 30_000 }, NOW), false, "read after the act: no longer news");

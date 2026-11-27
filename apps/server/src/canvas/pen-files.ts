@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
-import { CANVAS_FILE, movedPath } from "./canvas-files.ts";
+import { CANVAS_FILE } from "./canvas-files.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
 import { apply, baseTheme, clone, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, serialize, themeFrom, type Frame, type Op, type OpResult, type PenDocument, type PenNode } from "@decks/pen";
 import { slug } from "@decks/deck-kit";
@@ -79,7 +79,7 @@ export class PenFiles {
 		return Object.keys(out).length ? { ...doc, [IMPORTED]: out } : doc;
 	}
 
-	/** The deck's saved frames: `frames/<name>.pen`, beside `boards/`. */
+	/** The deck's saved frames: `frames/<name>.pen`, beside `cards/`. */
 	get framesDir(): string {
 		return join(this.of.deckPath, "frames");
 	}
@@ -122,7 +122,7 @@ export class PenFiles {
 			else if (value && typeof value === "object") {
 				const ref = (value as { ref?: unknown }).ref;
 				if (typeof ref === "string") {
-					const found = /^((?:frames|boards)\/[A-Za-z0-9][\w.-]*(?:\/[A-Za-z0-9][\w.-]*)*)(?::|$)/.exec(ref);
+					const found = /^(frames\/[A-Za-z0-9][\w.-]*(?:\/[A-Za-z0-9][\w.-]*)*)(?::|$)/.exec(ref);
 					if (found) names.add(found[1]!);
 				}
 				for (const inner of Object.values(value)) if (inner && typeof inner === "object") scan(inner);
@@ -152,9 +152,9 @@ export class PenFiles {
 		if (entry.error) throw new PenError(`${entry.error}. Fix the file before saving from it.`);
 		// A frame is saved in the canvas's own frames/, so the canvas still stands alone (`deck/layout.ts`).
 		const target = this.penFile(/^\.?\/?frames\//.test(path.trim()) ? `${canvasFolder(canvas)}/${path.trim().replace(/^\.?\/+/, "")}` : path);
-		if (!target.ref) throw new PenError(`A frame is saved in frames/ or boards/: give a path there, such as "frames/agent-card" or "frames/ui/agent-card".`);
+		if (!target.ref) throw new PenError(`A frame is saved in frames/: give a path there, such as "frames/agent-card" or "frames/ui/agent-card".`);
 		const found = indexOf(entry.doc).get(id);
-		if (!found) throw new PenError(`No item "${id}" on stage ${canvas}: decks canvas read lists the items.`);
+		if (!found) throw new PenError(`No item "${id}" on canvas ${canvas}: decks canvas read lists the items.`);
 		const node = clone(found.node);
 		const { x, y } = node;
 		delete node.x;
@@ -177,11 +177,10 @@ export class PenFiles {
 	 * `"canvases/research-notes/canvas.pen"`), or an absolute path anywhere. `.pen` may be left off. Its deck-relative path to show, the canvas it is when it is a
 	 * canvas's own file, and the ref that places it when it is a frame.
 	 */
-	penFile(path: string): { file: string; shown: string; stage?: string; ref?: string; canvas?: string } {
+	penFile(path: string): { file: string; shown: string; ownCanvas?: string; ref?: string; canvas?: string } {
 		const asked = typeof path === "string" ? path.trim() : "";
 		if (!asked) throw new PenError("A .pen file needs a path relative to the deck, such as \"frames/agent-card\" or \"canvases/research-notes/canvas.pen\", or an absolute one.");
-		// A path written before canvases moved out of stages/ still finds its canvas (`canvas-files.ts`).
-		const relativeAsked = movedPath(asked.replace(/^\.?\/+/, ""), new Map());
+		const relativeAsked = asked.replace(/^\.?\/+/, "");
 		let file = isAbsolute(asked) ? resolvePath(asked) : resolvePath(this.of.deckPath, relativeAsked);
 		if (!/\.[^/\\.]+$/.test(file)) file += ".pen";
 		if (!file.endsWith(".pen")) throw new PenError(`${asked} is not a .pen file.`);
@@ -190,11 +189,11 @@ export class PenFiles {
 		const outside = !inside || inside.startsWith("..") || isAbsolute(inside);
 		const shown = outside ? file : inside.split(sep).join("/");
 		const at = outside ? undefined : canvasOfPath(shown);
-		if (at && at.rest === CANVAS_FILE) return { file, shown, stage: at.name };
-		// A file in frames/ or boards/, the deck's or a canvas's own, is placed by its path there; the path is its ref, so it keeps to what a ref can say.
+		if (at && at.rest === CANVAS_FILE) return { file, shown, ownCanvas: at.name };
+		// A file in frames/ or cards/, the deck's or a canvas's own, is placed by its path there; the path is its ref, so it keeps to what a ref can say.
 		const placed = at ? at.rest : shown;
-		const ref = !outside && /^(?:frames|boards)\//.test(placed) ? placed.replace(/\.pen$/, "") : undefined;
-		if (ref && !/^(?:frames|boards)\/[A-Za-z0-9][\w.-]*(?:\/[A-Za-z0-9][\w.-]*)*$/.test(ref)) throw new PenError(`${asked}: a path placed by ref is letters, digits, dots and dashes, in folders if you like, such as "frames/ui/agent-card".`);
+		const ref = !outside && /^frames\//.test(placed) ? placed.replace(/\.pen$/, "") : undefined;
+		if (ref && !/^frames\/[A-Za-z0-9][\w.-]*(?:\/[A-Za-z0-9][\w.-]*)*$/.test(ref)) throw new PenError(`${asked}: a path placed by ref is letters, digits, dots and dashes, in folders if you like, such as "frames/ui/agent-card".`);
 		return { file, shown, ...(ref ? { ref } : {}), ...(at && ref ? { canvas: at.name } : {}) };
 	}
 
@@ -239,9 +238,9 @@ export class PenFiles {
 	 * imports and the saved frames it uses, the folder its relative links resolve from, and the box
 	 * round all its items. A canvas's own file answers as the canvas does, its cards included.
 	 */
-	fileFrame(path: string): { doc: PenDocument; base: string; box?: { x1: number; y1: number; x2: number; y2: number }; stage?: string } {
+	fileFrame(path: string): { doc: PenDocument; base: string; box?: { x1: number; y1: number; x2: number; y2: number }; canvas?: string } {
 		const target = this.penFile(path);
-		if (target.stage) return { doc: this.withImported(target.stage, this.of.get(target.stage).doc), base: `${fileUrl(this.of.folderOf(target.stage))}/`, stage: target.stage };
+		if (target.ownCanvas) return { doc: this.withImported(target.ownCanvas, this.of.get(target.ownCanvas).doc), base: `${fileUrl(this.of.folderOf(target.ownCanvas))}/`, canvas: target.ownCanvas };
 		const doc = this.withImportedAt(dirname(target.file), this.loadPen(target.file, target.shown));
 		const placed = placements(doc, { theme: baseTheme(doc, "light"), measure });
 		const boxes = doc.children.map((node) => placed.get(node.id)?.box).filter((box): box is NonNullable<typeof box> => !!box);
@@ -265,7 +264,7 @@ export class PenFiles {
 	/** What an agent reads of any .pen file: its items, each with its box in the file's own space. */
 	readFile(path: string, more: ReadMore = {}) {
 		const target = this.penFile(path);
-		if (target.stage) return { ...this.of.read(target.stage, more), file: target.shown };
+		if (target.ownCanvas) return { ...this.of.read(target.ownCanvas, more), file: target.shown };
 		const doc = this.loadPen(target.file, target.shown);
 		const { theme, ...rest } = more;
 		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), ...read(this.withImportedAt(dirname(target.file), doc), { theme: themeFrom(doc, theme), measure, ...rest }) };
@@ -275,9 +274,9 @@ export class PenFiles {
 	editFile(path: string, ops: readonly Op[]): { file: string; ref?: string; results: Array<OpResult & { box?: { x1: number; y1: number; x2: number; y2: number } }> } {
 		const target = this.penFile(path);
 		const theme = (doc: PenDocument) => baseTheme(doc, "light");
-		if (target.stage) {
-			const { entry, results } = this.of.edit(target.stage, ops);
-			const placed = placements(this.withImported(target.stage, entry.doc), { theme: theme(entry.doc), measure });
+		if (target.ownCanvas) {
+			const { entry, results } = this.of.edit(target.ownCanvas, ops);
+			const placed = placements(this.withImported(target.ownCanvas, entry.doc), { theme: theme(entry.doc), measure });
 			return { file: target.shown, results: results.map((result) => withBox(result, placed)) };
 		}
 		const current = this.loadPen(target.file, target.shown);
@@ -294,7 +293,7 @@ export class PenFiles {
 	 */
 	createFile(path: string, item?: Partial<PenNode>): { file: string; ref?: string; id: string } {
 		const target = this.penFile(path);
-		if (target.stage) throw new PenError(`${target.shown} is a canvas; make one with decks canvas create.`);
+		if (target.ownCanvas) throw new PenError(`${target.shown} is a canvas; make one with decks canvas create.`);
 		if (existsSync(target.file)) throw new PenError(`${target.shown} is already there: read it with decks canvas read --frame ${target.ref ?? path}, and change it with the canvas calls given { frame }.`);
 		const id = slug(basename(target.file, ".pen"), 60) || "frame";
 		const node = { type: "frame", layout: "vertical", width: 320, height: "fit_content", children: [], ...(item ?? {}), id, reusable: true } as PenNode;
@@ -312,7 +311,7 @@ export class PenFiles {
 	 * it is sent again, so each copy shows the change, as a card's edit shows on every canvas.
 	 */
 	watchFrames(): void {
-		for (const folder of ["frames", "boards"]) {
+		for (const folder of ["frames"]) {
 			const dir = join(this.of.deckPath, folder);
 			if (this.framesWatchers.has(folder) || !existsSync(dir)) continue;
 			try {

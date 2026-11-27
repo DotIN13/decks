@@ -45,7 +45,7 @@ test("an arrow moved with what it joins carries its point ends, and its joined e
 	assert.deepEqual(movedBy({ id: "r", type: "rectangle", x: 1.2 } as PenNode, 0.4, 0), { x: 2, y: 0 });
 });
 
-test("a drag into a frame is a move with the stage box it ends at, and the slot it goes in", () => {
+test("a drag into a frame is a move with the canvas box it ends at, and the slot it goes in", () => {
 	assert.deepEqual(moveOps(scene, ["a"], 5.4, 200, "col", 1), [{ op: "move", id: "a", parent: "col", index: 1, box: { x1: 15, y1: 220, x2: 115, y2: 270 } }]);
 	// Out onto the canvas: parent null, no index.
 	assert.deepEqual(moveOps(scene, ["c1"], 0, -300, null), [{ op: "move", id: "c1", parent: null, box: { x1: 18, y1: -82, x2: 282, y2: -42 } }]);
@@ -107,7 +107,7 @@ test("delete is one op per item", () => {
 	assert.deepEqual(deleteOps([]), []);
 });
 
-test("boards move to their own rounded corners; a board not on the stage is left out", () => {
+test("cards move to their own rounded corners; a card not on the canvas is left out", () => {
 	assert.deepEqual(pageMoves(cards, ["cards/one/index.html", "cards/gone/index.html"], 10.6, -1), [{ path: "cards/one/index.html", x: 1011, y: -1 }]);
 });
 

@@ -33,18 +33,10 @@ export function contentType(path: string): string {
 	return TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
 }
 
-/**
- * The file a page asks `lib/` for: `board.css` and `board.js`, which pages written before cards
- * (a friend's leftover board, a card written then) ask for by name, are `card.css` and `card.js`.
- */
-export function libName(path: string): string {
-	return path.replace(/(^|\/)board\.(css|js)$/, "$1card.$2");
-}
-
 /** A file of `lib/` by its path inside it (`card.css`, `fonts/x.woff2`), or nothing for one that is not there or climbs out. */
 export function libFile(path: string): { bytes: Uint8Array; type: string } | undefined {
 	const root = libDir();
-	const full = join(root, normalize(libName(path)));
+	const full = join(root, normalize(path));
 	if (!full.startsWith(root + sep) || !existsSync(full) || !statSync(full).isFile()) return undefined;
 	return { bytes: readFileSync(full), type: contentType(full) };
 }

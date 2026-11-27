@@ -40,7 +40,7 @@ export function Recipient(props: RecipientProps) {
 	};
 	const name = () => {
 		if (props.dest.kind === "prompt") return props.dest.name;
-		if (props.dest.kind === "note") return m.composer_recipient_board();
+		if (props.dest.kind === "note") return m.composer_recipient_card();
 		return m.composer_recipient_none();
 	};
 	/*

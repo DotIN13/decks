@@ -36,7 +36,7 @@ test("the page's language is not told to the agent: it answers in the language t
 test("a message is sent with the line as its last note, and a slash command with no note at all, what it would have carried waiting for the next message", async () => {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-looking-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	try {
 		const agent = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
@@ -94,7 +94,7 @@ test("a message is sent with the line as its last note, and a slash command with
 test("a camera moved between canvases is not told to the agent; a canvas deleted from under it is", async () => {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-moved-")));
 	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
+	mkdirSync(join(deck, "cards"), { recursive: true });
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	try {
 		const agent = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });

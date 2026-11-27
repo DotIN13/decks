@@ -41,7 +41,7 @@ test("…including when everything it remembers has been deleted", () => {
 	assert.equal(gone, undefined, "a path the deck no longer has is not something to look at");
 });
 
-test("a remembered view comes back exactly, not as a fresh fit of the same boards", () => {
+test("a remembered view comes back exactly, not as a fresh fit of the same cards", () => {
 	const back = viewOnSwitch(at({ view: { camera: somewhere }, playing: ["cards/deep/index.html"] }));
 	assert.deepEqual(back, somewhere, "position and zoom as they were, including having scrolled into a corner");
 });
@@ -56,13 +56,13 @@ test("a remembered view that has stopped showing anything is refitted, not resto
 	const moved = [card("cards/plan/index.html", 0, 0), card("cards/deep/index.html", 40000, 40000)];
 	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["cards/deep/index.html"] }), cards: moved });
 
-	assert.notDeepEqual(next, somewhere, "the saved camera is 40000px from the only board it has");
+	assert.notDeepEqual(next, somewhere, "the saved camera is 40000px from the only card it has");
 	assert.ok(next, "and it does move, because there is something to look at");
 	// A fit of what it is showing now, which is what no memory at all would have given.
 	assert.deepEqual(next, viewOnSwitch({ ...at({ view: undefined, playing: ["cards/deep/index.html"] }), cards: moved }));
 });
 
-test("…while a view that still has its board on screen is left exactly alone", () => {
+test("…while a view that still has its card on screen is left exactly alone", () => {
 	// The card moved, but not out of shot: this is still the view you left.
 	const nudged = [card("cards/plan/index.html", 0, 0), card("cards/deep/index.html", 700, 2900)];
 	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["cards/deep/index.html"] }), cards: nudged });
@@ -92,7 +92,7 @@ test("…and it frames all of them, not the first", () => {
 	assert.ok(both.y > 800 && both.y < 2440, `y ${both.y}`);
 	const one = viewOnSwitch(at({ view: undefined, playing: ["cards/plan/index.html"] }));
 	assert.ok(one);
-	assert.ok(both.zoom < one.zoom, "two boards frame wider than one");
+	assert.ok(both.zoom < one.zoom, "two cards frame wider than one");
 });
 
 test("the two agents from the measurement no longer share a view", () => {
@@ -118,7 +118,7 @@ test("parking copies the camera, so a later pan does not rewrite the memory", ()
 	assert.equal(viewToPark(live, undefined).selected, undefined, "no selection is no field");
 });
 
-test("a selection comes back only if its board is still on that canvas", () => {
+test("a selection comes back only if its card is still on that canvas", () => {
 	assert.equal(selectionOnSwitch({ camera: somewhere, selected: "cards/plan/index.html" }, ["cards/plan/index.html"]), "cards/plan/index.html");
 	assert.equal(selectionOnSwitch({ camera: somewhere, selected: "cards/plan/index.html" }, ["cards/risks/index.html"]), undefined, "hidden since: a handle around nothing");
 	assert.equal(selectionOnSwitch({ camera: somewhere }, ["cards/plan/index.html"]), undefined, "nothing was selected");

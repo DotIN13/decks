@@ -24,7 +24,7 @@ export function SidePanel(props: { parts: Parts }) {
 			{/*
 			 * Two panels where there was one, in the same corner and one at a time.
 			 *
-			 * The agent list and the boards an agent is holding were stacked inside a single
+			 * The agent list and the cards an agent is holding were stacked inside a single
 			 * surface, so opening either brought both — you scrolled past six chats to see a
 			 * thumbnail, or past four thumbnails to switch agent. They answer different
 			 * questions and now they are asked separately.
@@ -33,7 +33,7 @@ export function SidePanel(props: { parts: Parts }) {
 				One panel where there were two asides and a modal — and one list in it.
 
 				The agent list moved into the pill's dropdown — a list you switch *with* is a
-				selector, and a selector belongs on the thing it selects — and the board browser
+				selector, and a selector belongs on the thing it selects — and the card browser
 				stopped being a full-screen sheet over the canvas you were trying to look at.
 				It was this panel's second tab for a while; the panel's tabs now are Recent,
 				Canvas, Agents and Apps.
@@ -88,7 +88,7 @@ export function SidePanel(props: { parts: Parts }) {
 				onNewAgent={(workspace, kind) => void newAgent({ ...(kind ? { kind } : {}), ...(workspace ? { workspace } : {}) })}
 				onCloseAgent={closeAgent}
 				/* Your tags, which the agent cannot see or overwrite — a separate field from
-				   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
+				   `decks.me.setTags`, for the reason `protocol/Identity` gives. */
 				onAgentTags={(id, tags) => void call("agent.set", [id, { tags }]).then(warnIfFailed)}
 				/* The workspace, which is one field with two writers rather than two fields: the
 				   agent declares one and you can move it, and whoever wrote last is where it is. */

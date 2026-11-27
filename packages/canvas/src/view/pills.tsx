@@ -50,11 +50,11 @@ export function createPills(d: PillsNeeds) {
 		<>
 
 			{/*
-				Boards have no title bars: the selected board's name and actions are a pill over it
+				Cards have no title bars: the selected card's name and actions are a pill over it
 				(`PageCallout`), on every device. Kept mounted through a movement and only hidden, so a
 				drag that began on its grip keeps the element it captured the pointer on.
 			*/}
-			{/* Keyed by the card's path, not its object: the board list is made again at each change, and a pill made again would shut its ⋯ menu. */}
+			{/* Keyed by the card's path, not its object: the card list is made again at each change, and a pill made again would shut its ⋯ menu. */}
 			<Show when={!d.props.drawing ? d.calloutPath() : undefined} keyed>
 				{(path) => {
 					let last = d.calloutPage()!;
@@ -86,7 +86,7 @@ export function createPills(d: PillsNeeds) {
 											quote: "",
 											title: card().title,
 											// Under the pill, which follows the card as the camera moves.
-											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
+											anchor: () => document.querySelector(".canvas-fixed > .card-callout")?.getBoundingClientRect(),
 											open: true,
 										}),
 								}
@@ -120,7 +120,7 @@ export function createPills(d: PillsNeeds) {
 														items: items().ids,
 														quote: items().words,
 														title: items().name,
-														anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
+														anchor: () => document.querySelector(".canvas-fixed > .card-callout")?.getBoundingClientRect(),
 														open: true,
 													}),
 											}
@@ -167,7 +167,7 @@ export function createPills(d: PillsNeeds) {
 											items: held().ids,
 											quote: "",
 											title: m.canvas_pill_strokes({ count: held().ids.length }),
-											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
+											anchor: () => document.querySelector(".canvas-fixed > .card-callout")?.getBoundingClientRect(),
 											open: true,
 										}),
 								}
@@ -175,7 +175,7 @@ export function createPills(d: PillsNeeds) {
 						onDuplicate={() => {
 							const { ops, made } = duplicateOps(d.scene, held().ids, d.freshIds());
 							d.penEdit(ops);
-							if (made.length) setInkSelection({ path: inkSelection()?.path ?? "stage", ids: made });
+							if (made.length) setInkSelection({ path: inkSelection()?.path ?? "canvas", ids: made });
 						}}
 						onDelete={() => {
 							d.penEdit(held().ids.map((id) => ({ op: "delete", id })));

@@ -14,7 +14,7 @@ const canvas = await canvasFrame(page);
 /** What the stage says, and every element under the world that holds a `will-change: transform`. */
 const layers = () =>
 	canvas.evaluate(() => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const promised = [...document.querySelectorAll(".world, .world *")].filter((el) => getComputedStyle(el).willChange.includes("transform"));
 		return { scaling: stage.dataset.scaling ?? null, sliding: stage.dataset.sliding ?? null, promised: promised.length };
 	});
@@ -42,7 +42,7 @@ await settle(page, 1200);
 await page.mouse.move(spot.x, spot.y);
 await page.mouse.wheel(0, 120);
 await settle(page, 60);
-const sliding = await forced.evaluate(() => document.querySelector(".stage").dataset.sliding ?? null);
+const sliding = await forced.evaluate(() => document.querySelector(".canvas").dataset.sliding ?? null);
 say("?engine=chromium gives the pan its layer back", sliding === "true", `data-sliding=${sliding}`);
 
 say("no page errors", errors.length === 0, errors.join(" | "));

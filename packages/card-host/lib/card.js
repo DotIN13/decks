@@ -1,32 +1,32 @@
 /*
- * The board runtime: what turns a page of HTML into a board.
+ * The card runtime: what turns a page of HTML into a card.
  *
- * A board's head asks for `card.css`, this file, and — on a board this app wrote — an import
+ * A card's head asks for `card.css`, this file, and — on a card this app wrote — an import
  * map. Anything it needs (markdown, maths, diagrams, PDFs) is fetched from the same `lib/`
- * directory the moment a component actually uses it, so a board of three stickies does not pay
+ * directory the moment a component actually uses it, so a card of three stickies does not pay
  * for pdf.js and the agent does not have to remember which script tag goes with which component.
  * The map is the same bargain for the libraries an agent reaches for itself: a table of names,
- * pinned to versions, and nothing fetched until a board imports one.
+ * pinned to versions, and nothing fetched until a card imports one.
  *
  * **It draws nothing of its own.** It used to route an arrow between two components
  * named by id, and that is gone on purpose: a line whose position is decided at mount
  * time is a drawing the file does not state, so the file stopped being the whole truth
- * about the board. Neither an agent nor a person could say where the line went without
+ * about the card. Neither an agent nor a person could say where the line went without
  * running the page, and there was nothing to edit. A diagram is now a component that
  * owns its own geometry — an `<svg>` with coordinates its author chose — which is a
- * thing both of them can read and change. See `skills/board-authoring`.
+ * thing both of them can read and change. See `skills/card-authoring`.
  *
  * **What it renders, it can be asked to render again.** A `[data-md]` or
  * `[data-mermaid]` component is written as its source and mounted as the drawing made
  * from it, so a moment later the file's own words are nowhere in the live document.
  * That is why markdown used to be the one thing a user could not retype. The source is
- * kept instead, and handed out through `window.__board` along with a re-render of a
+ * kept instead, and handed out through `window.__card` along with a re-render of a
  * single component — which is what lets the editor open it, and what lets the frame
- * stay on the revision it loaded instead of reloading a whole board for one panel.
+ * stay on the revision it loaded instead of reloading a whole card for one panel.
  *
  * It also owns the readiness flag. Every async mount is awaited, then
  * `window.__cardReady` goes true — which is what the app waits for before it
- * measures a board, and what the agent's Playwright waits for before it takes a
+ * measures a card, and what the agent's Playwright waits for before it takes a
  * picture. Without it a screenshot is a race, and the race is usually lost. A
  * re-render takes the flag down and puts it back for the same reason.
  */
@@ -40,7 +40,7 @@
 	const loaded = new Map();
 
 	/*
-	 * Framed by a page of another origin (Decks Studio showing a harness's board): that page cannot
+	 * Framed by a page of another origin (Decks Studio showing a harness's card): that page cannot
 	 * listen in here as the Decks app does (`frame-gestures.ts`), so the gestures the canvas needs are
 	 * posted up to it: a scroll nothing here can
 	 * take, a pinch, fingers, Space and a middle-drag.
@@ -159,8 +159,8 @@
 	}
 
 	/*
-	 * Held still: on a touch screen the canvas asks a board nobody has picked to stop its CSS
-	 * animations (`plain-board.tsx`, `decks:still`): a looping one repaints every frame and takes the
+	 * Held still: on a touch screen the canvas asks a card nobody has picked to stop its CSS
+	 * animations (`decks:still`): a looping one repaints every frame and takes the
 	 * canvas's own frames away. Picked again, it plays on. The same for pages
 	 * without this script.
 	 */
@@ -184,7 +184,7 @@
 			el.rel = "stylesheet";
 			el.href = lib(file);
 			// A stylesheet that will not load is a cosmetic failure, not a reason to
-			// hold up the board: resolve either way.
+			// hold up the card: resolve either way.
 			el.onload = () => resolve();
 			el.onerror = () => resolve();
 			document.head.appendChild(el);
@@ -203,30 +203,30 @@
 	// --- paths -------------------------------------------------------------------
 
 	/**
-	 * This board's own deck-relative path, from the URL it was served at.
+	 * This card's own deck-relative path, from the URL it was served at.
 	 *
-	 * Null when the board was opened as a plain file, which is a supported way to
+	 * Null when the card was opened as a plain file, which is a supported way to
 	 * look at one: there is no app to ask, so every path stays relative and the
 	 * out-of-deck embeds are the only thing that does not work.
 	 */
 	/**
-	 * Where this page's server is: `/api`, or `/c/<id>/api` when the board came from another server
+	 * Where this page's server is: `/api`, or `/c/<id>/api` when the card came from another server
 	 * or a canvas file through one of the app's connections (`web/src/connections`). Every address
-	 * this file builds starts here, so a board on the second server asks the second server.
+	 * this file builds starts here, so a card on the second server asks the second server.
 	 */
 	const API = `${location.pathname.match(/^(\/c\/[a-z0-9]+)\/api\//)?.[1] ?? ""}/api`;
 
-	const BOARD_PATH = (() => {
-		if (!location.pathname.startsWith(`${API}/board/`)) return null;
-		return decodeURIComponent(location.pathname.slice(`${API}/board/`.length));
+	const CARD_PATH = (() => {
+		if (!location.pathname.startsWith(`${API}/card/`)) return null;
+		return decodeURIComponent(location.pathname.slice(`${API}/card/`.length));
 	})();
 
 	/**
-	 * A board's idea of a path -> a URL a browser can fetch.
+	 * A card's idea of a path -> a URL a browser can fetch.
 	 *
 	 * Relative paths mean what they would mean in an `<img src>`: relative to this
-	 * board. Ones that stay inside the deck are used as they are, which is what
-	 * keeps a board openable as a plain file. Anything pointing outside goes
+	 * card. Ones that stay inside the deck are used as they are, which is what
+	 * keeps a card openable as a plain file. Anything pointing outside goes
 	 * through `/api/file`, which resolves it against a declared root and redirects
 	 * to the absolute URL it lives at.
 	 *
@@ -242,15 +242,15 @@
 		if (path.startsWith(`${API}/f/`) || path.startsWith(`${API}/file`)) return path;
 		// Written for this server's own page: the same file, under this page's connection.
 		if (path.startsWith("/api/f/") || path.startsWith("/api/file")) return API + path.slice(4);
-		if (!BOARD_PATH) return path;
+		if (!CARD_PATH) return path;
 
 		if (!path.startsWith("~") && !path.startsWith("/")) {
 			const resolved = new URL(path, location.href);
-			if (resolved.origin === location.origin && resolved.pathname.startsWith(`${API}/board/`)) {
+			if (resolved.origin === location.origin && resolved.pathname.startsWith(`${API}/card/`)) {
 				return resolved.pathname + resolved.search;
 			}
 		}
-		return `${API}/file?path=${encodeURIComponent(path)}&from=${encodeURIComponent(BOARD_PATH)}`;
+		return `${API}/file?path=${encodeURIComponent(path)}&from=${encodeURIComponent(CARD_PATH)}`;
 	}
 
 	const nameOf = (path) => String(path).split("/").filter(Boolean).pop() ?? String(path);
@@ -258,23 +258,23 @@
 	// --- links -------------------------------------------------------------------
 
 	/*
-	 * What a click on a link means inside a board.
+	 * What a click on a link means inside a card.
 	 *
-	 * **A link never navigates the frame.** A board document *is* the reader's page, so
-	 * sending it to example.com replaces the board with a foreign site at an address nobody
-	 * can get back from — a frame has no back button — and a link to a sibling board would do
-	 * the same thing, one board over. Both are losses, and neither is what the link's author
+	 * **A link never navigates the frame.** A card document *is* the reader's page, so
+	 * sending it to example.com replaces the card with a foreign site at an address nobody
+	 * can get back from — a frame has no back button — and a link to a sibling card would do
+	 * the same thing, one card over. Both are losses, and neither is what the link's author
 	 * meant.
 	 *
 	 * So a click becomes one of two things, and **which one is decided here, in the click
 	 * itself**:
 	 *
-	 * - **a link to a board file** — a `.html` or `.md` path that resolves inside the deck —
-	 *   goes up to the app as a request to put that board on the canvas (`{ decks:
-	 *   "board.open" }`, and the deck-relative path). The app is the only thing here that knows
-	 *   the deck, so it decides whether there is a board there, and a path it does not hold is
-	 *   a notice rather than a board.
-	 * - **everything else** — another site, or a file in the deck that is not a board, a PDF or
+	 * - **a link to a card file** — a `.html` or `.md` path that resolves inside the deck —
+	 *   goes up to the app as a request to put that card on the canvas (`{ decks:
+	 *   "card.open" }`, and the deck-relative path). The app is the only thing here that knows
+	 *   the deck, so it decides whether there is a card there, and a path it does not hold is
+	 *   a notice rather than a card.
+	 * - **everything else** — another site, or a file in the deck that is not a card, a PDF or
 	 *   an image — opens in a tab of its own, by putting `target` on the anchor *before* the
 	 *   default action runs. Deliberately not `preventDefault` plus `window.open`: a real
 	 *   navigation keeps the tab, the address bar, the context menu and the middle click for
@@ -288,17 +288,17 @@
 	 * `deck/kinds.ts`'s — one list, two readers, and the same bargain `familyOf` makes with
 	 * `embedFamily` on the app's side.
 	 *
-	 * Opened as a plain file with no app above it, a board link opens in a tab as well: there
-	 * is nobody to ask, and a new tab beats losing the board being read.
+	 * Opened as a plain file with no app above it, a card link opens in a tab as well: there
+	 * is nobody to ask, and a new tab beats losing the card being read.
 	 */
-	const BOARD_PREFIX = `${API}/card/`;
-	/** What a board file is called (`deck/kinds.ts`): the one thing about a board that a link can be read against. */
-	const BOARD_FILE = /\.(?:html?|mdx?)$/i;
+	const CARD_PREFIX = `${API}/card/`;
+	/** What a card file is called (`deck/kinds.ts`): the one thing about a card that a link can be read against. */
+	const CARD_FILE = /\.(?:html?|mdx?)$/i;
 
 	/** The deck-relative path behind a `/api/card/…` URL, or null if it is not one. */
-	function boardPathOf(url) {
-		if (url.origin !== location.origin || !url.pathname.startsWith(BOARD_PREFIX)) return null;
-		const path = url.pathname.slice(BOARD_PREFIX.length);
+	function cardPathOf(url) {
+		if (url.origin !== location.origin || !url.pathname.startsWith(CARD_PREFIX)) return null;
+		const path = url.pathname.slice(CARD_PREFIX.length);
 		// A percent-escape the browser let through but nothing can read is not a path.
 		try {
 			return decodeURIComponent(path);
@@ -333,12 +333,12 @@
 		const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
 		if (!anchor) return;
 		const raw = (anchor.getAttribute("href") ?? "").trim();
-		// A jump within this board is the one link that stays in it, and the one `urlFor` is
+		// A jump within this card is the one link that stays in it, and the one `urlFor` is
 		// not asked about.
 		if (!raw || raw.startsWith("#") || /^(mailto|tel|javascript):/i.test(raw)) return;
 
 		/*
-		 * **Relative means relative to the board** — the same rule `[data-embed]` follows, and
+		 * **Relative means relative to the card** — the same rule `[data-embed]` follows, and
 		 * the reason a link and an embed of the same file agree about where it is. Everything
 		 * else is a URL and is left alone, which is also what keeps an absolute `/api/card/…`
 		 * href working as the browser reads it.
@@ -352,16 +352,16 @@
 			return;
 		}
 
-		const path = boardPathOf(url);
-		if (path && BOARD_FILE.test(path) && window.parent !== window) {
+		const path = cardPathOf(url);
+		if (path && CARD_FILE.test(path) && window.parent !== window) {
 			event.preventDefault();
-			window.parent.postMessage({ decks: "board.open", path }, "*");
+			window.parent.postMessage({ decks: "card.open", path }, "*");
 			return;
 		}
 		openTab(url.href, anchor);
 	}
 
-	/* Capture, so a board's own scripts — a live component, a game, an embed's gesture
+	/* Capture, so a card's own scripts — a live component, a game, an embed's gesture
 	   guard — cannot swallow the click first: the link belongs to the document. */
 	document.addEventListener("click", onLinkClick, true);
 
@@ -372,30 +372,30 @@
 	 *
 	 * Its code is a script block typed `text/decks-eval`, which a browser reads as text and never
 	 * runs on its own. A press runs the block whose `data-for` names the component, here in the
-	 * board's own page, as the body of an async function with two names in scope: `stage`, the
+	 * card's own page, as the body of an async function with two names in scope: `canvas`, the
 	 * Decks SDK (`packages/sdk`, served at `api/sdk/decks.mjs`), whose every call is one verb the
-	 * server checks and answers as this board; and `event`, which component was pressed, what it
-	 * carried and the board it sits on. The server runs none of it: it is asked once whether this
-	 * board may use the stage at all, and notes each verb the code calls in the conversation.
+	 * server checks and answers as this card; and `event`, which component was pressed, what it
+	 * carried and the card it sits on. The server runs none of it: it is asked once whether this
+	 * card may use the canvas at all, and notes each verb the code calls in the conversation.
 	 *
-	 * A board therefore explains itself. What a click can do is in the file, in one place, in
-	 * a script block somebody can read and grep, and a board that wants an agent to hear
-	 * something says so in that code (`stage.send`) — there is no second message kind for it.
+	 * A card therefore explains itself. What a click can do is in the file, in one place, in
+	 * a script block somebody can read and grep, and a card that wants an agent to hear
+	 * something says so in that code (`decks.agent.queue`) — there is no second message kind for it.
 	 *
 	 * The value is the component's own where it has one (an input, a select, a textarea) and
 	 * `data-value` otherwise, because a button carries no value and most of what a person
-	 * presses on a board is a button. `data-value` wins where both exist: an author who wrote
+	 * presses on a card is a button. `data-value` wins where both exist: an author who wrote
 	 * one meant it.
 	 */
-	const BOARD_ROUTE = "/api/card/";
+	const CARD_ROUTE = "/api/card/";
 
 	/*
-	 * A board's own code once called the stage with a token of its own, which the page around it asked
-	 * the harness for. Boards are cards on a canvas now, and a card's buttons call through the canvas
-	 * frame (`packages/canvas/src/items/card.ts`); a board on its own has no stage and no token.
+	 * A card's own code once called the canvas with a token of its own, which the page around it asked
+	 * the harness for. Cards are cards on a canvas now, and a card's buttons call through the canvas
+	 * frame (`packages/canvas/src/items/card.ts`); a card on its own has no canvas and no token.
 	 */
-	function boardStage() {
-		return Promise.reject(new Error("A board on its own has no stage: its buttons work as a card on a canvas, in Decks."));
+	function noCanvas() {
+		return Promise.reject(new Error("A card on its own has no canvas: its buttons work on a canvas, in Decks."));
 	}
 
 	const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
@@ -403,15 +403,15 @@
 	async function runEval(id, value) {
 		const block = [...document.querySelectorAll('script[type="text/decks-eval"]')].find((one) => (one.getAttribute("data-for") ?? "").trim() === id);
 		if (!block) {
-			console.warn(`[decks] Nothing on this board answers "${id}".`);
+			console.warn(`[decks] Nothing on this card answers "${id}".`);
 			return;
 		}
-		const at = location.pathname.indexOf(BOARD_ROUTE);
-		const path = at < 0 ? location.pathname : decodeURIComponent(location.pathname.slice(at + BOARD_ROUTE.length));
-		const event = { id, board: path, path, ...(value !== undefined ? { value } : {}) };
+		const at = location.pathname.indexOf(CARD_ROUTE);
+		const path = at < 0 ? location.pathname : decodeURIComponent(location.pathname.slice(at + CARD_ROUTE.length));
+		const event = { id, path, ...(value !== undefined ? { value } : {}) };
 		try {
-			const stage = await boardStage();
-			await new AsyncFunction("stage", "event", block.textContent ?? "")(stage, event);
+			const decks = await noCanvas();
+			await new AsyncFunction("decks", "event", block.textContent ?? "")(decks, event);
 		} catch (error) {
 			console.error(`[decks] "${id}" on ${path} failed:`, error);
 		}
@@ -420,9 +420,9 @@
 	function onEvalClick(event) {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		/*
-		 * Only a person's press runs a board's code. A script's `el.click()` is not one: the page that
-		 * measures a board for `canvas.fit` presses its controls to see each view, and every such press
-		 * ran the code as the board and asked the person to allow it, on a board nobody had touched.
+		 * Only a person's press runs a card's code. A script's `el.click()` is not one: the page that
+		 * measures a card for `canvas.fit` presses its controls to see each view, and every such press
+		 * ran the code as the card and asked the person to allow it, on a card nobody had touched.
 		 */
 		if (!event.isTrusted) return;
 		const target = event.target instanceof Element ? event.target.closest("[data-eval]") : null;
@@ -430,9 +430,9 @@
 		const id = (target.getAttribute("data-eval") ?? "").trim();
 		if (!id) return;
 		/*
-		 * The click is the board's now. Preventing the default is what stops a `<button>` in a
+		 * The click is the card's now. Preventing the default is what stops a `<button>` in a
 		 * form from submitting it and a link from navigating the frame away, neither of which
-		 * is what a component carrying code asked for — a board that wants to submit a form
+		 * is what a component carrying code asked for — a card that wants to submit a form
 		 * does it in the code, where it can say which form and wait for the result.
 		 */
 		event.preventDefault();
@@ -444,36 +444,36 @@
 
 	document.addEventListener("click", onEvalClick, true);
 
-	// --- the board itself --------------------------------------------------------
+	// --- the card itself --------------------------------------------------------
 
 	function readMeta() {
-		const tag = document.querySelector('meta[name="board"]');
+		const tag = document.querySelector('meta[name="card"]');
 		let meta = {};
 		if (tag) {
 			try {
 				meta = JSON.parse(tag.getAttribute("content") ?? "{}");
 			} catch (error) {
-				console.warn("[board] meta is not valid JSON:", error);
+				console.warn("[card] meta is not valid JSON:", error);
 			}
 		}
 		return meta;
 	}
 
 	function applyMeta(meta) {
-		const board = document.body;
-		board.classList.add("board");
-		if (Number.isFinite(Number(meta.w))) board.style.width = `${Number(meta.w)}px`;
+		const page = document.body;
+		page.classList.add("card-page");
+		if (Number.isFinite(Number(meta.w))) page.style.width = `${Number(meta.w)}px`;
 		/*
 		 * The height is the content's. A height in the tag is a floor, never a ceiling: the body is
 		 * at least that tall and grows with what is in it, and the canvas measures it a beat later
-		 * (`canvas/extent.ts`) and draws the board that tall — the server's half of the same rule is
-		 * `deck/loader.ts`. With no height in the tag the floor is the frame the board is drawn in
-		 * (`100vh`), so a click anywhere on the board lands on the board.
+		 * (`canvas/extent.ts`) and draws the card that tall — the server's half of the same rule is
+		 * `deck/loader.ts`. With no height in the tag the floor is the frame the card is drawn in
+		 * (`100vh`), so a click anywhere on the card lands on the card.
 		 */
 		const stated = Number.isFinite(Number(meta.h)) ? Number(meta.h) : undefined;
-		board.style.height = "auto";
-		board.style.minHeight = stated === undefined ? "100vh" : `${stated}px`;
-		board.dataset.bg = typeof meta.bg === "string" ? meta.bg : "plain";
+		page.style.height = "auto";
+		page.style.minHeight = stated === undefined ? "100vh" : `${stated}px`;
+		page.dataset.bg = typeof meta.bg === "string" ? meta.bg : "plain";
 		if (typeof meta.theme === "string") {
 			document.documentElement.dataset.theme = meta.theme;
 			document.documentElement.dataset.themeChosen = "true";
@@ -481,8 +481,8 @@
 	}
 
 	/*
-	 * The canvas's scheme, from the page's own address (`decks-theme`, `plain-board.tsx`): read before
-	 * the page first paints, so it starts in it and nothing restyles it once it has loaded. A board
+	 * The canvas's scheme, from the page's own address (`decks-theme`): read before
+	 * the page first paints, so it starts in it and nothing restyles it once it has loaded. A card
 	 * whose author chose its theme in its `<meta>` keeps it.
 	 */
 	{
@@ -495,7 +495,7 @@
 
 	/*
 	 * The canvas's scheme, for a page it cannot reach into (another address, a sandbox): the canvas
-	 * says it at each load and change (`plain-board.tsx`, `decks:theme`). A board whose author chose
+	 * says it at each load and change (`decks:theme`). A card whose author chose
 	 * its theme in its `<meta>` keeps it.
 	 */
 	window.addEventListener("message", (event) => {
@@ -506,7 +506,7 @@
 	});
 
 	/*
-	 * A new size from the canvas's handles, applied to the page as it is (`BoardFrame.tsx`). The
+	 * A new size from the canvas's handles, applied to the page as it is (`packages/canvas/src/items/card.ts`). The
 	 * same numbers go into the file, so the tag is rewritten to say them too: whatever reads it
 	 * next reads what the file now says, and the page is not reloaded to learn it.
 	 */
@@ -514,7 +514,7 @@
 		const meta = readMeta();
 		if (Number.isFinite(Number(size?.w))) meta.w = Math.round(Number(size.w));
 		if (Number.isFinite(Number(size?.h))) meta.h = Math.round(Number(size.h));
-		const tag = document.querySelector('meta[name="board"]');
+		const tag = document.querySelector('meta[name="card"]');
 		if (tag) tag.setAttribute("content", JSON.stringify(meta));
 		applyMeta(meta);
 		return true;
@@ -523,7 +523,7 @@
 	// --- markdown and maths ------------------------------------------------------
 
 	/**
-	 * Markdown written inline in a board is indented to match the HTML around it,
+	 * Markdown written inline in a card is indented to match the HTML around it,
 	 * and every one of those spaces is significant to a markdown parser — four of
 	 * them make a code block. So strip the common indent before parsing.
 	 */
@@ -546,9 +546,9 @@
 	 * Drop a YAML front-matter block, because it is metadata and not content.
 	 *
 	 * `marked` has no idea what front-matter is, so it renders the fence as a horizontal
-	 * rule and the keys as a paragraph — a markdown board opened with a rule and the words
-	 * "w: 760" across the top of it. True of any `.md` embedded on a board, not only of a
-	 * board that is one, so it belongs here rather than in the shell.
+	 * rule and the keys as a paragraph — a markdown card opened with a rule and the words
+	 * "w: 760" across the top of it. True of any `.md` embedded on a card, not only of a
+	 * card that is one, so it belongs here rather than in the shell.
 	 *
 	 * **Conservative on purpose.** A file may legitimately open with `---` as a rule, so the
 	 * block only counts as front-matter if every line in it looks like `key: value`. Getting
@@ -589,16 +589,16 @@
 	};
 
 	/**
-	 * The highlighter, fetched the first time a board actually shows code.
+	 * The highlighter, fetched the first time a card actually shows code.
 	 *
 	 * Vendored and not a stylesheet from a CDN, for the reason every other renderer here is:
-	 * a board has to draw itself with no network, and a code block that is coloured on one
-	 * machine and plain on another is a board that reads differently to the person looking at
+	 * a card has to draw itself with no network, and a code block that is coloured on one
+	 * machine and plain on another is a card that reads differently to the person looking at
 	 * it and to the agent reading a screenshot of it.
 	 *
 	 * It carries the grammars and never a theme. The colours are `card.css`'s — the same
-	 * tokens as everything else on the board — so light and dark are decided by the same two
-	 * rules as the rest of the palette, and a board that styles itself does not fight a
+	 * tokens as everything else on the card — so light and dark are decided by the same two
+	 * rules as the rest of the palette, and a card that styles itself does not fight a
 	 * third-party theme for the foreground colour of a string.
 	 */
 	let highlightReady;
@@ -615,7 +615,7 @@
 	/**
 	 * How much code is worth colouring, in characters.
 	 *
-	 * A highlighter is a tokeniser, and this one runs on the main thread while the board is
+	 * A highlighter is a tokeniser, and this one runs on the main thread while the card is
 	 * being read. A text embed is allowed to draw the first 256 KB of a file, and a JSON dump
 	 * that size is not read line by line by anybody — the first 64 KB is already more than a
 	 * person scrolls. Past this the block is drawn as it was, which is what it did before
@@ -642,7 +642,7 @@
 	 *   run over the same document — the renderer that drew a markdown panel, and the pass at
 	 *   the end of `start` that finds what the file itself carries — and an element claimed
 	 *   twice would be wrapped in spans twice.
-	 * - **A failure is a plain block, never a broken board.** One grammar throwing on one file
+	 * - **A failure is a plain block, never a broken card.** One grammar throwing on one file
 	 *   must not take the rest of the page with it.
 	 */
 	async function highlightCode(root, fallback) {
@@ -677,7 +677,7 @@
 		try {
 			hljs = await highlighter();
 		} catch (error) {
-			console.warn("[board] the highlighter did not load:", error);
+			console.warn("[card] the highlighter did not load:", error);
 			return;
 		}
 
@@ -687,11 +687,11 @@
 			try {
 				element.innerHTML = hljs.highlight(element.textContent ?? "", { language, ignoreIllegals: true }).value;
 				// Both classes, always: the highlighted element says which grammar produced it, even
-				// when the grammar came from a file's extension rather than from a fence. A board's
+				// when the grammar came from a file's extension rather than from a fence. A card's
 				// own stylesheet can then key on one language, and a check can read the answer out.
 				element.classList.add("hljs", `language-${language}`);
 			} catch (error) {
-				console.warn(`[board] could not highlight ${element.tagName.toLowerCase()} as ${language}:`, error);
+				console.warn(`[card] could not highlight ${element.tagName.toLowerCase()} as ${language}:`, error);
 			}
 		}
 	}
@@ -713,7 +713,7 @@
 				throwOnError: false,
 			});
 		} catch (error) {
-			console.warn("[board] maths did not render:", error);
+			console.warn("[card] maths did not render:", error);
 		}
 	}
 
@@ -723,7 +723,7 @@
 	 * A `WeakMap` and not an attribute: the source is the file's, and writing it into
 	 * the live DOM as a `data-source` would put a copy of it in the document the
 	 * inspector reads and the editor walks — a second truth to keep in step, in the one
-	 * place this project insists there is only one. A component the board removes takes
+	 * place this project insists there is only one. A component the card removes takes
 	 * its entry with it.
 	 */
 	const sources = new WeakMap();
@@ -739,7 +739,7 @@
 	 *
 	 * The source is read out of the element the first time — after which the element no
 	 * longer holds it, because rendering is what replaced it. A failure is reported in
-	 * place and never rethrown: one diagram that will not parse must not take the board
+	 * place and never rethrown: one diagram that will not parse must not take the card
 	 * down with it, and the source is kept either way, so it can be retyped into
 	 * something that does parse.
 	 */
@@ -753,7 +753,7 @@
 		} catch (error) {
 			const said = error instanceof Error ? error.message : String(error);
 			if (diagram) element.textContent = `mermaid: ${said}`;
-			console.warn(`[board] ${diagram ? "mermaid" : "markdown"}:`, error);
+			console.warn(`[card] ${diagram ? "mermaid" : "markdown"}:`, error);
 		}
 	}
 
@@ -761,15 +761,15 @@
 	 * Draw one component again, from a source the user has just changed.
 	 *
 	 * The alternative is reloading the frame, and the frame is deliberately pinned to
-	 * the revision it loaded so a user's own edit does not reload the board they are
+	 * the revision it loaded so a user's own edit does not reload the card they are
 	 * editing (DESIGN §7) — a markdown panel that could only be re-rendered by reload
-	 * would flash the whole board on every keystroke's worth of commit.
+	 * would flash the whole card on every keystroke's worth of commit.
 	 *
 	 * `__cardReady` goes down for as long as it takes, because everything that waits
-	 * for a board waits on that flag and a flag left true through a re-render is a
-	 * promise this file had quietly stopped keeping. `board:ready` is *not* dispatched
-	 * again: that event means the board finished loading, which happens once, and a
-	 * board's own `<script>` listening for it would run a second time.
+	 * for a card waits on that flag and a flag left true through a re-render is a
+	 * promise this file had quietly stopped keeping. `card:ready` is *not* dispatched
+	 * again: that event means the card finished loading, which happens once, and a
+	 * card's own `<script>` listening for it would run a second time.
 	 */
 	async function redraw(element, source) {
 		window.__cardReady = false;
@@ -811,7 +811,7 @@
 						edgeLabelBackground: token("--b-bg", dark ? "#161616" : "#ffffff"),
 						fontSize: "14px",
 					},
-					// The diagram source comes from the same place the board does, but
+					// The diagram source comes from the same place the card does, but
 					// "strict" costs nothing here and keeps a pasted diagram honest.
 					securityLevel: "strict",
 					fontFamily: getComputedStyle(document.body).fontFamily,
@@ -825,7 +825,7 @@
 		target.innerHTML = svg;
 
 		/*
-		 * Mermaid sizes its SVG to the diagram; a board sizes its components to the
+		 * Mermaid sizes its SVG to the diagram; a card sizes its components to the
 		 * layout. Without this the diagram spills out of the panel it was put in —
 		 * and since the SVG carries a viewBox, dropping the fixed width is all it
 		 * takes for it to scale down into the box instead.
@@ -871,10 +871,10 @@
 		const pdfjs = await pdfjsReady;
 		const doc = await pdfjs.getDocument({
 			url,
-			// Vendored beside this file so a board renders a paper with no network.
+			// Vendored beside this file so a card renders a paper with no network.
 			standardFontDataUrl: lib("standard_fonts/"),
 			wasmUrl: lib("wasm/"),
-			// Nothing in a board needs PDF scripting, and it is the part of a PDF
+			// Nothing in a card needs PDF scripting, and it is the part of a PDF
 			// most worth not running.
 			isEvalSupported: false,
 		}).promise;
@@ -884,7 +884,7 @@
 			const page = await doc.getPage(number);
 			const base = page.getViewport({ scale: 1 });
 			// Render at the component's width, times the display density, so a
-			// zoomed-in board is not looking at a blurry upscale.
+			// zoomed-in card is not looking at a blurry upscale.
 			const scale = Math.min(4, ((width || base.width) / base.width) * Math.min(2, devicePixelRatio || 1));
 			const viewport = page.getViewport({ scale });
 			const canvas = document.createElement("canvas");
@@ -929,9 +929,9 @@
 	 * A rendered page is kept as an image, not left on the canvas it was drawn on.
 	 *
 	 * A `<canvas>` is a drawing surface, and the browser treats it as one for as long as it
-	 * exists: while the board is being panned or zoomed, every frame re-uploads each canvas's
+	 * exists: while the card is being panned or zoomed, every frame re-uploads each canvas's
 	 * pixels to the compositor as if something might have drawn on it — about 2ms per page at
-	 * 4× CPU throttle, paid on every step of every gesture for the life of the board. Nothing
+	 * 4× CPU throttle, paid on every step of every gesture for the life of the card. Nothing
 	 * ever draws on it again, so the same pixels as an `<img>` are a picture the compositor
 	 * keeps. The swap waits for the image to load, so `__cardReady` still means visible.
 	 */
@@ -969,7 +969,7 @@
 		right.textContent = note ?? "";
 		head.append(name, right);
 		/*
-		 * A board that is one file (`data-bare`) has a bar of its own over it: the file's name, what
+		 * A card that is one file (`data-bare`) has a bar of its own over it: the file's name, what
 		 * it is, and a button that loads it again, for a PDF rewritten or a page that changed.
 		 */
 		if (host.hasAttribute("data-bare")) {
@@ -1000,9 +1000,9 @@
 	/**
 	 * Finger ids for embeds, from a range no real pointer will use.
 	 *
-	 * The stage pools fingers by id from every document it can see, so a guest's own
+	 * The canvas pools fingers by id from every document it can see, so a guest's own
 	 * `pointerId` — which starts at 1 in its document, like everyone else's — would be
-	 * the same finger as a thumb on the board next to it, and a pinch made of the two
+	 * the same finger as a thumb on the card next to it, and a pinch made of the two
 	 * would be one finger teleporting. Counted here rather than per embed, so two embeds
 	 * cannot collide either.
 	 */
@@ -1011,12 +1011,12 @@
 	/**
 	 * An HTML embed, and the gesture that cannot get out of it.
 	 *
-	 * `frame-gestures.ts` forwards a wheel out of a *board* by listening inside the
-	 * board's own document, which same origin allows (DESIGN §4). An HTML embed is one
+	 * `frame-gestures.ts` forwards a wheel out of a *card* by listening inside the
+	 * card's own document, which same origin allows (DESIGN §4). An HTML embed is one
 	 * document deeper and sandboxed, so nobody can listen inside it: a two-finger scroll
 	 * over an embedded page arrives there and stops, and the canvas — which pans by
 	 * handling wheel itself rather than by scrolling anything — never learns the gesture
-	 * happened. The board could not be dragged by that patch of itself either, which is
+	 * happened. The card could not be dragged by that patch of itself either, which is
 	 * the same bug wearing a different hat.
 	 *
 	 * Two answers, and an embed gets whichever one it earns:
@@ -1029,13 +1029,13 @@
 	 *   Leaving is the release gesture because Escape cannot be — once focus is inside
 	 *   the frame its keys belong to its document too, which is where this started.
 	 * The bridge a page could opt into (`embed-guest.js`), which handed its scrolls, fingers
-	 * and drops up, is gone with the boards: an embedded page is behind its veil until clicked.
+	 * and drops up, is gone with the cards: an embedded page is behind its veil until clicked.
 	 * An embed is quarantined content; a postMessage channel into the app's document is
 	 * exactly the sort of thing that must not quietly become a remote control.
 	 */
 	/**
-	 * A web page that is its board (`data-bare`), drawn whole: the frame as tall and as wide as the page
-	 * says it is, never smaller than the board, so the body round it scrolls the way a PDF's pages do.
+	 * A web page that is its card (`data-bare`), drawn whole: the frame as tall and as wide as the page
+	 * says it is, never smaller than the card, so the body round it scrolls the way a PDF's pages do.
 	 *
 	 * A page sized by the window (`100vh` plus a margin) grows by the same step every time it is made
 	 * taller; the second such step is the sign, and the frame stops there. Capped either way.
@@ -1058,7 +1058,7 @@
 	}
 
 	function guardEmbed(host, body, frame) {
-		/** This embed's own finger ids -> the ones the stage is told about. */
+		/** This embed's own finger ids -> the ones the canvas is told about. */
 		const fingers = new Map();
 
 		const veil = document.createElement("div");
@@ -1096,10 +1096,10 @@
 	 * Two families were originally one: `.txt` was handled inside the markdown branch
 	 * and everything else with a `.py` or a `.json` in it fell through to the generic
 	 * "here is a file" chip, which is a blank box with a name on it. Source is the
-	 * thing people most often want *on* a board next to a plan, so it is a family.
+	 * thing people most often want *on* a card next to a plan, so it is a family.
 	 *
 	 * Rendered with `textContent`, never `innerHTML`: a `.json` containing `<script>`
-	 * is a file with those characters in it, and a board is same-origin (DESIGN §4),
+	 * is a file with those characters in it, and a card is same-origin (DESIGN §4),
 	 * so parsing it as markup would be the one place foreign bytes could execute with
 	 * the app's authority.
 	 */
@@ -1172,7 +1172,7 @@
 		}
 
 		/*
-		 * The extension comes from the path the *board* wrote, not from the URL it
+		 * The extension comes from the path the *card* wrote, not from the URL it
 		 * resolved to: an out-of-deck path becomes `/api/file?path=...`, which ends
 		 * in no extension at all, and every embed outside the deck was landing in
 		 * the generic "here is a file" branch.
@@ -1197,7 +1197,7 @@
 				/*
 				 * Asked for by range, so the truncation happens on the wire rather than in
 				 * memory: `/api/card` and `/api/f` both send with `acceptRanges`, and a
-				 * board that fetched a 50MB log in full would stall every other mount
+				 * card that fetched a 50MB log in full would stall every other mount
 				 * behind it — `__cardReady` waits for all of them.
 				 *
 				 * A server that ignores the header answers 200 with everything, so the
@@ -1242,7 +1242,7 @@
 			if (family === "pdf") {
 				const { body, note } = chrome(host, "pdf", label, "loading…");
 				const pages = await renderPdf(body, url, host.dataset.pages, host.clientWidth - 2);
-				// A board that is the PDF says so in words; an embed among other things, in the short form it always has.
+				// A card that is the PDF says so in words; an embed among other things, in the short form it always has.
 				note.textContent = host.hasAttribute("data-bare") ? `PDF, ${pages}` : host.dataset.pages ? `pages ${host.dataset.pages} of ${pages}` : pages;
 				return;
 			}
@@ -1259,13 +1259,13 @@
 			/*
 			 * Something that plays: the browser's own player, with its own controls.
 			 *
-			 * `preload="metadata"` so a board of six films fetches six headers rather than six
-			 * films, and nothing starts on its own — a board that makes a noise when it comes into
+			 * `preload="metadata"` so a card of six films fetches six headers rather than six
+			 * films, and nothing starts on its own — a card that makes a noise when it comes into
 			 * view is not something anybody asked for. The note carries the running time once the
 			 * header has landed, and a container this browser cannot decode says so there instead
 			 * of leaving an empty black box.
 			 *
-			 * `poster` is taken from the host when the board names one, which is what a stage item
+			 * `poster` is taken from the host when the card names one, which is what a canvas item
 			 * passes down; without one the player shows its own first frame.
 			 */
 			if (family === "video" || family === "audio") {
@@ -1294,7 +1294,7 @@
 			if (family === "html") {
 				const { body, note } = chrome(host, "html", label, mode === "snapshot" ? "snapshot" : "live");
 				/*
-				 * The one place a board contains something it did not write.
+				 * The one place a card contains something it did not write.
 				 *
 				 * `/api/file` already serves it with `Content-Security-Policy: sandbox`,
 				 * so it is in an opaque origin before this attribute is read; the
@@ -1317,10 +1317,10 @@
 			/*
 			 * Anything else — a `.zip`, a `.sketch`, a file with no extension at all.
 			 *
-			 * This is the branch that decides whether "drop anything onto a board" is
+			 * This is the branch that decides whether "drop anything onto a card" is
 			 * true, so it is a component rather than an apology: the name, the size, the
 			 * kind, and two things to do with it. A blank box with a console warning
-			 * behind it was the previous answer, and a user looking at the board could
+			 * behind it was the previous answer, and a user looking at the card could
 			 * not tell it from a broken embed.
 			 */
 			const { body, note } = chrome(host, "file", label);
@@ -1360,7 +1360,7 @@
 			const why = document.createElement("span");
 			why.textContent = error instanceof Error ? error.message : String(error);
 			body.append(message, why);
-			console.warn(`[board] embed ${raw}:`, error);
+			console.warn(`[card] embed ${raw}:`, error);
 		}
 	}
 
@@ -1368,8 +1368,8 @@
 	async function mountLiveDoc(host) {
 		try {
 			const module = await needModule("live-doc.js");
-			// The board's own renderers, so a document reads like every other markdown and maths here.
-			module.mountLiveDoc(host, BOARD_PATH, {
+			// The card's own renderers, so a document reads like every other markdown and maths here.
+			module.mountLiveDoc(host, CARD_PATH, {
 				markdown: renderMarkdown,
 				math: renderMath,
 				// A Word page is drawn from the whole file, read fresh from this server each time it is asked for.
@@ -1400,11 +1400,11 @@
 		}
 	}
 
-	/** A board that is an app: a bar over a frame of `/app/<name>/` — `lib/live-app.js`, reading the server's `/api/apps`. */
+	/** A card that is an app: a bar over a frame of `/app/<name>/` — `lib/live-app.js`, reading the server's `/api/apps`. */
 	async function mountLiveApp(host) {
 		try {
 			const module = await needModule("live-app.js");
-			module.mountLiveApp(host, { api: API, stage: boardStage });
+			module.mountLiveApp(host, { api: API, canvas: noCanvas });
 		} catch (error) {
 			host.textContent = `Cannot show this app: ${error.message}`;
 			host.dataset.state = "broken";
@@ -1414,11 +1414,11 @@
 	// --- go ----------------------------------------------------------------------
 
 	/*
-	 * The app's focus view, as this board's frame says it.
+	 * The app's focus view, as this card's frame says it.
 	 *
-	 * A board that is one document or one file is laid out across the whole work area there, and its
+	 * A card that is one document or one file is laid out across the whole work area there, and its
 	 * own bar is the view's header: the app lays its controls over the two ends of the bar, and says on
-	 * this frame's element how wide they are (`data-focus-left`, `-right`; `canvas/Stage.tsx`). A board is in the app's own
+	 * this frame's element how wide they are (`data-focus-left`, `-right`; `packages/canvas/src/view/CanvasView.tsx`). A card is in the app's own
 	 * origin, so it can read its frame's element; the bar's rules are in `card.css` and the document
 	 * page's (`.dp-bar`) are keyed to the same attribute.
 	 */
@@ -1457,7 +1457,7 @@
 		 *
 		 * A `[data-live]` box draws itself from something the app is holding rather than
 		 * from anything in the file. Loaded on demand like every
-		 * other renderer here, so a board without one never fetches it.
+		 * other renderer here, so a card without one never fetches it.
 		 */
 		for (const element of document.querySelectorAll('[data-live="web"]')) {
 			work.push(mountLiveWeb(element));
@@ -1474,11 +1474,11 @@
 		 * A `[data-md]` component gets KaTeX because the markdown renderer runs it over what it
 		 * rendered. Prose written as HTML has no such moment — it is in the file — so `$…$` sat
 		 * there as three characters. Offered to the `.doc` block rather than to the whole body,
-		 * because a `$` on a board of boxes is usually a price and two of them are usually two
+		 * because a `$` on a card of boxes is usually a price and two of them are usually two
 		 * prices; inside a document it is the notation the writer meant. `renderMath` looks for a
-		 * delimiter before loading anything, so a board with no maths pays nothing.
+		 * delimiter before loading anything, so a card with no maths pays nothing.
 		 *
-		 * `body.flow` is the same block before the two board formats became one.
+		 * `body.flow` is the same block before the two card formats became one.
 		 */
 		for (const doc of document.querySelectorAll(".doc")) work.push(renderMath(doc));
 		if (document.body.classList.contains("flow") && !document.querySelector(".doc")) {
@@ -1491,7 +1491,7 @@
 		 * Code the *file* carries, which no renderer above has seen.
 		 *
 		 * Everything the runtime drew has already been coloured by whatever drew it, and this
-		 * pass finds what is left: a `<pre>` an agent typed into a board, and a document block's
+		 * pass finds what is left: a `<pre>` an agent typed into a card, and a document block's
 		 * own prose. Last, so a block inside a panel that was rendered has been claimed already
 		 * and is not looked at twice.
 		 */
@@ -1506,17 +1506,17 @@
 		}
 
 		/*
-		 * What the app is allowed to ask of a mounted board.
+		 * What the app is allowed to ask of a mounted card.
 		 *
 		 * `mount` re-mounts an embed whose `data-embed` changed, `source` hands back the
 		 * words a rendered component was written from, and `redraw` draws it again from
 		 * words the user has just typed. `markdown` is here for a caller that has prose
 		 * and an element and no component to go with them.
 		 */
-		window.__board = { meta, mount: mountEmbed, markdown: renderMarkdown, source: sourceOf, redraw };
+		window.__card = { meta, mount: mountEmbed, markdown: renderMarkdown, source: sourceOf, redraw };
 		window.__cardReady = true;
 		document.body.dataset.ready = "true";
-		document.dispatchEvent(new CustomEvent("board:ready", { detail: { meta } }));
+		document.dispatchEvent(new CustomEvent("card:ready", { detail: { meta } }));
 	}
 
 	if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void start());

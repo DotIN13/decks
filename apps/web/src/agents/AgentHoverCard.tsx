@@ -185,7 +185,7 @@ export function AgentHoverCard(props: {
 				 *
 				 * Three lines at most: this is the evidence for the decision rather than the
 				 * transcript, and a card that grows with whatever the agent last wrote would be
-				 * a card that covers the boards it is telling you about.
+				 * a card that covers the cards it is telling you about.
 				 */}
 				<Show when={props.chat.lastLine}>
 					{(line) => <div class="line-clamp-3 text-note leading-[1.45] text-faint">{m.agents_quote({ text: line() })}</div>}

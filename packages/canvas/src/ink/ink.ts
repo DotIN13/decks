@@ -57,7 +57,7 @@ const [inkSelection, setInkSelection] = createSignal<{ path: string; ids: string
 export { inkSelection, setInkSelection };
 
 /** What the lasso holds is marked with this path, since ink is the canvas's now and not a card's. */
-export const CANVAS_INK = "stage";
+export const CANVAS_INK = "canvas";
 
 /** A touch this soon after the pencil leaves the glass is the hand that held it. */
 export const PALM_AFTER_MS = 500;

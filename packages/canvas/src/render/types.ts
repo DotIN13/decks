@@ -94,7 +94,7 @@ export type ToWorker =
 	| { type: "pixels"; on: boolean }
 	/** How long after the camera last changed the worker still paints one tile a batch (`AFTER_MOVE_MS` in `render.worker.ts`): for measuring in one page. */
 	| { type: "afterMove"; ms: number }
-	/** The stage is sharp and idle: make what a first gesture would otherwise make (`WorkerEngine::warm`). */
+	/** The canvas is sharp and idle: make what a first gesture would otherwise make (`WorkerEngine::warm`). */
 	| { type: "warm" }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
@@ -144,7 +144,7 @@ export type FromWorker =
 	| { type: "picture"; url: string; bitmap: ImageBitmap; width: number; height: number }
 	| { type: "resync" }
 	| { type: "error"; message: string }
-	/** The worker could not open a device: the stage shows the notice (`backends/notice.ts`). */
+	/** The worker could not open a device: the canvas shows the notice (`backends/notice.ts`). */
 	| { type: "failed"; message: string }
 	/** The worker's device or context was lost: the page starts both engines again. */
 	| { type: "lost" };

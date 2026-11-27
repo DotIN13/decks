@@ -72,7 +72,7 @@ export class FolderWatch {
 			}
 			return;
 		} else {
-			// A deck file: the canvases whose bundles hold it or whose boards point at it.
+			// A deck file: the canvases whose bundles hold it or whose cards point at it.
 			const path = `${top}/${parts.join("/")}`;
 			for (const [n, s] of Object.entries(this.store.state.canvases)) if (s.files[path] || this.files.pointsAt(n, path)) scheduler.dirtyFiles.add(n);
 			return scheduler.soon(300);

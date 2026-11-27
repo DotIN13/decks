@@ -21,12 +21,12 @@ const draws = () => canvas.evaluate(() => window.__decksProbes.sheet.shown ?? 0)
 /** Whether the canvas covers the whole window, as it must at every frame: the sheet holds the window inside it. */
 const covers = () =>
 	canvas.evaluate(() => {
-		const r = document.querySelector("canvas.stage-engine-over").getBoundingClientRect();
+		const r = document.querySelector("canvas.canvas-engine-over").getBoundingClientRect();
 		return r.left <= 0.5 && r.top <= 0.5 && r.right >= innerWidth - 0.5 && r.bottom >= innerHeight - 0.5;
 	});
 
 const size = await canvas.evaluate(() => {
-	const c = document.querySelector("canvas.stage-engine-over");
+	const c = document.querySelector("canvas.canvas-engine-over");
 	return { w: c.width, h: c.height, css: c.getBoundingClientRect().width };
 });
 say("the canvas is the window and a quarter of it on each side", Math.abs(size.css - 2100) < 1 && size.w === 4200 && size.h === 2700, JSON.stringify(size));
@@ -84,7 +84,7 @@ const ms = await canvas.evaluate(() => [...window.__slideMs].sort((a, b) => a - 
 const median = ms[Math.floor(ms.length / 2)] ?? Infinity;
 say("a pan frame is one cheap draw: the page's median draw under 2 ms", median < 2, `${median.toFixed(2)} ms over ${ms.length} draws`);
 
-await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.moving === "true", null, { timeout: 300 }).catch(() => {});
+await canvas.waitForFunction(() => document.querySelector(".canvas")?.dataset.moving === "true", null, { timeout: 300 }).catch(() => {});
 const moved = await draws();
 await rest(page, { start: 0 });
 await settle(page, 100);

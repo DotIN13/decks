@@ -87,10 +87,10 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 	});
 
 	/**
-	 * A canvas frame's answer to an agent's `decks view …` on its canvas (`stage.call`, which its stream
+	 * A canvas frame's answer to an agent's `decks view …` on its canvas (`decks.call`, which its stream
 	 * carries), as a tab answers on the socket. Only a front end showing the canvas answers one.
 	 */
-	router.post("/stage-result", (req: Request, res: Response) => {
+	router.post("/canvas-result", (req: Request, res: Response) => {
 		const kind = req.principal?.kind;
 		if (kind !== "canvas" && !actsAsPerson(req.principal)) {
 			res.status(403).json({ ok: false, error: "Only a page showing the canvas answers the canvas's calls." });

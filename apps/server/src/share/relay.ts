@@ -74,7 +74,7 @@ export class Relay {
 		 * on goes on too, as parameters: the canvas, the agent (`calls/run.ts`).
 		 */
 		const headers: Record<string, string> = { Authorization: `Bearer ${target.token}` };
-		for (const name of ["accept", "content-type", "range", "x-decks-stage", "x-decks-agent", "x-decks-edit"]) {
+		for (const name of ["accept", "content-type", "range", "x-decks-canvas", "x-decks-agent", "x-decks-edit"]) {
 			const value = req.headers[name];
 			if (typeof value === "string") headers[name] = value;
 		}

@@ -71,8 +71,8 @@ export interface ConnectOptions {
 	 * this address in \`~/.decks/token\`, else none.
 	 */
 	token?: string | (() => string | undefined);
-	/** For the person: the canvas they are acting on (\`X-Decks-Stage\`). A parameter, not who is calling. */
-	stage?: string | (() => string | undefined);
+	/** For the person: the canvas they are acting on (\`X-Decks-Canvas\`). A parameter, not who is calling. */
+	canvas?: string | (() => string | undefined);
 	/** For the person: the agent they are talking to (\`X-Decks-Agent\`). A parameter, not who is calling. */
 	agent?: string | (() => string | undefined);
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */

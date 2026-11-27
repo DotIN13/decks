@@ -115,7 +115,7 @@ test("a drawing the host owns shows the person's edit at once, sends it named, a
 	assert.equal(content(d.doc()), "two", "shown before the host answers");
 	assert.equal(d.waiting(), 1);
 	assert.equal(d.given(), host0, "the host's drawing is still the one it gave");
-	assert.deepEqual(d.editsTo(d.doc())?.edits, [{ op: "set", id: "a", key: "content", value: "two" }], "the stage is given the edit");
+	assert.deepEqual(d.editsTo(d.doc())?.edits, [{ op: "set", id: "a", key: "content", value: "two" }], "the canvas is given the edit");
 	// A drawing from the host that does not have it yet (another revision): the edit stays on top.
 	const other = served(host0, [{ op: "update", id: "b", set: { x: 999 } }]);
 	d.set(other);
@@ -233,7 +233,7 @@ test("a step is not shown ahead when anything else changed the drawing since the
 	assert.equal(d.doc().children[0]?.x, 50, "the host answers, and its answer is shown");
 });
 
-test("the host's boards are shown as the person's edits on their way leave them", () => {
+test("the host's cards are shown as the person's edits on their way leave them", () => {
 	const given = sample();
 	const shown = served(given, [{ op: "update", id: "b", set: { x: 700, y: 40 } }]);
 	const list = [{ path: "canvases/t/cards/plan/index.html", title: "Plan", x: 400, y: 10, w: 600, h: 520, rev: 3, inContext: [] }];
@@ -242,7 +242,7 @@ test("the host's boards are shown as the person's edits on their way leave them"
 	assert.equal(pagesAhead(list, given, given), list);
 });
 
-test("each new drawing comes with the edits that made it, for the stage, and edits from elsewhere are followed", () => {
+test("each new drawing comes with the edits that made it, for the canvas, and edits from elsewhere are followed", () => {
 	const drawing = createDrawing(sample());
 	const first = drawing.doc();
 	assert.equal(drawing.editsTo(first), undefined, "the first drawing was made by nothing");
@@ -393,7 +393,7 @@ test("edits go together as their ops in order, runs of plain updates folded into
 	assert.deepEqual(first.set, { x: 1 }, "the edits' own ops are not changed");
 });
 
-test("an edit leaves every arrow as the server routed it: the stage engine routes the ones it touches", () => {
+test("an edit leaves every arrow as the server routed it: the canvas engine routes the ones it touches", () => {
 	const served: PenDocument = {
 		version: "2.14",
 		children: [

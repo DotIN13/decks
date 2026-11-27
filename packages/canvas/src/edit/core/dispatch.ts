@@ -53,17 +53,17 @@ export type PressAction =
 	| { do: "make" }
 	/** The select tool on the drawing or bare canvas: what is under the press is picked up, or a marquee drawn. */
 	| { do: "press" }
-	/** A mouse or a pen on a board's picture: it is carried as its node would be (`carry`), or only selected. */
+	/** A mouse or a pen on a card's picture: it is carried as its node would be (`carry`), or only selected. */
 	| { do: "picture"; path: string; carry: boolean }
 	/**
-	 * A finger: the board whose picture it landed on is selected, the finger goes to the stage's pool
+	 * A finger: the card whose picture it landed on is selected, the finger goes to the canvas's pool
 	 * (a pan, a pinch), and then, with no picture, it follows the drawing's tap and carry
 	 * (`drawing`) or a tap that lets go of the selection (`deselect`).
 	 */
 	| { do: "touch"; picture?: string; then?: "drawing" | "deselect" }
-	/** The camera is dragged: with the middle button, Space, or on bare canvas, which lets the selected board go (`deselect`). */
+	/** The camera is dragged: with the middle button, Space, or on bare canvas, which lets the selected card go (`deselect`). */
 	| { do: "pan"; deselect: boolean; middle: boolean }
-	/** Not the stage's: a board's own press. */
+	/** Not the canvas's: a card's own press. */
 	| { do: "nothing" };
 
 /** Bare canvas or something drawn on it: either way not a card, and the canvas's to handle. */

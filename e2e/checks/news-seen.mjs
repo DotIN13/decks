@@ -37,7 +37,7 @@ const sent = () => canvas.evaluate(() => window.__seenSent ?? []);
 // A card on the canvas on screen (the fixture's plan).
 const onStage = await canvas.evaluate(() => (window.__decksProbes?.cards?.() ?? []).map((one) => one.path));
 const deck = await deckState();
-const card = deck.boards.find((board) => board.path === "canvases/auth-refresh/cards/plan/index.html" && onStage.includes(board.path)) ?? deck.boards.find((board) => onStage.includes(board.path));
+const card = deck.cards.find((board) => board.path === "canvases/auth-refresh/cards/plan/index.html" && onStage.includes(board.path)) ?? deck.cards.find((board) => onStage.includes(board.path));
 say("a card is on the canvas on screen", Boolean(card), JSON.stringify(onStage));
 
 const newsNow = () => canvas.evaluate(() => window.__decksProbes?.frameNews?.() ?? {});
@@ -55,8 +55,8 @@ if (card) {
 	// The person's resize as the socket carries it (`card.resize`, `calls/gestures.ts`).
 	const link = await socket();
 	link.call("card.resize", [card.path, { w: (card.w ?? 800) + 24 }]);
-	const named = await waitFor(async () => (await deckState()).boards.find((board) => board.path === card.path)?.lastWrittenBy === "you");
-	say("the person's resize names them the card's writer", named, JSON.stringify((await deckState()).boards.find((board) => board.path === card.path)?.lastWrittenBy));
+	const named = await waitFor(async () => (await deckState()).cards.find((board) => board.path === card.path)?.lastWrittenBy === "you");
+	say("the person's resize names them the card's writer", named, JSON.stringify((await deckState()).cards.find((board) => board.path === card.path)?.lastWrittenBy));
 	link.close?.();
 	await page.waitForTimeout(1500);
 	const file = `${deck.path}/${card.path}`;
@@ -70,7 +70,7 @@ if (card) {
 	say("selecting it clears its dot", cleared, JSON.stringify(await newsNow()));
 	const seen = await sent();
 	say("…by one card.seen from the frame", seen.length - before === 1, `${seen.length - before} sent: ${seen.slice(before).join(" | ")}`);
-	const stamped = (await deckState()).boards.find((board) => board.path === card.path);
+	const stamped = (await deckState()).cards.find((board) => board.path === card.path);
 	say("…which the harness keeps as read", (stamped?.seenAt ?? 0) >= Math.max(stamped?.modifiedAt ?? 0, stamped?.namedAt ?? 0), JSON.stringify({ seenAt: stamped?.seenAt, modifiedAt: stamped?.modifiedAt, namedAt: stamped?.namedAt }));
 
 	// Pressed off and on again, unchanged: nothing more is said.

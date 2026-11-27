@@ -37,7 +37,7 @@ export interface NativeRequest {
 	doc: unknown;
 	/** The folder its image fills are read against: a `file:` URL, as `CanvasPens.frame` gives it. */
 	base: string;
-	boards: NativeCard[];
+	cards: NativeCard[];
 	box: Box;
 	/** Picture pixels a canvas unit. */
 	scale: number;
@@ -61,8 +61,8 @@ interface NativeHost {
 	cardPicture: (path: string, scheme: "light" | "dark", px: number) => { file: string } | { why: string };
 }
 
-/** The canvas's own paper (`--stage` in `apps/web/src/index.css`), straight RGB 0 to 1. */
-// The canvas's paper as the harness shows it (`--stage`, v3: #f5f5f5 and #1e1e1e), so a picture matches the screen.
+/** The canvas's own paper (`--canvas` in `apps/web/src/index.css`), straight RGB 0 to 1. */
+// The canvas's paper as the harness shows it (`--canvas`, v3: #f5f5f5 and #1e1e1e), so a picture matches the screen.
 const PAPER = { light: [245 / 255, 245 / 255, 245 / 255], dark: [30 / 255, 30 / 255, 30 / 255] } as const;
 /** Rounds of asking: fonts, then cards, then pictures and icons, with room to spare. */
 const ROUNDS = 6;
@@ -72,9 +72,9 @@ const ANSWER_MS = 30_000;
 const IDLE_MS = 10 * 60_000;
 const FETCH_MS = 10_000;
 
-/** Where the binary is: `DECKS_STAGE_SHOT`, or this repository's release build. */
+/** Where the binary is: `DECKS_CANVAS_SHOT`, or this repository's release build. */
 export function nativeBinary(): string | undefined {
-	const named = process.env.DECKS_STAGE_SHOT;
+	const named = process.env.DECKS_CANVAS_SHOT;
 	if (named) return existsSync(named) ? named : undefined;
 	const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/stage/target/release/stage-shot");
 	return existsSync(built) ? built : undefined;
@@ -113,7 +113,7 @@ export class NativeShots {
 		if (!binary) return { ok: false, why: "the native renderer is not built (cargo build --release -p stage-shot in packages/stage)" };
 		if (this.broken?.binary === binary) return { ok: false, why: this.broken.why };
 		const s = request.scale;
-		const inBox = request.boards.filter((b) => b.x < request.box.x2 && b.x + b.w > request.box.x1 && b.y < request.box.y2 && b.y + b.h > request.box.y1);
+		const inBox = request.cards.filter((b) => b.x < request.box.x2 && b.x + b.w > request.box.x1 && b.y < request.box.y2 && b.y + b.h > request.box.y1);
 		const cards: Array<{ x: number; y: number; w: number; h: number; picture: string }> = [];
 		for (const card of inBox) {
 			const found = this.host.cardPicture(card.path, request.scheme, card.w * s);

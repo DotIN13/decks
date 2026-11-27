@@ -72,7 +72,7 @@ export function ScribbleCatch(props: {
 	onEnd?: () => void;
 	/** What the catcher covers; `.work`, else the page. */
 	mount?: () => Element | null | undefined;
-	/** Its stacking inside `mount`: over the boards, under the floating bars. */
+	/** Its stacking inside `mount`: over the cards, under the floating bars. */
 	z?: number;
 }) {
 	watchPencil();

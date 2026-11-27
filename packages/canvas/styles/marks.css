@@ -8,7 +8,7 @@
 @layer decks.surface {
 	/*
 	 * What an agent just drew (`frame/inside/marks.ts`): a mark on each item it touched, drawn in the
-	 * stage's world in canvas units, so it is counter-scaled by `--zoom` like the cursor. An insert or
+	 * canvas's world in canvas units, so it is counter-scaled by `--zoom` like the cursor. An insert or
 	 * a change is printed: a band of the agent's colour sweeps across the item behind a bright head, a
 	 * fill and a glow fade, and the outline goes last. A move keeps only the outline, since the glide
 	 * already shows the travel; a delete dissolves where the item was. Reduced motion draws none.
@@ -133,7 +133,7 @@
 	/*
  * An agent's cursor (`canvas/AgentCursor.tsx`): an arrow and a name tag in the agent's colour,
  * lightened, with dark words, as a design tool draws a collaborator. The drift is a transition on
- * `left`/`top`, which are stage coordinates, so it follows the canvas at any zoom; the
+ * `left`/`top`, which are canvas coordinates, so it follows the canvas at any zoom; the
  * counter-scale keeps the arrow and the tag one size on the screen. The tip is the point.
  */
 .agent-cursor {
@@ -146,7 +146,7 @@
 	transform-origin: 0 0;
 	pointer-events: none;
 	/*
-	 * Its own layer. The cursor sits in the stage's world, which is scaled by the zoom, with this
+	 * Its own layer. The cursor sits in the canvas's world, which is scaled by the zoom, with this
 	 * counter-scale on top; drawn into the world's layer the name was rasterised at the world's scale
 	 * and enlarged, and read blurred at any zoom under 100%. On a layer of its own it is rasterised at
 	 * the scale it is seen at.

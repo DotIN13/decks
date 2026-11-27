@@ -9,9 +9,9 @@ import type { PenDocument, PenNode } from "./types.ts";
  * which pen.dev draws as it is. What pen.dev does not know is which two things the arrow joins,
  * so that rides in pen's extension field:
  *
- *     { "type": "path", "id": "then", "metadata": { "type": "decks.arrow", "from": "draft", "to": "boards/report.html" } }
+ *     { "type": "path", "id": "then", "metadata": { "type": "decks.arrow", "from": "draft", "to": "cards/report.html" } }
  *
- * `from` and `to` name an item by id, a board by its path, or a point on the stage as `[x, y]` —
+ * `from` and `to` name an item by id, a card by its path, or a point on the canvas as `[x, y]` —
  * the end of an arrow that stops on bare canvas. An end that should stay on one side of what it
  * joins says so: `{ "item": "check", "side": "right" }`, with `top`, `right`, `bottom` or `left`,
  * and leaves from the middle of that side, square to it. Without a side, an end meets the edge that
@@ -23,7 +23,7 @@ import type { PenDocument, PenNode } from "./types.ts";
  * `"curved"` or `"elbow"`; `heads` is `"end"` (the default), `"both"` or `"none"`; and `dash: true`
  * draws the line dashed, which pen.dev, knowing nothing of it, draws solid.
  *
- * A point end is where it is on the stage, not in the arrow's own box, so moving an arrow by its
+ * A point end is where it is on the canvas, not in the arrow's own box, so moving an arrow by its
  * `x` and `y` alone is undone by the next reroute: `moveArrowEnds` shifts its points with it.
  */
 
@@ -39,7 +39,7 @@ export function isArrow(node: PenNode): boolean {
 /**
  * Redraw every arrow in `doc` from where its ends are now. Returns whether anything changed.
  *
- * `placed` is the layout of the document; `extra` finds anything that is not an item — a board,
+ * `placed` is the layout of the document; `extra` finds anything that is not an item — a card,
  * by its path. `only`, when given, picks the arrows to redraw; the rest are left as they are.
  */
 export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined, router: ArrowRouter = routeArrow, only?: (arrow: PenNode) => boolean): boolean {
@@ -71,7 +71,7 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 /**
  * Routes one joined arrow: its metadata, where the things its ends name are, and its stroke width,
  * to the path's fields; undefined when an end cannot be found. pen's own is `routeArrow`; the server
- * hands `reroute` the stage engine's Rust router, which is held to this one (`arrow-fixtures.test.ts`).
+ * hands `reroute` the canvas engine's Rust router, which is held to this one (`arrow-fixtures.test.ts`).
  */
 export type ArrowRouter = (metadata: unknown, end: (name: string) => Frame | undefined, strokeWidth: number) => { x: number; y: number; width: number; height: number; viewBox: [number, number, number, number]; geometry: string } | undefined;
 
@@ -132,7 +132,7 @@ export function arrowStyle(metadata: unknown): ArrowStyle {
 	return { route, heads, dash: meta.dash === true };
 }
 
-/** A point end, `[x, y]` on the stage. */
+/** A point end, `[x, y]` on the canvas. */
 export function isPointEnd(end: unknown): end is Point {
 	return Array.isArray(end) && end.length === 2 && typeof end[0] === "number" && typeof end[1] === "number";
 }
@@ -140,7 +140,7 @@ export function isPointEnd(end: unknown): end is Point {
 export type ArrowSide = "top" | "right" | "bottom" | "left";
 export const ARROW_SIDES: readonly ArrowSide[] = ["top", "right", "bottom", "left"];
 
-/** The item or board an end joins, whether it names a side or not; undefined for a point. */
+/** The item or card an end joins, whether it names a side or not; undefined for a point. */
 export function arrowEndItem(end: unknown): string | undefined {
 	if (typeof end === "string") return end;
 	if (end && typeof end === "object" && !Array.isArray(end) && typeof (end as { item?: unknown }).item === "string") return (end as { item: string }).item;
@@ -164,7 +164,7 @@ export function arrowEndAt(end: unknown): number | undefined {
 
 /**
  * How an arrow is bent away from its automatic route, from `metadata.bend`: for an elbow, where its
- * turn sits from start (0) to end (1); for a curve, how far its middle is pulled, `[dx, dy]` in stage
+ * turn sits from start (0) to end (1); for a curve, how far its middle is pulled, `[dx, dy]` in canvas
  * pixels. Undefined when it takes the automatic route.
  */
 export function arrowBend(metadata: unknown): number | [number, number] | undefined {
@@ -174,7 +174,7 @@ export function arrowBend(metadata: unknown): number | [number, number] | undefi
 	return undefined;
 }
 
-/** Where an arrow's end is: an item's box, a board's (through `extra`), or a point as a box of no size. */
+/** Where an arrow's end is: an item's box, a card's (through `extra`), or a point as a box of no size. */
 export function arrowEnd(end: unknown, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined): Frame | undefined {
 	if (isPointEnd(end)) return { x: end[0], y: end[1], w: 0, h: 0 };
 	const item = arrowEndItem(end);
@@ -284,7 +284,7 @@ export function moveArrowEnds(metadata: Record<string, unknown>, dx: number, dy:
 }
 
 /**
- * A line through `points` with its heads, as the fields of a pen `path`: its corner on the stage,
+ * A line through `points` with its heads, as the fields of a pen `path`: its corner on the canvas,
  * its size, its `viewBox` and its `geometry`. What `reroute` writes for a joined arrow, and what a
  * free arrow drawn by hand is made of. A curved route's four points are a cubic Bézier's start,
  * two controls and end. The line is the geometry's first subpath and each head one after it, so a

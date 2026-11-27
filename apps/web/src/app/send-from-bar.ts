@@ -19,7 +19,7 @@ export interface BarContext {
 
 export type Destination =
 	| { kind: "note"; card: string; component: string }
-	/** `named` is true when an `@` in the text chose the agent, false when the stage did. */
+	/** `named` is true when an `@` in the text chose the agent, false when the canvas did. */
 	| { kind: "prompt"; id: string; name: string; named: boolean }
 	| { kind: "nowhere" };
 

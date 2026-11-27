@@ -8,7 +8,7 @@ const canvas = (start: readonly string[]) => {
 	return { items: () => items, select: (next: readonly string[]) => (items = next) };
 };
 
-test("the selection survives a stage mounting again, as the page's own signal did before the editor held it", () => {
+test("the selection survives a canvas mounting again, as the page's own signal did before the editor held it", () => {
 	setPenSelection([]);
 	// A canvas starts with what is kept: nothing yet.
 	const first = canvas(keptSelection());
@@ -17,7 +17,7 @@ test("the selection survives a stage mounting again, as the page's own signal di
 	// The properties panel and the canvas select through the one selection.
 	setPenSelection(["a", "b"]);
 	assert.deepEqual(first.items(), ["a", "b"]);
-	assert.deepEqual(keptSelection(), ["a", "b"], "a stage mounted beside it starts with it too");
+	assert.deepEqual(keptSelection(), ["a", "b"], "a canvas mounted beside it starts with it too");
 	first.select(["b"]);
 	assert.deepEqual(penSelection(), ["b"]);
 	// The canvas goes: what it had selected is kept, and the next one starts with it.
@@ -31,7 +31,7 @@ test("the selection survives a stage mounting again, as the page's own signal di
 	giveBackSecond();
 });
 
-test("a stage replaced before it is put away does not write over the one that replaced it", () => {
+test("a canvas replaced before it is put away does not write over the one that replaced it", () => {
 	setPenSelection([]);
 	const old = canvas(["x"]);
 	const giveBackOld = feedSelection(old);
@@ -40,7 +40,7 @@ test("a stage replaced before it is put away does not write over the one that re
 	assert.deepEqual(next.items(), ["x"]);
 	next.select(["y"]);
 	giveBackOld();
-	assert.deepEqual(penSelection(), ["y"], "the old stage's give-back is a no-op");
+	assert.deepEqual(penSelection(), ["y"], "the old canvas's give-back is a no-op");
 	giveBackNext();
 	assert.deepEqual(keptSelection(), ["y"]);
 });

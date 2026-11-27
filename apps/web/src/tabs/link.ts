@@ -13,7 +13,7 @@ import { canvasOnScreen } from "./tabs.ts";
  */
 export async function placeLink(to: Pick<Tab, "kind" | "target">, client?: { x: number; y: number }): Promise<void> {
 	const canvas = canvasOnScreen()?.name;
-	const element = document.querySelector<HTMLElement>(".stage, iframe.canvas-frame");
+	const element = document.querySelector<HTMLElement>(".canvas, iframe.canvas-frame");
 	const address = addressOf(to);
 	if (!canvas || !element || !address) return;
 	const box = element.getBoundingClientRect();

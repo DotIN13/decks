@@ -13,7 +13,7 @@ export const TARGETS = [
 ];
 
 /** `packages/canvas/src/render/backends/notice.ts`, word for word. */
-export const NOTICE_TEXT = "This browser can't draw the stage: it needs WebGPU or WebGL 2.";
+export const NOTICE_TEXT = "This browser can't draw the canvas: it needs WebGPU or WebGL 2.";
 
 /** No WebGPU on the page: the worker is told the page's backend and opens the same. */
 export function noGpu() {
@@ -45,7 +45,7 @@ export function noGpuNoWebgl() {
 /** A wheel step about the middle of the stage, with the zoom key: `dy` < 0 zooms in. */
 export async function zoomStep(page, dy) {
 	await (await canvasFrame(page)).evaluate((deltaY) => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".canvas");
 		const rect = stage.getBoundingClientRect();
 		stage.dispatchEvent(new WheelEvent("wheel", { deltaY, ctrlKey: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, bubbles: true, cancelable: true }));
 	}, dy);
@@ -55,7 +55,7 @@ export async function zoomStep(page, dy) {
 export async function outOfLive(page) {
 	const canvas = await canvasFrame(page);
 	await settle(page, 1200);
-	for (let i = 0; i < 16 && (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")); i++) {
+	for (let i = 0; i < 16 && (await canvas.evaluate(() => document.querySelector(".canvas")?.dataset.live === "true")); i++) {
 		await zoomStep(page, 60);
 		await settle(page, 350);
 	}
@@ -71,12 +71,12 @@ export async function canvasDraws(page) {
 	const frame = await canvasFrame(page);
 	const withIt = (await page.screenshot()).toString("base64");
 	await frame.evaluate(() => {
-		for (const canvas of document.querySelectorAll("canvas.stage-engine")) canvas.style.visibility = "hidden";
+		for (const canvas of document.querySelectorAll("canvas.canvas-engine")) canvas.style.visibility = "hidden";
 	});
 	await frame.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 	const without = (await page.screenshot()).toString("base64");
 	await frame.evaluate(() => {
-		for (const canvas of document.querySelectorAll("canvas.stage-engine")) canvas.style.visibility = "";
+		for (const canvas of document.querySelectorAll("canvas.canvas-engine")) canvas.style.visibility = "";
 	});
 	return page.evaluate(
 		async ([a, b]) => {

@@ -3,7 +3,7 @@ import { CanvasEngine } from "@decks/canvas/host";
 
 /**
  * One canvas, drawn for a picture: the page the server's Chromium loads to take `decks.canvas.screenshot`
- * and the drawing's Export (`server/stage/shots.ts`).
+ * and the drawing's Export (`server/canvas/shots.ts`).
  *
  * The same pieces as the canvas, and nothing else: the canvas's engine (`render/engine.ts`) on its
  * canvas, over the cards as live frames, framed on the box in the address. No socket, no chrome,
@@ -15,7 +15,7 @@ type ShotWindow = Window & { __shotReady?: boolean; __shotFailed?: string };
 const shotWindow = window as ShotWindow;
 
 const query = new URLSearchParams(location.search);
-const canvas = query.get("stage") ?? "";
+const canvas = query.get("canvas") ?? "";
 /** A .pen file to draw instead of a canvas: a saved frame, by its path (`/api/pen-file`). */
 const penPath = query.get("pen");
 const box = { x1: Number(query.get("x1")), y1: Number(query.get("y1")), x2: Number(query.get("x2")), y2: Number(query.get("y2")) };
@@ -30,8 +30,8 @@ async function main(): Promise<void> {
 	// The harness's canvas pass for the canvas this page draws (`server/src/auth/passes.ts`).
 	const pass = query.get("pass");
 	const headers: Record<string, string> = pass ? { Authorization: `Bearer ${pass}` } : {};
-	const response = penPath ? await fetch(`/api/pen-file?path=${encodeURIComponent(penPath)}`, { headers }) : await fetch(`/api/stage-pen/${encodeURIComponent(canvas)}`, { headers });
-	if (!response.ok) throw new Error(penPath ? `no pen file "${penPath}" (${response.status}): ${await response.text()}` : `no stage "${canvas}" (${response.status})`);
+	const response = penPath ? await fetch(`/api/pen-file?path=${encodeURIComponent(penPath)}`, { headers }) : await fetch(`/api/canvas-pen/${encodeURIComponent(canvas)}`, { headers });
+	if (!response.ok) throw new Error(penPath ? `no pen file "${penPath}" (${response.status}): ${await response.text()}` : `no canvas "${canvas}" (${response.status})`);
 	const { doc, base, cards } = (await response.json()) as { doc: PenDocument; base: string; cards: Array<{ path: string; x: number; y: number; w: number; h: number }> };
 
 	const view = { width: innerWidth, height: innerHeight };
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
 	const started = performance.now();
 	for (;;) {
 		await new Promise((resolve) => setTimeout(resolve, 100));
-		if (failed) throw new Error(`the stage engine did not start: ${failed}`);
+		if (failed) throw new Error(`the canvas engine did not start: ${failed}`);
 		const drawingShown = doc.children.length === 0 || engine.tiles.tileCount() > 0;
 		if (drawingShown && performance.now() - lastDrawn > QUIET_MS) break;
 		if (performance.now() - started > PAGE_MS) break;

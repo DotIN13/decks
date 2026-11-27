@@ -1,10 +1,10 @@
 {
 	"files_canvas_title": "Add a file",
-	"files_canvas_sub": "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a board.",
+	"files_canvas_sub": "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a card.",
 	"files_attach_title": "Attach a file",
 	"files_attach_sub": "It goes into your message, for the agent to read.",
 	"files_embed_title": "Choose a file",
-	"files_embed_sub": "It is shown on the board, where it is.",
+	"files_embed_sub": "It is shown on the card, where it is.",
 	"files_google_answered": "Google answered {status}.",
 	"files_signed_in_sentence": "Signed in as {email}.",
 	"files_did_not_work": "That did not work.",

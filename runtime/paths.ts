@@ -1,19 +1,19 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { libDir as boardLib } from "@decks/card-host";
+import { libDir as cardLib } from "@decks/card-host";
 import { fileURLToPath } from "node:url";
 
 /**
  * Where the runtime's assets are, resolved once.
  *
  * `runtime/` is what the agents' runtimes read: the page primitives every deck copies (the old
- * boards' stylesheet and runtime, which their pages still load), the skills an agent is taught
+ * cards' stylesheet and runtime, which their pages still load), the skills an agent is taught
  * with, the canvas API, the tool's own words, and the shims that let a runtime outside this
  * process call back.
  *
  * **It is a package so the paths are one module rather than four sums.** Before this, four
  * files worked out the directory for themselves — `agents/context.ts` counted four levels up
- * from `src/agents`, `boards/templates.ts` (now `cards/size.ts`) four from `src/boards`, `app.ts` three, and the
+ * from `src/agents`, `cards/size.ts` four from `src/cards`, `app.ts` three, and the
  * opencode shim two from `runtime/opencode/tools` — and each was right about a different
  * depth. Nothing tied any of them to the directory they meant, so moving a file was a silent
  * change to a path that happened to still resolve, or to one that did not.
@@ -47,17 +47,17 @@ export function skillsDir(): string {
 }
 
 /**
- * The page primitives a deck copies into itself (`lib/`): the stylesheet and runtime the old boards
+ * The page primitives a deck copies into itself (`lib/`): the stylesheet and runtime the cards
  * load, and that a card may use.
  *
  * A *copy*, and the copy is refreshed whenever a deck is opened (`deck/lib-sync.ts`) — an old
- * board is a standalone document, so its stylesheet and runtime have to be files beside it
+ * card is a standalone document, so its stylesheet and runtime have to be files beside it
  * rather than a route this server serves.
  */
 export function runtimeLib(): string {
 	// A variant runtime (`DECKS_RUNTIME_DIR`) may carry its own primitives; otherwise they are @decks/card-host's.
 	if (HERE !== SELF && existsSync(resolve(HERE, "lib"))) return resolve(HERE, "lib");
-	return boardLib();
+	return cardLib();
 }
 
 /** The `decks` command reference, generated from the verb table and given to every agent in its context. */

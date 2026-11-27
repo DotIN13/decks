@@ -85,7 +85,7 @@ test("the line takes its token in hello, answers calls once each, and says a can
 		assert.equal(me.heard.filter((m) => m.type === "canvas.changed").length, 0);
 
 		// A call: one answer under its id, and the change it made, once, with the edit's name on it.
-		me.send({ type: "line.call", id: "k1", verb: "canvas.batch", args: [[{ op: "update", id: "a", set: { content: "two" } }]], edit: "typed two", stage: canvas });
+		me.send({ type: "line.call", id: "k1", verb: "canvas.batch", args: [[{ op: "update", id: "a", set: { content: "two" } }]], edit: "typed two", canvas: canvas });
 		const answer = (await me.next((m) => m.type === "call.answered")) as Extract<ServerMessage, { type: "call.answered" }>;
 		assert.equal(answer.id, "k1");
 		assert.equal(answer.ok, true, answer.error);
