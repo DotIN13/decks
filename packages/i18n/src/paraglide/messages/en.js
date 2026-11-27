@@ -4254,7 +4254,7 @@ export const chat_the_conversation = /** @type {(inputs: Chat_The_ConversationIn
 };
 
 export const chat_thinking = /** @type {(inputs: Chat_ThinkingInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`thinking…`)
+	return /** @type {LocalizedString} */ (`show thinking`)
 };
 
 export const chat_tm_fork_note = /** @type {(inputs: Chat_Tm_Fork_NoteInputs) => LocalizedString} */ () => {

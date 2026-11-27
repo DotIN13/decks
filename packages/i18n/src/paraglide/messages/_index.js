@@ -10887,7 +10887,7 @@ export const chat_the_conversation = /** @type {((inputs?: Chat_The_Conversation
 /**
 * | output |
 * | --- |
-* | "thinking…" |
+* | "show thinking" |
 *
 * @param {Chat_ThinkingInputs} inputs
 * @param {{ locale?: "en" | "zh-CN" }} options

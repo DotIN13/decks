@@ -4223,7 +4223,7 @@ export const chat_the_conversation = /** @type {(inputs: Chat_The_ConversationIn
 };
 
 export const chat_thinking = /** @type {(inputs: Chat_ThinkingInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`思考中…`)
+	return /** @type {LocalizedString} */ (`显示思考`)
 };
 
 export const chat_tm_fork_note = /** @type {(inputs: Chat_Tm_Fork_NoteInputs) => LocalizedString} */ () => {

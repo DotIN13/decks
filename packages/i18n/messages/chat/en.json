@@ -80,7 +80,7 @@
 	"chat_fork_label": "Fork from here",
 	"chat_fork": "Fork",
 	"chat_hide_thinking": "hide thinking",
-	"chat_thinking": "thinking…",
+	"chat_thinking": "show thinking",
 	"chat_tm_go_back": "Go back to this message",
 	"chat_tm_title": "Preview, rewind, fork or restore from this message",
 	"chat_tm_stop_previewing": "Stop previewing",

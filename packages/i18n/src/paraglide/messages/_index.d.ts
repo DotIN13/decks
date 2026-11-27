@@ -4667,7 +4667,7 @@ export const chat_the_conversation: ((inputs?: Chat_The_ConversationInputs, opti
 /**
 * | output |
 * | --- |
-* | "thinking…" |
+* | "show thinking" |
 *
 */
 export const chat_thinking: ((inputs?: Chat_ThinkingInputs, options?: { locale?: "en" | "zh-CN" }) => LocalizedString) & __ParaglideMessageMetadata<Chat_ThinkingInputs, { locale?: "en" | "zh-CN" }, {}>;

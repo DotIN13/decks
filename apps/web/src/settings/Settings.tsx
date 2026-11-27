@@ -41,14 +41,14 @@ const SECTIONS = [
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
-/** The section open last, kept on this device: Settings opens where you left it. */
+/** The section open last, kept on this device: Settings opens where you left it, on General the first time. */
 const KEY = "decks.settings.section";
 const saved = (): Section => {
 	try {
 		const one = localStorage.getItem(KEY);
-		return SECTIONS.some((section) => section.id === one) ? (one as Section) : "notifications";
+		return SECTIONS.some((section) => section.id === one) ? (one as Section) : "general";
 	} catch {
-		return "notifications";
+		return "general";
 	}
 };
 
@@ -85,25 +85,28 @@ export function Settings(props: {
 	// Accounts is Decks Studio's login, which a backend that cannot share has none of.
 	const sections = () => SECTIONS.filter((one) => one.id !== "accounts" || can("share"));
 	const [chosen, setSection] = createSignal<Section>(saved());
-	const section = (): Section => (sections().some((one) => one.id === chosen()) ? chosen() : "notifications");
+	const section = (): Section => (sections().some((one) => one.id === chosen()) ? chosen() : "general");
 	const open = (id: Section) => {
 		setSection(id);
 		try {
 			localStorage.setItem(KEY, id);
 		} catch {
-			/* private mode: it opens on Notifications next time */
+			/* private mode: it opens on General next time */
 		}
 	};
 	const label = () => SECTIONS.find((one) => one.id === section())!.label();
 
 	onMount(() => {
+		// Before anything else hears it (the capture phase): the canvas takes Escape for itself and marks
+		// it handled, and a Settings window listening after it never closed on Escape.
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key !== "Escape" || event.defaultPrevented) return;
+			if (event.key !== "Escape") return;
 			event.preventDefault();
+			event.stopPropagation();
 			props.onClose();
 		};
-		window.addEventListener("keydown", onKey);
-		onCleanup(() => window.removeEventListener("keydown", onKey));
+		window.addEventListener("keydown", onKey, true);
+		onCleanup(() => window.removeEventListener("keydown", onKey, true));
 	});
 
 	const body = () => (

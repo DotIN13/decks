@@ -15,9 +15,13 @@ const RECENT = 5;
 /**
  * The canvas switcher: what the canvas title opens, in the panel's head and in the top bar.
  *
- * As the "Menus and dialogs redesign" draws it: a find field (not focused on open), the canvases
+ * As the "Menus and dialogs redesign" draws it: a find field, the canvases
  * you were in most lately with a small picture, the faces on each and how long ago it changed,
  * the one you are on washed; then New canvas and All canvases, which opens the canvas manager.
+ *
+ * The find field takes the typing at once with a mouse or a trackpad, so a letter typed after the menu
+ * opens finds rather than going nowhere; on a touch screen it waits for a tap, so opening the menu does
+ * not throw up the keyboard over it.
  */
 export function CanvasSwitcher(props: {
 	stages: StageRow[];
@@ -38,6 +42,7 @@ export function CanvasSwitcher(props: {
 	findLabel?: string;
 }) {
 	const [find, setFind] = createSignal("");
+	let field: HTMLInputElement | undefined;
 	let dismiss: (() => void) | undefined;
 	const pick = (run: () => void) => {
 		dismiss?.();
@@ -56,6 +61,7 @@ export function CanvasSwitcher(props: {
 			class="w-[320px]"
 			onOpenChange={(open) => {
 				if (!open) setFind("");
+				else if (matchMedia("(pointer: fine)").matches) requestAnimationFrame(() => field?.focus());
 			}}
 			trigger={(popover) => {
 				dismiss = () => popover.open && popover.toggle();
@@ -64,7 +70,7 @@ export function CanvasSwitcher(props: {
 		>
 			<label class="field menu-find">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
-				<input type="text" placeholder={props.findLabel ?? m.canvases_find()} aria-label={props.findLabel ?? m.canvases_find()} value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
+				<input ref={field} type="text" placeholder={props.findLabel ?? m.canvases_find()} aria-label={props.findLabel ?? m.canvases_find()} value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
 			</label>
 			<div class="menu-label">{find().trim() ? m.canvases_canvases() : m.canvases_recent()}</div>
 			<Show when={listed().length > 0} fallback={<p class="m-0 px-2 py-2 text-note text-faint">{m.canvases_find_none()}</p>}>

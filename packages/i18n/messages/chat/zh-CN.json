@@ -23,7 +23,7 @@
 	"chat_fork_label": "从这里分叉",
 	"chat_fork": "分叉",
 	"chat_hide_thinking": "隐藏思考",
-	"chat_thinking": "思考中…",
+	"chat_thinking": "显示思考",
 	"chat_tm_go_back": "回到这条消息",
 	"chat_tm_title": "从这条消息预览、回退、分叉或恢复",
 	"chat_tm_stop_previewing": "停止预览",
