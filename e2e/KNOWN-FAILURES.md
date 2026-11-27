@@ -1,15 +1,25 @@
 # Known failures
 
-What fails on studio-canvas after the tidy-up of 2026-10-28, and why. Each line is an app bug a check
-found, not a check that is out of date; the check is left failing (or works around it, where it says
-so) until the bug is fixed. Remove a line when its fix lands.
+What fails on dev, and why. Each line is an app bug a check found, not a check that is out of date; the
+check is left failing (or works around it, where it says so) until the bug is fixed. Remove a line when
+its fix lands. The older sections below are kept as the record of each run.
 
-Last full runs on this Mac (2026-10-28): with 2 workers, 973 assertions passed and 1 failed
-(`media`, below); with the default 4 workers, 2 to 4 checks fail, a different few each run.
+Last full run on this Mac (2026-11-27, branch e2e-fix on dev 0b29be2a, `DECKS_E2E_JOBS=2`, ports
+4640/4641): 1,555 assertions passed and 0 failed; one check, `tiers`, timed out under load (below) and
+passes alone, three runs out of three. The five checks that need a model were not run.
 
 ## App bugs
 
 None known.
+
+## Not run here: the native renderer
+
+`card-frame`'s screenshot corners and `stage-shot`'s "drawn natively" lines are the native renderer's
+(`cargo build --release -p stage-shot` in packages/stage, or `DECKS_CANVAS_SHOT`). This Mac has no cargo,
+so the server falls back to Chromium and both checks skip those lines, saying so. `card-frame` used to
+take Chromium's answer for native (its `how`, "chromium: the native renderer is not built …", matched
+`/native/`) and failed on the corner; `stage-shot` looked for a binary called `canvas-shot`, which the
+rename gave a name the binary does not have.
 
 ## Flaky under load
 
@@ -130,3 +140,44 @@ two other workers and passes alone, as above. `nudge` and `arrows-steady` pass w
   stage". The same throw at the branch's base (f7f0d20f) and before the canvas refactor (30830792): a
   check bug that predates both, not fixed. The Chromium half's "a board hidden from its pill" failed
   there (1 or 2 of ~150 frames) and passed at f8e03110, which a frame or two of timing explains.
+
+## After the card and canvas rename (2026-11-27)
+
+The first full run after the rename (0b29be2a) had 37 checks failing, 62 assertions. All pass now
+(`tiers` as above).
+
+### App bugs found and fixed
+
+- Escape with Settings' sound picker open shut all of Settings: Settings hears Escape first, in the
+  capture phase (bb1f6932), and never let the open popover have it (`settings/Settings.tsx`).
+  notifications.
+- A selected item's pill could not be pressed after a Fit: since Fit keeps clear of the composer
+  (fc832a6d) it frames an item 24 px under the top bar, and the pill stayed in the slot above, chosen
+  before the glide, hidden under the bar; the slot below was under the composer, which the frame cannot
+  see. The pill's slots now keep clear of the chrome the page tells the frame (`fitBox`), it chooses
+  again when it shows with its edge on screen but its slot not, and with no slot clear it slides onto
+  the screen over the item's edge (`ui/callout-side.ts`). tab-document, tab-app.
+
+### Checks out of date, updated
+
+- The harness's line read `canvas.list`'s `stages` (now `canvases`), so it never knew which canvas an
+  agent was on and every edit and drawing it read came back empty: pen-stage, stage-gestures, shapes,
+  frames, media, same-drawing, canvas-frame, tools-on-page, item-pill and the others with
+  `link.drawing(...)`. Other checks read `stages` themselves (placement-views, placement-at, items-made,
+  drop-clear, stages, canvas-frame, and the app checks).
+- The Objects tab (was Canvas) and its card rows' `data-kind="card"` (was `board`): panel, tiers, shell,
+  agents-tab, glide, tabs, stage-api, walkthrough.
+- A card's ⋯ menu starts with Reload: focus. Settings opens on General: notifications presses
+  Notifications before reading it.
+- `<meta name="card">` (was `board`): geometry. Canvas pictures under `.decks/thumbs/canvases/`:
+  canvas-pictures. Agent rows' `cards` (was `boards`) in the checks' fake rosters.
+- A place with no point steps right past what is in the way (fc267d28), so the new item lands just past
+  the hand-drawn note, 580 px from the newest card: placement-views asserts that spot, not "under 500 px".
+- A camera move made outside a window used in the last half minute is offered (Follow) rather than taken
+  (953b43c5): tabs-kept presses Follow, and asserts the offer.
+- The fixture's five card pages were written with the 0.6.0 migration's own code (`planNames`), so they
+  say `<meta name="card">` as the app writes; the friend's shared canvas is left as it was, as the
+  migration leaves it.
+- Failing in the first run only because WebKit was missing or for the harness's `stages`: layers-webkit,
+  backends, context-loss, one-picture, note-edges, tile-pixels, stage-goldens, drop-lands, card-copy,
+  old-board.

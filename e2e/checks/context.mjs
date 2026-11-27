@@ -38,7 +38,7 @@ const agent = {
 	type: "agent.list",
 	defaultKind: "pi",
 	focused: "A",
-	chats: [{ id: "A", name: "Ada", kind: "claude", state: "idle", lastAt: Date.now(), unread: 0, identity: { name: "Ada", color: "#3b5cf6" }, boards: [], inPlay: [] }],
+	chats: [{ id: "A", name: "Ada", kind: "claude", state: "idle", lastAt: Date.now(), unread: 0, identity: { name: "Ada", color: "#3b5cf6" }, cards: [], inPlay: [] }],
 };
 
 // --- a fine pointer: the dial under the box -----------------------------------------

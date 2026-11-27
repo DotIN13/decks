@@ -22,7 +22,7 @@ await resetStage(page);
 await settle(page, 900);
 const link = await socket();
 const agentId = await until(async () => link.last("agent.list")?.focused);
-const stageName = await until(async () => link.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
+const stageName = await until(async () => link.last("canvas.list")?.canvases.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 const view = page.viewportSize();
 
 const made = await call("apps.create", ["e2e-touch", { title: "E2E touch", starter: "static" }]);

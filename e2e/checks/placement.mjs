@@ -11,7 +11,7 @@
  * off the screen rather than off the deck state, because "can the person see it" is a question
  * about pixels.
  *
- * The rail is gone (the panel's Canvas tab lists only what is on the canvas), so a board put back
+ * The rail is gone (the panel's Objects tab lists only what is on the canvas), so a board put back
  * is put back over the wire, `card.play`, as an agent's `view.focus` does; nothing flies the camera to
  * it, so whether it is on screen is not asserted, only where it lands. A document from the file
  * picker, with no point named, lands by the same rule.

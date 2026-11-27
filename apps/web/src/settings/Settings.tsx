@@ -54,11 +54,12 @@ const saved = (): Section => {
 
 /**
  * Close on Escape, heard before anything else (the capture phase): the canvas takes Escape for itself
- * and marks it handled, and a Settings window listening after it never closed on Escape.
+ * and marks it handled, and a Settings window listening after it never closed on Escape. While one of
+ * its menus is open (a sound picker, say) the Escape is the menu's, which shuts only itself.
  */
 function closeOnEscape(close: () => void): void {
 	const onKey = (event: KeyboardEvent) => {
-		if (event.key !== "Escape") return;
+		if (event.key !== "Escape" || document.querySelector(".popover")) return;
 		event.preventDefault();
 		event.stopPropagation();
 		close();

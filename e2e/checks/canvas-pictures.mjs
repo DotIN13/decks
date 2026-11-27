@@ -36,7 +36,7 @@ const made = (await call("canvas.create", ["Picture check"])).value?.name;
 await call("canvas.insert", [{ type: "card", html: '<div class="doc"><h1>One card</h1></div>', title: "One card", width: 600, height: 300 }, { canvas: made, at: { x1: 0, y1: 0 } }]);
 
 // What an earlier run of the harness left: a picture of this canvas kept as revision 1, which is the revision a restart gives it again.
-const folder = join((await deckState()).path, ".decks", "thumbs", "stages");
+const folder = join((await deckState()).path, ".decks", "thumbs", "canvases");
 mkdirSync(folder, { recursive: true });
 for (const scheme of ["light", "dark"]) writeFileSync(join(folder, `${made}-1-${scheme}.jpg`), "not a picture");
 

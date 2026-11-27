@@ -27,7 +27,7 @@ await resetStage(page);
 await settle(page, 900);
 const link = await socket();
 const agentId = await until(async () => link.last("agent.list")?.focused);
-const stageName = await until(async () => link.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
+const stageName = await until(async () => link.last("canvas.list")?.canvases.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 
 const made = await call("apps.create", ["e2e-window", { title: "E2E window", starter: "static" }]);
 say("an app is made", made.ok, JSON.stringify(made.error ?? ""));

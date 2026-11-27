@@ -64,7 +64,7 @@ await feed({
 			lastAt: Date.now(),
 			unread: 0,
 			identity: { name: "Ada", color: "#3b5cf6" },
-			boards: [],
+			cards: [],
 			inPlay: [],
 			commands,
 		},

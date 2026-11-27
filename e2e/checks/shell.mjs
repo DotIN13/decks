@@ -40,13 +40,13 @@ const pill = await page.evaluate(() => ({
 say("the top-left bar has the agent and the canvas as its one tab, and the panel folds from its own head", pill.agent === 1 && pill.canvas === 1 && pill.tabs === 1 && pill.unfold === 0 && pill.fold === 1, JSON.stringify(pill));
 
 /*
- * The left panel's Canvas tab (once Boards) lists what is on the canvas as rows of an icon and a
+ * The left panel's Objects tab (once Boards) lists what is on the canvas as rows of an icon and a
  * name (`panel/ObjectsTab.tsx`, `itemRow`): no picture of the board, and no board mounted as a
  * document, so a long list costs a line of text a row. The server still takes pictures
  * (`pictures/service.ts`) for the stage's sheet, asked for by revision so each can be cached for a year.
  */
 {
-	const canvasTab = page.locator('.panel-shell [role="tab"]', { hasText: "Canvas" });
+	const canvasTab = page.locator('.panel-shell [role="tab"]', { hasText: "Objects" });
 	if ((await page.evaluate(() => document.querySelector(".panel-shell")?.dataset.open)) !== "true") {
 		await page.locator('button[aria-label="Show the side panel"]').first().click();
 		await settle(page, 400);
@@ -54,7 +54,7 @@ say("the top-left bar has the agent and the canvas as its one tab, and the panel
 	await canvasTab.click();
 	await settle(page, 400);
 	const rows = await page.evaluate(() => {
-		const all = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
+		const all = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="card"]')];
 		return {
 			rows: all.length,
 			named: all.every((row) => (row.querySelector(".v3-item-name")?.textContent ?? "").length > 0),

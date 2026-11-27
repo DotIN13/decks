@@ -61,6 +61,14 @@ const opened = await call("view.open", [plan]);
 say("view open on a card's path opens it as a tab, in front, and says so", opened.ok === true && opened.value?.kind === "card" && opened.value?.opened === true && JSON.stringify(await until(async () => ((await chips()).length ? chips() : undefined))) === '["card*"]', JSON.stringify([opened, await chips()]).slice(0, 300));
 say("the address names the tab in front", (await hash()) === `#card/${plan}`, await hash());
 const canvasTab = await call("view.open", [second]);
+/*
+ * The chat's camera is every window's, and this window was used a moment ago with the agent idle: a move
+ * made from outside it is offered, not taken from under the person (953b43c5, `tabs/remember.ts`), so the
+ * check presses Follow, as the person would.
+ */
+const follow = page.locator(".notice .notice-action", { hasText: "Follow" });
+say("a window used a moment ago is offered the camera's move to another canvas, as Follow", (await until(() => follow.count())) === 1, await page.locator(".notice").allInnerTexts().then((all) => all.join(" | ")));
+await follow.click().catch(() => {});
 say("…on a canvas's name, the chat's camera goes to that canvas: its tab is in the row, and the one it left stays where it was, first", canvasTab.value?.kind === "canvas" && canvasTab.value?.opened === true && (await until(async () => ((await canvasChip().innerText()).includes("Tab two") ? true : undefined))) === true && JSON.stringify(await until(async () => ((await chips()).length === 2 ? chips() : undefined))) === '["canvas","card"]' && (await hash()) === "" && ((await call("canvas.list", [])).value ?? []).find((one) => one.name === second)?.open.length === 1, JSON.stringify([canvasTab.value, await chips(), await hash()]));
 const doc = await call("view.open", ["docs/kept.md"]);
 // (Checked below, after the document is in front: view open on the canvas the camera is already on brings it forward.)

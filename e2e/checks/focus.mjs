@@ -13,7 +13,7 @@ import { canvasFrame, card, open, pressCardAction, say, selectCard, settle } fro
 // The panel opens on Canvas, where a board on the canvas has its row (`panel/ObjectsTab.tsx`, `itemRow`).
 const { browser, page, errors } = await open({ width: 1440, height: 1000, panelTab: "canvas" });
 
-/* Its row in the panel's Canvas tab flies the camera to the board. */
+/* Its row in the panel's Objects tab flies the camera to the board. */
 await page.locator('.panel-shell [title^="What the survey round found"]').first().click();
 await settle(page, 900);
 const NOTES = card("notes");
@@ -29,7 +29,7 @@ say("the pill over the board offers fit, a tab, a comment, hide and more, in tha
 // More opens the card's menu under the pill: the two exports, its path, and Delete; Escape shuts it and keeps the card selected.
 await pressCardAction(page, "More");
 const menu = await canvas.evaluate(() => [...document.querySelectorAll(".card-callout .callout-more [role=menuitem]")].map((one) => one.getAttribute("aria-label") ?? ""));
-say("More opens a menu of Export as PNG, Export as PDF, Copy path and Delete", menu.join(",") === "Export as PNG,Export as PDF,Copy path,Delete", JSON.stringify(menu));
+say("More opens a menu of Reload, Export as PNG, Export as PDF, Copy path and Delete", menu.join(",") === "Reload,Export as PNG,Export as PDF,Copy path,Delete", JSON.stringify(menu));
 // It hangs down from the ⋯ button, whole on the screen.
 await settle(page, 200);
 const hang = await canvas.evaluate(() => {

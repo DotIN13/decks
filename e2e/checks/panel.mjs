@@ -2,7 +2,7 @@
  * The side panel: a full-height column at the window's left edge, beside the canvas.
  *
  * Four tabs now — Recent, Canvas, Agents, Apps (`panel/LeftPanel.tsx`, `PANEL_TABS`) — and the
- * Canvas tab is what is on this canvas, boards then drawings, as plain rows (`.v3-item`). The old
+ * Objects tab is what is on this canvas, boards then drawings, as plain rows (`.v3-item`). The old
  * boards list (the whole deck in canvas → held → deck sections, a dot/bin/hide column per row,
  * a count in each heading, the finger rail) is gone with that redesign, and so are its checks.
  *
@@ -56,9 +56,9 @@ try {
 	say("…and forgets the width it had", (await page.evaluate(() => localStorage.getItem("decks.panel-width"))) === null);
 
 	const tabs = await page.locator('.panel-shell [role="tab"]').allInnerTexts();
-	say("four tabs: Recent, Canvas, Agents, Apps", JSON.stringify(tabs.map((t) => t.trim())) === JSON.stringify(["Recent", "Canvas", "Agents", "Apps"]), JSON.stringify(tabs));
+	say("four tabs: Recent, Objects, Agents, Apps", JSON.stringify(tabs.map((t) => t.trim())) === JSON.stringify(["Recent", "Objects", "Agents", "Apps"]), JSON.stringify(tabs));
 	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent.trim()));
-	say("…and the panel opens on the tab it was left on", JSON.stringify(selected) === JSON.stringify(["Canvas"]), JSON.stringify(selected));
+	say("…and the panel opens on the tab it was left on", JSON.stringify(selected) === JSON.stringify(["Objects"]), JSON.stringify(selected));
 
 	// v3: 30px tabs and a 32px search (`styles/v3.css`, `.v3-nav-tab`, `.v3-search`).
 	const header = await page.evaluate(() => ({
@@ -68,13 +68,13 @@ try {
 	say("the tabs are 30px and the field 32px", header.strip === 30 && header.field === 32, JSON.stringify(header));
 
 	/*
-	 * The Canvas tab is what is on this canvas: one row per card under "Cards", and the
+	 * The Objects tab is what is on this canvas: one row per card under "Cards", and the
 	 * heading's count is the rows'. The stage's own list (`__decksProbes.cards`) is the reference.
 	 */
 	// The stage is in the canvas frame.
 	const onStage = await (await canvasFrame(page)).evaluate(() => (window.__decksProbes?.cards?.() ?? []).length);
 	const listed = await page.evaluate((stage) => {
-		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
+		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="card"]')];
 		const head = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-sec')].find((sec) => sec.textContent.startsWith("Cards"));
 		return {
 			rows: rows.length,
@@ -83,7 +83,7 @@ try {
 			stage,
 		};
 	}, onStage);
-	say("the Canvas tab lists every board on the canvas, once", listed.rows >= 1 && listed.rows === listed.stage && new Set(listed.names).size === listed.rows, JSON.stringify(listed));
+	say("the Objects tab lists every board on the canvas, once", listed.rows >= 1 && listed.rows === listed.stage && new Set(listed.names).size === listed.rows, JSON.stringify(listed));
 	say("…and the Boards heading counts them", listed.count === listed.rows, JSON.stringify(listed));
 
 	// The one field filters the tab: a word from one board's name leaves that board.

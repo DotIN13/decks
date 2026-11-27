@@ -167,13 +167,19 @@ await settle(page, 500);
 
 /*
  * The Settings redesign (`settings/Settings.tsx`): a window of seven sections on a grey left, the
- * open one on the right under its name, opening on Notifications. Notifications is one table
+ * open one on the right under its name, opening on General (the person's choice). Notifications is one table
  * (`settings/AlertSettings.tsx`): each moment once, its sound and its banner side by side under
  * When / Sound / Banner, then Volume as four stops, then the permission line when the browser
  * will not show banners. The Sounds and Banners groups this replaced printed every moment twice.
  */
-const panel = await page.evaluate(() => ({
+const opening = await page.evaluate(() => ({
 	nav: [...document.querySelectorAll(".settings .sw-nav button")].map((b) => b.textContent.trim()),
+	open: document.querySelector(".settings .sw-nav button[aria-current='page']")?.textContent.trim(),
+	title: document.querySelector(".settings .sw-head .sw-title")?.textContent,
+}));
+await page.locator(".settings .sw-nav button[data-section='notifications']").click();
+await settle(page, 300);
+const panel = await page.evaluate(() => ({
 	open: document.querySelector(".settings .sw-nav button[aria-current='page']")?.textContent.trim(),
 	title: document.querySelector(".settings .sw-head .sw-title")?.textContent,
 	heads: [...document.querySelectorAll(".sw-moments .sw-cols-head > span")].map((s) => s.textContent),
@@ -186,8 +192,9 @@ const panel = await page.evaluate(() => ({
 	volume: [...document.querySelectorAll('.sw-group[data-group="volume"] .sw-seg > button')].map((b) => b.textContent),
 	strip: document.querySelector(".sw-strip")?.innerText.replace(/\s+/g, " ").trim() ?? null,
 }));
-say("Settings is a window of seven sections", JSON.stringify(panel.nav) === JSON.stringify(["General", "Notifications", "Accounts", "Claude", "Voice", "Connections", "Chrome"]), JSON.stringify(panel.nav));
-say("…opening on Notifications, under its name", panel.open === "Notifications" && panel.title === "Notifications", `${panel.open} / ${panel.title}`);
+say("Settings is a window of seven sections", JSON.stringify(opening.nav) === JSON.stringify(["General", "Notifications", "Accounts", "Claude", "Voice", "Connections", "Chrome"]), JSON.stringify(opening.nav));
+say("…opening on General, under its name", opening.open === "General" && opening.title === "General", `${opening.open} / ${opening.title}`);
+say("Notifications, pressed, opens under its name", panel.open === "Notifications" && panel.title === "Notifications", `${panel.open} / ${panel.title}`);
 say("one table under When, Sound and Banner", JSON.stringify(panel.heads) === JSON.stringify(["When", "Sound", "Banner"]), JSON.stringify(panel.heads));
 say("…with each of the three moments once", panel.moments.length === 3 && new Set(panel.moments.map((m) => m.name)).size === 3, JSON.stringify(panel.moments.map((m) => m.name)));
 say("…each with the sentence that explains it", panel.moments.every((m) => m.note.length > 10), JSON.stringify(panel.moments.map((m) => m.note.slice(0, 20))));

@@ -50,7 +50,7 @@ say("there are two chats, so there can be two stages", !!chats && chats.length >
 const note = (id) => [{ op: "insert", node: { type: "note", id, content: "Made for the stages check" }, box: { x1: 0, y1: 0, x2: 240, y2: 120 } }];
 for (const [index, id] of (chats ?? []).entries()) link.edit(id, note(`s-${index}`));
 const listed = await until(async () => {
-	const rows = link.received.filter((m) => m.type === "canvas.list").at(-1)?.stages ?? [];
+	const rows = link.received.filter((m) => m.type === "canvas.list").at(-1)?.canvases ?? [];
 	return rows.length >= 2 ? rows : undefined;
 }, 12000);
 say("the server tells the browser what stages exist", !!listed && listed.length >= 2, JSON.stringify((listed ?? []).map((one) => one.name)));
@@ -109,7 +109,7 @@ say("a search leaves only the canvases that match", searched.length === 1 && sea
 
 await page.locator(`.canvas-card[data-name="${wanted}"]`).click();
 await settle(page, 2500);
-const sent = link.received.filter((m) => m.type === "canvas.list").at(-1)?.stages ?? [];
+const sent = link.received.filter((m) => m.type === "canvas.list").at(-1)?.canvases ?? [];
 say("the panel closes on a pick", await page.evaluate(() => !document.querySelector(".canvas-manager")));
 say("…the agent you are talking to is on that stage now", (await pillStage()) === wantedTitle, `${mine} → ${await pillStage()}`);
 say("…and the server says so too", sent.find((one) => one.name === wanted)?.agents.some((agent) => agent.id === focused) === true, JSON.stringify(sent.map((one) => [one.name, one.agents.length])));

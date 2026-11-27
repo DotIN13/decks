@@ -21,16 +21,16 @@ const base = nameOf;
 const names = paths.map(base).sort();
 
 /*
- * The panel's Canvas tab: one row per board on this canvas (`panel/ObjectsTab.tsx`, `itemRow`). It
+ * The panel's Objects tab: one row per board on this canvas (`panel/ObjectsTab.tsx`, `itemRow`). It
  * says a board's title, not its file, so it is compared with the stage by count. The panel no
  * longer has the agent's "held" and "deck" headings; what the agent holds is read off the
  * server's `context.changed` instead (below).
  */
-const panelBoards = () => page.evaluate(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]').length);
+const panelBoards = () => page.evaluate(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="card"]').length);
 
 await openPanel(page);
 say("the stage shows what the agent has up", (await onCanvas()).join() === paths.join(), (await onCanvas()).join(" "));
-say("…and the panel's Canvas tab lists the same boards", (await panelBoards()) === paths.length, `${await panelBoards()} rows for ${paths.length} boards`);
+say("…and the panel's Objects tab lists the same boards", (await panelBoards()) === paths.length, `${await panelBoards()} rows for ${paths.length} boards`);
 await page.mouse.move(800, 500);
 
 /*
@@ -55,7 +55,7 @@ await emptyCanvas(page);
 say("an agent holding nothing puts nothing on its canvas", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
 await openPanel(page);
 await page.waitForFunction(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item').length === 0, null, { timeout: 4000 }).catch(() => {});
-say("…and the panel's Canvas tab lists nothing", (await panelBoards()) === 0, `${await panelBoards()} rows`);
+say("…and the panel's Objects tab lists nothing", (await panelBoards()) === 0, `${await panelBoards()} rows`);
 /*
  * And it is called something nothing else is called.
  *
@@ -87,8 +87,8 @@ for (const path of two) link.call("card.play", [path]);
 await (await canvasFrame(page)).waitForFunction((wanted) => (window.__decksProbes?.cards?.() ?? []).length === wanted, two.length, { timeout: 8000 });
 say("the stage narrows to what the agent holds", (await onCanvas()).map(base).sort().join() === twoNames.join(), (await onCanvas()).join(" "));
 await openPanel(page);
-await page.waitForFunction((wanted) => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]').length === wanted, two.length, { timeout: 4000 }).catch(() => {});
-say("the panel's Canvas tab lists the same two", (await panelBoards()) === two.length, `${await panelBoards()} rows`);
+await page.waitForFunction((wanted) => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="card"]').length === wanted, two.length, { timeout: 4000 }).catch(() => {});
+say("the panel's Objects tab lists the same two", (await panelBoards()) === two.length, `${await panelBoards()} rows`);
 
 // The hide button on a board takes it off the stage, and the agent keeps it.
 //
