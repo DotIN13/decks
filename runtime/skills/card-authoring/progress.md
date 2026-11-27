@@ -74,6 +74,11 @@ in the card's colours (`var(--b-…)`); its scripts do not run. It is drawn with
 wrap it in `<div class="panel">` when it needs a frame (a chart, a tally), and leave it bare when it
 has boxes of its own (a diagram, a before and after).
 
+**Screenshots, SVG diagrams and short video demos are always welcome.** Whenever the work shows on
+a screen, put it on the card: a screenshot of what changed, a few seconds of video of it working
+(save it in `files/`; `media.html` shows both), an SVG of how the parts connect. A picture of the
+real thing beats a sentence about it.
+
 Put the picture on the entry it explains: what a run will do on the `run` (a process diagram on the
 command that makes the data), what came out on its `result`, `fail` or `finding`. Start from a
 template in [templates/](progress-example/templates/), copy it into `log/`, and put your numbers in:
@@ -86,11 +91,12 @@ template in [templates/](progress-example/templates/), copy it into `log/`, and 
 | `waterfall.html` | where the time went, one lane per variant, one bar per phase |
 | `bars.html` | a few numbers side by side, the one that matters in the accent |
 | `compare.html` | before and after, as large numbers or two pictures |
+| `media.html` | a screenshot or a short video demo, with what to look at in the caption |
 | `codebase.html` | the files before and after an upgrade or a refactor: two trees with sizes, what is new, changed or gone |
 | `cloud.html` | a word cloud and example lines, when what the data looks like is the point |
 
 Each template says in a comment how to fill it. When none fits, write your own piece: a diff, a
-table, a map, a screenshot (`<img src="files/…">`). The rules for every piece:
+table, a map, an SVG diagram drawn for this run. The rules for every piece:
 
 - Pick the picture that makes the result obvious; a picture that does not add to the line above it
   is left out ("23 of 23 pass" needs no row of green blocks).

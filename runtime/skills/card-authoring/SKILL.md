@@ -95,8 +95,8 @@ Everything that used to be a board is a card. A board file left in a deck from b
   row of Working, made before you run anything. It is an ordinary 16:10 card copied from the template
   [progress-example/](progress-example/): steps on the left (a plain title, a goal or hypothesis with
   why, a method, what you expect, whether it held), a log on the right of every command with what it
-  is for and how far it has got, and each failure, finding and result, with a small picture where it
-  makes the result obvious. [progress.md](progress.md) says how.
+  is for and how far it has got, and each failure, finding and result, with screenshots, SVG diagrams and
+  short video demos wherever they help (always welcome). [progress.md](progress.md) says how.
 
 **Scripts: modules handed the card**
 
