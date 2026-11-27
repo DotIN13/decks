@@ -274,11 +274,12 @@ export class CanvasEngine {
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
 		this.page.setMath(mathTypesetter());
+		// Fonts already here go to both engines now, before the drawing, so it is laid out once with
+		// them (given after, they laid it all out a second time); those still coming (asked for before
+		// the engine was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
+		this.faces.giveFonts(this.faces.fonts, false);
 		if (doc !== EMPTY) this.page.setDocument(doc);
 		this.paused = false;
-		// Fonts already here go to both engines now; those still coming (asked for before the engine
-		// was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
-		this.faces.giveFonts(this.faces.fonts, false);
 		setCanvasWords(this.layout.words);
 		this.faces.needFonts();
 		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.faces.fontsPending > 0, docDue: !this.doc, pixels: pixelsFirst() });
