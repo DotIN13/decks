@@ -909,3 +909,16 @@ test("a new agent starts in auto wherever its runtime has it; a kept or asked-fo
 	assert.equal(startingMode("claude", { mode: "plan" }), "plan", "asked for");
 	assert.equal(startingMode("claude", { restored: {} }), undefined, "a chat read back keeps what it had");
 });
+
+test("a new agent opens on its runtime's starting model when the runtime offers it, else on the runtime's own default", async () => {
+	const { startingModel } = await import("./registry.ts");
+	const offer = (...pairs: Array<[string, string]>) => pairs.map(([provider, model]) => ({ provider, model, label: model, reasoning: true }));
+	assert.deepEqual(startingModel("pi", {}, offer(["opencode-go", "kimi-k3"], ["opencode-go", "deepseek-v4.1-flash"])), { provider: "opencode-go", model: "deepseek-v4.1-flash", thinking: "medium" });
+	assert.deepEqual(startingModel("opencode", {}, offer(["deepseek", "deepseek-flash"])), { provider: "deepseek", model: "deepseek-flash", thinking: "medium" }, "the next choice when the first is not offered");
+	assert.equal(startingModel("antigravity", {}, offer(["antigravity", "gemini-4-hydrogen-medium"]))?.model, "gemini-4-hydrogen-medium");
+	assert.equal(startingModel("claude", {}, offer(["anthropic", "claude-haiku-5-5"])), undefined, "Claude keeps its own default");
+	assert.equal(startingModel("pi", {}, []), undefined, "nothing offered yet: the runtime's own default");
+	assert.equal(startingModel("pi", { restored: {} }, offer(["opencode-go", "deepseek-v4.1-flash"])), undefined, "a chat read back keeps its model");
+	const given = { provider: "opencode-go", model: "glm-5.3-flash", thinking: "low" as const };
+	assert.equal(startingModel("pi", { model: given }, offer(["opencode-go", "deepseek-v4.1-flash"])), given, "a model given wins");
+});

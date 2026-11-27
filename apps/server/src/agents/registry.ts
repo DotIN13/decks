@@ -42,6 +42,31 @@ export function startingMode(kind: AgentKind, options: { mode?: AgentMode; resto
 	return runtimeOf(kind).capabilities.modes.includes("auto") ? "auto" : undefined;
 }
 
+/**
+ * The model a new agent opens on, by runtime, where the person has chosen one: the first of these
+ * the runtime offers on this deck (its remembered list, `AgentStore.knownModels`), else the
+ * runtime's own default. Claude is left to its own default. Each is a fast, cheap model, so an
+ * agent made without a model never lands on an expensive one by accident.
+ */
+export const STARTING_MODELS: Partial<Record<AgentKind, ReadonlyArray<{ provider: string; model: string; thinking: AgentModel["thinking"] }>>> = {
+	pi: [{ provider: "opencode-go", model: "deepseek-v4.1-flash", thinking: "medium" }],
+	opencode: [
+		{ provider: "opencode", model: "deepseek-v4.1-flash-free", thinking: "medium" },
+		{ provider: "deepseek", model: "deepseek-flash", thinking: "medium" },
+	],
+	opencode2: [
+		{ provider: "opencode", model: "deepseek-v4.1-flash-free", thinking: "medium" },
+		{ provider: "deepseek", model: "deepseek-flash", thinking: "medium" },
+	],
+	antigravity: [{ provider: "antigravity", model: "gemini-4-hydrogen-medium", thinking: "off" }],
+};
+
+/** The model a chat opens on: the one given or kept, else the first starting model its runtime offers; nothing leaves the runtime's own default. */
+export function startingModel(kind: AgentKind, options: { model?: AgentModel; restored?: unknown }, offered: readonly ModelOption[]): AgentModel | undefined {
+	if (options.model || options.restored) return options.model;
+	return STARTING_MODELS[kind]?.find((one) => offered.some((model) => model.provider === one.provider && model.model === one.model));
+}
+
 export class Registry {
 	private readonly agents: DeckAgent[] = [];
 	private focusedId: string | undefined;
@@ -265,6 +290,8 @@ export class Registry {
 		 */
 		const mode = startingMode(options.kind ?? this.host.defaultKind, options);
 		if (mode) options = { ...options, mode };
+		const model = startingModel(options.kind ?? this.host.defaultKind, options, this.store.knownModels(options.kind ?? this.host.defaultKind));
+		if (model) options = { ...options, model: { ...model } };
 		const agent = new DeckAgent(
 			this.deck,
 			this.emit,
