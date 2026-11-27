@@ -11,7 +11,7 @@
 			"verdict": "held",
 			"goal": "count words correctly, so later timings measure correct code",
 			"method": "write count.py, check one paragraph by hand",
-			"expect": "matches a hand count of 41 words"
+			"expect": "matches a hand count of 11 words"
 		},
 		{
 			"id": 2,
@@ -54,7 +54,7 @@
 			"step": 1,
 			"at": "18:07",
 			"kind": "result",
-			"text": "Matches a hand count: 41 words",
+			"text": "Matches a hand count: 11 words",
 			"file": "log/step1-tally.html"
 		},
 		{
