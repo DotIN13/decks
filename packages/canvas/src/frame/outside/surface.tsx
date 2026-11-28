@@ -5,6 +5,7 @@ import { createEffect, createSignal, For, on, onCleanup, untrack, type JSX } fro
 import { type PageEnd } from "../protocol.ts";
 import { type FramedEditorOptions, } from "./host.tsx";
 import { keepForFrames } from "./kept.ts";
+import { scheme } from "../../base/theme.ts";
 import { chooseFrame, type Held } from "./held.ts";
 
 const frameAddress = (): string => {
@@ -15,6 +16,8 @@ const frameAddress = (): string => {
 	passed.set("kind", "canvas");
 	// The page's language, which a sandboxed frame cannot read for itself (`canvas-frame.html` keeps it).
 	passed.set("lang", getLocale());
+	// And its light or dark, so the frame's first paint is the canvas's ground, not a white page (`canvas-frame.html`).
+	passed.set("scheme", untrack(scheme));
 	return `/canvas-frame.html?${passed.toString()}`;
 };
 

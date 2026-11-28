@@ -49,10 +49,17 @@
 				// messages look first. Only in memory: a frame sharing the page's storage reads the page's choice itself.
 				var lang = new URLSearchParams(location.search).get("lang");
 				if (sandboxed && lang) localStorage.setItem("decks.locale", lang);
+				// The page's light or dark (`?scheme=`), before anything paints: the frame's start message says it
+				// again, but until then the frame was a white page, a blink over a dark canvas.
+				var scheme = new URLSearchParams(location.search).get("scheme");
+				if (scheme === "dark" || scheme === "light") document.documentElement.dataset.colorScheme = scheme;
 			})();
 		</script>
 		<style>
 			html, body, #canvas { margin: 0; height: 100%; overflow: hidden }
+			/* The canvas's ground (`--ground`, styles/tokens.css) before the stylesheets come with the scripts. */
+			html { background: #f1f1f3 }
+			html[data-color-scheme="dark"] { background: #101010; color-scheme: dark }
 		</style>
 	</head>
 	<body>

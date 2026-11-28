@@ -25,6 +25,22 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 
 		<!--
+			Light or dark before the first paint, as `src/lib/theme.ts` will choose it (the saved choice, else
+			the system's), and the ground in it: the stylesheets come with the scripts, and until then a dark
+			page showed white, or a light one dark.
+		-->
+		<script>
+			(function () {
+				var saved = null;
+				try { saved = localStorage.getItem("decks.scheme"); } catch (e) {}
+				document.documentElement.dataset.colorScheme = saved === "light" || saved === "dark" ? saved : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+			})();
+		</script>
+		<style>
+			html { background: #f1f1f3 }
+			html[data-color-scheme="dark"] { background: #101010; color-scheme: dark }
+		</style>
+		<!--
 			The libraries a card imports by name (`packages/canvas/src/items/card.ts`): the same map a board's
 			page has (`cards/size.ts`), here once for every card, so sixty cards that import three
 			share one copy of it.

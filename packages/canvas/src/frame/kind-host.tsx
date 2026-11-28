@@ -5,6 +5,7 @@ import { createEffect, createSignal, on, onCleanup, onMount, untrack, type JSX }
 import type { CanvasPass } from "./outside/host.tsx";
 import { CallRefused } from "./protocol.ts";
 import { keepForFrames } from "./outside/kept.ts";
+import { scheme } from "../base/theme.ts";
 
 /** Light or dark, and how much of the window's foot the page's composer covers: what a frame shows can be scrolled clear of it. */
 export interface ItemLook {
@@ -116,5 +117,5 @@ export function ItemFrame<Own = unknown, Says = unknown, Pass extends ItemPass =
 		stopWaiting();
 		end()?.close();
 	});
-	return <iframe ref={begin} class={`${props.kind}-frame`} title={props.title} sandbox={SANDBOX} allow={ALLOW} src={`/canvas-frame.html?kind=${encodeURIComponent(props.kind)}&lang=${encodeURIComponent(getLocale())}`} style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }} />;
+	return <iframe ref={begin} class={`${props.kind}-frame`} title={props.title} sandbox={SANDBOX} allow={ALLOW} src={`/canvas-frame.html?kind=${encodeURIComponent(props.kind)}&lang=${encodeURIComponent(getLocale())}&scheme=${untrack(scheme)}`} style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }} />;
 }
