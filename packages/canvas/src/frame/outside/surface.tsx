@@ -5,10 +5,9 @@ import { createEffect, createSignal, For, on, onCleanup, untrack, type JSX } fro
 import { type PageEnd } from "../protocol.ts";
 import { type FramedEditorOptions, } from "./host.tsx";
 import { keepForFrames } from "./kept.ts";
-import { scheme } from "../../base/theme.ts";
 import { chooseFrame, type Held } from "./held.ts";
 
-const frameAddress = (): string => {
+const frameAddress = (dark: boolean): string => {
 	const page = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
 	const passed = new URLSearchParams();
 	for (const name of PASSED_ON) if (page.has(name)) passed.set(name, page.get(name)!);
@@ -16,8 +15,8 @@ const frameAddress = (): string => {
 	passed.set("kind", "canvas");
 	// The page's language, which a sandboxed frame cannot read for itself (`canvas-frame.html` keeps it).
 	passed.set("lang", getLocale());
-	// And its light or dark, so the frame's first paint is the canvas's ground, not a white page (`canvas-frame.html`).
-	passed.set("scheme", untrack(scheme));
+	// And its light or dark, as the host drew it then (`dark`), so the frame's first paint is the canvas's ground, not a white page (`canvas-frame.html`).
+	passed.set("scheme", dark ? "dark" : "light");
 	return `/canvas-frame.html?${passed.toString()}`;
 };
 
@@ -36,6 +35,8 @@ export interface SurfaceNeeds {
 	/** Make a frame's line the one the page talks on, or none: `again` when that frame was in front before (`host.tsx`, `attach`). */
 	readonly attach: (page: PageEnd | undefined, how: { again: boolean; selected?: string | undefined }) => void;
 	readonly options: FramedEditorOptions;
+	/** Whether the canvas is drawn dark now, as the host last said (`setDark`, or its `dark` option). */
+	readonly darkNow: boolean;
 	readonly frameAt: Accessor<HTMLIFrameElement | undefined>;
 	readonly setFrameAt: Setter<HTMLIFrameElement | undefined>;
 }
@@ -179,7 +180,7 @@ export function createSurface(d: SurfaceNeeds) {
 						/* What every frame may do, and why no more (`@decks/frame`, `sandbox.ts`): the apps inside this one can have no more than it has. */
 						sandbox={SANDBOX}
 						allow={ALLOW}
-						src={frameAddress()}
+						src={frameAddress(d.darkNow)}
 						style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block", visibility: front() === one ? undefined : "hidden", "pointer-events": front() === one ? undefined : "none" }}
 					/>
 				)}

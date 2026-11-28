@@ -303,7 +303,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 		set modeNow(next) { modeNow = next; },
 	});
 
-	const { surface } = createSurface({ keepInStep, startFrame, end, attach, options, frameAt, setFrameAt });
+	const { surface } = createSurface({ keepInStep, startFrame, end, attach, options, frameAt, setFrameAt, get darkNow() { return darkNow; } });
 
 	// The frame follows the drawing itself, from the harness or Studio: nothing of it is passed on from here.
 	const handle: FramedHandle = {
