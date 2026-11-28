@@ -181,7 +181,8 @@ export function createSurface(d: SurfaceNeeds) {
 						sandbox={SANDBOX}
 						allow={ALLOW}
 						src={frameAddress(d.darkNow)}
-						style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block", visibility: front() === one ? undefined : "hidden", "pointer-events": front() === one ? undefined : "none" }}
+						/* color-scheme normal, the empty first document's own: a host declaring one (Studio) had it painted opaque white. */
+						style={{ "color-scheme": "normal", position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block", visibility: front() === one ? undefined : "hidden", "pointer-events": front() === one ? undefined : "none" }}
 					/>
 				)}
 			</For>

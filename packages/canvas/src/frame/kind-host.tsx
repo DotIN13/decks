@@ -117,5 +117,5 @@ export function ItemFrame<Own = unknown, Says = unknown, Pass extends ItemPass =
 		stopWaiting();
 		end()?.close();
 	});
-	return <iframe ref={begin} class={`${props.kind}-frame`} title={props.title} sandbox={SANDBOX} allow={ALLOW} src={`/canvas-frame.html?kind=${encodeURIComponent(props.kind)}&lang=${encodeURIComponent(getLocale())}&scheme=${untrack(scheme)}`} style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }} />;
+	return <iframe ref={begin} class={`${props.kind}-frame`} title={props.title} sandbox={SANDBOX} allow={ALLOW} src={`/canvas-frame.html?kind=${encodeURIComponent(props.kind)}&lang=${encodeURIComponent(getLocale())}&scheme=${untrack(scheme)}`} style={{ "color-scheme": "normal", position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }} />;
 }
